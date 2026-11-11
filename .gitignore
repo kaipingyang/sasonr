@@ -7,3 +7,5 @@
 *.Rproj
 docs/
 inst/sashelp/
+__pycache__/
+*.pyc
