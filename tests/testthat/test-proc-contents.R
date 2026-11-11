@@ -66,3 +66,12 @@ test_that("unsupported CONTENTS / DATASETS surfaces fail loud", {
   expect_error(sas_run(paste(cdata, "proc datasets lib=work; quit;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(cdata, "proc datasets lib=work nolist; copy out=x; quit;")), class = "sasonr_unsupported")
 })
+
+test_that("Observation Length: padded to 8 only when there is an 8-byte numeric variable", {
+  res <- sas_run("data a; length c $ 4; c = 'x'; run; proc contents data=a; run;
+    data b; length c $ 3; x = 1; c = 'y'; run; proc contents data=b; run;
+    data e; length x 5; x = 1; run; proc contents data=e; run;")
+  l <- squish(res$listing)
+  ol <- grep("Observation Length", l, value = TRUE)
+  expect_equal(sub(".*Observation Length ", "", ol), c("4", "16", "5"))
+})

@@ -116,7 +116,9 @@ sas_proc_contents <- function(work, name, m, sp) {
   if (!isTRUE(sp$noprint)) {
     now <- format(Sys.time(), "%m/%d/%Y %H:%M:%S")
     sorted <- if (!is.null(m$sortedby)) "YES" else "NO"
-    obslen <- max(8L, as.integer(ceiling(np$obslen / 8) * 8))
+    # numeric variables come first; the record is padded to a multiple of 8
+    # when it holds an 8-byte numeric (shorter numerics and characters are not aligned)
+    obslen <- if (any(cv$type == "num" & cv$len == 8L)) as.integer(ceiling(np$obslen / 8) * 8) else np$obslen
     two <- function(a, av, b, bv) sprintf("%-21s%-56s%-22s%s", a, av, b, bv)
     lst <- c(paste0("The ", sp$proc %||% "CONTENTS", " Procedure"), "",
              two("Data Set Name", paste0("WORK.", toupper(name)), "Observations", nobs),
