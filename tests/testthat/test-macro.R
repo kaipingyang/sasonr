@@ -177,3 +177,13 @@ test_that("statement comments do not treat quotes specially", {
 test_that("SYSINDEX counts macro invocations; %SYSMACEXIST", {
   expect_equal(mlog("%macro a; %mend; %a %a %put &sysindex %sysmacexist(a) %sysmacexist(zz);"), "2 1 0")
 })
+
+test_that("single quotes hide & in %LET; the stored text resolves later in double quotes", {
+  code <- "%let t=RESOLVED;
+%let q2='AT&t';
+data _null_; a = \"&q2\"; b = symget('q2'); put a= / b=; run;
+%let t=CHANGED;
+data _null_; c = \"&q2\"; put c=; run;"
+  expect_equal(mlog(code), c("a='ATRESOLVED'", "b='AT&t'", "c='ATCHANGED'"))
+  expect_equal(mlog("%let x=abc; %put %bquote('&x') '&x';"), "'abc' '&x'")
+})

@@ -38,7 +38,7 @@ mp_percent <- function(nm, raw, src, ses, sink, mode, in_dq) {
     until = abort_syntax(paste0("%", toupper(nm), " outside a %DO statement"), line),
     {
       if (nm %in% mac_reserved_unsupported) abort_unsupported(paste0("macro statement %", toupper(nm)), line)
-      if (in_dq || mode == "macro") {
+      if (in_dq || mode != "code") {
         mac_warn(paste0("Apparent invocation of macro ", toupper(nm), " not resolved."))
         sink$add(paste0("%", raw))
       } else {

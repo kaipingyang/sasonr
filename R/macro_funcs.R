@@ -65,9 +65,11 @@ mp_function <- function(nm, src, ses, mode) {
       sink_text(s)
     },
     quote = ,
-    bquote = mq_mask(mp_paren_text(src, ses, nm, strip = FALSE), triggers = FALSE),
+    bquote = mq_mask(mp_paren_text(src, ses, nm, strip = FALSE, mode = if (nm == "bquote") "macro_bq" else "macro"),
+                     triggers = FALSE),
     nrquote = ,
-    nrbquote = mq_mask(mp_paren_text(src, ses, nm, strip = FALSE), triggers = TRUE),
+    nrbquote = mq_mask(mp_paren_text(src, ses, nm, strip = FALSE, mode = if (nm == "nrbquote") "macro_bq" else "macro"),
+                       triggers = TRUE),
     superq = {
       name <- trimws(mq_unmask(mp_paren_text(src, ses, nm)))
       v <- mv_get(ses, name)

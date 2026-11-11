@@ -308,7 +308,9 @@ code_sink <- function(ses) {
 
 # Scan `src` from its cursor, resolving macro triggers into `sink`.
 #   mode     "code": compiler-bound text, single quotes hide triggers;
-#            "macro": macro statement text, single quotes only group.
+#            "macro": macro statement text; single quotes also hide triggers
+#            (SAS: `%let q='AT&t';` stores `'AT&t'` unresolved);
+#            "macro_bq": %BQUOTE / %NRBQUOTE arguments, single quotes only group.
 #   stop     list(chars = code points, kw = %keywords, nodepth = TRUE/FALSE):
 #            return (without consuming) at a top-level stop character or a
 #            `%keyword`; parentheses nest unless `nodepth`.
@@ -360,7 +362,7 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
         i <- i + 1L
         next
       }
-      if (triggers && (quote == 34L || mode == "macro") && is_trigger(i)) {
+      if (triggers && (quote == 34L || mode == "macro_bq") && is_trigger(i)) {
         emit_lit(i - 1L)
         src$i <- i
         mp_trigger(src, ses, sink, mode, in_dq = quote == 34L, put_eq = put_eq)
