@@ -21,9 +21,16 @@ Number of occurrences of a substring. See the \href{https://documentation.sas.co
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# COUNT: each call is followed by the result of the same call in SAS 9.4
+sas_f_count("banana", "an")  # SAS: count('banana', 'an') -> 2
+sas_f_count("Banana", "b", "i")  # SAS: count('Banana', 'b', 'i') -> 1
+sas_f_count("aaa", "aa")  # SAS: count('aaa', 'aa') -> 1
+sas_f_count("abc", "x")  # SAS: count('abc', 'x') -> 0
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

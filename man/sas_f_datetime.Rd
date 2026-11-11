@@ -14,9 +14,17 @@ Current datetime. See the \href{https://documentation.sas.com/doc/en/lefunctions
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 1 offline conformance case(s) agree.
+ Verified against SAS 9.4: 2 example call(s) and 1 offline conformance case(s) agree with SAS. The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only.
 }
 
+\examples{
+# DATETIME: each call is followed by the result of the same call in SAS 9.4
+# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
+# DATETIME() returns the current date and time (the clock of the session), so
+# its value cannot be reproduced; the examples check its type and range only.
+as.numeric(sas_f_datetime() > 2019686400)  # SAS: datetime() > '01JAN2024:00:00:00'dt -> 1
+as.numeric(sas_f_datepart(sas_f_datetime()) == sas_f_today())  # SAS: datepart(datetime()) = today() -> 1
+}
 \seealso{
 Other datetime functions:
 \code{\link[=sas_f_datdif]{sas_f_datdif()}},

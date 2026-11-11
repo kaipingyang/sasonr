@@ -17,9 +17,15 @@ Bytes allocated for the string. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# LENGTHM: each call is followed by the result of the same call in SAS 9.4
+sas_f_lengthm("abc  ")  # SAS: lengthm('abc  ') -> 5
+sas_f_lengthm("")  # SAS: lengthm('') -> 1
+sas_f_lengthm("abcdef")  # SAS: lengthm('abcdef') -> 6
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

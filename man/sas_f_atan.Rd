@@ -19,9 +19,16 @@ Arctangent. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# ATAN: each call is followed by the result of the same call in SAS 9.4
+sas_f_atan(1)  # SAS: atan(1) -> 0.785398163397448
+sas_f_atan(-1e10)  # SAS: atan(-1e10) -> -1.5707963266949
+sas_f_atan(0)  # SAS: atan(0) -> 0
+sas_f_atan(NA_real_)  # SAS: atan(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

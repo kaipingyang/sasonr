@@ -7,6 +7,9 @@
 # tests/conformance/ these tests skip.
 conf_dir <- conf_root()
 conf_cases <- if (is.null(conf_dir)) character() else conf_list_cases(conf_dir)
+# fn_examples/ holds the reference-page examples, compared call by call in
+# test-fn-examples.R (one case runs several independent calls).
+conf_cases <- conf_cases[!grepl("/fn_examples/", conf_cases, fixed = TRUE)]
 
 test_that("offline conformance cases are available", {
   skip_if(length(conf_cases) == 0, "tests/conformance/ not present (local conformance assets)")

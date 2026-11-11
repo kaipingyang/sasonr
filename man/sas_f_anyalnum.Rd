@@ -19,9 +19,16 @@ Position of the first alphanumeric character (0 if none). See the \href{https://
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# ANYALNUM: each call is followed by the result of the same call in SAS 9.4
+sas_f_anyalnum("  ab1")  # SAS: anyalnum('  ab1') -> 3
+sas_f_anyalnum("!!!")  # SAS: anyalnum('!!!') -> 0
+sas_f_anyalnum("a1!", -3)  # SAS: anyalnum('a1!', -3) -> 2
+sas_f_anyalnum("!a!", 3)  # SAS: anyalnum('!a!', 3) -> 0
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalpha]{sas_f_anyalpha()}},

@@ -19,9 +19,16 @@ Base-2 logarithm. See the \href{https://documentation.sas.com/doc/en/lefunctions
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# LOG2: each call is followed by the result of the same call in SAS 9.4
+sas_f_log2(8)  # SAS: log2(8) -> 3
+sas_f_log2(10)  # SAS: log2(10) -> 3.3219280948874
+sas_f_log2(0.5)  # SAS: log2(0.5) -> -1
+sas_f_log2(-1)  # SAS: log2(-1) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

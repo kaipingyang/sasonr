@@ -19,9 +19,16 @@ Cosine. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/ti
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# COS: each call is followed by the result of the same call in SAS 9.4
+sas_f_cos(0)  # SAS: cos(0) -> 1
+sas_f_cos(1)  # SAS: cos(1) -> 0.54030230586814
+sas_f_cos(-3.5)  # SAS: cos(-3.5) -> -0.936456687290796
+sas_f_cos(NA_real_)  # SAS: cos(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

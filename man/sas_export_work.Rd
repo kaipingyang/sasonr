@@ -16,3 +16,9 @@ Writes \verb{<MEMNAME>.csv} for each data set of a \code{\link[=sas_run]{sas_run
 names as stored, formatted values, blank missing values) and \verb{__attr.csv}
 with columns memname, varnum, name, type, length, format, informat, label.
 }
+\examples{
+res <- sas_run("data a; x = 1.5; y = 'b'; run;")
+out <- file.path(tempdir(), "work_csv")
+sas_export_work(res, out)
+readLines(file.path(out, "A.csv"))
+}

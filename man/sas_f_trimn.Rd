@@ -17,9 +17,14 @@ Removes trailing blanks (empty for a blank string). See the \href{https://docume
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# TRIMN: each call is followed by the result of the same call in SAS 9.4
+sas_f_trimn("abc  ")  # SAS: trimn('abc  ') -> "abc"
+sas_f_trimn("  a")  # SAS: trimn('  a') -> "  a"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

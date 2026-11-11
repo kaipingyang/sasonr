@@ -17,9 +17,16 @@ Removes matching quotation marks. See the \href{https://documentation.sas.com/do
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# DEQUOTE: each call is followed by the result of the same call in SAS 9.4
+sas_f_dequote("\"abc\"")  # SAS: dequote('"abc"') -> "abc"
+sas_f_dequote("'a''b'")  # SAS: dequote("'a''b'") -> "a'b"
+sas_f_dequote("abc")  # SAS: dequote('abc') -> "abc"
+sas_f_dequote("\"ab\"cd")  # SAS: dequote('"ab"cd') -> "ab"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

@@ -21,9 +21,15 @@ Writes a character value with a format given at run time. See the \href{https://
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# PUTC: each call is followed by the result of the same call in SAS 9.4
+sas_f_putc("abc", "$5.")  # SAS: putc('abc', '$5.') -> "abc"
+sas_f_putc("abc", "$upcase3.")  # SAS: putc('abc', '$upcase3.') -> "ABC"
+sas_f_putc("abcdef", "$3.")  # SAS: putc('abcdef', '$3.') -> "abc"
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

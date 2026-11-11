@@ -17,9 +17,17 @@ Seven-digit Julian date (yyyyddd). See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# JULDATE7: each call is followed by the result of the same call in SAS 9.4
+# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
+sas_f_juldate7(23450)  # SAS: juldate7('15MAR2024'd) -> 2024075
+sas_f_juldate7(0)  # SAS: juldate7(0) -> 1960001
+sas_f_juldate7(-21915)  # SAS: juldate7('31DEC1899'd) -> 1899365
+sas_f_juldate7(NA_real_)  # SAS: juldate7(.) -> .
+}
 \seealso{
 Other datetime functions:
 \code{\link[=sas_f_datdif]{sas_f_datdif()}},

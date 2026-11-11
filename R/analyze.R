@@ -828,6 +828,10 @@ resolve_ds_items <- function(items, vars, line) {
 #' @param meta Named list of input data set metadata (see [sas_translate()]).
 #' @param level `"auto"` or a forced level (`"L3"`).
 #' @return A list describing the PDV, annotated statements, and the level.
+#' @examples
+#' p <- sas_parse("data b; do i = 1 to 3; s + i; output; end; run;")
+#' a <- sas_analyze(p$steps[[1]])
+#' a$level
 #' @export
 sas_analyze <- function(step, meta = list(), level = "auto") {
   st <- new_state(meta)

@@ -19,9 +19,14 @@ Position of the first character from a list. See the \href{https://documentation
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 2 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# INDEXC: each call is followed by the result of the same call in SAS 9.4
+sas_f_indexc("abcdef", "fd")  # SAS: indexc('abcdef', 'fd') -> 4
+sas_f_indexc("ABC", "b")  # SAS: indexc('ABC', 'b') -> 0
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

@@ -17,9 +17,16 @@ Standard normal quantile. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# PROBIT: each call is followed by the result of the same call in SAS 9.4
+sas_f_probit(0.975)  # SAS: probit(0.975) -> 1.9599639845401
+sas_f_probit(0.5)  # SAS: probit(0.5) -> 0
+sas_f_probit(1e-10)  # SAS: probit(1e-10) -> -6.3613409024041
+sas_f_probit(NA_real_)  # SAS: probit(.) -> .
+}
 \seealso{
 Other probability functions:
 \code{\link[=sas_f_cdf]{sas_f_cdf()}},

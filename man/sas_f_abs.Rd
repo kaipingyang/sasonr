@@ -17,9 +17,16 @@ Absolute value. See the \href{https://documentation.sas.com/doc/en/lefunctionsre
 }
 
 \section{Verification}{
- Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+ Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
 }
 
+\examples{
+# ABS: each call is followed by the result of the same call in SAS 9.4
+sas_f_abs(-3.5)  # SAS: abs(-3.5) -> 3.5
+sas_f_abs(0)  # SAS: abs(0) -> 0
+sas_f_abs(NA_real_)  # SAS: abs(.) -> .
+sas_f_abs(sas_missing(".A"))  # SAS: abs(.A) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_arcos]{sas_f_arcos()}},

@@ -17,9 +17,15 @@ Converts to uppercase. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 1 offline conformance case(s) agree.
+ Verified against SAS 9.4: 3 example call(s) and 1 offline conformance case(s) agree with SAS.
 }
 
+\examples{
+# UPCASE: each call is followed by the result of the same call in SAS 9.4
+sas_f_upcase("abc Def")  # SAS: upcase('abc Def') -> "ABC DEF"
+sas_f_upcase("")  # SAS: upcase('') -> ""
+sas_f_upcase("a1!")  # SAS: upcase('a1!') -> "A1!"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

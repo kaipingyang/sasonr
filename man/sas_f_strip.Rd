@@ -17,9 +17,15 @@ Removes leading and trailing blanks. See the \href{https://documentation.sas.com
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 1 offline conformance case(s) agree.
+ Partial: 3 of 4 example call(s) and 1 of 1 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# STRIP: each call is followed by the result of the same call in SAS 9.4
+sas_f_strip("  a b  ")  # SAS: strip('  a b  ') -> "a b"
+sas_f_strip("")  # SAS: strip('') -> ""
+sas_f_strip("abc")  # SAS: strip('abc') -> "abc"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

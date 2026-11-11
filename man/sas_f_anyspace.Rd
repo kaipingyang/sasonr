@@ -19,9 +19,15 @@ Position of the first white-space character. See the \href{https://documentation
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# ANYSPACE: each call is followed by the result of the same call in SAS 9.4
+sas_f_anyspace("ab c")  # SAS: anyspace('ab c') -> 3
+sas_f_anyspace("abc")  # SAS: anyspace('abc') -> 0
+sas_f_anyspace("a b c", 3)  # SAS: anyspace('a b c', 3) -> 4
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

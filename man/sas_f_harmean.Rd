@@ -17,9 +17,16 @@ Harmonic mean. See the \href{https://documentation.sas.com/doc/en/lefunctionsref
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# HARMEAN: each call is followed by the result of the same call in SAS 9.4
+sas_f_harmean(1, 2, 4)  # SAS: harmean(1, 2, 4) -> 1.71428571428571
+sas_f_harmean(2, NA_real_, 2)  # SAS: harmean(2, ., 2) -> 2
+sas_f_harmean(1, 1)  # SAS: harmean(1, 1) -> 1
+sas_f_harmean(NA_real_, NA_real_)  # SAS: harmean(., .) -> .
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

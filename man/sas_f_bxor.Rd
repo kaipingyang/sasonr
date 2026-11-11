@@ -21,9 +21,15 @@ Bitwise exclusive OR. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# BXOR: each call is followed by the result of the same call in SAS 9.4
+sas_f_bxor(12, 10)  # SAS: bxor(12, 10) -> 6
+sas_f_bxor(5, 5)  # SAS: bxor(5, 5) -> 0
+sas_f_bxor(NA_real_, 1)  # SAS: bxor(., 1) -> .
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

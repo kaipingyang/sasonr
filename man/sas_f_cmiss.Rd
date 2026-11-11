@@ -17,9 +17,15 @@ Number of missing arguments (numeric or character). See the \href{https://docume
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# CMISS: each call is followed by the result of the same call in SAS 9.4
+sas_f_cmiss(1, NA_real_, "a", "")  # SAS: cmiss(1, ., 'a', '') -> 2
+sas_f_cmiss(sas_missing(".A"))  # SAS: cmiss(.A) -> 1
+sas_f_cmiss("x", 2)  # SAS: cmiss('x', 2) -> 0
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_css]{sas_f_css()}},

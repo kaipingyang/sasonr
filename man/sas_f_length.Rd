@@ -17,9 +17,16 @@ Position of the last non-blank character (1 for a blank string). See the \href{h
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 offline conformance case(s) agree.
+ Verified against SAS 9.4: 4 example call(s) and 3 offline conformance case(s) agree with SAS.
 }
 
+\examples{
+# LENGTH: each call is followed by the result of the same call in SAS 9.4
+sas_f_length("abc  ")  # SAS: length('abc  ') -> 3
+sas_f_length("")  # SAS: length('') -> 1
+sas_f_length("  a")  # SAS: length('  a') -> 3
+sas_f_length(123)  # SAS: length(123) -> 12
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

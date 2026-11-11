@@ -17,9 +17,16 @@ Corrected sum of squares. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# CSS: each call is followed by the result of the same call in SAS 9.4
+sas_f_css(1, 2, 3, 4)  # SAS: css(1, 2, 3, 4) -> 5
+sas_f_css(1, NA_real_, 3)  # SAS: css(1, ., 3) -> 2
+sas_f_css(5)  # SAS: css(5) -> 0
+sas_f_css(NA_real_, NA_real_)  # SAS: css(., .) -> .
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

@@ -19,9 +19,17 @@ Exponential function. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 5 example call(s) agree with SAS.
 }
 
+\examples{
+# EXP: each call is followed by the result of the same call in SAS 9.4
+sas_f_exp(1)  # SAS: exp(1) -> 2.71828182845905
+sas_f_exp(0)  # SAS: exp(0) -> 1
+sas_f_exp(-1)  # SAS: exp(-1) -> 0.367879441171442
+sas_f_exp(NA_real_)  # SAS: exp(.) -> .
+sas_f_exp(1000)  # SAS: exp(1000) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

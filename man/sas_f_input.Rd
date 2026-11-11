@@ -23,9 +23,17 @@ Reads a value with an informat. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Partial: 40 of 44 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ Partial: 5 of 5 example call(s) and 40 of 44 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# INPUT: each call is followed by the result of the same call in SAS 9.4
+sas_f_input("123", list(name = "", w = 8L, d = NA_integer_, char = FALSE, text = "8."))  # SAS: input('123', 8.) -> 123
+sas_f_input("1234", list(name = "", w = 4L, d = 2L, char = FALSE, text = "4.2"))  # SAS: input('1234', 4.2) -> 12.34
+sas_f_input("1,234", list(name = "comma", w = 8L, d = NA_integer_, char = FALSE, text = "comma8."))  # SAS: input('1,234', comma8.) -> 1234
+sas_f_input("abc", list(name = "", w = 8L, d = NA_integer_, char = FALSE, text = "8."), qq = "??")  # SAS: input('abc', ?? 8.) -> .
+sas_f_input("abcdef", list(name = "", w = 3L, d = NA_integer_, char = TRUE, text = "$3."))  # SAS: input('abcdef', $3.) -> "abc"
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

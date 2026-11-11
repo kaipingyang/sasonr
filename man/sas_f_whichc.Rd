@@ -19,9 +19,15 @@ Index of the first matching character value. See the \href{https://documentation
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# WHICHC: each call is followed by the result of the same call in SAS 9.4
+sas_f_whichc("b", "a", "b", "c")  # SAS: whichc('b', 'a', 'b', 'c') -> 2
+sas_f_whichc("x", "a", "b")  # SAS: whichc('x', 'a', 'b') -> 0
+sas_f_whichc("a ", "a")  # SAS: whichc('a ', 'a') -> 1
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

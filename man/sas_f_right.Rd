@@ -17,9 +17,15 @@ Right-aligns a string. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# RIGHT: each call is followed by the result of the same call in SAS 9.4
+sas_f_right("abc  ")  # SAS: right('abc  ') -> "  abc"
+sas_f_right("  abc")  # SAS: right('  abc') -> "  abc"
+sas_f_right("")  # SAS: right('') -> ""
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

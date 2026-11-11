@@ -19,9 +19,17 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 5 example call(s) agree with SAS.
 }
 
+\examples{
+# NVALID: each call is followed by the result of the same call in SAS 9.4
+sas_f_nvalid("abc")  # SAS: nvalid('abc') -> 1
+sas_f_nvalid("1abc")  # SAS: nvalid('1abc') -> 0
+sas_f_nvalid("my var", "v7")  # SAS: nvalid('my var', 'v7') -> 0
+sas_f_nvalid("my var", "any")  # SAS: nvalid('my var', 'any') -> 1
+sas_f_nvalid("_x1", "nliteral")  # SAS: nvalid('_x1', 'nliteral') -> 1
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

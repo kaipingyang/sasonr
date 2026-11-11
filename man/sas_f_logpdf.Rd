@@ -21,9 +21,16 @@ Logarithm of the density. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# LOGPDF: each call is followed by the result of the same call in SAS 9.4
+sas_f_logpdf("NORMAL", 0)  # SAS: logpdf('NORMAL', 0) -> -0.91893853320467
+sas_f_logpdf("EXPONENTIAL", 1, 2)  # SAS: logpdf('EXPONENTIAL', 1, 2) -> -1.19314718055995
+sas_f_logpdf("BINOMIAL", 3, 0.5, 10)  # SAS: logpdf('BINOMIAL', 3, 0.5, 10) -> -2.1439800628174
+sas_f_logpdf("NORMAL", NA_real_)  # SAS: logpdf('NORMAL', .) -> .
+}
 \seealso{
 Other probability functions:
 \code{\link[=sas_f_cdf]{sas_f_cdf()}},

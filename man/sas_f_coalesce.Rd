@@ -17,9 +17,15 @@ First non-missing numeric argument. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# COALESCE: each call is followed by the result of the same call in SAS 9.4
+sas_f_coalesce(NA_real_, 2, 3)  # SAS: coalesce(., 2, 3) -> 2
+sas_f_coalesce(NA_real_, NA_real_)  # SAS: coalesce(., .) -> .
+sas_f_coalesce(sas_missing(".A"), sas_missing("._"), 5)  # SAS: coalesce(.A, ._, 5) -> 5
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

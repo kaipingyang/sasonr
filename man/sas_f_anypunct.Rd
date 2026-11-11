@@ -19,9 +19,15 @@ Position of the first punctuation character. See the \href{https://documentation
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# ANYPUNCT: each call is followed by the result of the same call in SAS 9.4
+sas_f_anypunct("ab,c")  # SAS: anypunct('ab,c') -> 3
+sas_f_anypunct("abc")  # SAS: anypunct('abc') -> 0
+sas_f_anypunct("a!b?", 3)  # SAS: anypunct('a!b?', 3) -> 4
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

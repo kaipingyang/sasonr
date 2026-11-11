@@ -23,9 +23,15 @@ PROC SQL quantified comparison.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# SQLQUANT: each call is followed by the result of the same call in SAS 9.4
+sas_f_sqlquant(1, c(2, 3), "<", "any")  # SAS: 1 < any (select v from work.t) -> 1
+sas_f_sqlquant(3, c(2, 3), ">", "all")  # SAS: 3 > all (select v from work.t) -> 0
+sas_f_sqlquant(3, c(2, 3), ">=", "all")  # SAS: 3 >= all (select v from work.t) -> 1
+}
 \seealso{
 Other internal functions:
 \code{\link[=sas_f_cvt_c2n]{sas_f_cvt_c2n()}},

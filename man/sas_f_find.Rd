@@ -23,9 +23,17 @@ Position of a substring. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 5 example call(s) agree with SAS.
 }
 
+\examples{
+# FIND: each call is followed by the result of the same call in SAS 9.4
+sas_f_find("abcabc", "bc")  # SAS: find('abcabc', 'bc') -> 2
+sas_f_find("abcabc", "BC", "i")  # SAS: find('abcabc', 'BC', 'i') -> 2
+sas_f_find("abcabc", "bc", 3)  # SAS: find('abcabc', 'bc', 3) -> 5
+sas_f_find("abcabc", "bc", -4)  # SAS: find('abcabc', 'bc', -4) -> 2
+sas_f_find("abc", "x")  # SAS: find('abc', 'x') -> 0
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

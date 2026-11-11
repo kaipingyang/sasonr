@@ -75,6 +75,7 @@ verif <- list()
 if (nzchar(res_csv) && file.exists(res_csv) && dir.exists("tests/conformance")) {
   res <- utils::read.csv(res_csv, colClasses = "character")
   for (k in seq_len(nrow(res))) {
+    if (startsWith(res$case[k], "fn_examples/")) next  # counted per call below
     mf <- file.path("tests/conformance", res$case[k], "meta.yaml")
     if (!file.exists(mf)) next
     tg <- grep("^tags:", readLines(mf), value = TRUE)
@@ -87,8 +88,35 @@ if (nzchar(res_csv) && file.exists(res_csv) && dir.exists("tests/conformance")) 
     for (t in intersect(targets, tab$name)) verif[[t]] <- c(verif[[t]], st)
   }
 }
+# reference-page examples (tools/gen_examples.R): per call, agree or not
+ex_res <- if (file.exists(f <- "tests/conformance/fn_examples/results.csv")) utils::read.csv(f, colClasses = "character") else NULL
+ex_note <- c(today = "clock", date = "clock", datetime = "clock", time = "clock")
+ex_text <- function(nm) {
+  if (is.null(ex_res)) return(NULL)
+  r <- ex_res[tolower(ex_res$fn) == nm, ]
+  if (nrow(r) == 0) return(NULL)
+  list(ok = sum(r$status %in% c("agree", "agree_tol")), n = nrow(r))
+}
 verif_text <- function(nm) {
+  clock <- if (nm %in% names(ex_note)) " The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only." else ""
+  paste0(verif_text0(nm), clock)
+}
+verif_text0 <- function(nm) {
   v <- verif[[nm]]
+  e <- ex_text(nm)
+  if (!is.null(e)) {
+    v <- v %||% character()
+    ok <- sum(v %in% c("pass", "both_error"))
+    kn <- sum(startsWith(v, "known:"))
+    cases <- if (length(v)) sprintf(" and %d of %d offline conformance case(s)", ok + kn, length(v)) else ""
+    if (e$ok == e$n && ok + kn == length(v)) {
+      return(sprintf("Verified against SAS 9.4: %d example call(s)%s agree with SAS%s.", e$n,
+                     if (length(v)) sprintf(" and %d offline conformance case(s)", length(v)) else "",
+                     if (kn) sprintf(" (%d case(s) with a known log or listing difference)", kn) else ""))
+    }
+    return(sprintf("Partial: %d of %d example call(s)%s agree with SAS 9.4; the examples show only calls that agree.",
+                   e$ok, e$n, cases))
+  }
   if (is.null(v)) return("Not yet verified against SAS (no offline conformance case).")
   ok <- sum(v %in% c("pass", "both_error"))
   kn <- sum(startsWith(v, "known:"))

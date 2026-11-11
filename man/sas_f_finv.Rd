@@ -23,9 +23,15 @@ Quantile of the F distribution. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# FINV: each call is followed by the result of the same call in SAS 9.4
+sas_f_finv(0.95, 2, 10)  # SAS: finv(0.95, 2, 10) -> 4.1028210151304
+sas_f_finv(0.5, 1, 1)  # SAS: finv(0.5, 1, 1) -> 1
+sas_f_finv(NA_real_, 1, 1)  # SAS: finv(., 1, 1) -> .
+}
 \seealso{
 Other probability functions:
 \code{\link[=sas_f_cdf]{sas_f_cdf()}},

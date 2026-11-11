@@ -23,9 +23,16 @@ SAS date from month, day and year. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# MDY: each call is followed by the result of the same call in SAS 9.4
+sas_f_mdy(3, 15, 2024)  # SAS: mdy(3, 15, 2024) -> 23450
+sas_f_mdy(2, 30, 2024)  # SAS: mdy(2, 30, 2024) -> .
+sas_f_mdy(1, 1, 1960)  # SAS: mdy(1, 1, 1960) -> 0
+sas_f_mdy(NA_real_, 1, 2024)  # SAS: mdy(., 1, 2024) -> .
+}
 \seealso{
 Other datetime functions:
 \code{\link[=sas_f_datdif]{sas_f_datdif()}},

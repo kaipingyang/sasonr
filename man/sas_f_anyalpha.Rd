@@ -19,9 +19,16 @@ Position of the first alphabetic character. See the \href{https://documentation.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# ANYALPHA: each call is followed by the result of the same call in SAS 9.4
+sas_f_anyalpha("12ab")  # SAS: anyalpha('12ab') -> 3
+sas_f_anyalpha("123")  # SAS: anyalpha('123') -> 0
+sas_f_anyalpha("ab12", 3)  # SAS: anyalpha('ab12', 3) -> 0
+sas_f_anyalpha("ab12", -4)  # SAS: anyalpha('ab12', -4) -> 2
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

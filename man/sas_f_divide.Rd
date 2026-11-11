@@ -19,9 +19,17 @@ Division that returns special missing values for division by zero. See the \href
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 5 example call(s) agree with SAS.
 }
 
+\examples{
+# DIVIDE: each call is followed by the result of the same call in SAS 9.4
+sas_f_divide(1, 2)  # SAS: divide(1, 2) -> 0.5
+sas_f_divide(1, 0)  # SAS: divide(1, 0) -> .I
+sas_f_divide(-1, 0)  # SAS: divide(-1, 0) -> .M
+sas_f_divide(0, 0)  # SAS: divide(0, 0) -> .
+sas_f_divide(NA_real_, 2)  # SAS: divide(., 2) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

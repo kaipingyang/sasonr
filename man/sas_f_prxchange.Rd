@@ -23,9 +23,16 @@ Substitutes with a Perl regular expression. See the \href{https://documentation.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# PRXCHANGE: each call is followed by the result of the same call in SAS 9.4
+sas_f_prxchange("s/a/X/", -1, "banana")  # SAS: prxchange('s/a/X/', -1, 'banana') -> "bXnXnX"
+sas_f_prxchange("s/a/X/", 1, "banana")  # SAS: prxchange('s/a/X/', 1, 'banana') -> "bXnana"
+sas_f_prxchange("s/(\\\\w+) (\\\\w+)/$2 $1/", -1, "hello world")  # SAS: prxchange('s/(\w+) (\w+)/$2 $1/', -1, 'hello world') -> "world hello"
+sas_f_prxchange("s/x/y/i", -1, "XxX")  # SAS: prxchange('s/x/y/i', -1, 'XxX') -> "yyy"
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

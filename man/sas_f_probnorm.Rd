@@ -17,9 +17,16 @@ Standard normal cumulative probability. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# PROBNORM: each call is followed by the result of the same call in SAS 9.4
+sas_f_probnorm(1.96)  # SAS: probnorm(1.96) -> 0.97500210485178
+sas_f_probnorm(0)  # SAS: probnorm(0) -> 0.5
+sas_f_probnorm(-10)  # SAS: probnorm(-10) -> 7.619853024161e-24
+sas_f_probnorm(NA_real_)  # SAS: probnorm(.) -> .
+}
 \seealso{
 Other probability functions:
 \code{\link[=sas_f_cdf]{sas_f_cdf()}},

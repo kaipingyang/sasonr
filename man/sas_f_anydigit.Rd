@@ -19,9 +19,16 @@ Position of the first digit. See the \href{https://documentation.sas.com/doc/en/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# ANYDIGIT: each call is followed by the result of the same call in SAS 9.4
+sas_f_anydigit("ab12")  # SAS: anydigit('ab12') -> 3
+sas_f_anydigit("abc")  # SAS: anydigit('abc') -> 0
+sas_f_anydigit("1a2", 2)  # SAS: anydigit('1a2', 2) -> 3
+sas_f_anydigit("1a2", -2)  # SAS: anydigit('1a2', -2) -> 1
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

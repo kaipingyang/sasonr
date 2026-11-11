@@ -17,9 +17,16 @@ Smallest non-missing value. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+ Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
 }
 
+\examples{
+# MIN: each call is followed by the result of the same call in SAS 9.4
+sas_f_min(1, 5, 3)  # SAS: min(1, 5, 3) -> 1
+sas_f_min(NA_real_, 2)  # SAS: min(., 2) -> 2
+sas_f_min(NA_real_, NA_real_)  # SAS: min(., .) -> .
+sas_f_min(sas_missing(".A"), 1)  # SAS: min(.A, 1) -> 1
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

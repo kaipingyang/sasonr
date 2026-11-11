@@ -19,3 +19,8 @@ A list describing the PDV, annotated statements, and the level.
 \description{
 Analyse a parsed DATA step
 }
+\examples{
+p <- sas_parse("data b; do i = 1 to 3; s + i; output; end; run;")
+a <- sas_analyze(p$steps[[1]])
+a$level
+}

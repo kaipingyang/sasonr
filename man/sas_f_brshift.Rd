@@ -21,9 +21,15 @@ Bitwise right shift. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# BRSHIFT: each call is followed by the result of the same call in SAS 9.4
+sas_f_brshift(16, 2)  # SAS: brshift(16, 2) -> 4
+sas_f_brshift(255, 4)  # SAS: brshift(255, 4) -> 15
+sas_f_brshift(NA_real_, 1)  # SAS: brshift(., 1) -> .
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

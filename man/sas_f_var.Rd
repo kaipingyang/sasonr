@@ -17,9 +17,15 @@ Variance. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# VAR: each call is followed by the result of the same call in SAS 9.4
+sas_f_var(1, 2, 3, 4)  # SAS: var(1, 2, 3, 4) -> 1.66666666666667
+sas_f_var(5, NA_real_, 7)  # SAS: var(5, ., 7) -> 2
+sas_f_var(5, NA_real_)  # SAS: var(5, .) -> .
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

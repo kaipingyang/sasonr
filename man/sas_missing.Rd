@@ -13,3 +13,10 @@ sas_missing(code = ".")
 \code{.} is \code{NA_real_}; special missing values \code{.A}-\code{.Z} and \code{._} are encoded as
 NaN payloads so that they keep the SAS sort order \verb{._ < . < .A < ... < .Z}.
 }
+\examples{
+sas_missing()      # .  (NA_real_)
+a <- sas_missing(".A")
+is.na(a)
+sas_f_missing(a)   # SAS MISSING(.A) is 1
+sas_f_max(a, 1)    # missing values are ignored by MAX
+}

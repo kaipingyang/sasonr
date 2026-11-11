@@ -19,9 +19,15 @@ Position of the first non-alphabetic character. See the \href{https://documentat
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# NOTALPHA: each call is followed by the result of the same call in SAS 9.4
+sas_f_notalpha("ab1")  # SAS: notalpha('ab1') -> 3
+sas_f_notalpha("abc")  # SAS: notalpha('abc') -> 0
+sas_f_notalpha("a1b", 3)  # SAS: notalpha('a1b', 3) -> 0
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

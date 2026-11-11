@@ -19,9 +19,16 @@ Position of the first character not in the excerpts. See the \href{https://docum
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# VERIFY: each call is followed by the result of the same call in SAS 9.4
+sas_f_verify("abc123", "abc")  # SAS: verify('abc123', 'abc') -> 4
+sas_f_verify("aaa", "a")  # SAS: verify('aaa', 'a') -> 0
+sas_f_verify("ab ", "ab")  # SAS: verify('ab ', 'ab') -> 3
+sas_f_verify("abcd", "ab", "c")  # SAS: verify('abcd', 'ab', 'c') -> 4
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

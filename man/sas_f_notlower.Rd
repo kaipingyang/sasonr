@@ -19,9 +19,15 @@ Position of the first character that is not lowercase. See the \href{https://doc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# NOTLOWER: each call is followed by the result of the same call in SAS 9.4
+sas_f_notlower("abC")  # SAS: notlower('abC') -> 3
+sas_f_notlower("abc")  # SAS: notlower('abc') -> 0
+sas_f_notlower("aBc", 3)  # SAS: notlower('aBc', 3) -> 0
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

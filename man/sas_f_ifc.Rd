@@ -23,9 +23,16 @@ Character value chosen by a condition. See the \href{https://documentation.sas.c
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# IFC: each call is followed by the result of the same call in SAS 9.4
+sas_f_ifc(1, "yes", "no")  # SAS: ifc(1, 'yes', 'no') -> "yes"
+sas_f_ifc(0, "yes", "no")  # SAS: ifc(0, 'yes', 'no') -> "no"
+sas_f_ifc(NA_real_, "yes", "no", "miss")  # SAS: ifc(., 'yes', 'no', 'miss') -> "miss"
+sas_f_ifc(2 > 1, "a", "b")  # SAS: ifc(2 > 1, 'a', 'b') -> "a"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

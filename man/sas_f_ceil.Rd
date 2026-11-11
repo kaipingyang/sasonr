@@ -17,9 +17,16 @@ Smallest integer >= the argument, with fuzz. See the \href{https://documentation
 }
 
 \section{Verification}{
- Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# CEIL: each call is followed by the result of the same call in SAS 9.4
+sas_f_ceil(2.1)  # SAS: ceil(2.1) -> 3
+sas_f_ceil(-2.1)  # SAS: ceil(-2.1) -> -2
+sas_f_ceil(1 + 1e-13)  # SAS: ceil(1 + 1e-13) -> 1
+sas_f_ceil(NA_real_)  # SAS: ceil(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

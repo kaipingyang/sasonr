@@ -21,7 +21,12 @@ Value of a macro variable at run time. See the \href{https://documentation.sas.c
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# SYMGET: each call is followed by the result of the same call in SAS 9.4
+sas_f_symget(list2env(list(mv = "hello")), "mv")  # SAS: symget('mv') -> "hello"
+sas_f_symget(list2env(list(mv = "hello")), "MV")  # SAS: symget('MV') -> "hello"
+}
 \concept{macro functions}

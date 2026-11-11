@@ -19,9 +19,16 @@ Implicit character-to-numeric conversion of a function argument.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# CVT_C2N: each call is followed by the result of the same call in SAS 9.4
+sas_f_cvt_c2n(" 12 ")  # SAS: ' 12 ' + 0 -> 12
+sas_f_cvt_c2n("1e3")  # SAS: '1e3' + 0 -> 1000
+sas_f_cvt_c2n("-.5")  # SAS: '-.5' + 0 -> -0.5
+sas_f_cvt_c2n("abc")  # SAS: 'abc' + 0 -> .
+}
 \seealso{
 Other internal functions:
 \code{\link[=sas_f_cvt_n2c]{sas_f_cvt_n2c()}},

@@ -17,9 +17,17 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 }
 
 \section{Verification}{
- Values verified against SAS 9.4 in 5 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+ Verified against SAS 9.4: 5 example call(s) and 5 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
 }
 
+\examples{
+# MISSING: each call is followed by the result of the same call in SAS 9.4
+sas_f_missing(NA_real_)  # SAS: missing(.) -> 1
+sas_f_missing(sas_missing(".A"))  # SAS: missing(.A) -> 1
+sas_f_missing(0)  # SAS: missing(0) -> 0
+sas_f_missing("")  # SAS: missing('') -> 1
+sas_f_missing(" a")  # SAS: missing(' a') -> 0
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

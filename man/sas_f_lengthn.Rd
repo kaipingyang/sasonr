@@ -17,9 +17,15 @@ Length without trailing blanks (0 for a blank string). See the \href{https://doc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# LENGTHN: each call is followed by the result of the same call in SAS 9.4
+sas_f_lengthn("abc  ")  # SAS: lengthn('abc  ') -> 3
+sas_f_lengthn("")  # SAS: lengthn('') -> 0
+sas_f_lengthn("  a")  # SAS: lengthn('  a') -> 3
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

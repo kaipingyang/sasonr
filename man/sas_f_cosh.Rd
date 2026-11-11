@@ -19,9 +19,16 @@ Hyperbolic cosine. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# COSH: each call is followed by the result of the same call in SAS 9.4
+sas_f_cosh(0)  # SAS: cosh(0) -> 1
+sas_f_cosh(1)  # SAS: cosh(1) -> 1.54308063481524
+sas_f_cosh(-2)  # SAS: cosh(-2) -> 3.76219569108363
+sas_f_cosh(NA_real_)  # SAS: cosh(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

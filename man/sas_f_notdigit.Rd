@@ -19,9 +19,15 @@ Position of the first non-digit. See the \href{https://documentation.sas.com/doc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# NOTDIGIT: each call is followed by the result of the same call in SAS 9.4
+sas_f_notdigit("12a")  # SAS: notdigit('12a') -> 3
+sas_f_notdigit("123")  # SAS: notdigit('123') -> 0
+sas_f_notdigit("1a2b", -3)  # SAS: notdigit('1a2b', -3) -> 2
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

@@ -21,9 +21,16 @@ Position of the first match of a Perl regular expression. See the \href{https://
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# PRXMATCH: each call is followed by the result of the same call in SAS 9.4
+sas_f_prxmatch("/b+/", "abbc")  # SAS: prxmatch('/b+/', 'abbc') -> 2
+sas_f_prxmatch("/z/", "abc")  # SAS: prxmatch('/z/', 'abc') -> 0
+sas_f_prxmatch("/B/i", "abc")  # SAS: prxmatch('/B/i', 'abc') -> 2
+sas_f_prxmatch("/^a/", " abc")  # SAS: prxmatch('/^a/', ' abc') -> 0
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

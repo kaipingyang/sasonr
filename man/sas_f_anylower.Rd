@@ -19,9 +19,15 @@ Position of the first lowercase letter. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# ANYLOWER: each call is followed by the result of the same call in SAS 9.4
+sas_f_anylower("ABc")  # SAS: anylower('ABc') -> 3
+sas_f_anylower("ABC")  # SAS: anylower('ABC') -> 0
+sas_f_anylower("aBc", -2)  # SAS: anylower('aBc', -2) -> 1
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

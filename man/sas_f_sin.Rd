@@ -19,9 +19,16 @@ Sine. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titl
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# SIN: each call is followed by the result of the same call in SAS 9.4
+sas_f_sin(0)  # SAS: sin(0) -> 0
+sas_f_sin(1)  # SAS: sin(1) -> 0.841470984807897
+sas_f_sin(-3.5)  # SAS: sin(-3.5) -> 0.35078322768962
+sas_f_sin(NA_real_)  # SAS: sin(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

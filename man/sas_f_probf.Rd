@@ -23,9 +23,16 @@ F cumulative probability. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# PROBF: each call is followed by the result of the same call in SAS 9.4
+sas_f_probf(4, 2, 10)  # SAS: probf(4, 2, 10) -> 0.947077850598655
+sas_f_probf(1, 1, 1)  # SAS: probf(1, 1, 1) -> 0.5
+sas_f_probf(1, 2, 10, 1)  # SAS: probf(1, 2, 10, 1) -> 0.45026969
+sas_f_probf(NA_real_, 1, 1)  # SAS: probf(., 1, 1) -> .
+}
 \seealso{
 Other probability functions:
 \code{\link[=sas_f_cdf]{sas_f_cdf()}},

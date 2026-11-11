@@ -17,9 +17,15 @@ Standard error of the mean. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# STDERR: each call is followed by the result of the same call in SAS 9.4
+sas_f_stderr(1, 2, 3, 4)  # SAS: stderr(1, 2, 3, 4) -> 0.645497224367903
+sas_f_stderr(2, 4)  # SAS: stderr(2, 4) -> 1
+sas_f_stderr(5, NA_real_)  # SAS: stderr(5, .) -> .
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

@@ -19,9 +19,15 @@ Numeric value selected by index. See the \href{https://documentation.sas.com/doc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# CHOOSEN: each call is followed by the result of the same call in SAS 9.4
+sas_f_choosen(2, 10, 20, 30)  # SAS: choosen(2, 10, 20, 30) -> 20
+sas_f_choosen(-1, 10, 20, 30)  # SAS: choosen(-1, 10, 20, 30) -> 30
+sas_f_choosen(5, 1, 2)  # SAS: choosen(5, 1, 2) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

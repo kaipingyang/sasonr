@@ -19,9 +19,17 @@ Natural logarithm. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 5 example call(s) agree with SAS.
 }
 
+\examples{
+# LOG: each call is followed by the result of the same call in SAS 9.4
+sas_f_log(10)  # SAS: log(10) -> 2.30258509299405
+sas_f_log(1)  # SAS: log(1) -> 0
+sas_f_log(0)  # SAS: log(0) -> .
+sas_f_log(-1)  # SAS: log(-1) -> .
+sas_f_log(NA_real_)  # SAS: log(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

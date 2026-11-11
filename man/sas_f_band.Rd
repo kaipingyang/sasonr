@@ -21,9 +21,15 @@ Bitwise AND of two nonnegative integers. See the \href{https://documentation.sas
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# BAND: each call is followed by the result of the same call in SAS 9.4
+sas_f_band(12, 10)  # SAS: band(12, 10) -> 8
+sas_f_band(255, 15)  # SAS: band(255, 15) -> 15
+sas_f_band(NA_real_, 1)  # SAS: band(., 1) -> .
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_blshift]{sas_f_blshift()}},

@@ -17,9 +17,16 @@ Natural logarithm of the gamma function. See the \href{https://documentation.sas
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# LGAMMA: each call is followed by the result of the same call in SAS 9.4
+sas_f_lgamma(10)  # SAS: lgamma(10) -> 12.8018274800815
+sas_f_lgamma(0.5)  # SAS: lgamma(0.5) -> 0.5723649429247
+sas_f_lgamma(100)  # SAS: lgamma(100) -> 359.134205369575
+sas_f_lgamma(NA_real_)  # SAS: lgamma(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

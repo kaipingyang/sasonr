@@ -17,9 +17,16 @@ Skewness. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 1 offline conformance case(s) agree.
+ Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS.
 }
 
+\examples{
+# SKEWNESS: each call is followed by the result of the same call in SAS 9.4
+sas_f_skewness(1, 2, 3, 10)  # SAS: skewness(1, 2, 3, 10) -> 1.7636326148039
+sas_f_skewness(1, 2, NA_real_, 3)  # SAS: skewness(1, 2, ., 3) -> 0
+sas_f_skewness(2, 4, 4, 4, 5, 5, 7, 9)  # SAS: skewness(2, 4, 4, 4, 5, 5, 7, 9) -> 0.8184875533568
+sas_f_skewness(1, 1, 1)  # SAS: skewness(1, 1, 1) -> .
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

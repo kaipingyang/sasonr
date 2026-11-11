@@ -7,7 +7,8 @@
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+#' @example inst/examples/sas_f_abs.R
 #' @family numeric functions
 #' @name sas_f_abs
 NULL
@@ -20,7 +21,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_anyalnum.R
 #' @family character functions
 #' @name sas_f_anyalnum
 NULL
@@ -33,7 +35,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_anyalpha.R
 #' @family character functions
 #' @name sas_f_anyalpha
 NULL
@@ -46,7 +49,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_anydigit.R
 #' @family character functions
 #' @name sas_f_anydigit
 NULL
@@ -59,7 +63,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_anylower.R
 #' @family character functions
 #' @name sas_f_anylower
 NULL
@@ -72,7 +77,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_anypunct.R
 #' @family character functions
 #' @name sas_f_anypunct
 NULL
@@ -85,7 +91,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_anyspace.R
 #' @family character functions
 #' @name sas_f_anyspace
 NULL
@@ -98,7 +105,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_anyupper.R
 #' @family character functions
 #' @name sas_f_anyupper
 NULL
@@ -111,7 +119,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_arcos.R
 #' @family numeric functions
 #' @name sas_f_arcos
 NULL
@@ -124,7 +133,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_arsin.R
 #' @family numeric functions
 #' @name sas_f_arsin
 NULL
@@ -137,7 +147,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_atan.R
 #' @family numeric functions
 #' @name sas_f_atan
 NULL
@@ -150,7 +161,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_atan2.R
 #' @family numeric functions
 #' @name sas_f_atan2
 NULL
@@ -164,7 +176,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_band.R
 #' @family special functions
 #' @name sas_f_band
 NULL
@@ -177,7 +190,8 @@ NULL
 #' @param b Numeric argument.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_beta.R
 #' @family numeric functions
 #' @name sas_f_beta
 NULL
@@ -191,7 +205,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_blshift.R
 #' @family special functions
 #' @name sas_f_blshift
 NULL
@@ -204,7 +219,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_bnot.R
 #' @family special functions
 #' @name sas_f_bnot
 NULL
@@ -218,7 +234,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_bor.R
 #' @family special functions
 #' @name sas_f_bor
 NULL
@@ -232,7 +249,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_brshift.R
 #' @family special functions
 #' @name sas_f_brshift
 NULL
@@ -246,7 +264,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_bxor.R
 #' @family special functions
 #' @name sas_f_bxor
 NULL
@@ -258,7 +277,8 @@ NULL
 #' @param n Count or position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_byte.R
 #' @family character functions
 #' @name sas_f_byte
 NULL
@@ -270,7 +290,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 1 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_cat.R
 #' @family character functions
 #' @name sas_f_cat
 NULL
@@ -282,7 +303,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cats.R
 #' @family character functions
 #' @name sas_f_cats
 NULL
@@ -294,7 +316,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_catt.R
 #' @family character functions
 #' @name sas_f_catt
 NULL
@@ -324,7 +347,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cdf.R
 #' @family probability functions
 #' @name sas_f_cdf
 NULL
@@ -336,7 +360,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: A value within 1.5e-12 above an integer counts as that integer; a zero result is -0.
-#' @section Verification: Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_ceil.R
 #' @family numeric functions
 #' @name sas_f_ceil
 NULL
@@ -348,7 +373,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_ceilz.R
 #' @family numeric functions
 #' @name sas_f_ceilz
 NULL
@@ -361,7 +387,8 @@ NULL
 #' @param pos Position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_char.R
 #' @family character functions
 #' @name sas_f_char
 NULL
@@ -374,7 +401,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_choosec.R
 #' @family character functions
 #' @name sas_f_choosec
 NULL
@@ -387,7 +415,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_choosen.R
 #' @family numeric functions
 #' @name sas_f_choosen
 NULL
@@ -401,7 +430,8 @@ NULL
 #' @param nc Noncentrality parameter.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cinv.R
 #' @family probability functions
 #' @name sas_f_cinv
 NULL
@@ -413,7 +443,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cmiss.R
 #' @family descriptive functions
 #' @name sas_f_cmiss
 NULL
@@ -425,7 +456,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_coalesce.R
 #' @family numeric functions
 #' @name sas_f_coalesce
 NULL
@@ -437,7 +469,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_coalescec.R
 #' @family character functions
 #' @name sas_f_coalescec
 NULL
@@ -451,7 +484,8 @@ NULL
 #' @param len Length.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_collate.R
 #' @family character functions
 #' @name sas_f_collate
 NULL
@@ -464,7 +498,8 @@ NULL
 #' @param r Count.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_comb.R
 #' @family numeric functions
 #' @name sas_f_comb
 NULL
@@ -478,7 +513,8 @@ NULL
 #' @param mods Modifiers, as in SAS.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 6 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_compare.R
 #' @family character functions
 #' @name sas_f_compare
 NULL
@@ -490,7 +526,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_compbl.R
 #' @family character functions
 #' @name sas_f_compbl
 NULL
@@ -518,7 +555,8 @@ NULL
 #' @param p Probability.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_constant.R
 #' @family numeric functions
 #' @name sas_f_constant
 NULL
@@ -531,7 +569,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cos.R
 #' @family numeric functions
 #' @name sas_f_cos
 NULL
@@ -544,7 +583,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cosh.R
 #' @family numeric functions
 #' @name sas_f_cosh
 NULL
@@ -558,7 +598,8 @@ NULL
 #' @param mods Modifiers, as in SAS.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_count.R
 #' @family character functions
 #' @name sas_f_count
 NULL
@@ -572,7 +613,8 @@ NULL
 #' @param mods Modifiers, as in SAS.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_countc.R
 #' @family character functions
 #' @name sas_f_countc
 NULL
@@ -586,7 +628,8 @@ NULL
 #' @param mods Modifiers, as in SAS.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_countw.R
 #' @family character functions
 #' @name sas_f_countw
 NULL
@@ -598,7 +641,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_css.R
 #' @family descriptive functions
 #' @name sas_f_css
 NULL
@@ -610,7 +654,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cv.R
 #' @family descriptive functions
 #' @name sas_f_cv
 NULL
@@ -623,7 +668,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Used by translated code; not a SAS function.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cvt_c2n.R
 #' @family internal functions
 #' @keywords internal
 #' @name sas_f_cvt_c2n
@@ -636,7 +682,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Used by translated code; not a SAS function.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_cvt_n2c.R
 #' @family internal functions
 #' @keywords internal
 #' @name sas_f_cvt_n2c
@@ -651,7 +698,8 @@ NULL
 #' @param basis Day-count basis, as in SAS.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_datdif.R
 #' @family datetime functions
 #' @name sas_f_datdif
 NULL
@@ -662,7 +710,8 @@ NULL
 #'
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS. The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only.
+#' @example inst/examples/sas_f_date.R
 #' @family datetime functions
 #' @name sas_f_date
 NULL
@@ -674,7 +723,8 @@ NULL
 #' @param j Julian date.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_datejul.R
 #' @family datetime functions
 #' @name sas_f_datejul
 NULL
@@ -686,7 +736,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_datepart.R
 #' @family datetime functions
 #' @name sas_f_datepart
 NULL
@@ -697,7 +748,8 @@ NULL
 #'
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Verified against SAS 9.4: 1 offline conformance case(s) agree.
+#' @section Verification: Verified against SAS 9.4: 2 example call(s) and 1 offline conformance case(s) agree with SAS. The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only.
+#' @example inst/examples/sas_f_datetime.R
 #' @family datetime functions
 #' @name sas_f_datetime
 NULL
@@ -709,7 +761,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_day.R
 #' @family datetime functions
 #' @name sas_f_day
 NULL
@@ -721,7 +774,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_dequote.R
 #' @family character functions
 #' @name sas_f_dequote
 NULL
@@ -736,7 +790,8 @@ NULL
 #' @param s Source text.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_dhms.R
 #' @family datetime functions
 #' @name sas_f_dhms
 NULL
@@ -749,7 +804,8 @@ NULL
 #' @param b Numeric argument.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_divide.R
 #' @family numeric functions
 #' @name sas_f_divide
 NULL
@@ -762,7 +818,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_exp.R
 #' @family numeric functions
 #' @name sas_f_exp
 NULL
@@ -775,7 +832,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_fact.R
 #' @family numeric functions
 #' @name sas_f_fact
 NULL
@@ -790,7 +848,8 @@ NULL
 #' @param a4 Start position or modifiers (as in SAS).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_find.R
 #' @family character functions
 #' @name sas_f_find
 NULL
@@ -805,7 +864,8 @@ NULL
 #' @param a4 Start position or modifiers (as in SAS).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_findc.R
 #' @family character functions
 #' @name sas_f_findc
 NULL
@@ -821,7 +881,8 @@ NULL
 #' @param a5 Argument `a5` of the SAS function.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_findw.R
 #' @family character functions
 #' @name sas_f_findw
 NULL
@@ -836,7 +897,8 @@ NULL
 #' @param nc Noncentrality parameter.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_finv.R
 #' @family probability functions
 #' @name sas_f_finv
 NULL
@@ -848,7 +910,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_first.R
 #' @family character functions
 #' @name sas_f_first
 NULL
@@ -860,7 +923,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: A value within 1.5e-12 below an integer counts as that integer.
-#' @section Verification: Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_floor.R
 #' @family numeric functions
 #' @name sas_f_floor
 NULL
@@ -872,7 +936,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_floorz.R
 #' @family numeric functions
 #' @name sas_f_floorz
 NULL
@@ -885,7 +950,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_gamma.R
 #' @family numeric functions
 #' @name sas_f_gamma
 NULL
@@ -897,7 +963,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_gcd.R
 #' @family numeric functions
 #' @name sas_f_gcd
 NULL
@@ -909,7 +976,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_geomean.R
 #' @family descriptive functions
 #' @name sas_f_geomean
 NULL
@@ -921,7 +989,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_harmean.R
 #' @family descriptive functions
 #' @name sas_f_harmean
 NULL
@@ -935,7 +1004,8 @@ NULL
 #' @param s Source text.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_hms.R
 #' @family datetime functions
 #' @name sas_f_hms
 NULL
@@ -947,7 +1017,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_hour.R
 #' @family datetime functions
 #' @name sas_f_hour
 NULL
@@ -962,7 +1033,8 @@ NULL
 #' @param m Value when missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_ifc.R
 #' @family character functions
 #' @name sas_f_ifc
 NULL
@@ -977,7 +1049,8 @@ NULL
 #' @param m Value when missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_ifn.R
 #' @family numeric functions
 #' @name sas_f_ifn
 NULL
@@ -1004,7 +1077,8 @@ NULL
 #' @param chars Characters to remove or find.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 2 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_indexc.R
 #' @family character functions
 #' @name sas_f_indexc
 NULL
@@ -1018,7 +1092,8 @@ NULL
 #' @param dlm Delimiters.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_indexw.R
 #' @family character functions
 #' @name sas_f_indexw
 NULL
@@ -1033,7 +1108,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Partial: 40 of 44 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 5 of 5 example call(s) and 40 of 44 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_input.R
 #' @family special functions
 #' @name sas_f_input
 NULL
@@ -1047,7 +1123,8 @@ NULL
 #' @param w Width override.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_inputc.R
 #' @family special functions
 #' @name sas_f_inputc
 NULL
@@ -1076,7 +1153,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: A value within 1.5e-12 of the next integer counts as that integer; `INT(0)` is -0.
-#' @section Verification: Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_int.R
 #' @family numeric functions
 #' @name sas_f_int
 NULL
@@ -1122,7 +1200,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_intz.R
 #' @family numeric functions
 #' @name sas_f_intz
 NULL
@@ -1134,7 +1213,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_juldate.R
 #' @family datetime functions
 #' @name sas_f_juldate
 NULL
@@ -1146,7 +1226,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_juldate7.R
 #' @family datetime functions
 #' @name sas_f_juldate7
 NULL
@@ -1158,7 +1239,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Verified against SAS 9.4: 1 offline conformance case(s) agree.
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS.
+#' @example inst/examples/sas_f_kurtosis.R
 #' @family descriptive functions
 #' @name sas_f_kurtosis
 NULL
@@ -1171,7 +1253,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_largest.R
 #' @family descriptive functions
 #' @name sas_f_largest
 NULL
@@ -1183,7 +1266,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_lcm.R
 #' @family numeric functions
 #' @name sas_f_lcm
 NULL
@@ -1195,7 +1279,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_left.R
 #' @family character functions
 #' @name sas_f_left
 NULL
@@ -1207,7 +1292,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Verified against SAS 9.4: 3 offline conformance case(s) agree.
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) and 3 offline conformance case(s) agree with SAS.
+#' @example inst/examples/sas_f_length.R
 #' @family character functions
 #' @name sas_f_length
 NULL
@@ -1219,7 +1305,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_lengthc.R
 #' @family character functions
 #' @name sas_f_lengthc
 NULL
@@ -1231,7 +1318,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_lengthm.R
 #' @family character functions
 #' @name sas_f_lengthm
 NULL
@@ -1243,7 +1331,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_lengthn.R
 #' @family character functions
 #' @name sas_f_lengthn
 NULL
@@ -1255,7 +1344,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_lgamma.R
 #' @family numeric functions
 #' @name sas_f_lgamma
 NULL
@@ -1268,7 +1358,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_log.R
 #' @family numeric functions
 #' @name sas_f_log
 NULL
@@ -1281,7 +1372,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_log10.R
 #' @family numeric functions
 #' @name sas_f_log10
 NULL
@@ -1294,7 +1386,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_log2.R
 #' @family numeric functions
 #' @name sas_f_log2
 NULL
@@ -1307,7 +1400,8 @@ NULL
 #' @param b Numeric argument.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_logbeta.R
 #' @family numeric functions
 #' @name sas_f_logbeta
 NULL
@@ -1321,7 +1415,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_logcdf.R
 #' @family probability functions
 #' @name sas_f_logcdf
 NULL
@@ -1335,7 +1430,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_logpdf.R
 #' @family probability functions
 #' @name sas_f_logpdf
 NULL
@@ -1349,7 +1445,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_logsdf.R
 #' @family probability functions
 #' @name sas_f_logsdf
 NULL
@@ -1361,7 +1458,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Verified against SAS 9.4: 1 offline conformance case(s) agree.
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) and 1 offline conformance case(s) agree with SAS.
+#' @example inst/examples/sas_f_lowcase.R
 #' @family character functions
 #' @name sas_f_lowcase
 NULL
@@ -1373,7 +1471,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+#' @example inst/examples/sas_f_max.R
 #' @family descriptive functions
 #' @name sas_f_max
 NULL
@@ -1388,7 +1487,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_mdy.R
 #' @family datetime functions
 #' @name sas_f_mdy
 NULL
@@ -1400,7 +1500,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+#' @example inst/examples/sas_f_mean.R
 #' @family descriptive functions
 #' @name sas_f_mean
 NULL
@@ -1412,7 +1513,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_median.R
 #' @family descriptive functions
 #' @name sas_f_median
 NULL
@@ -1424,7 +1526,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+#' @example inst/examples/sas_f_min.R
 #' @family descriptive functions
 #' @name sas_f_min
 NULL
@@ -1436,7 +1539,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_minute.R
 #' @family datetime functions
 #' @name sas_f_minute
 NULL
@@ -1448,7 +1552,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Blank character values and special missing values (.A-.Z, ._) are missing; `is.na()` knows neither.
-#' @section Verification: Values verified against SAS 9.4 in 5 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) and 5 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+#' @example inst/examples/sas_f_missing.R
 #' @family special functions
 #' @name sas_f_missing
 NULL
@@ -1462,7 +1567,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 6 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_mod.R
 #' @family numeric functions
 #' @name sas_f_mod
 NULL
@@ -1476,7 +1582,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_modz.R
 #' @family numeric functions
 #' @name sas_f_modz
 NULL
@@ -1488,7 +1595,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_month.R
 #' @family datetime functions
 #' @name sas_f_month
 NULL
@@ -1500,7 +1608,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_n.R
 #' @family descriptive functions
 #' @name sas_f_n
 NULL
@@ -1512,7 +1621,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_nmiss.R
 #' @family descriptive functions
 #' @name sas_f_nmiss
 NULL
@@ -1525,7 +1635,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_notalnum.R
 #' @family character functions
 #' @name sas_f_notalnum
 NULL
@@ -1538,7 +1649,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_notalpha.R
 #' @family character functions
 #' @name sas_f_notalpha
 NULL
@@ -1551,7 +1663,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_notdigit.R
 #' @family character functions
 #' @name sas_f_notdigit
 NULL
@@ -1564,7 +1677,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_notlower.R
 #' @family character functions
 #' @name sas_f_notlower
 NULL
@@ -1577,7 +1691,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_notpunct.R
 #' @family character functions
 #' @name sas_f_notpunct
 NULL
@@ -1590,7 +1705,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_notspace.R
 #' @family character functions
 #' @name sas_f_notspace
 NULL
@@ -1603,7 +1719,8 @@ NULL
 #' @param start Starting position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_notupper.R
 #' @family character functions
 #' @name sas_f_notupper
 NULL
@@ -1616,7 +1733,8 @@ NULL
 #' @param opt Option, as in SAS.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_nvalid.R
 #' @family special functions
 #' @name sas_f_nvalid
 NULL
@@ -1629,7 +1747,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_ordinal.R
 #' @family descriptive functions
 #' @name sas_f_ordinal
 NULL
@@ -1642,7 +1761,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_pctl.R
 #' @family descriptive functions
 #' @name sas_f_pctl
 NULL
@@ -1656,7 +1776,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_pdf.R
 #' @family probability functions
 #' @name sas_f_pdf
 NULL
@@ -1669,7 +1790,8 @@ NULL
 #' @param r Count.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_perm.R
 #' @family numeric functions
 #' @name sas_f_perm
 NULL
@@ -1682,7 +1804,8 @@ NULL
 #' @param n Count or position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_poisson.R
 #' @family probability functions
 #' @name sas_f_poisson
 NULL
@@ -1696,7 +1819,8 @@ NULL
 #' @param m Value when missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_probbnml.R
 #' @family probability functions
 #' @name sas_f_probbnml
 NULL
@@ -1710,7 +1834,8 @@ NULL
 #' @param nc Noncentrality parameter.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_probchi.R
 #' @family probability functions
 #' @name sas_f_probchi
 NULL
@@ -1725,7 +1850,8 @@ NULL
 #' @param nc Noncentrality parameter.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_probf.R
 #' @family probability functions
 #' @name sas_f_probf
 NULL
@@ -1737,7 +1863,8 @@ NULL
 #' @param p Probability.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_probit.R
 #' @family probability functions
 #' @name sas_f_probit
 NULL
@@ -1749,7 +1876,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_probnorm.R
 #' @family probability functions
 #' @name sas_f_probnorm
 NULL
@@ -1763,7 +1891,8 @@ NULL
 #' @param nc Noncentrality parameter.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_probt.R
 #' @family probability functions
 #' @name sas_f_probt
 NULL
@@ -1776,7 +1905,8 @@ NULL
 #' @param dlm Delimiters.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_propcase.R
 #' @family character functions
 #' @name sas_f_propcase
 NULL
@@ -1791,7 +1921,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_prxchange.R
 #' @family special functions
 #' @name sas_f_prxchange
 NULL
@@ -1805,7 +1936,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_prxmatch.R
 #' @family special functions
 #' @name sas_f_prxmatch
 NULL
@@ -1818,7 +1950,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 2 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_prxparse.R
 #' @family special functions
 #' @name sas_f_prxparse
 NULL
@@ -1832,7 +1965,8 @@ NULL
 #' @param align Alignment (`"-l"`, `"-r"`, `"-c"`).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Partial: 44 of 46 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 5 of 5 example call(s) and 44 of 46 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_put.R
 #' @family special functions
 #' @name sas_f_put
 NULL
@@ -1846,7 +1980,8 @@ NULL
 #' @param w Width override.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_putc.R
 #' @family special functions
 #' @name sas_f_putc
 NULL
@@ -1874,7 +2009,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_qtr.R
 #' @family datetime functions
 #' @name sas_f_qtr
 NULL
@@ -1888,7 +2024,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 5 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_quantile.R
 #' @family probability functions
 #' @name sas_f_quantile
 NULL
@@ -1901,7 +2038,8 @@ NULL
 #' @param q Quotation character.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_quote.R
 #' @family character functions
 #' @name sas_f_quote
 NULL
@@ -1913,7 +2051,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_range.R
 #' @family descriptive functions
 #' @name sas_f_range
 NULL
@@ -1925,7 +2064,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_rank.R
 #' @family character functions
 #' @name sas_f_rank
 NULL
@@ -1938,7 +2078,8 @@ NULL
 #' @param n Count or position.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_repeat.R
 #' @family character functions
 #' @name sas_f_repeat
 NULL
@@ -1950,7 +2091,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_reverse.R
 #' @family character functions
 #' @name sas_f_reverse
 NULL
@@ -1962,7 +2104,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_right.R
 #' @family character functions
 #' @name sas_f_right
 NULL
@@ -1991,7 +2134,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Ties go to the even multiple as in `base::round()`, but SAS applies the same fuzz as ROUND and returns the decimal multiple.
-#' @section Verification: Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 5 of 5 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_rounde.R
 #' @family numeric functions
 #' @name sas_f_rounde
 NULL
@@ -2005,7 +2149,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: No fuzz; ties go to the even multiple; the result is the decimal multiple.
-#' @section Verification: Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (`sasonr_unsupported`).
+#' @section Verification: Partial: 5 of 5 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_roundz.R
 #' @family numeric functions
 #' @name sas_f_roundz
 NULL
@@ -2036,7 +2181,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sdf.R
 #' @family probability functions
 #' @name sas_f_sdf
 NULL
@@ -2048,7 +2194,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_second.R
 #' @family datetime functions
 #' @name sas_f_second
 NULL
@@ -2060,7 +2207,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sign.R
 #' @family numeric functions
 #' @name sas_f_sign
 NULL
@@ -2073,7 +2221,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sin.R
 #' @family numeric functions
 #' @name sas_f_sin
 NULL
@@ -2086,7 +2235,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sinh.R
 #' @family numeric functions
 #' @name sas_f_sinh
 NULL
@@ -2098,7 +2248,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Verified against SAS 9.4: 1 offline conformance case(s) agree.
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS.
+#' @example inst/examples/sas_f_skewness.R
 #' @family descriptive functions
 #' @name sas_f_skewness
 NULL
@@ -2111,7 +2262,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_smallest.R
 #' @family descriptive functions
 #' @name sas_f_smallest
 NULL
@@ -2123,7 +2275,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Used by translated code; not a SAS function.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sqlcase.R
 #' @family internal functions
 #' @keywords internal
 #' @name sas_f_sqlcase
@@ -2137,7 +2290,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Used by translated code; not a SAS function.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sqlinlist.R
 #' @family internal functions
 #' @keywords internal
 #' @name sas_f_sqlinlist
@@ -2152,7 +2306,8 @@ NULL
 #' @param escape Escape character.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Used by translated code; not a SAS function.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sqllike.R
 #' @family internal functions
 #' @keywords internal
 #' @name sas_f_sqllike
@@ -2180,7 +2335,8 @@ NULL
 #' @param quant `"any"` or `"all"`.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Used by translated code; not a SAS function.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sqlquant.R
 #' @family internal functions
 #' @keywords internal
 #' @name sas_f_sqlquant
@@ -2194,7 +2350,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_sqrt.R
 #' @family numeric functions
 #' @name sas_f_sqrt
 NULL
@@ -2206,7 +2363,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_std.R
 #' @family descriptive functions
 #' @name sas_f_std
 NULL
@@ -2218,7 +2376,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_stderr.R
 #' @family descriptive functions
 #' @name sas_f_stderr
 NULL
@@ -2230,7 +2389,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Verified against SAS 9.4: 1 offline conformance case(s) agree.
+#' @section Verification: Partial: 3 of 4 example call(s) and 1 of 1 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_strip.R
 #' @family character functions
 #' @name sas_f_strip
 NULL
@@ -2260,7 +2420,8 @@ NULL
 #' @param len Length.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_substrn.R
 #' @family character functions
 #' @name sas_f_substrn
 NULL
@@ -2272,7 +2433,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+#' @example inst/examples/sas_f_sum.R
 #' @family descriptive functions
 #' @name sas_f_sum
 NULL
@@ -2286,7 +2448,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Reads the macro symbol table of the running SAS program.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_symget.R
 #' @family macro functions
 #' @name sas_f_symget
 NULL
@@ -2299,7 +2462,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_tan.R
 #' @family numeric functions
 #' @name sas_f_tan
 NULL
@@ -2312,7 +2476,8 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_tanh.R
 #' @family numeric functions
 #' @name sas_f_tanh
 NULL
@@ -2323,7 +2488,8 @@ NULL
 #'
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 2 example call(s) agree with SAS. The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only.
+#' @example inst/examples/sas_f_time.R
 #' @family datetime functions
 #' @name sas_f_time
 NULL
@@ -2335,7 +2501,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_timepart.R
 #' @family datetime functions
 #' @name sas_f_timepart
 NULL
@@ -2349,7 +2516,8 @@ NULL
 #' @param nc Noncentrality parameter.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_tinv.R
 #' @family probability functions
 #' @name sas_f_tinv
 NULL
@@ -2360,7 +2528,8 @@ NULL
 #'
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS. The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only.
+#' @example inst/examples/sas_f_today.R
 #' @family datetime functions
 #' @name sas_f_today
 NULL
@@ -2373,7 +2542,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_translate.R
 #' @family character functions
 #' @name sas_f_translate
 NULL
@@ -2387,7 +2557,8 @@ NULL
 #' @param to End value.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_transtrn.R
 #' @family character functions
 #' @name sas_f_transtrn
 NULL
@@ -2401,7 +2572,8 @@ NULL
 #' @param to End value.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_tranwrd.R
 #' @family character functions
 #' @name sas_f_tranwrd
 NULL
@@ -2413,7 +2585,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_trim.R
 #' @family character functions
 #' @name sas_f_trim
 NULL
@@ -2425,7 +2598,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_trimn.R
 #' @family character functions
 #' @name sas_f_trimn
 NULL
@@ -2437,7 +2611,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Verified against SAS 9.4: 1 offline conformance case(s) agree.
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) and 1 offline conformance case(s) agree with SAS.
+#' @example inst/examples/sas_f_upcase.R
 #' @family character functions
 #' @name sas_f_upcase
 NULL
@@ -2449,7 +2624,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_uss.R
 #' @family descriptive functions
 #' @name sas_f_uss
 NULL
@@ -2461,7 +2637,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_var.R
 #' @family descriptive functions
 #' @name sas_f_var
 NULL
@@ -2474,7 +2651,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_verify.R
 #' @family character functions
 #' @name sas_f_verify
 NULL
@@ -2487,7 +2665,8 @@ NULL
 #' @param desc Descriptor (`"u"`, `"v"`, `"w"`).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_week.R
 #' @family datetime functions
 #' @name sas_f_week
 NULL
@@ -2499,7 +2678,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_weekday.R
 #' @family datetime functions
 #' @name sas_f_weekday
 NULL
@@ -2512,7 +2692,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_whichc.R
 #' @family character functions
 #' @name sas_f_whichc
 NULL
@@ -2525,7 +2706,8 @@ NULL
 #' @param ... Further arguments, as in SAS (vectorised).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 3 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_whichn.R
 #' @family numeric functions
 #' @name sas_f_whichn
 NULL
@@ -2537,7 +2719,8 @@ NULL
 #' @param x Argument (vector; character values are SAS fixed-width strings).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Verified against SAS 9.4: 4 example call(s) agree with SAS.
+#' @example inst/examples/sas_f_year.R
 #' @family datetime functions
 #' @name sas_f_year
 NULL
@@ -2551,7 +2734,8 @@ NULL
 #' @param basis Day-count basis, as in SAS.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: Not yet verified against SAS (no offline conformance case).
+#' @section Verification: Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+#' @example inst/examples/sas_f_yrdif.R
 #' @family datetime functions
 #' @name sas_f_yrdif
 NULL

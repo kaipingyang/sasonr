@@ -17,9 +17,16 @@ Julian date (yyddd) of a SAS date. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# JULDATE: each call is followed by the result of the same call in SAS 9.4
+# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
+sas_f_juldate(0)  # SAS: juldate('01JAN1960'd) -> 60001
+sas_f_juldate(-21915)  # SAS: juldate('31DEC1899'd) -> 1899365
+sas_f_juldate(NA_real_)  # SAS: juldate(.) -> .
+}
 \seealso{
 Other datetime functions:
 \code{\link[=sas_f_datdif]{sas_f_datdif()}},

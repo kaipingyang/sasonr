@@ -17,9 +17,16 @@ Character with the given byte code. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# BYTE: each call is followed by the result of the same call in SAS 9.4
+sas_f_byte(65)  # SAS: byte(65) -> "A"
+sas_f_byte(97)  # SAS: byte(97) -> "a"
+sas_f_byte(48)  # SAS: byte(48) -> "0"
+sas_f_byte(NA_real_)  # SAS: byte(.) -> ""
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

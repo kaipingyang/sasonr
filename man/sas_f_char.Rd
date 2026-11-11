@@ -19,9 +19,15 @@ Single character at a position. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# CHAR: each call is followed by the result of the same call in SAS 9.4
+sas_f_char("abcdef", 3)  # SAS: char('abcdef', 3) -> "c"
+sas_f_char("abc", 5)  # SAS: char('abc', 5) -> ""
+sas_f_char("abc", 1)  # SAS: char('abc', 1) -> "a"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

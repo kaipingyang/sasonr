@@ -17,9 +17,16 @@ Integer part, without fuzz. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# INTZ: each call is followed by the result of the same call in SAS 9.4
+sas_f_intz(2.7)  # SAS: intz(2.7) -> 2
+sas_f_intz(-2.7)  # SAS: intz(-2.7) -> -2
+sas_f_intz(3 - 1e-13)  # SAS: intz(3 - 1e-13) -> 2
+sas_f_intz(NA_real_)  # SAS: intz(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

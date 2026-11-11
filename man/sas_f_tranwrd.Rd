@@ -21,9 +21,14 @@ Replaces substrings. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# TRANWRD: each call is followed by the result of the same call in SAS 9.4
+sas_f_tranwrd("banana", "an", "AN")  # SAS: tranwrd('banana', 'an', 'AN') -> "bANANa"
+sas_f_tranwrd("a b c", " ", "-")  # SAS: tranwrd('a b c', ' ', '-') -> "a-b-c"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

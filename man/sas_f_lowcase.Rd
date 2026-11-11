@@ -17,9 +17,15 @@ Converts to lowercase. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 1 offline conformance case(s) agree.
+ Verified against SAS 9.4: 3 example call(s) and 1 offline conformance case(s) agree with SAS.
 }
 
+\examples{
+# LOWCASE: each call is followed by the result of the same call in SAS 9.4
+sas_f_lowcase("ABC def")  # SAS: lowcase('ABC def') -> "abc def"
+sas_f_lowcase("")  # SAS: lowcase('') -> ""
+sas_f_lowcase("A1!")  # SAS: lowcase('A1!') -> "a1!"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

@@ -17,9 +17,15 @@ First non-blank character argument. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# COALESCEC: each call is followed by the result of the same call in SAS 9.4
+sas_f_coalescec("", "b", "c")  # SAS: coalescec('', 'b', 'c') -> "b"
+sas_f_coalescec("", " ")  # SAS: coalescec('', ' ') -> ""
+sas_f_coalescec(" a", "b")  # SAS: coalescec(' a', 'b') -> " a"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

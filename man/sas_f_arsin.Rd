@@ -19,9 +19,16 @@ Arcsine. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/t
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# ARSIN: each call is followed by the result of the same call in SAS 9.4
+sas_f_arsin(0.5)  # SAS: arsin(0.5) -> 0.523598775598299
+sas_f_arsin(-1)  # SAS: arsin(-1) -> -1.5707963267949
+sas_f_arsin(NA_real_)  # SAS: arsin(.) -> .
+sas_f_arsin(1.5)  # SAS: arsin(1.5) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

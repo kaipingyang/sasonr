@@ -17,3 +17,8 @@ Expression AST (nested lists with a \code{node} field).
 \description{
 Parse a single SAS expression
 }
+\examples{
+e <- sas_parse_expr("round(x * 2, 0.1) > 3")
+e$node
+sas_parse_expr("age between 18 and 65", where = TRUE)$node
+}

@@ -21,9 +21,17 @@ Rounds to a multiple of the unit, ties to even, with fuzz. See the \href{https:/
 }
 
 \section{Verification}{
- Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ Partial: 5 of 5 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# ROUNDE: each call is followed by the result of the same call in SAS 9.4
+sas_f_rounde(2.5)  # SAS: rounde(2.5) -> 2
+sas_f_rounde(3.5)  # SAS: rounde(3.5) -> 4
+sas_f_rounde(-2.5)  # SAS: rounde(-2.5) -> -2
+sas_f_rounde(2.45, 0.1)  # SAS: rounde(2.45, 0.1) -> 2.4
+sas_f_rounde(NA_real_)  # SAS: rounde(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

@@ -17,9 +17,15 @@ Coefficient of variation. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# CV: each call is followed by the result of the same call in SAS 9.4
+sas_f_cv(1, 2, 3, 4)  # SAS: cv(1, 2, 3, 4) -> 51.6397779494322
+sas_f_cv(2, 2)  # SAS: cv(2, 2) -> 0
+sas_f_cv(1, NA_real_, 3)  # SAS: cv(1, ., 3) -> 70.7106781186548
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

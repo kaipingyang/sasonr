@@ -19,9 +19,15 @@ Repeats a string n + 1 times. See the \href{https://documentation.sas.com/doc/en
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# REPEAT: each call is followed by the result of the same call in SAS 9.4
+sas_f_repeat("ab", 2)  # SAS: repeat('ab', 2) -> "ababab"
+sas_f_repeat("x", 0)  # SAS: repeat('x', 0) -> "x"
+sas_f_repeat("-", 4)  # SAS: repeat('-', 4) -> "-----"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

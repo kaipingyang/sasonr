@@ -21,9 +21,15 @@ Bitwise OR. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# BOR: each call is followed by the result of the same call in SAS 9.4
+sas_f_bor(12, 10)  # SAS: bor(12, 10) -> 14
+sas_f_bor(0, 0)  # SAS: bor(0, 0) -> 0
+sas_f_bor(NA_real_, 1)  # SAS: bor(., 1) -> .
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

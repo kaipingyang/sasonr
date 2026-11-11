@@ -17,9 +17,15 @@ Compresses runs of blanks to one blank. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# COMPBL: each call is followed by the result of the same call in SAS 9.4
+sas_f_compbl("a   b    c")  # SAS: compbl('a   b    c') -> "a b c"
+sas_f_compbl("  a  b")  # SAS: compbl('  a  b') -> " a b"
+sas_f_compbl("a")  # SAS: compbl('a') -> "a"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

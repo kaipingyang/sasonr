@@ -19,9 +19,16 @@ Number of permutations. See the \href{https://documentation.sas.com/doc/en/lefun
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# PERM: each call is followed by the result of the same call in SAS 9.4
+sas_f_perm(5, 2)  # SAS: perm(5, 2) -> 20
+sas_f_perm(5)  # SAS: perm(5) -> 120
+sas_f_perm(10, 0)  # SAS: perm(10, 0) -> 1
+sas_f_perm(NA_real_, 2)  # SAS: perm(., 2) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

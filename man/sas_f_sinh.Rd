@@ -19,9 +19,16 @@ Hyperbolic sine. See the \href{https://documentation.sas.com/doc/en/lefunctionsr
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# SINH: each call is followed by the result of the same call in SAS 9.4
+sas_f_sinh(0)  # SAS: sinh(0) -> 0
+sas_f_sinh(1)  # SAS: sinh(1) -> 1.1752011936438
+sas_f_sinh(-2)  # SAS: sinh(-2) -> -3.626860407847
+sas_f_sinh(NA_real_)  # SAS: sinh(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

@@ -21,9 +21,16 @@ Binomial cumulative probability. See the \href{https://documentation.sas.com/doc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# PROBBNML: each call is followed by the result of the same call in SAS 9.4
+sas_f_probbnml(0.5, 10, 3)  # SAS: probbnml(0.5, 10, 3) -> 0.171875
+sas_f_probbnml(0.2, 5, 5)  # SAS: probbnml(0.2, 5, 5) -> 1
+sas_f_probbnml(0.1, 20, 0)  # SAS: probbnml(0.1, 20, 0) -> 0.1215766545906
+sas_f_probbnml(NA_real_, 5, 1)  # SAS: probbnml(., 5, 1) -> .
+}
 \seealso{
 Other probability functions:
 \code{\link[=sas_f_cdf]{sas_f_cdf()}},

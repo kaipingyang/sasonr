@@ -21,9 +21,16 @@ Reads a character value with an informat given at run time. See the \href{https:
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# INPUTC: each call is followed by the result of the same call in SAS 9.4
+sas_f_inputc("abc", "$3.")  # SAS: inputc('abc', '$3.') -> "abc"
+sas_f_inputc("abc", "$upcase3.")  # SAS: inputc('abc', '$upcase3.') -> "ABC"
+sas_f_inputc("abcdef", "$3.")  # SAS: inputc('abcdef', '$3.') -> "abc"
+sas_f_inputc("abcdef", "$char.", 2)  # SAS: inputc('abcdef', '$char.', 2) -> "ab"
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

@@ -19,9 +19,15 @@ Character value selected by index. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# CHOOSEC: each call is followed by the result of the same call in SAS 9.4
+sas_f_choosec(2, "a", "b", "c")  # SAS: choosec(2, 'a', 'b', 'c') -> "b"
+sas_f_choosec(-1, "a", "b", "c")  # SAS: choosec(-1, 'a', 'b', 'c') -> "c"
+sas_f_choosec(4, "a", "b")  # SAS: choosec(4, 'a', 'b') -> ""
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

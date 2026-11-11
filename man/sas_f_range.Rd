@@ -17,9 +17,16 @@ Range of the non-missing values. See the \href{https://documentation.sas.com/doc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# RANGE: each call is followed by the result of the same call in SAS 9.4
+sas_f_range(1, 5, 3)  # SAS: range(1, 5, 3) -> 4
+sas_f_range(NA_real_, 2)  # SAS: range(., 2) -> 0
+sas_f_range(NA_real_, NA_real_)  # SAS: range(., .) -> .
+sas_f_range(-1, 1)  # SAS: range(-1, 1) -> 2
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

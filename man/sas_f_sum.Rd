@@ -17,9 +17,16 @@ Sum of the non-missing values. See the \href{https://documentation.sas.com/doc/e
 }
 
 \section{Verification}{
- Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+ Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
 }
 
+\examples{
+# SUM: each call is followed by the result of the same call in SAS 9.4
+sas_f_sum(1, 2, 3)  # SAS: sum(1, 2, 3) -> 6
+sas_f_sum(1, NA_real_, 3)  # SAS: sum(1, ., 3) -> 4
+sas_f_sum(NA_real_, NA_real_)  # SAS: sum(., .) -> .
+sas_f_sum(sas_missing(".A"), 1)  # SAS: sum(.A, 1) -> 1
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

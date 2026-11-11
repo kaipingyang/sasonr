@@ -19,9 +19,15 @@ Position of the first non-blank character. See the \href{https://documentation.s
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# NOTSPACE: each call is followed by the result of the same call in SAS 9.4
+sas_f_notspace("  ab")  # SAS: notspace('  ab') -> 3
+sas_f_notspace("   ")  # SAS: notspace('   ') -> 0
+sas_f_notspace("a  b", 2)  # SAS: notspace('a  b', 2) -> 4
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

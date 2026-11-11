@@ -1,0 +1,1089 @@
+# Reference-page examples of the sas_f_* functions (tools/gen_examples.R).
+#
+# One section per function: "## NAME".  Each call line is a SAS expression; the
+# R call is derived from it (sas_f_<name>(...), 'x' -> "x", . -> NA_real_,
+# .A -> sas_missing(".A"), date/time literals -> SAS day/second counts) unless
+# given explicitly after " => ".  Other lines of a section:
+#   glob: <SAS code>   placed before the DATA step (or PROC SQL)
+#   pre:  <SAS code>   placed inside the DATA step before the calls
+#   mode: sql          the calls are PROC SQL select expressions
+#   note: <text>       shown in the example file (e.g. clock-dependent values)
+# tools/gen_examples.R programs   writes tests/conformance/fn_examples/<NAME>/program.sas;
+# the SAS results come from tools/refresh_gold.py.  All data are made up.
+
+## ABS
+abs(-3.5)
+abs(0)
+abs(.)
+abs(.A)
+
+## ANYALNUM
+anyalnum('  ab1')
+anyalnum('!!!')
+anyalnum('a1!', -3)
+anyalnum('!a!', 3)
+
+## ANYALPHA
+anyalpha('12ab')
+anyalpha('123')
+anyalpha('ab12', 3)
+anyalpha('ab12', -4)
+
+## ANYDIGIT
+anydigit('ab12')
+anydigit('abc')
+anydigit('1a2', 2)
+anydigit('1a2', -2)
+
+## ANYLOWER
+anylower('ABc')
+anylower('ABC')
+anylower('aBc', -2)
+
+## ANYPUNCT
+anypunct('ab,c')
+anypunct('abc')
+anypunct('a!b?', 3)
+
+## ANYSPACE
+anyspace('ab c')
+anyspace('abc')
+anyspace('a b c', 3)
+
+## ANYUPPER
+anyupper('abC')
+anyupper('abc')
+anyupper('AbC', -2)
+
+## ARCOS
+arcos(1)
+arcos(0)
+arcos(0.5)
+arcos(.)
+arcos(2)
+
+## ARSIN
+arsin(0.5)
+arsin(-1)
+arsin(.)
+arsin(1.5)
+
+## ATAN
+atan(1)
+atan(-1e10)
+atan(0)
+atan(.)
+
+## ATAN2
+atan2(1, 1)
+atan2(1, -1)
+atan2(-1, -1)
+atan2(., 1)
+
+## BAND
+band(12, 10)
+band(255, 15)
+band(., 1)
+
+## BLSHIFT
+blshift(1, 4)
+blshift(3, 1)
+blshift(., 1)
+
+## BNOT
+bnot(0)
+bnot(4294967295)
+bnot(.)
+
+## BOR
+bor(12, 10)
+bor(0, 0)
+bor(., 1)
+
+## BRSHIFT
+brshift(16, 2)
+brshift(255, 4)
+brshift(., 1)
+
+## BXOR
+bxor(12, 10)
+bxor(5, 5)
+bxor(., 1)
+
+## BETA
+beta(2, 3)
+beta(0.5, 0.5)
+beta(1, 1)
+beta(., 1)
+
+## BYTE
+byte(65)
+byte(97)
+byte(48)
+byte(.)
+
+## CAT
+cat('a', ' b ', 'c ')
+cat('x', 1)
+cat('a', '', 'b')
+cat('a', ., 'b')
+
+## CATS
+cats(' a ', 'b ', ' c')
+cats('x', 12.5)
+cats('', '')
+cats('a', ., 'b')
+
+## CATT
+catt(' a ', 'b ', ' c')
+catt('x', 3)
+catt('a', '', 'b')
+
+## CDF
+cdf('NORMAL', 1.96)
+cdf('BINOMIAL', 3, 0.5, 10)
+cdf('POISSON', 2, 1.5)
+cdf('T', 2, 5)
+cdf('NORMAL', .)
+
+## CEIL
+ceil(2.1)
+ceil(-2.1)
+ceil(1 + 1e-13)
+ceil(.)
+
+## CEILZ
+ceilz(2.1)
+ceilz(1 + 1e-13)
+ceilz(-2.5)
+ceilz(.)
+
+## CHAR
+char('abcdef', 3)
+char('abc', 5)
+char('abc', 1)
+
+## CHOOSEC
+choosec(2, 'a', 'b', 'c')
+choosec(-1, 'a', 'b', 'c')
+choosec(4, 'a', 'b')
+
+## CHOOSEN
+choosen(2, 10, 20, 30)
+choosen(-1, 10, 20, 30)
+choosen(5, 1, 2)
+
+## CINV
+cinv(0.95, 3)
+cinv(0.5, 1)
+cinv(0.95, 3, 2)
+cinv(., 2)
+
+## CMISS
+cmiss(1, ., 'a', '')
+cmiss(.A)
+cmiss('x', 2)
+
+## COALESCE
+coalesce(., 2, 3)
+coalesce(., .)
+coalesce(.A, ._, 5)
+
+## COALESCEC
+coalescec('', 'b', 'c')
+coalescec('', ' ')
+coalescec(' a', 'b')
+
+## COLLATE
+collate(65, 70)
+collate(48, , 10) => sas_f_collate(48, len = 10)
+collate(97, 99)
+
+## COMB
+comb(5, 2)
+comb(10, 0)
+comb(52, 5)
+comb(., 2)
+
+## COMPARE
+compare('abc', 'abc')
+compare('abc', 'abd')
+compare('abd', 'abc')
+compare('ABC', 'abc', 'i')
+compare('abc', 'ab')
+compare('ab', 'abc', ':')
+
+## COMPBL
+compbl('a   b    c')
+compbl('  a  b')
+compbl('a')
+
+## CONSTANT
+constant('PI')
+constant('E')
+constant('EULER')
+constant('MACEPS')
+constant('BIG')
+
+## COS
+cos(0)
+cos(1)
+cos(-3.5)
+cos(.)
+
+## COSH
+cosh(0)
+cosh(1)
+cosh(-2)
+cosh(.)
+
+## COUNT
+count('banana', 'an')
+count('Banana', 'b', 'i')
+count('aaa', 'aa')
+count('abc', 'x')
+
+## COUNTC
+countc('banana', 'an')
+countc('abc', 'x')
+countc('aBc', 'b', 'i')
+countc('abc', 'ab', 'v')
+
+## COUNTW
+countw('a b  c')
+countw('a,b,,c', ',')
+countw('a,b,,c', ',', 'm')
+countw('')
+
+## CSS
+css(1, 2, 3, 4)
+css(1, ., 3)
+css(5)
+css(., .)
+
+## CV
+cv(1, 2, 3, 4)
+cv(2, 2)
+cv(1, ., 3)
+
+## CVT_C2N
+' 12 ' + 0 => sas_f_cvt_c2n(" 12 ")
+'1e3' + 0 => sas_f_cvt_c2n("1e3")
+'-.5' + 0 => sas_f_cvt_c2n("-.5")
+'abc' + 0 => sas_f_cvt_c2n("abc")
+
+## CVT_N2C
+pre: length r1-r4 $12;
+3.5 => sas_f_cvt_n2c(3.5)
+-12 => sas_f_cvt_n2c(-12)
+1e15 => sas_f_cvt_n2c(1e15)
+1/3 => sas_f_cvt_n2c(1/3)
+
+## DATDIF
+datdif('01JAN2024'd, '01MAR2024'd, 'ACT/ACT')
+datdif('01JAN2024'd, '01MAR2024'd, '30/360')
+datdif('31JAN2024'd, '01MAR2024'd, '30/360')
+datdif('01MAR2024'd, '01JAN2024'd, 'ACT/ACT')
+
+## DATE
+note: DATE() returns the current date (the clock of the session), so its value cannot be reproduced; the examples check its type and range only.
+date() = today() => as.numeric(sas_f_date() == sas_f_today())
+date() > '01JAN2024'd => as.numeric(sas_f_date() > 23376)
+date() = int(date()) => as.numeric(sas_f_date() == sas_f_int(sas_f_date()))
+
+## DATEJUL
+datejul(2024075)
+datejul(2024001)
+datejul(1960001)
+datejul(.)
+
+## DATEPART
+datepart('15MAR2024:10:30:00'dt)
+datepart(0)
+datepart(-1)
+datepart(.)
+
+## DATETIME
+note: DATETIME() returns the current date and time (the clock of the session), so its value cannot be reproduced; the examples check its type and range only.
+datetime() > '01JAN2024:00:00:00'dt => as.numeric(sas_f_datetime() > 2019686400)
+datepart(datetime()) = today() => as.numeric(sas_f_datepart(sas_f_datetime()) == sas_f_today())
+
+## DAY
+day('15MAR2024'd)
+day(0)
+day('29FEB2024'd)
+day(.)
+
+## DEQUOTE
+dequote('"abc"')
+dequote("'a''b'")
+dequote('abc')
+dequote('"ab"cd')
+
+## DHMS
+dhms('15MAR2024'd, 10, 30, 15)
+dhms(0, 25, 0, 0)
+dhms(0, 0, 0, 0.5)
+dhms(., 1, 1, 1)
+
+## DIVIDE
+divide(1, 2)
+divide(1, 0)
+divide(-1, 0)
+divide(0, 0)
+divide(., 2)
+
+## EXP
+exp(1)
+exp(0)
+exp(-1)
+exp(.)
+exp(1000)
+
+## FACT
+fact(5)
+fact(0)
+fact(20)
+fact(.)
+
+## FIND
+find('abcabc', 'bc')
+find('abcabc', 'BC', 'i')
+find('abcabc', 'bc', 3)
+find('abcabc', 'bc', -4)
+find('abc', 'x')
+
+## FINDC
+findc('abc', 'cb')
+findc('abc', 'x')
+findc('abc', 'B', 'i')
+findc('abc', 'a', 'k')
+findc('ab1', '', 'd')
+
+## FINDW
+findw('the cat sat', 'cat')
+findw('the cat sat', 'at')
+findw('a,b,c', 'b', ',')
+findw('The Cat', 'cat', ' ', 'i')
+findw('the cat sat', 'sat', ' ', 'e')
+
+## FINV
+finv(0.95, 2, 10)
+finv(0.5, 1, 1)
+finv(0.95, 2, 10, 1)
+finv(., 1, 1)
+
+## FIRST
+first('abc')
+first('  x')
+first('')
+
+## FLOOR
+floor(2.7)
+floor(-2.1)
+floor(3 - 1e-13)
+floor(.)
+
+## FLOORZ
+floorz(2.7)
+floorz(3 - 1e-13)
+floorz(-2.5)
+floorz(.)
+
+## GAMMA
+gamma(5)
+gamma(0.5)
+gamma(-1.5)
+gamma(.)
+gamma(0)
+
+## GCD
+gcd(12, 18)
+gcd(7, 13)
+gcd(12, 18, 8)
+gcd(12, .)
+
+## GEOMEAN
+geomean(1, 2, 4)
+geomean(1, ., 9)
+geomean(0, 4)
+geomean(., .)
+
+## HARMEAN
+harmean(1, 2, 4)
+harmean(2, ., 2)
+harmean(1, 1)
+harmean(., .)
+
+## HMS
+hms(10, 30, 15)
+hms(0, 90, 0)
+hms(1, 0, 0.25)
+hms(., 1, 1)
+
+## HOUR
+hour('10:30:15't)
+hour('15MAR2024:23:59:59'dt)
+hour(0)
+hour(.)
+
+## IFC
+ifc(1, 'yes', 'no')
+ifc(0, 'yes', 'no')
+ifc(., 'yes', 'no', 'miss')
+ifc(2 > 1, 'a', 'b')
+
+## IFN
+ifn(1, 10, 20)
+ifn(0, 10, 20)
+ifn(., 10, 20, 99)
+ifn(-1, 10, 20)
+
+## INDEXC
+indexc('abcdef', 'fd')
+indexc('abc', 'x', 'yz')
+indexc('abc', 'x', 'c')
+indexc('ABC', 'b')
+
+## INDEXW
+indexw('the cat sat', 'cat')
+indexw('the cat sat', 'at')
+indexw('a;b;c', 'b', ';')
+indexw('cat', 'cat')
+
+## INPUT
+input('123', 8.) => sas_f_input("123", list(name = "", w = 8L, d = NA_integer_, char = FALSE, text = "8."))
+input('1234', 4.2) => sas_f_input("1234", list(name = "", w = 4L, d = 2L, char = FALSE, text = "4.2"))
+input('1,234', comma8.) => sas_f_input("1,234", list(name = "comma", w = 8L, d = NA_integer_, char = FALSE, text = "comma8."))
+input('abc', ?? 8.) => sas_f_input("abc", list(name = "", w = 8L, d = NA_integer_, char = FALSE, text = "8."), qq = "??")
+input('abcdef', $3.) => sas_f_input("abcdef", list(name = "", w = 3L, d = NA_integer_, char = TRUE, text = "$3."))
+
+## INPUTC
+inputc('abc', '$3.')
+inputc('abc', '$upcase3.')
+inputc('abcdef', '$3.')
+inputc('abcdef', '$char.', 2)
+
+## INT
+int(2.7)
+int(-2.7)
+int(3 - 1e-13)
+int(.)
+
+## INTZ
+intz(2.7)
+intz(-2.7)
+intz(3 - 1e-13)
+intz(.)
+
+## JULDATE
+juldate('15MAR2024'd)
+juldate('01JAN1960'd)
+juldate('31DEC1899'd)
+juldate(.)
+
+## JULDATE7
+juldate7('15MAR2024'd)
+juldate7(0)
+juldate7('31DEC1899'd)
+juldate7(.)
+
+## KURTOSIS
+kurtosis(1, 2, 3, 4, 10)
+kurtosis(2, 4, 4, 4, 5, 5, 7, 9)
+kurtosis(1, 2, ., 3, 4, 8)
+kurtosis(1, 1, 1, 1)
+
+## LARGEST
+largest(1, 3, 9, 5)
+largest(2, 3, 9, 5)
+largest(1, ., 4, .)
+largest(3, 3, .)
+
+## LCM
+lcm(4, 6)
+lcm(3, 5, 7)
+lcm(4, .)
+
+## LEFT
+left('  abc')
+left('abc')
+left('   ')
+lengthc(left('  ab')) => sas_f_lengthc(sas_f_left("  ab"))
+
+## LENGTH
+length('abc  ')
+length('')
+length('  a')
+length(123)
+
+## LENGTHC
+lengthc('abc  ')
+lengthc('')
+lengthc('a')
+
+## LENGTHM
+lengthm('abc  ')
+lengthm('')
+lengthm('abcdef')
+
+## LENGTHN
+lengthn('abc  ')
+lengthn('')
+lengthn('  a')
+
+## LGAMMA
+lgamma(10)
+lgamma(0.5)
+lgamma(100)
+lgamma(.)
+
+## LOG
+log(10)
+log(1)
+log(0)
+log(-1)
+log(.)
+
+## LOG10
+log10(1000)
+log10(2)
+log10(0.001)
+log10(0)
+
+## LOG2
+log2(8)
+log2(10)
+log2(0.5)
+log2(-1)
+
+## LOGBETA
+logbeta(2, 3)
+logbeta(0.5, 0.5)
+logbeta(100, 100)
+logbeta(., 1)
+
+## LOGCDF
+logcdf('NORMAL', 0)
+logcdf('NORMAL', -10)
+logcdf('POISSON', 2, 1)
+logcdf('NORMAL', .)
+
+## LOGPDF
+logpdf('NORMAL', 0)
+logpdf('EXPONENTIAL', 1, 2)
+logpdf('BINOMIAL', 3, 0.5, 10)
+logpdf('NORMAL', .)
+
+## LOGSDF
+logsdf('NORMAL', 0)
+logsdf('NORMAL', 10)
+logsdf('T', 1, 3)
+logsdf('NORMAL', .)
+
+## LOWCASE
+lowcase('ABC def')
+lowcase('')
+lowcase('A1!')
+
+## MAX
+max(1, 5, 3)
+max(., 2)
+max(., .)
+max(.A, 1)
+max(-1, .B)
+
+## MDY
+mdy(3, 15, 2024)
+mdy(2, 30, 2024)
+mdy(1, 1, 1960)
+mdy(., 1, 2024)
+
+## MEAN
+mean(1, 2, 3, 4)
+mean(1, ., 3)
+mean(., .)
+mean(.A, 4)
+
+## MEDIAN
+median(1, 3, 2, 10)
+median(5, ., 1)
+median(7)
+median(., .)
+
+## MIN
+min(1, 5, 3)
+min(., 2)
+min(., .)
+min(.A, 1)
+
+## MINUTE
+minute('10:30:15't)
+minute('15MAR2024:23:59:59'dt)
+minute(0)
+minute(.)
+
+## MISSING
+missing(.)
+missing(.A)
+missing(0)
+missing('')
+missing(' a')
+
+## MOD
+mod(10, 3)
+mod(-10, 3)
+mod(10, -3)
+mod(5.5, 2)
+mod(0.3, 0.1)
+mod(10, 0)
+
+## MODZ
+modz(10, 3)
+modz(-10, 3)
+modz(5.5, 2)
+modz(0.3, 0.1)
+
+## MONTH
+month('15MAR2024'd)
+month(0)
+month('31DEC2024'd)
+month(.)
+
+## N
+n(1, ., 3)
+n(., .)
+n(.A, 1)
+n(0)
+
+## NMISS
+nmiss(1, ., 3)
+nmiss(.A, ._, 0)
+nmiss(1, 2)
+
+## NOTALNUM
+notalnum('ab1!')
+notalnum('abc')
+notalnum('a!b', -3)
+
+## NOTALPHA
+notalpha('ab1')
+notalpha('abc')
+notalpha('a1b', 3)
+
+## NOTDIGIT
+notdigit('12a')
+notdigit('123')
+notdigit('1a2b', -3)
+
+## NOTLOWER
+notlower('abC')
+notlower('abc')
+notlower('aBc', 3)
+
+## NOTPUNCT
+notpunct('!!a')
+notpunct('!?')
+notpunct('a!b', 2)
+
+## NOTSPACE
+notspace('  ab')
+notspace('   ')
+notspace('a  b', 2)
+
+## NOTUPPER
+notupper('ABc')
+notupper('ABC')
+notupper('aBC', -3)
+
+## NVALID
+nvalid('abc')
+nvalid('1abc')
+nvalid('my var', 'v7')
+nvalid('my var', 'any')
+nvalid('_x1', 'nliteral')
+
+## ORDINAL
+ordinal(2, 5, 1, 3)
+ordinal(1, ., 2)
+ordinal(3, 3, 1, 2)
+
+## PCTL
+pctl(50, 1, 2, 3, 4)
+pctl(25, 1, 2, 3, 4)
+pctl(100, 5, ., 9)
+pctl(10, 7)
+
+## PDF
+pdf('NORMAL', 0)
+pdf('BINOMIAL', 3, 0.5, 10)
+pdf('POISSON', 2, 1.5)
+pdf('UNIFORM', 0.5)
+pdf('NORMAL', .)
+
+## PERM
+perm(5, 2)
+perm(5)
+perm(10, 0)
+perm(., 2)
+
+## POISSON
+poisson(1.5, 2)
+poisson(0.5, 0)
+poisson(10, 15)
+poisson(., 1)
+
+## PROBBNML
+probbnml(0.5, 10, 3)
+probbnml(0.2, 5, 5)
+probbnml(0.1, 20, 0)
+probbnml(., 5, 1)
+
+## PROBCHI
+probchi(3.84, 1)
+probchi(2, 3)
+probchi(2, 3, 1)
+probchi(., 1)
+
+## PROBF
+probf(4, 2, 10)
+probf(1, 1, 1)
+probf(1, 2, 10, 1)
+probf(., 1, 1)
+
+## PROBIT
+probit(0.975)
+probit(0.5)
+probit(1e-10)
+probit(.)
+
+## PROBNORM
+probnorm(1.96)
+probnorm(0)
+probnorm(-10)
+probnorm(.)
+
+## PROBT
+probt(2, 10)
+probt(0, 5)
+probt(2, 10, 1)
+probt(., 5)
+
+## PROPCASE
+propcase('hello WORLD')
+propcase('a-b c', '-')
+propcase('jean-luc')
+propcase('')
+
+## PRXCHANGE
+prxchange('s/a/X/', -1, 'banana')
+prxchange('s/a/X/', 1, 'banana')
+prxchange('s/(\w+) (\w+)/$2 $1/', -1, 'hello world')
+prxchange('s/x/y/i', -1, 'XxX')
+
+## PRXMATCH
+prxmatch('/b+/', 'abbc')
+prxmatch('/z/', 'abc')
+prxmatch('/B/i', 'abc')
+prxmatch('/^a/', ' abc')
+
+## PRXPARSE
+prxparse('/a+/')
+prxparse('/b/i')
+
+## PUT
+put(3.14159, 8.3) => sas_f_put(3.14159, list(name = "", w = 8L, d = 3L, char = FALSE, text = "8.3"))
+put(42, z5.) => sas_f_put(42, list(name = "z", w = 5L, d = NA_integer_, char = FALSE, text = "z5."))
+put(1234567, comma10.) => sas_f_put(1234567, list(name = "comma", w = 10L, d = NA_integer_, char = FALSE, text = "comma10."))
+put(., 8.2) => sas_f_put(NA_real_, list(name = "", w = 8L, d = 2L, char = FALSE, text = "8.2"))
+put('ab', $5.) => sas_f_put("ab", list(name = "", w = 5L, d = NA_integer_, char = TRUE, text = "$5."))
+
+## PUTC
+putc('abc', '$5.')
+putc('abc', '$upcase3.')
+putc('abc', '$hex6.')
+putc('abcdef', '$3.')
+
+## QTR
+qtr('15MAR2024'd)
+qtr('15NOV2024'd)
+qtr(0)
+qtr(.)
+
+## QUANTILE
+quantile('NORMAL', 0.975)
+quantile('T', 0.975, 10)
+quantile('CHISQ', 0.95, 3)
+quantile('BINOMIAL', 0.5, 0.5, 10)
+quantile('NORMAL', .)
+
+## QUOTE
+quote('abc')
+quote('a"b')
+quote('abc', "'")
+quote('')
+
+## RANGE
+range(1, 5, 3)
+range(., 2)
+range(., .)
+range(-1, 1)
+
+## RANK
+rank('A')
+rank('a')
+rank(' ')
+rank('0')
+
+## REPEAT
+repeat('ab', 2)
+repeat('x', 0)
+repeat('-', 4)
+
+## REVERSE
+reverse('abc')
+reverse('abc  ')
+reverse('')
+
+## RIGHT
+right('abc  ')
+right('  abc')
+right('')
+
+## ROUNDE
+rounde(2.5)
+rounde(3.5)
+rounde(-2.5)
+rounde(2.45, 0.1)
+rounde(.)
+
+## ROUNDZ
+roundz(2.5)
+roundz(2.45, 0.1)
+roundz(1.005, 0.01)
+roundz(-3.5)
+roundz(.)
+
+## SDF
+sdf('NORMAL', 1.96)
+sdf('POISSON', 2, 1.5)
+sdf('EXPONENTIAL', 1)
+sdf('NORMAL', .)
+
+## SECOND
+second('10:30:15't)
+second('15MAR2024:10:30:15.5'dt)
+second(0)
+second(.)
+
+## SIGN
+sign(-3)
+sign(0)
+sign(2.5)
+sign(.)
+
+## SIN
+sin(0)
+sin(1)
+sin(-3.5)
+sin(.)
+
+## SINH
+sinh(0)
+sinh(1)
+sinh(-2)
+sinh(.)
+
+## SKEWNESS
+skewness(1, 2, 3, 10)
+skewness(1, 2, ., 3)
+skewness(2, 4, 4, 4, 5, 5, 7, 9)
+skewness(1, 1, 1)
+
+## SMALLEST
+smallest(1, 3, 9, 5)
+smallest(2, ., 9, 5)
+smallest(3, 1, 2)
+smallest(1, ., .)
+
+## SQRT
+sqrt(16)
+sqrt(2)
+sqrt(-1)
+sqrt(.)
+
+## STD
+std(1, 2, 3, 4)
+std(5, ., 7)
+std(5, .)
+std(2, 4, 4, 4, 5, 5, 7, 9)
+
+## STDERR
+stderr(1, 2, 3, 4)
+stderr(2, 4)
+stderr(5, .)
+
+## STRIP
+strip('  a b  ')
+strip('')
+strip('abc')
+lengthc(strip('   ')) => sas_f_lengthc(sas_f_strip("   "))
+
+## SUBSTRN
+substrn('abcdef', 2, 3)
+substrn('abcdef', 0, 3)
+substrn('abcdef', 5, 10)
+substrn('abc', 4)
+
+## SUM
+sum(1, 2, 3)
+sum(1, ., 3)
+sum(., .)
+sum(.A, 1)
+
+## SYMGET
+glob: %let mv = hello;
+symget('mv') => sas_f_symget(list2env(list(mv = "hello")), "mv")
+symget('MV') => sas_f_symget(list2env(list(mv = "hello")), "MV")
+symget(' mv ') => sas_f_symget(list2env(list(mv = "hello")), " mv ")
+
+## TAN
+tan(0)
+tan(1)
+tan(-0.5)
+tan(.)
+
+## TANH
+tanh(0)
+tanh(1)
+tanh(20)
+tanh(.)
+
+## TIME
+note: TIME() returns the current time of day (the clock of the session), so its value cannot be reproduced; the examples check its type and range only.
+time() >= 0 => as.numeric(sas_f_time() >= 0)
+time() < 86400 => as.numeric(sas_f_time() < 86400)
+
+## TIMEPART
+timepart('15MAR2024:10:30:15'dt)
+timepart(-1)
+timepart(0)
+timepart(.)
+
+## TINV
+tinv(0.975, 10)
+tinv(0.5, 5)
+tinv(0.975, 10, 1)
+tinv(., 5)
+
+## TODAY
+note: TODAY() returns the current date (the clock of the session), so its value cannot be reproduced; the examples check its type and range only.
+today() = date() => as.numeric(sas_f_today() == sas_f_date())
+today() > '01JAN2024'd => as.numeric(sas_f_today() > 23376)
+weekday(today()) <= 7 => as.numeric(sas_f_weekday(sas_f_today()) <= 7)
+
+## TRANSLATE
+translate('abcabc', 'xy', 'ab')
+translate('abc', 'X', 'a', 'Y', 'b')
+translate('abc', 'x', 'z')
+
+## TRANSTRN
+transtrn('banana', 'an', 'AN')
+transtrn('abc', 'b', trimn(''))
+transtrn('abc', 'x', 'y')
+
+## TRANWRD
+tranwrd('banana', 'an', 'AN')
+tranwrd('a b c', ' ', '-')
+tranwrd('abc', 'b', '')
+
+## TRIM
+trim('abc  ')
+trim('  a')
+lengthc(trim('   ')) => sas_f_lengthc(sas_f_trim("   "))
+
+## TRIMN
+trimn('abc  ')
+trimn('  a')
+lengthc(trimn('   ')) => sas_f_lengthc(sas_f_trimn("   "))
+
+## UPCASE
+upcase('abc Def')
+upcase('')
+upcase('a1!')
+
+## USS
+uss(1, 2, 3)
+uss(1, ., 2)
+uss(., .)
+
+## VAR
+var(1, 2, 3, 4)
+var(5, ., 7)
+var(5, .)
+
+## VERIFY
+verify('abc123', 'abc')
+verify('aaa', 'a')
+verify('ab ', 'ab')
+verify('abcd', 'ab', 'c')
+
+## WEEK
+week('15MAR2024'd)
+week('15MAR2024'd, 'v')
+week('15MAR2024'd, 'w')
+week('01JAN2023'd, 'v')
+
+## WEEKDAY
+weekday('15MAR2024'd)
+weekday(0)
+weekday('17MAR2024'd)
+weekday(.)
+
+## WHICHC
+whichc('b', 'a', 'b', 'c')
+whichc('x', 'a', 'b')
+whichc('a ', 'a')
+
+## WHICHN
+whichn(2, 1, 2, 3)
+whichn(9, 1, 2)
+whichn(., 1, ., 3)
+
+## YEAR
+year('15MAR2024'd)
+year(0)
+year(-1)
+year(.)
+
+## YRDIF
+yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/ACT')
+yrdif('15MAR2000'd, '14MAR2024'd, 'AGE')
+yrdif('01JAN2020'd, '01JUL2024'd, '30/360')
+yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/365')
+
+## SQLCASE
+mode: sql
+case when 2 > 1 then 'yes' else 'no' end => sas_f_sqlcase(2 > 1, "yes", "no")
+case when 1 > 2 then 1 when 2 > 1 then 2 else 3 end => sas_f_sqlcase(1 > 2, 1, 2 > 1, 2, 3)
+case when 1 > 2 then 1 else 3 end => sas_f_sqlcase(1 > 2, 1, 3)
+
+## SQLINLIST
+mode: sql
+2 in (1, 2, 3) => sas_f_sqlinlist(2, 1, 2, 3)
+'b' in ('a', 'c') => sas_f_sqlinlist("b", "a", "c")
+. in (., 1) => sas_f_sqlinlist(NA, NA, 1)
+
+## SQLLIKE
+mode: sql
+'abc' like 'a%' => as.numeric(sas_f_sqllike("abc", "a%"))
+'abc' like '_b_' => as.numeric(sas_f_sqllike("abc", "_b_"))
+'abc' like 'b%' => as.numeric(sas_f_sqllike("abc", "b%"))
+'a%c' like 'a\%c' escape '\' => as.numeric(sas_f_sqllike("a%c", "a\\%c", "\\"))
+
+## SQLQUANT
+mode: sql
+glob: data work.t; v = 2; output; v = 3; output; run;
+1 < any (select v from work.t) => sas_f_sqlquant(1, c(2, 3), "<", "any")
+3 > all (select v from work.t) => sas_f_sqlquant(3, c(2, 3), ">", "all")
+3 >= all (select v from work.t) => sas_f_sqlquant(3, c(2, 3), ">=", "all")

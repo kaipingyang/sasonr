@@ -33,6 +33,11 @@ export_values <- function(x, fmt) {
 #' with columns memname, varnum, name, type, length, format, informat, label.
 #' @param res A `sasonr_result`.
 #' @param dir Output directory (created if needed).
+#' @examples
+#' res <- sas_run("data a; x = 1.5; y = 'b'; run;")
+#' out <- file.path(tempdir(), "work_csv")
+#' sas_export_work(res, out)
+#' readLines(file.path(out, "A.csv"))
 #' @export
 sas_export_work <- function(res, dir) {
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)

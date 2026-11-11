@@ -21,9 +21,15 @@ Replaces substrings (zero-length allowed). See the \href{https://documentation.s
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# TRANSTRN: each call is followed by the result of the same call in SAS 9.4
+sas_f_transtrn("banana", "an", "AN")  # SAS: transtrn('banana', 'an', 'AN') -> "bANANa"
+sas_f_transtrn("abc", "b", sas_f_trimn(""))  # SAS: transtrn('abc', 'b', trimn('')) -> "ac"
+sas_f_transtrn("abc", "x", "y")  # SAS: transtrn('abc', 'x', 'y') -> "abc"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

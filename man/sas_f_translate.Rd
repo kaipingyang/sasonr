@@ -19,9 +19,15 @@ Replaces characters. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# TRANSLATE: each call is followed by the result of the same call in SAS 9.4
+sas_f_translate("abcabc", "xy", "ab")  # SAS: translate('abcabc', 'xy', 'ab') -> "xycxyc"
+sas_f_translate("abc", "X", "a", "Y", "b")  # SAS: translate('abc', 'X', 'a', 'Y', 'b') -> "XYc"
+sas_f_translate("abc", "x", "z")  # SAS: translate('abc', 'x', 'z') -> "abc"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

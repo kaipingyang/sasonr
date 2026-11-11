@@ -17,9 +17,16 @@ Integer part, with fuzz. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# INT: each call is followed by the result of the same call in SAS 9.4
+sas_f_int(2.7)  # SAS: int(2.7) -> 2
+sas_f_int(-2.7)  # SAS: int(-2.7) -> -2
+sas_f_int(3 - 1e-13)  # SAS: int(3 - 1e-13) -> 3
+sas_f_int(NA_real_)  # SAS: int(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

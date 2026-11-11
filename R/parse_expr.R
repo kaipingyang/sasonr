@@ -83,6 +83,10 @@ tk_adjacent <- function(p, k1 = 0L, k2 = 1L) {
 #' @param text SAS expression source.
 #' @param where Parse in WHERE context (enables BETWEEN, CONTAINS, IS MISSING).
 #' @return Expression AST (nested lists with a `node` field).
+#' @examples
+#' e <- sas_parse_expr("round(x * 2, 0.1) > 3")
+#' e$node
+#' sas_parse_expr("age between 18 and 65", where = TRUE)$node
 #' @export
 sas_parse_expr <- function(text, where = FALSE) {
   p <- new_parser(sas_lex(text))

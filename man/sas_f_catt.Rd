@@ -17,9 +17,14 @@ Concatenates after removing trailing blanks. See the \href{https://documentation
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# CATT: each call is followed by the result of the same call in SAS 9.4
+sas_f_catt(" a ", "b ", " c")  # SAS: catt(' a ', 'b ', ' c') -> " ab c"
+sas_f_catt("a", "", "b")  # SAS: catt('a', '', 'b') -> "ab"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

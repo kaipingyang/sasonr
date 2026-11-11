@@ -21,9 +21,16 @@ Quantile of the t distribution. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# TINV: each call is followed by the result of the same call in SAS 9.4
+sas_f_tinv(0.975, 10)  # SAS: tinv(0.975, 10) -> 2.2281388519863
+sas_f_tinv(0.5, 5)  # SAS: tinv(0.5, 5) -> 0
+sas_f_tinv(0.975, 10, 1)  # SAS: tinv(0.975, 10, 1) -> 3.540505535
+sas_f_tinv(NA_real_, 5)  # SAS: tinv(., 5) -> .
+}
 \seealso{
 Other probability functions:
 \code{\link[=sas_f_cdf]{sas_f_cdf()}},

@@ -17,9 +17,16 @@ Largest integer <= the argument, without fuzz. See the \href{https://documentati
 }
 
 \section{Verification}{
- Partial: 3 of 6 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# FLOORZ: each call is followed by the result of the same call in SAS 9.4
+sas_f_floorz(2.7)  # SAS: floorz(2.7) -> 2
+sas_f_floorz(3 - 1e-13)  # SAS: floorz(3 - 1e-13) -> 2
+sas_f_floorz(-2.5)  # SAS: floorz(-2.5) -> -3
+sas_f_floorz(NA_real_)  # SAS: floorz(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

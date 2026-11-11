@@ -17,9 +17,16 @@ Left-aligns a string. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# LEFT: each call is followed by the result of the same call in SAS 9.4
+sas_f_left("  abc")  # SAS: left('  abc') -> "abc"
+sas_f_left("abc")  # SAS: left('abc') -> "abc"
+sas_f_left("   ")  # SAS: left('   ') -> ""
+sas_f_lengthc(sas_f_left("  ab"))  # SAS: lengthc(left('  ab')) -> 4
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

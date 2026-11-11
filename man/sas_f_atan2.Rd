@@ -19,9 +19,16 @@ Arctangent of the quotient of two arguments. See the \href{https://documentation
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# ATAN2: each call is followed by the result of the same call in SAS 9.4
+sas_f_atan2(1, 1)  # SAS: atan2(1, 1) -> 0.785398163397448
+sas_f_atan2(1, -1)  # SAS: atan2(1, -1) -> 2.35619449019234
+sas_f_atan2(-1, -1)  # SAS: atan2(-1, -1) -> -2.35619449019234
+sas_f_atan2(NA_real_, 1)  # SAS: atan2(., 1) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

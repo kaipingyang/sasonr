@@ -17,9 +17,16 @@ SAS date from a Julian date (yyddd or yyyyddd). See the \href{https://documentat
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# DATEJUL: each call is followed by the result of the same call in SAS 9.4
+sas_f_datejul(2024075)  # SAS: datejul(2024075) -> 23450
+sas_f_datejul(2024001)  # SAS: datejul(2024001) -> 23376
+sas_f_datejul(1960001)  # SAS: datejul(1960001) -> 0
+sas_f_datejul(NA_real_)  # SAS: datejul(.) -> .
+}
 \seealso{
 Other datetime functions:
 \code{\link[=sas_f_datdif]{sas_f_datdif()}},

@@ -17,9 +17,15 @@ Least common multiple. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# LCM: each call is followed by the result of the same call in SAS 9.4
+sas_f_lcm(4, 6)  # SAS: lcm(4, 6) -> 12
+sas_f_lcm(3, 5, 7)  # SAS: lcm(3, 5, 7) -> 105
+sas_f_lcm(4, NA_real_)  # SAS: lcm(4, .) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

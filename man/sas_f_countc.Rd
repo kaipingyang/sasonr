@@ -21,9 +21,15 @@ Number of occurrences of the listed characters. See the \href{https://documentat
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# COUNTC: each call is followed by the result of the same call in SAS 9.4
+sas_f_countc("banana", "an")  # SAS: countc('banana', 'an') -> 5
+sas_f_countc("abc", "x")  # SAS: countc('abc', 'x') -> 0
+sas_f_countc("aBc", "b", "i")  # SAS: countc('aBc', 'b', 'i') -> 1
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

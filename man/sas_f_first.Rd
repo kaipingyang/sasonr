@@ -17,9 +17,15 @@ First character. See the \href{https://documentation.sas.com/doc/en/lefunctionsr
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 3 example call(s) agree with SAS.
 }
 
+\examples{
+# FIRST: each call is followed by the result of the same call in SAS 9.4
+sas_f_first("abc")  # SAS: first('abc') -> "a"
+sas_f_first("  x")  # SAS: first('  x') -> ""
+sas_f_first("")  # SAS: first('') -> ""
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

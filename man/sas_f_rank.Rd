@@ -17,9 +17,16 @@ Position of a character in the collating sequence. See the \href{https://documen
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# RANK: each call is followed by the result of the same call in SAS 9.4
+sas_f_rank("A")  # SAS: rank('A') -> 65
+sas_f_rank("a")  # SAS: rank('a') -> 97
+sas_f_rank(" ")  # SAS: rank(' ') -> 32
+sas_f_rank("0")  # SAS: rank('0') -> 48
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

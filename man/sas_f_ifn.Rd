@@ -23,9 +23,16 @@ Numeric value chosen by a condition. See the \href{https://documentation.sas.com
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# IFN: each call is followed by the result of the same call in SAS 9.4
+sas_f_ifn(1, 10, 20)  # SAS: ifn(1, 10, 20) -> 10
+sas_f_ifn(0, 10, 20)  # SAS: ifn(0, 10, 20) -> 20
+sas_f_ifn(NA_real_, 10, 20, 99)  # SAS: ifn(., 10, 20, 99) -> 99
+sas_f_ifn(-1, 10, 20)  # SAS: ifn(-1, 10, 20) -> 10
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

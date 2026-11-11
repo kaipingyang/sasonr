@@ -19,9 +19,14 @@ Compiles a Perl regular expression. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 2 example call(s) agree with SAS.
 }
 
+\examples{
+# PRXPARSE: each call is followed by the result of the same call in SAS 9.4
+sas_f_prxparse("/a+/")  # SAS: prxparse('/a+/') -> 1
+sas_f_prxparse("/b/i")  # SAS: prxparse('/b/i') -> 2
+}
 \seealso{
 Other special functions:
 \code{\link[=sas_f_band]{sas_f_band()}},

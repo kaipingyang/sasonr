@@ -19,9 +19,16 @@ Square root. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 4 example call(s) agree with SAS.
 }
 
+\examples{
+# SQRT: each call is followed by the result of the same call in SAS 9.4
+sas_f_sqrt(16)  # SAS: sqrt(16) -> 4
+sas_f_sqrt(2)  # SAS: sqrt(2) -> 1.4142135623731
+sas_f_sqrt(-1)  # SAS: sqrt(-1) -> .
+sas_f_sqrt(NA_real_)  # SAS: sqrt(.) -> .
+}
 \seealso{
 Other numeric functions:
 \code{\link[=sas_f_abs]{sas_f_abs()}},

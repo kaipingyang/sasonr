@@ -17,9 +17,16 @@ Mean of the non-missing values. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Values verified against SAS 9.4 in 1 offline conformance case(s); 1 of them have a known difference in the log layer (log NOTE or listing layout).
+ Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
 }
 
+\examples{
+# MEAN: each call is followed by the result of the same call in SAS 9.4
+sas_f_mean(1, 2, 3, 4)  # SAS: mean(1, 2, 3, 4) -> 2.5
+sas_f_mean(1, NA_real_, 3)  # SAS: mean(1, ., 3) -> 2
+sas_f_mean(NA_real_, NA_real_)  # SAS: mean(., .) -> .
+sas_f_mean(sas_missing(".A"), 4)  # SAS: mean(.A, 4) -> 4
+}
 \seealso{
 Other descriptive functions:
 \code{\link[=sas_f_cmiss]{sas_f_cmiss()}},

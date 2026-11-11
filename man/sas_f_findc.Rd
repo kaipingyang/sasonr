@@ -23,9 +23,18 @@ Position of a character from a list. See the \href{https://documentation.sas.com
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Verified against SAS 9.4: 5 example call(s) agree with SAS.
 }
 
+\examples{
+# FINDC: each call is followed by the result of the same call in SAS 9.4
+# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
+sas_f_findc("abc", "cb")  # SAS: findc('abc', 'cb') -> 2
+sas_f_findc("abc", "x")  # SAS: findc('abc', 'x') -> 0
+sas_f_findc("abc", "B", "i")  # SAS: findc('abc', 'B', 'i') -> 2
+sas_f_findc("abc", "a", "k")  # SAS: findc('abc', 'a', 'k') -> 2
+sas_f_findc("ab1", "", "d")  # SAS: findc('ab1', '', 'd') -> 3
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},

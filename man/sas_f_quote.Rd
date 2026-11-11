@@ -19,9 +19,15 @@ Adds quotation marks (trailing blanks kept). See the \href{https://documentation
 }
 
 \section{Verification}{
- Not yet verified against SAS (no offline conformance case).
+ Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
 }
 
+\examples{
+# QUOTE: each call is followed by the result of the same call in SAS 9.4
+sas_f_quote("abc")  # SAS: quote('abc') -> "\"abc\""
+sas_f_quote("a\"b")  # SAS: quote('a"b') -> "\"a\"\"b\""
+sas_f_quote("abc", "'")  # SAS: quote('abc', "'") -> "'abc'"
+}
 \seealso{
 Other character functions:
 \code{\link[=sas_f_anyalnum]{sas_f_anyalnum()}},
