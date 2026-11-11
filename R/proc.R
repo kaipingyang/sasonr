@@ -75,6 +75,7 @@ parse_proc_step <- function(p) {
   name <- tk_low(p)
   if (name == "format") return(parse_proc_format(p, line))
   if (name %in% c("means", "summary")) return(parse_proc_means(p, line, name))
+  if (name == "freq") return(parse_proc_freq(p, line))
   if (!name %in% c("sort", "print")) abort_unsupported(paste0("PROC ", toupper(tk_val(p))), line)
   advance(p)
   opts <- list()
@@ -189,6 +190,7 @@ proc_source_code <- function(inp, obs_col = FALSE) {
 translate_proc <- function(step, meta, last = NULL) {
   if (step$name == "format") return(translate_proc_format(step))
   if (step$name %in% c("means", "summary")) return(translate_proc_means(step, meta, last))
+  if (step$name == "freq") return(translate_proc_freq(step, meta, last))
   inp <- proc_input(step, meta, last)
   vars <- inp$ds$out_names
   header <- sprintf("# ---- PROC %s (SAS line %d)", toupper(step$name), as.integer(step$line))
