@@ -103,6 +103,7 @@ transpose_valid_name <- function(s) {
 #' @param d Input data (after WHERE).
 #' @param sp Specification built by the translator.
 #' @export
+#' @keywords internal
 sas_proc_transpose <- function(d, sp) {
   info <- sp$info
   vars <- sp$vars

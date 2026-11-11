@@ -191,6 +191,11 @@ mac_sysfunc <- function(text, line = NULL) {
     abort_runtime(paste0("The function ", toupper(fname), " referenced by %SYSFUNC has the wrong number of arguments"), line)
   }
   types <- if (variadic) rep(substr(spec$args, 1, 1), length(args)) else spec$args[seq_along(args)]
+  # the CAT functions accept numbers: an empty argument goes through %SYSEVALF,
+  # which reports an ERROR; processing continues and the argument is skipped
+  if (fname %in% c("cats", "catx") && any(!nzchar(args[if (fname == "catx") -1L else TRUE]))) {
+    mac_error_note("%SYSEVALF function has no expression to evaluate.")
+  }
   vals <- lapply(seq_along(args), function(k) {
     switch(types[k],
       n = {

@@ -6,3 +6,4 @@
 .Renviron
 *.Rproj
 docs/
+inst/sashelp/

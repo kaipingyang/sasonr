@@ -17,6 +17,8 @@ value_expecting_kw <- c(
 #'
 #' @param text SAS source (character; multiple elements are joined by newlines).
 #' @return A tibble with columns `type`, `value`, `line`, `col`.
+#' @examples
+#' sas_lex("x = substr(name, 1, 3); /* comment */")
 #' @export
 sas_lex <- function(text) {
   text <- paste(text, collapse = "\n")

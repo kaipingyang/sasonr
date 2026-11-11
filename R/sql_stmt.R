@@ -17,6 +17,8 @@ sql_set_status <- function(eng, sqlobs, sqlrc = 0) {
 engine_sql <- function(eng, st) {
   rt_reset()
   on.exit({
+    #
+    rt$mv <- integer()
     if (isTRUE(eng$step_notes)) sql_note(eng, step_end_notes())
   })
   switch(st$kind,

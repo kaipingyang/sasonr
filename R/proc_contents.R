@@ -105,6 +105,7 @@ contents_var_table <- function(cv, idx, title) {
 #' @param m Member metadata.
 #' @param sp Options.
 #' @export
+#' @keywords internal
 sas_proc_contents <- function(work, name, m, sp) {
   d <- work[[name]]
   if (is.null(d)) abort_runtime(paste0("File WORK.", toupper(name), ".DATA does not exist."))

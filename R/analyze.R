@@ -290,6 +290,7 @@ an_call <- function(e, st) {
     if (e$name == "put") check_format_width(f, e$line)
     e$args <- lapply(e$args, an_expr, st = st)
     a <- expr_type(e$args[[1]], st)
+    if (e$name == "input" && a$type == "num") ct_conversion("n2c", e$args[[1]]$line %||% e$line, e$args[[1]]$col %||% e$col)
     # PUT(123, $5.) writes the number with 5.; PUT('abc', 8.) writes the text with $8.
     if (e$name == "put" && f$name == "" && !is.na(f$w) && is.na(f$d) && f$char != (a$type == "char") &&
         is.null(user_fmt("", TRUE))) {
@@ -357,6 +358,7 @@ convert_fn_args <- function(e, st) {
     if (is.na(want) || a$node %in% c("of", "omitted")) return(a)
     have <- expr_type(a, st)$type
     if (have == want) return(a)
+    ct_conversion(if (want == "char") "n2c" else "c2n", a$line %||% e$line, a$col %||% e$col)
     list(node = "call", name = if (want == "char") "cvt_n2c" else "cvt_c2n", args = list(a),
          line = a$line %||% e$line, col = a$col %||% e$col)
   })
@@ -397,6 +399,38 @@ assign_target_type <- function(st, name, value, line) {
 }
 
 an_stmts <- function(stmts, st) lapply(stmts, an_stmt, st = st)
+
+# The external file PUT writes to (FILE statement), or NULL for the log.
+# Supported: FILE statements at the top level of the step that all name the
+# same file, with no PUT executed before the first of them (so every PUT of
+# the step goes to that file).  Anything else fails loud.
+file_target <- function(stmts) {
+  nested <- function(ss) any(vapply(ss, function(s) s$stmt == "file" || nested(stmt_children(s)), logical(1)))
+  has_put <- function(ss) any(vapply(ss, function(s) s$stmt == "put" || has_put(stmt_children(s)), logical(1)))
+  if (any(vapply(stmts, function(s) nested(stmt_children(s)), logical(1)))) {
+    f <- Find(function(s) nested(stmt_children(s)), stmts)
+    abort_unsupported("FILE statement inside a conditional or DO block", f$line)
+  }
+  k <- which(vapply(stmts, function(s) s$stmt == "file", logical(1)))
+  if (length(k) == 0) return(NULL)
+  dests <- lapply(stmts[k], function(s) {
+    d <- s$dest
+    if (d$kind == "print") abort_unsupported("FILE PRINT", s$line)
+    if (d$kind == "fileref") {
+      path <- rt$filerefs[[d$ref]]
+      if (is.null(path)) abort_unsupported(paste0("FILE fileref ", toupper(d$ref), " (no FILENAME statement)"), s$line)
+      d <- list(kind = "path", path = path)
+    }
+    c(d, s$opts)
+  })
+  keys <- unique(vapply(dests, function(d) paste(d$kind, d$path %||% "", d$mod, d$lrecl), ""))
+  if (length(keys) > 1) abort_unsupported("several FILE destinations in one step", stmts[[k[2]]]$line)
+  if (dests[[1]]$kind == "log") return(NULL)
+  if (k[1] > 1 && has_put(stmts[seq_len(k[1] - 1L)])) {
+    abort_unsupported("PUT before the FILE statement of the step", stmts[[k[1]]]$line)
+  }
+  dests[[1]]
+}
 
 an_stmt <- function(s, st) {
   line <- s$line
@@ -517,6 +551,7 @@ an_stmt <- function(s, st) {
       })
       st$readers <- c(st$readers, list(s))
     },
+    file = NULL,
     infile = {
       if (!is.null(st$infile)) abort_unsupported("more than one INFILE statement in a step", line)
       if (identical(s$source$kind, "fileref")) {
@@ -801,6 +836,7 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   if (length(by) > 1) abort_unsupported("more than one BY statement", by[[2]]$line)
   stmts <- step$stmts
   if (length(by) == 1) st$by <- by[[1]]
+  st$file <- file_target(stmts)
   # Arrays are declared before use; declare them in order while annotating.
   stmts <- an_stmts(stmts, st)
   if (!is.null(st$by)) {
