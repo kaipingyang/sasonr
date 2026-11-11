@@ -19,3 +19,7 @@ Imports:
 Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+URL: https://kaipingyang.github.io/sasonr/, https://github.com/kaipingyang/sasonr
+BugReports: https://github.com/kaipingyang/sasonr/issues
+Config/roxygen2/version: 8.1.0
