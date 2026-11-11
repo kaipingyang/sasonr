@@ -866,7 +866,7 @@ means_listing <- function(d, sp, cells_by, print_types) {
         i <- info[[tvars[z]]]
         w <- if (i$char) (if (is.null(i$fmt)) i$len else fmt_width(i$fmt, TRUE) %|NA|% i$len) else if (is.null(i$fmt)) 12L else fmt_width(i$fmt, FALSE)
         w <- max(w, nchar(i$disp), nchar(class_cells[[z]]))
-        fixed[[length(fixed) + 1L]] <- list(parts = i$disp, width = w, right = !i$char, cells = class_cells[[z]])
+        fixed[[length(fixed) + 1L]] <- list(parts = i$disp, width = w, right = proc_right_align(i), cells = class_cells[[z]])
       }
       if (k > 0 && any(sel) && !sp$nonobs) {
         fixed[[length(fixed) + 1L]] <- list(parts = c("N", "Obs"), width = max(3L, nchar(nobs_cells)), right = TRUE, cells = nobs_cells)

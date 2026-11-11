@@ -79,7 +79,12 @@ proc_apply_attr_stmts <- function(stmts, st) {
       for (sp in s$specs) {
         vars <- proc_resolve(sp$vars, st, s$line)
         for (v in vars) {
-          if (is.null(sp$fmt)) st$formats[[v]] <- NULL else st$formats[[v]] <- sp$fmt
+          f <- sp$fmt
+          if (!is.null(f) && identical(st$info[[v]]$type, "char") && !isTRUE(f$char) &&
+              is.null(user_fmt(f$name, FALSE)) && !is.null(user_fmt(f$name, TRUE))) {
+            abort_runtime(paste0("The format ", toupper(f$name), " was not found or could not be loaded."), s$line)
+          }
+          if (is.null(f)) st$formats[[v]] <- NULL else st$formats[[v]] <- f
         }
       }
     } else if (identical(s$stmt, "label")) {
@@ -306,3 +311,9 @@ render_table <- function(cols, gap = 4L, rule = TRUE) {
 }
 
 table_width <- function(cols, gap) sum(vapply(cols, function(c) as.integer(c$width), 1L)) + gap * (length(cols) - 1L)
+
+# Numeric values are right aligned unless a user-defined format turns them into
+# labels.
+proc_right_align <- function(info) {
+  !info$char && (is.null(info$fmt) || is.null(user_fmt(info$fmt$name, FALSE)))
+}
