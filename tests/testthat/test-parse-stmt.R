@@ -80,7 +80,7 @@ test_that("step boundaries: RUN, the next DATA, and DATALINES", {
 test_that("unsupported statements fail loud with the SAS line number", {
   err <- expect_error(sas_parse("data a;\n  x = 1;\n  file 'f.txt';\nrun;"), class = "sasonr_unsupported")
   expect_equal(err$sas_line, 3L)
-  expect_error(sas_parse("proc means data=a; run;"), class = "sasonr_unsupported")
+  expect_error(sas_parse("proc univariate data=a; run;"), class = "sasonr_unsupported")
   expect_error(sas_parse("%let x = 1;"), class = "sasonr_unsupported")
   expect_error(sas_parse("options obs=3;"), class = "sasonr_unsupported")
   expect_error(sas_parse("data a; call execute('x'); run;"), class = "sasonr_unsupported")

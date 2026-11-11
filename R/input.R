@@ -115,7 +115,8 @@ end_of_record <- function(inf) {
     missover = , truncover = TRUE,
     stopover = abort_runtime("INPUT statement exceeded record length. INFILE OPTION STOPOVER specified"),
     {
-      if (inf$flow_notes < 20L) rt$notes <- c(rt$notes, "NOTE: SAS went to a new line when INPUT statement reached past the end of a line.")
+      # written once, at the end of the step (after LOST CARD and the like)
+      rt$flow_note <- TRUE
       inf$flow_notes <- inf$flow_notes + 1L
       next_record(inf)
       FALSE

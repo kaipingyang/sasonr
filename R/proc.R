@@ -74,6 +74,7 @@ parse_proc_step <- function(p) {
   if (tk_type(p) != "name") abort_syntax("expected a procedure name after PROC", line)
   name <- tk_low(p)
   if (name == "format") return(parse_proc_format(p, line))
+  if (name %in% c("means", "summary")) return(parse_proc_means(p, line, name))
   if (!name %in% c("sort", "print")) abort_unsupported(paste0("PROC ", toupper(tk_val(p))), line)
   advance(p)
   opts <- list()
@@ -187,6 +188,7 @@ proc_source_code <- function(inp, obs_col = FALSE) {
 
 translate_proc <- function(step, meta, last = NULL) {
   if (step$name == "format") return(translate_proc_format(step))
+  if (step$name %in% c("means", "summary")) return(translate_proc_means(step, meta, last))
   inp <- proc_input(step, meta, last)
   vars <- inp$ds$out_names
   header <- sprintf("# ---- PROC %s (SAS line %d)", toupper(step$name), as.integer(step$line))
@@ -297,6 +299,19 @@ print_num_column <- function(x) {
   if (length(v) == 0) return(out)
   if (all(v == trunc(v) & abs(v) < 1e12)) {
     out[!miss] <- sprintf("%.0f", v)
+    return(out)
+  }
+  # ordinary magnitudes: a common number of decimals, as many as the values
+  # need but no more than fit 7 positions beside the widest integer part
+  ip <- nchar(sprintf("%.0f", trunc(abs(v))))
+  if (max(ip) <= 6L) {
+    dmax <- 6L - max(ip)
+    need <- vapply(v, function(x) {
+      for (dd in 0:dmax) if (abs(x - round(x, dd)) <= 1e-9 * max(1, abs(x))) return(dd)
+      dmax
+    }, 1L)
+    d <- max(need)
+    out[!miss] <- sprintf("%.*f", d, sas_f_round(v, 10^-d))
     return(out)
   }
   s <- trimws(sas_fmt_best(abs(v), 7L))

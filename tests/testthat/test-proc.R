@@ -96,7 +96,7 @@ proc print data=e; run;
 
 test_that("unsupported PROCs, options and statements fail loud", {
   d <- "data a; x = 1; run;"
-  expect_error(sas_run(paste(d, "proc means data=a; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(d, "proc univariate data=a; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc print data=a; by x; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc print data=a label; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc sort data=a dupout=b; by x; run;")), class = "sasonr_unsupported")

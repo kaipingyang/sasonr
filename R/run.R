@@ -117,6 +117,9 @@ engine_exec <- function(eng, text, line) {
       eng$log <- c(eng$log, step_end_notes(), reads, rt$proc_notes, ds_notes)
     }
     eng$listing <- c(eng$listing, env$.lst)
+    # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
+    if (length(env$.meta) > 0) eng$meta[names(env$.meta)] <- env$.meta
+    if (length(env$.meta) > 0) eng$meta[names(env$.meta)] <- env$.meta
   }
   invisible()
 }
@@ -134,6 +137,7 @@ engine_eval <- function(eng, code, stage = FALSE) {
   }
   env$.log <- character()
   env$.lst <- character()
+  env$.meta <- list()
   env$.symtab <- eng$ses
   env$.titles <- eng$titles
   tryCatch(eval(parse(text = code, keep.source = FALSE), envir = env), error = function(e) {
