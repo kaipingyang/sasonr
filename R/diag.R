@@ -22,6 +22,7 @@ rt_reset <- function() {
   rt$math <- integer()
   rt$reads <- list()
   rt$proc_notes <- character()
+  rt$flow_note <- FALSE
   invisible()
 }
 

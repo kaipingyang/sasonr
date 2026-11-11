@@ -90,6 +90,7 @@ note_mv_lines <- function(entries) {
 # NOTEs written at the end of a step from the run-time counters.
 step_end_notes <- function() {
   out <- character()
+  if (isTRUE(rt$flow_note)) out <- "NOTE: SAS went to a new line when INPUT statement reached past the end of a line."
   if (length(rt$mv) > 0) out <- c(out, note_mv_lines(count_entries(rt$mv)))
   if (length(rt$math) > 0) {
     out <- c(out,
