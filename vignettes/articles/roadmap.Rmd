@@ -17,4 +17,4 @@ give the same results as SAS 9.4.
 | Statistical PROCs | GLM, MIXED, LIFETEST, PHREG, LOGISTIC (via CRAN packages) | ⬜ planned |
 | End-to-end acceptance | Book programs (Little SAS Book, pharmaceutical programming examples) | 🔄 SAS results ready, sasonr runs pending |
 
-See [Conformance status](conformance.html) for the current numbers.
+See [Conformance status](conformance.html) for the current numbers and [To do and future plan](todo.html) for the next steps.

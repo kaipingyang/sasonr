@@ -1,0 +1,39 @@
+---
+title: "To do and future plan"
+---
+
+*Updated after every development round. Last update: 2026-11-11 (after round 5).*
+
+## Next round (round 6): verification
+
+| # | Task | Why |
+|---|---|---|
+| 1 | Mask environment fields (creation time, file path) of PROC CONTENTS in the comparison | 8 data set and 31 listing differences are only time stamps and paths; they hide real problems |
+| 2 | Verify PROC FREQ test statistics against SAS (chi-square family, Fisher, binomial confidence limits, CMH) with dedicated SAS-generated cases; until then they stop with `sasonr_unsupported` | Currently checked only against R functions, which may use different defaults |
+| 3 | Run the function pilot (370 cases for SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT, INTNX, INTCK) and fix differences | First function-by-function verification |
+| 4 | Run the 154 book programs with SAS results and publish a baseline | First end-to-end programs, including pharmaceutical examples |
+
+## Following rounds
+
+| Round | Content |
+|---|---|
+| 7 | PROC REPORT and PROC TABULATE (computation layer), ODS output for TFL |
+| 8 | DATA step hash objects (`DECLARE`), `SET ... POINT=`, `UPDATE`, `LIBNAME` |
+| 9 | PROC UNIVARIATE, PROC COMPARE, PROC RANK, IMPORT/EXPORT |
+| 10+ | Statistical procedures via CRAN packages: GLM (sasLM), MIXED (mmrm), LIFETEST/PHREG (survival), LOGISTIC |
+
+## Verification backlog
+
+* Function-by-function tests for about 120 functions frequently used in
+  clinical programming, then the remaining Base SAS functions.
+* Format and informat tests for the 207 Base formats and informats.
+* ODS HTML comparison layer (L-HTML).
+* Recover more pharmaceutical book programs (31 cannot run as printed:
+  fragments or files not provided).
+
+## Open questions
+
+* Tolerance policy for statistical distribution functions (last-digit
+  differences were observed).
+* Random number functions: reproduce SAS random streams exactly or mark them
+  as not comparable.
