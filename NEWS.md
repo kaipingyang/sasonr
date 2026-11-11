@@ -1,5 +1,20 @@
 # sasonr (development version)
 
+## Round 7a (2026-11-12)
+
+* Offline conformance cases: program + invented data + SAS 9.4 output (data
+  sets kept as `.sas7bdat` for exact comparison); sanitiser, gold refresher
+  and offline runner in `tools/`.
+* Rounding and formats aligned with SAS: ROUND 98.5%, other rounding
+  functions 99.6%, formats 96.2% of about 21,000 SAS points; remaining edge
+  cases stop with `sasonr_unsupported`.
+* `HEX16.` informat (previously returned missing silently), `FILE`
+  statement, `LINESIZE`, log NOTE fixes.
+* Semantics registry (`inst/registry/semantics.csv`).
+* Reference pages for every `sas_f_*` function: SAS syntax, differences
+  from R, verification status, examples from SAS-verified cases.
+* New site structure: SAS language guides, Developers, Progress.
+
 ## Round 6 (2026-11-12): verification
 
 * Function pilot (SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT,

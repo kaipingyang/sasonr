@@ -9,3 +9,4 @@
 ^inst/sashelp$
 ^tests/conformance$
 ^tools$
+^CONTRIBUTING\.md$

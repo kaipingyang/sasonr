@@ -3,14 +3,56 @@ template:
   bootstrap: 5
 navbar:
   structure:
-    left: [intro, reference, articles, news]
+    left: [getstarted, guides, reference, developers, progress, news]
     right: [search, github]
+  components:
+    getstarted:
+      text: Get started
+      href: articles/getting-started.html
+    guides:
+      text: SAS language guides
+      menu:
+      - text: DATA step
+        href: articles/guide-datastep.html
+      - text: PROC SQL
+        href: articles/guide-sql.html
+      - text: Functions, formats and rounding
+        href: articles/guide-functions.html
+    developers:
+      text: Developers
+      menu:
+      - text: Architecture
+        href: articles/architecture.html
+      - text: Contributing
+        href: CONTRIBUTING.html
+      - text: Adding a conformance case
+        href: articles/dev-conformance-cases.html
+      - text: Semantics registry
+        href: articles/dev-registry.html
+    progress:
+      text: Progress
+      menu:
+      - text: Conformance status
+        href: articles/conformance.html
+      - text: Roadmap
+        href: articles/roadmap.html
+      - text: To do and future plan
+        href: articles/todo.html
 articles:
-- title: Overview
+- title: Get started
   navbar: ~
   contents:
   - articles/getting-started
+- title: SAS language guides
+  contents:
+  - articles/guide-datastep
+  - articles/guide-sql
+  - articles/guide-functions
+- title: Developers
+  contents:
   - articles/architecture
+  - articles/dev-conformance-cases
+  - articles/dev-registry
 - title: Progress
   contents:
   - articles/conformance

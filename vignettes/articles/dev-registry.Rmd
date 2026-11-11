@@ -1,0 +1,35 @@
+---
+title: "Semantics registry"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+The registry lists SAS behaviours that commonly differ from base R defaults
+and records whether sasonr reproduces them. The status comes from the
+offline conformance cases (gold standard: SAS 9.4).
+
+* **verified**: all linked cases match SAS.
+* **partial**: some cases match; the unverified situations stop with
+  `sasonr_unsupported`.
+* **unsupported**: not implemented yet; using it stops the program.
+
+```{r}
+reg <- utils::read.csv(system.file("registry", "semantics.csv", package = "sasonr"),
+                       stringsAsFactors = FALSE)
+cat(sprintf("Entries: %d (verified %d, partial %d, unsupported %d, not applicable %d)",
+            nrow(reg), sum(reg$sasonr_status == "verified"),
+            sum(reg$sasonr_status == "partial"),
+            sum(reg$sasonr_status == "unsupported"),
+            sum(reg$sasonr_status %in% c("n/a", "not_applicable", "na"))))
+```
+
+```{r}
+knitr::kable(reg[, c("entry", "kind", "sas_behaviour", "r_default", "sasonr_status", "cases", "cases_pass")],
+             col.names = c("Entry", "Kind", "SAS behaviour", "R default", "sasonr", "Cases", "Pass"))
+```
+
+The list of entries is based on the semantics registry of the
+[sas2r](https://cran.r-project.org/package=sas2r) package (Apache License
+2.0); descriptions and statuses are maintained by sasonr.

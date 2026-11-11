@@ -6,7 +6,7 @@ title: "Conformance status"
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-*Last updated: 2026-11-12 (development round 6).*
+*Last updated: 2026-11-12 (development round 7a).*
 
 sasonr only accepts a feature once its test cases reproduce the output of
 **real SAS 9.4** (TS1M7, Linux). Expected results are never taken from
@@ -44,7 +44,7 @@ stopped with an error on 285.
 | sasonr ran to completion | **1,110** |
 | sasonr stopped: feature not supported yet | 548 |
 | sasonr stopped: error | 22 |
-| **All four layers identical to SAS** | **1,066** (96.0% of completed) |
+| **All layers identical to SAS** | **1,070** (96.4% of completed) |
 | L-DS mismatches | **0** |
 | SAS stopped with an error but sasonr kept running | **0** of 285 |
 
@@ -58,6 +58,7 @@ stopped with an error on 285.
 | 4 | Four-layer comparison, variable attributes, log notes, PROC SQL | 906 | 866 | 0 |
 | 5 | PROC MEANS/SUMMARY, FREQ, TRANSPOSE, CONTENTS, DATASETS, APPEND, DELETE | 1,104 | 1,031 | 0 ** |
 | 6 | Verification round: function pilot, book programs, FREQ statistics against SAS; environment fields of PROC CONTENTS masked | 1,110 | 1,066 | 0 |
+| 7a | Offline conformance cases (gold as sas7bdat), SAS rounding and formats, semantics registry, function reference pages | 1,110 | 1,070 | 0 |
 
 \* Rounds 2–3 used an earlier, weaker comparison (printed output only).
 \*\* Excluding environment fields (time stamps, file paths) in `PROC CONTENTS`; masked in the comparison from round 6 on.
@@ -129,9 +130,34 @@ The pharmaceutical programs are mainly blocked by ODS statements (12) and `OPTIO
 
 ## Test suite 4: SAS rounding
 
-About 22,000 rounding points generated on SAS (ROUND, ROUNDE, ROUNDZ, INT/FLOOR/CEIL,
-`w.d`, BEST, Z, COMMA, DOLLAR, PERCENT, E formats) plus 84 PROC display programs.
-Inputs are given as exact IEEE-754 bit patterns. sasonr comparison: next step.
+About 21,000 rounding points generated on SAS 9.4 (ROUND, ROUNDE, ROUNDZ,
+INT/FLOOR/CEIL, `w.d`, BEST, Z, COMMA, DOLLAR, PERCENT, E formats) plus PROC
+display programs. Inputs are exact IEEE-754 bit patterns.
+
+| Group | Before round 7a | After round 7a |
+|---|---|---|
+| ROUND | 95.6% | **98.5%** |
+| ROUNDE, ROUNDZ, INT, FLOOR, CEIL, ... | 95.9% | **99.6%** |
+| Formats | 87.8% | **96.2%** |
+
+The remaining points (edge windows of the ROUND fuzz, half-way edges of
+formats, very narrow BEST widths, PROC MEANS default decimals for very large
+or very small values) stop with `sasonr_unsupported`; none returns a
+different value silently. Target: 100%.
+
+## Offline conformance cases
+
+From round 7a all cases are stored as offline fixtures (program, invented
+data, SAS output with data sets as `.sas7bdat`), so regression runs without
+SAS:
+
+| Layer | Cases |
+|---|---|
+| Our own cases (parser, functions, FREQ statistics, rounding, semantics) | 574 |
+| Single-feature corpus and book programs | 2,119 |
+
+Silent wrong results (data set mismatches, or SAS errors that sasonr
+accepts) remain **0** in both layers.
 
 ## Known gaps
 

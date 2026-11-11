@@ -1,0 +1,157 @@
+---
+title: "DATA step"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup}
+library(sasonr)
+```
+
+The DATA step is compiled into R code. Simple steps become vectorised
+`dplyr` pipelines; steps with cross-row state use grouped vectorised code when
+it is provably equivalent, and an explicit row loop that follows the SAS
+program data vector (PDV) otherwise. Use `sas_translate()` to see the code.
+
+This chapter is organised by topic. It grows with the DATA step
+specification; every example below is part of the conformance suite.
+
+## Conditional logic
+
+```{r}
+sas_run("
+data _null_;
+  do x = 1 to 3;
+    if x = 1 then do; y = 'one'; z = 1; end;
+    else if x = 2 then do; y = 'two'; z = 2; end;
+    else do; y = 'oth'; z = 3; end;
+    put x= y= z=;
+  end;
+run;
+")$log
+```
+
+`SELECT` and the dangling `ELSE` behave as in SAS:
+
+```{r}
+sas_run("
+data _null_;
+  x = 5;
+  select;
+    when (x < 3)  g = 'L';
+    when (x < 10) g = 'M';
+    otherwise     g = 'H';
+  end;
+  if x > 1 then if x > 10 then h = 1; else h = 2;
+  put g= h=;
+run;
+")$log
+```
+
+## Missing values
+
+A missing numeric value is smaller than any number; arithmetic propagates
+missing values, while SAS functions such as `SUM` skip them:
+
+```{r}
+sas_run("
+data _null_;
+  x = .;
+  a = (x < 0); b = (x = .); c = (.A < .); d = (._ < .);
+  e = min(x, 3); f = x + 1; g = sum(x, 1);
+  put a= b= c= d= e= f= g=;
+run;
+")$log
+```
+
+## BY groups, RETAIN and FIRST./LAST.
+
+```{r}
+code <- "
+data lab;
+  input usubjid $ visit aval;
+  datalines;
+S01 1 10
+S01 2 12
+S02 1 20
+S02 2 18
+;
+run;
+data chg;
+  set lab;
+  by usubjid;
+  retain base;
+  if first.usubjid then base = aval;
+  chg = aval - base;
+run;
+"
+sas_run(code)$work$chg
+```
+
+The generated code for the second step is vectorised (level L2):
+
+```{r}
+cat(sas_translate(code)$steps[[2]]$code)
+```
+
+## LAG inside a condition
+
+`LAG` only updates its queue when it is executed, so a conditional `LAG`
+differs from a shifted column. sasonr runs such steps row by row:
+
+```{r}
+sas_run("
+data a; do i = 1 to 5; output; end; run;
+data _null_;
+  set a;
+  if mod(i, 2) = 1 then l = lag(i);
+  put i= l=;
+run;
+")$log
+```
+
+## Arrays and DO loops
+
+```{r}
+sas_run("
+data _null_;
+  array a{*} x1-x3 (1 2 3);
+  array t{3} _temporary_ (10 20 30);
+  tot = 0;
+  do i = 1 to dim(a); tot + a{i} * t{i}; end;
+  s = sum(of x1-x3);
+  put tot= s=;
+run;
+")$log
+```
+
+## Character length
+
+The length of a character variable is set the first time the compiler sees
+it, so later assignments are truncated:
+
+```{r}
+sas_run("
+data _null_;
+  x = 'ab'; x = 'abcd';
+  if 0 then y = 'long text';
+  y = 'hi';
+  put x= y=;
+run;
+")$log
+```
+
+## Not supported yet
+
+Features that are not verified against SAS stop the program:
+
+```{r, error = TRUE}
+sas_run("data a; x = 1; link sub; return; sub: x = 2; return; run;")
+```
+
+The DATA step specification (control flow such as `RETURN`, `LINK`,
+`GOTO`, `STOP`, the execution model, multiple `SET` statements, `UPDATE`,
+`MODIFY` and hash objects) is the next development focus; see
+[To do and future plan](todo.html).

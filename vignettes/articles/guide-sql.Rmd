@@ -1,0 +1,64 @@
+---
+title: "PROC SQL"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup}
+library(sasonr)
+```
+
+PROC SQL is parsed by sasonr's own SQL parser. Joins and grouping run on
+DuckDB; SAS semantics are applied in R: missing values sort and compare as
+the smallest value, character comparisons ignore trailing blanks, summary
+statistics are merged back to detail rows ("remerging") with the SAS NOTE,
+`CALCULATED` columns and `INTO :macro-variable` work as in SAS.
+
+## Summaries, CALCULATED and CASE
+
+```{r}
+res <- sas_run("
+data a;
+  input g $ v;
+  datalines;
+A 1
+B 2
+A 3
+;
+run;
+proc sql noprint;
+  select distinct g into :glist separated by ',' from a;
+  create table s as
+    select g, sum(v) as tot, calculated tot * 2 as dbl,
+           case when calculated tot > 3 then 'H' else 'L' end as cls
+    from a group by g;
+quit;
+%put glist=&glist;
+")
+res$log
+res$work$s
+```
+
+## Remerging summary statistics
+
+```{r}
+res <- sas_run("
+data a;
+  input id $ grp $ x;
+  datalines;
+1 A 10
+2 A 30
+3 B 5
+;
+run;
+proc sql;
+  create table pct as
+    select id, grp, x, x / sum(x) * 100 as pct
+    from a group by grp;
+quit;
+")
+grep("remerging", res$log, value = TRUE)
+res$work$pct
+```

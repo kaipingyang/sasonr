@@ -2,48 +2,43 @@
 title: "To do and future plan"
 ---
 
-*Updated after every development round. Last update: 2026-11-12 (after round 6).*
+*Updated after every development round. Last update: 2026-11-12 (after round 7a).*
 
 ## Three ways to use sasonr
 
-1. **Run SAS on R** – execute existing SAS programs without a SAS licence.
+1. **Run SAS on R** – execute SAS programs without a SAS licence.
 2. **Deterministic SAS → R migration** – `sas_translate()` turns SAS into R
-   code without a language model; the translated code is verified by running
-   it against real SAS results.
+   code without a language model; the translated code is verified against
+   SAS output.
 3. **R / SAS double programming** – programmer A writes R, programmer B writes
-   SAS and runs it with sasonr; both sides run on the same platform and are
-   compared with PROC COMPARE.
+   SAS and runs it with sasonr; both sides are compared on the same platform.
 
-Priority is **correct computation first**: reporting layout comes after the
-numbers are right.
+## Focus
 
-## Next round (round 7): engineering + computation gaps
+The first goal is narrow and practical: `sas_run()` with SAS code as a string
+must handle the **DATA step, the macro language, PROC SQL, SAS functions and
+formats, and the procedures used in clinical trials** with results identical
+to SAS 9.4. Program files, `%include`, report layout and other procedures
+come later.
+
+## Next steps
 
 | # | Task |
 |---|---|
-| 1 | PROC framework refactor: every procedure = parser → PROC IR (option whitelist) → computation that produces SAS-named ODS tables → OUT= / ODS OUTPUT data sets → listing / HTML renderers |
-| 2 | Naming: `sas_f_*` (SAS functions), `sas_fmt_*` (formats), `sas_proc_*` (procedure R API), `sas_rt_*` (runtime helpers, internal); examples taken from SAS-verified cases; regression must be unchanged |
-| 3 | ODS statements and ODS OUTPUT; `OPTIONS MISSING=` (main blockers of the pharmaceutical programs) |
-| 4 | PROC COMPARE (needed for double programming) |
-| 5 | DATA step hash objects, `SET ... POINT=`, `UPDATE`, `LIBNAME` |
-| 6 | Rounding report: sasonr against the SAS rounding suite |
+| 1 | Write the specifications of the five focus domains: DATA step, macro language, PROC SQL, functions / formats / rounding, clinical procedures (published under Developers) |
+| 2 | Internal refactor: session state in one object (R6), replacing scattered engine state; no new features, regression must be unchanged |
+| 3 | DATA step specification first: control flow (`RETURN`, `LINK`, `GOTO`, `STOP`, `ABORT`), execution model (multiple `SET`, `UPDATE`, `MODIFY`, `POINT=`, `END=`), PDV details, `INPUT` edge cases, hash objects |
+| 4 | Rounding and formats: close the remaining edge cases to reach 100% |
 
-## Following rounds
+## Following
 
-| Round | Content |
+| Topic | Content |
 |---|---|
-| 8 | PROC UNIVARIATE, RANK; BINOMIAL and CMH listings; SASHELP data sets |
-| 9 | Statistical procedures (computation via ODS OUTPUT): GLM, MIXED, LIFETEST, PHREG, LOGISTIC – candidate CRAN packages are evaluated against SAS results first |
-| 10 | PROC REPORT and PROC TABULATE computation layer; rendering with a SAS-like theme |
-| 11 | Migration: "idiomatic" translation mode that produces plain tidyverse code for people to maintain, with comments where SAS and R semantics differ |
-
-## Verification backlog
-
-* Function-by-function tests for about 120 functions frequently used in
-  clinical programming, then the remaining Base SAS functions.
-* Format and informat tests for the 207 Base formats and informats.
-* ODS HTML comparison layer.
-* Clean up `R CMD check` documentation warnings (handled by the renaming in round 7).
+| Clinical procedures | PROC COMPARE, UNIVARIATE, RANK; ODS OUTPUT; BINOMIAL and CMH listings; then LIFETEST, PHREG, MIXED, LOGISTIC |
+| Functions | Function-by-function verification of about 120 functions used in clinical programming, then the remaining Base SAS functions |
+| Program level | `sas_run(file =)`, `%include`, `FILENAME`, `LIBNAME`, SASHELP, autocall macros, sandbox |
+| Output | SAS-like HTML (ODS HTMLBlue structure), RTF, PROC REPORT / TABULATE |
+| Migration | "Idiomatic" translation mode producing plain tidyverse code with comments where SAS and R semantics differ |
 
 ## Open questions
 
