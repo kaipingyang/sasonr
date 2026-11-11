@@ -1,0 +1,7 @@
+#
+.claude/
+.Rproj.user/
+.Rhistory
+.RData
+.Renviron
+*.Rproj
