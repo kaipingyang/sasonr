@@ -1,0 +1,21 @@
+Package: sasonr
+Title: Run SAS Programs on an R Engine
+Version: 0.0.0.9000
+Authors@R: person("Kaiping", "Yang", role = c("aut", "cre"), email = "kaiping.yang@example.com")
+Description: Deterministically parses SAS programs into a faithful abstract
+    syntax tree and compiles DATA steps into tidyverse R code. Unsupported
+    language features fail loudly with classed conditions.
+License: Apache License (>= 2)
+Encoding: UTF-8
+Imports:
+    cli,
+    DBI,
+    dplyr (>= 1.1.0),
+    duckdb,
+    purrr,
+    rlang,
+    tibble,
+    vctrs
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

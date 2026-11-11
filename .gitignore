@@ -1,0 +1,7 @@
+# local-only: research, third-party sources, binaries, books, experiments
+.claude/
+.Rproj.user/
+.Rhistory
+.RData
+.Renviron
+*.Rproj
