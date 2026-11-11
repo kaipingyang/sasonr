@@ -225,6 +225,8 @@ sql_header_lines <- function(h, width) {
   ch <- strsplit(h, "")[[1]]
   best <- NULL
   for (i in seq_len(n - 1L)) {
+    # a leading underscore is not a split point
+    if (i == 1L && ch[i] == "_") next
     if (ch[i] == "_") cand <- c(substr(h, 1L, i), substr(h, i + 1L, n))
     else if (ch[i] == " ") cand <- c(substr(h, 1L, i - 1L), substr(h, i + 1L, n))
     else next
