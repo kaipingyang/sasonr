@@ -7,6 +7,26 @@ freq_table_opts <- c("list", "missing", "missprint", "nocum", "nopercent", "noro
 freq_output_kw <- c("n", "nmiss", "pchi", "lrchi", "ajchi", "mhchi", "chisq", "phi", "contgy", "cramv", "cmh",
                     "cmh1", "cmh2", "cmhcor", "cmhrms", "cmhga", "binomial", "bin")
 
+# Statistics that have been checked against real SAS output.  Every other
+# statistic request (TABLES options, EXACT, OUTPUT keywords) fails loud until
+# it is verified; the computations below stay in place for that work.  The
+# option `sasonr.freq_unverified_stats = TRUE` opens the gate for development
+# and for the package's own reference-computation tests only.
+# Verified (2026-11-11, freq_stats gold c01-c33): two-way and one-way CHISQ,
+# FISHER (2x2 and RxC) and EXACT FISHER -- values within 1e-12 of SAS and the
+# listing line for line.  BINOMIAL and CMH values agree too, but their
+# listings (and CMH's common odds ratio / Breslow-Day tables) do not yet.
+freq_verified_stats <- c("chisq", "fisher", "exact_fisher")
+
+freq_stat_gate <- function(k, line) {
+  k <- tolower(k)
+  if (k == "bin") k <- "binomial"
+  if (!k %in% freq_verified_stats && !isTRUE(getOption("sasonr.freq_unverified_stats"))) {
+    abort_unsupported(paste0("PROC FREQ statistic ", toupper(k), " (not yet verified against SAS)"), line)
+  }
+  invisible(k)
+}
+
 # Parser ------------------------------------------------------------------------
 
 parse_proc_freq <- function(p, line) {
@@ -64,6 +84,7 @@ parse_proc_freq <- function(p, line) {
         while (tk_type(p) == "name") {
           k <- tk_low(p)
           if (!k %in% c("fisher", "binomial", "bin")) abort_unsupported(paste0("EXACT ", toupper(k)), sline)
+          freq_stat_gate(paste0("exact_", if (k == "bin") "binomial" else k), sline)
           kws <- c(kws, if (k == "bin") "binomial" else k)
           advance(p)
         }
@@ -82,6 +103,7 @@ parse_proc_freq <- function(p, line) {
             next
           }
           if (!k %in% freq_output_kw) abort_unsupported(paste0("PROC FREQ OUTPUT statistic ", toupper(k)), sline)
+          freq_stat_gate(paste0("output_", if (k == "bin") "binomial" else k), sline)
           o$kws <- c(o$kws, if (k == "bin") "binomial" else k)
           advance(p)
         }
@@ -135,6 +157,7 @@ parse_freq_tables <- function(p) {
         if (k == "out") {
           o$out <- parse_ds_ref(p, "output")
         } else if (k == "alpha") {
+          freq_stat_gate("alpha", kl)
           o$alpha <- as.numeric(parse_opt_value(p, k, kl))
         } else if (k == "plots") {
           v <- tolower(parse_opt_value(p, k, kl))
@@ -145,6 +168,7 @@ parse_freq_tables <- function(p) {
         next
       }
       if (!k %in% freq_table_opts) abort_unsupported(paste0("TABLES option ", toupper(k)), kl)
+      if (k %in% c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "exact")) freq_stat_gate(k, kl)
       advance(p)
       if (k %in% c("binomial") && tk_type(p) == "lparen") abort_unsupported("BINOMIAL options", kl)
       o[[k]] <- TRUE
@@ -201,6 +225,10 @@ translate_proc_freq <- function(step, meta, last) {
   }
   for (rq in requests) {
     if (length(rq$vars) > 1 && any(c("binomial") %in% names(rq$opts))) abort_syntax("BINOMIAL is valid only for one-way tables", rq$line)
+  }
+  stat_opts <- c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2")
+  if (!is.null(by) && (length(exact) > 0 || any(vapply(requests, function(r) any(stat_opts %in% names(r$opts)), logical(1))))) {
+    abort_unsupported("PROC FREQ statistics with BY groups (listing page layout not verified)", by$line)
   }
   outs <- of("output")
   if (length(outs) > 1) abort_unsupported("more than one OUTPUT statement in PROC FREQ", outs[[2]]$line)
@@ -510,8 +538,18 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   R <- max(c(9L, nchar(labels), nchar(rvals) + 1L))
   C <- max(c(8L, nchar(cvals), 7L))
   lst <- c(title %||% paste("Table of", ri$disp, "by", ci$disp), stratum, "")
-  lst <- c(lst, paste0(formatC(ri$disp, width = -(R + 1L)), ci$disp))
-  chead <- paste(vapply(cvals, function(x) formatC(x, width = if (proc_right_align(ci)) C else -C), ""), collapse = "|")
+  # variable headings carry the label in parentheses; a row heading that does
+  # not fit before the first column puts the column heading on the next line
+  rh <- paste0(ri$disp, if (!is.null(ri$label)) paste0("(", ri$label, ")"))
+  ch <- paste0(ci$disp, if (!is.null(ci$label)) paste0("(", ci$label, ")"))
+  lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -(R + 1L)), ch) else c(rh, paste0(strrep(" ", R + 1L), ch)))
+  # a user-format label keeps its leading blanks in the column heading ('  50+ ')
+  chv <- cvals
+  if (!is.null(ci$fmt) && !is.null(user_fmt(ci$fmt$name, is.character(lc$values) || isTRUE(ci$fmt$char)))) {
+    chv <- substr(sas_rtrim(sas_format(lc$values, ci$fmt)), 1L, C)
+    chv[is.na(chv)] <- cvals[is.na(chv)]
+  }
+  chead <- paste(vapply(chv, function(x) formatC(x, width = if (proc_right_align(ci)) C else -C), ""), collapse = "|")
   for (j in seq_along(labels)) {
     lab <- formatC(labels[j], width = -R)
     lst <- c(lst, if (j < length(labels)) paste0(lab, "|") else paste0(lab, "|", chead, "|  Total"))
@@ -542,7 +580,7 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   lst <- c(lst, sas_rtrim(tl))
   if (show[["pct"]]) {
     lst <- c(lst, sas_rtrim(paste0(strrep(" ", R), " ", paste(vapply(ct_, function(x) cell(freq_pct(x / tot * 100)), ""), collapse = " "),
-                                   " ", formatC(freq_pct(100), width = 7L))))
+                                   " ", formatC(if (tot > 0) freq_pct(100) else ".", width = 7L))))
   }
   if (nmiss > 0 && is.null(stratum)) lst <- c(lst, "", paste0("Frequency Missing = ", freq_num(nmiss)))
   if (R + 1L + (C + 1L) * nc + 7L > 132L) abort_unsupported("a crosstabulation wider than the line size (multi-panel tables)")
@@ -722,7 +760,9 @@ freq_fisher <- function(tb) {
     list(fisher_f = x, xpl = sum(d[support <= x]), xpr = sum(d[support >= x]), xpt = px,
          xp2 = min(1, sum(d[d <= px * (1 + 1e-7)])))
   } else {
-    list(xp2 = stats::fisher.test(tb, workspace = 2e7)$p.value)
+    # probability of the observed table (multivariate hypergeometric)
+    pt <- exp(sum(lfactorial(rowSums(tb))) + sum(lfactorial(colSums(tb))) - lfactorial(sum(tb)) - sum(lfactorial(tb)))
+    list(xpt = pt, xp2 = stats::fisher.test(tb, workspace = 2e7)$p.value)
   }
 }
 
@@ -814,7 +854,8 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       cnt <- cnt[cnt > 0]
       e <- sum(cnt) / length(cnt)
       x2 <- sum((cnt - e)^2 / e)
-      st <- c(st, list(pchi = x2, df_pchi = length(cnt) - 1, p_pchi = stats::pchisq(x2, length(cnt) - 1, lower.tail = FALSE)))
+      st <- c(st, list(pchi = x2, df_pchi = length(cnt) - 1, p_pchi = stats::pchisq(x2, length(cnt) - 1, lower.tail = FALSE),
+                       oneway_small = e < 5))
       st$oneway_chi <- TRUE
     } else {
       if (k > 2) abort_unsupported("CHISQ / FISHER for n-way tables (per-stratum statistics)")
@@ -824,6 +865,14 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       keep_r <- rowSums(tb) > 0
       keep_c <- colSums(tb) > 0
       if (sum(keep_r) < 2 || sum(keep_c) < 2) abort_unsupported("CHISQ for a table with fewer than two nonzero rows or columns")
+      # a level kept with WEIGHT / ZEROS whose row or column sum is zero: SAS
+      # computes no statistics for the table
+      if (!all(keep_r) || !all(keep_c)) {
+        st$nostat <- TRUE
+        return(st)
+      }
+      # FISHER is always accompanied by the chi-square statistics
+      if ("fisher" %in% want) want <- c(want, "chisq")
       if ("chisq" %in% want) {
         cs2 <- freq_chisq(tb, rs, cs)
         mh <- freq_mhchi(tb[keep_r, keep_c, drop = FALSE], rs[keep_r], cs[keep_c])
@@ -842,6 +891,9 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
     if (k < 2) abort_syntax("CMH requires a two-way or n-way table")
     st <- c(st, freq_cmh(tab, lv))
   }
+  # development hook: the conformance harness collects the computed statistics
+  cap <- getOption("sasonr.freq_capture")
+  if (is.environment(cap)) cap$stats <- c(cap$stats, list(st))
   st
 }
 
@@ -851,36 +903,47 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
   f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", sas_f_round(v, 1e-4))
   pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
   if (isTRUE(st$oneway_chi) && isTRUE(o$chisq)) {
-    out <- c(out, paste0("Chi-Square Test"), "for Equal Proportions", "--------------------",
+    out <- c(out, "   Chi-Square Test", "for Equal Proportions", "",
              paste0("Chi-Square", formatC(f4(st$pchi), width = 10L)), paste0("DF", formatC(sprintf("%.0f", st$df_pchi), width = 18L)),
-             paste0("Pr > ChiSq", formatC(pv(st$p_pchi), width = 10L)), "", paste0("Sample Size = ", freq_num(st$n)), "")
-  } else if (isTRUE(o$chisq) && k == 2) {
+             paste0("Pr > ChiSq", formatC(pv(st$p_pchi), width = 10L)), "",
+             if (isTRUE(st$oneway_small)) c("WARNING: The table cells have expected counts less",
+                                             "         than 5. Chi-Square may not be a valid test.", ""),
+             freq_sample_size(st))
+  } else if (isTRUE(st$nostat) && k == 2) {
+    out <- c(out, paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp), "",
+             "Row or column sum zero. No statistics computed for this table.", "", freq_sample_size(st))
+  } else if ((isTRUE(o$chisq) || isTRUE(o$fisher) || "fisher" %in% sp$exact) && k == 2 && !is.null(st$pchi)) {
+    # FISHER also prints the chi-square table (SAS computes it with every 2-way test)
     rows <- list(c("Chi-Square", st$df_pchi, st$pchi, st$p_pchi), c("Likelihood Ratio Chi-Square", st$df_lrchi, st$lrchi, st$p_lrchi))
     if (!is.null(st$ajchi)) rows <- c(rows, list(c("Continuity Adj. Chi-Square", 1, st$ajchi, st$p_ajchi)))
     rows <- c(rows, list(c("Mantel-Haenszel Chi-Square", 1, st$mhchi, st$p_mhchi)))
-    body <- vapply(rows, function(r) paste0(formatC(r[1], width = -27L), formatC(sprintf("%.0f", as.numeric(r[2])), width = 6L),
+    body <- vapply(rows, function(r) paste0(formatC(r[1], width = -27L), formatC(sprintf("%.0f", as.numeric(r[2])), width = 5L),
                                             formatC(f4(as.numeric(r[3])), width = 12L), formatC(pv(as.numeric(r[4])), width = 10L)), "")
     body <- c(body, vapply(list(c("Phi Coefficient", st$phi), c("Contingency Coefficient", st$contgy), c("Cramer's V", st$cramv)),
-                           function(r) paste0(formatC(r[1], width = -33L), formatC(f4(as.numeric(r[2])), width = 12L)), ""))
+                           function(r) paste0(formatC(r[1], width = -32L), formatC(f4(as.numeric(r[2])), width = 12L)), ""))
     out <- c(out, paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp), "",
-             paste0(formatC("Statistic", width = -27L), "    DF       Value      Prob"), strrep("-", 55), body, "")
+             paste0(formatC("Statistic", width = -27L), "   DF       Value      Prob"), strrep("-", 54), body, "")
     if (isTRUE(st$small > 0) && !isTRUE(o$nowarn)) {
-      out <- c(out, sprintf("WARNING: %.0f%% of the cells have expected counts less", st$small * 100),
-               "         than 5. Chi-Square may not be a valid test.", "")
+      out <- c(out, sprintf(" WARNING: %.0f%% of the cells have expected counts less", st$small * 100),
+               "          than 5. Chi-Square may not be a valid test.", "")
     }
+    if (is.null(st$fisher)) out <- c(out, freq_sample_size(st))
   }
   if (!is.null(st$fisher) && k == 2) {
     fz <- st$fisher
     if (!is.null(fz$xpl)) {
       out <- c(out, "       Fisher's Exact Test", strrep("-", 34),
                paste0(formatC("Cell (1,1) Frequency (F)", width = -26L), formatC(freq_num(fz$fisher_f), width = 8L)),
-               paste0(formatC("Left-sided Pr <= F", width = -26L), formatC(f4(fz$xpl), width = 8L)),
-               paste0(formatC("Right-sided Pr >= F", width = -26L), formatC(f4(fz$xpr), width = 8L)), "",
-               paste0(formatC("Table Probability (P)", width = -26L), formatC(f4(fz$xpt), width = 8L)),
-               paste0(formatC("Two-sided Pr <= P", width = -26L), formatC(f4(fz$xp2), width = 8L)), "",
-               paste0("Sample Size = ", freq_num(st$n)), "")
+               paste0(formatC("Left-sided Pr <= F", width = -26L), formatC(pv(fz$xpl), width = 8L)),
+               paste0(formatC("Right-sided Pr >= F", width = -26L), formatC(pv(fz$xpr), width = 8L)), "",
+               paste0(formatC("Table Probability (P)", width = -26L), formatC(pv(fz$xpt), width = 8L)),
+               paste0(formatC("Two-sided Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "",
+               freq_sample_size(st))
     } else {
-      out <- c(out, "Fisher's Exact Test", strrep("-", 24), paste0("Pr <= P", formatC(pv(fz$xp2), width = 17L)), "")
+      out <- c(out, "       Fisher's Exact Test", strrep("-", 34),
+               paste0(formatC("Table Probability (P)", width = -26L), formatC(pv(fz$xpt), width = 8L)),
+               paste0(formatC("Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "",
+               freq_sample_size(st))
     }
   }
   if (!is.null(st$bin)) {
@@ -907,6 +970,18 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
              paste0("    3        General Association", formatC(sprintf("%.0f", st$df_cmhga), width = 10L), formatC(f4(st$cmhga), width = 12L), formatC(pv(st$p_cmhga), width = 10L)), "")
   }
   out
+}
+
+# "Sample Size = n" after the statistics of a table, with the missing count
+# and the SAS warning when at least 20% of the data are missing.
+freq_sample_size <- function(st) {
+  out <- paste0("Sample Size = ", freq_num(st$n))
+  if (isTRUE(st$nmiss > 0)) {
+    out <- c(out, paste0("Frequency Missing = ", freq_num(st$nmiss)))
+    pct <- st$nmiss / (st$n + st$nmiss) * 100
+    if (pct >= 20) out <- c(out, sprintf("WARNING: %.0f%% of the data are missing.", pct))
+  }
+  c(out, "")
 }
 
 # OUTPUT OUT= data set: one row per table request (per BY group).

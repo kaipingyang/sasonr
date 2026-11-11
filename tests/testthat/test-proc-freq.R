@@ -54,7 +54,47 @@ test_that("TABLES grouping syntax and LIST / n-way tables", {
   expect_true("s trt resp Frequency Percent Frequency Percent" %in% squish(res$listing))
 })
 
+test_that("statistics not yet verified against SAS fail loud by default", {
+  for (src in c("proc freq data=d; tables trt / binomial; weight n; run;",
+                "proc freq data=d; by s; tables trt*resp / chisq; weight n; run;",
+                "proc freq data=d; tables s*trt*resp / cmh; weight n; run;",
+                "proc freq data=d; tables trt*resp / alpha=0.1; weight n; run;",
+                "proc freq data=d; tables trt*resp; exact binomial; weight n; run;",
+                "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;")) {
+    expect_error(sas_run(paste(freq_data, src)), class = "sasonr_unsupported")
+  }
+  # plain frequency tables are unaffected; CHISQ / FISHER are verified
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / out=o outpct; weight n; run;")))
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq fisher; exact fisher; weight n; run;")))
+})
+
+test_that("CHISQ / FISHER listing layout and the no-statistics cases (SAS gold)", {
+  res <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq; weight n; run;"))
+  l <- res$listing
+  expect_true("Statistic                     DF       Value      Prob" %in% l)
+  expect_true(any(grepl("^Phi Coefficient {22}-?0\\.", l)))
+  expect_true("       Fisher's Exact Test" %in% l)
+  expect_true(any(grepl("^Two-sided Pr <= P {11}", l)))
+  # FISHER alone also prints the chi-square table
+  res <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / fisher; weight n; run;"))
+  expect_true(any(grepl("^Chi-Square ", res$listing)))
+  # a level kept by WEIGHT / ZEROS with a zero row: no statistics
+  res <- sas_run("data z; input a $ b $ w; datalines;
+x p 3
+x q 2
+y p 0
+y q 0
+z p 4
+z q 1
+;
+proc freq data=z; weight w / zeros; tables a*b / chisq; run;")
+  expect_true("Row or column sum zero. No statistics computed for this table." %in% res$listing)
+  expect_false(any(grepl("^Chi-Square ", res$listing)))
+})
+
 test_that("CHISQ, FISHER, CMH and BINOMIAL agree with reference computations", {
+  old <- options(sasonr.freq_unverified_stats = TRUE)
+  on.exit(options(old), add = TRUE)
   res <- sas_run(paste(freq_data, "proc freq data=d noprint; tables trt*resp / chisq; weight n;
     output out=c chisq; run;
     proc freq data=d noprint; tables s*trt*resp / cmh; weight n; output out=m cmh; run;"))
@@ -83,6 +123,8 @@ test_that("CHISQ, FISHER, CMH and BINOMIAL agree with reference computations", {
 })
 
 test_that("listing of statistics and fail-loud surfaces", {
+  old <- options(sasonr.freq_unverified_stats = TRUE)
+  on.exit(options(old), add = TRUE)
   res <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq; weight n; run;"))
   l <- squish(res$listing)
   expect_true("Statistics for Table of trt by resp" %in% l)
@@ -91,4 +133,26 @@ test_that("listing of statistics and fail-loud surfaces", {
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt / expected; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt; output out=o binomial; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp; exact jt; run;")), class = "sasonr_unsupported")
+})
+
+test_that("an all-zero stratum kept by WEIGHT / ZEROS shows '.' for the total percent", {
+  res <- sas_run("data z; input s $ a $ b $ w; datalines;
+1 x p 3
+1 y q 2
+2 x p 0
+2 y q 0
+;
+proc freq data=z; weight w / zeros; tables s*a*b; run;")
+  l <- trimws(res$listing)
+  expect_true(any(grepl("^\\. +\\. +\\.$", l)))
+})
+
+test_that("crosstab headings show variable labels; a long row heading wraps the column heading", {
+  res <- sas_run("data d; input a b $; label a = 'Analysis Value' b = 'Planned Treatment'; datalines;
+0 x
+1 y
+;
+proc freq data=d; tables a*b; run;")
+  expect_true("a(Analysis Value)" %in% res$listing)
+  expect_true("          b(Planned Treatment)" %in% res$listing)
 })
