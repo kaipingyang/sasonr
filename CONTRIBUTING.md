@@ -17,8 +17,9 @@ welcome.
 3. **Deterministic.** No language model or network service is used at run
    time.
 4. **No proprietary or personal data.** Test programs use invented data
-   (`datalines`). Never add real study data, SAS-owned data sets or text
-   copied from books or manuals.
+   (`datalines`). Never add real study data, SAS-owned data sets (such as
+   SASHELP), or programs, output or text copied from books, manuals or
+   training material - write your own program for the behaviour instead.
 
 ## Development setup
 
@@ -55,7 +56,7 @@ expected output.
   link the conformance cases.
 * `devtools::test()` and `R CMD check` must pass.
 * By contributing you agree that your contribution is licensed under the
-  Apache License 2.0.
+  MIT License of this project.
 
 SAS is a registered trademark of SAS Institute Inc. sasonr is not affiliated
 with SAS Institute Inc.

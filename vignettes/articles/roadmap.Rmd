@@ -15,7 +15,7 @@ give the same results as SAS 9.4.
 | Descriptive statistics | MEANS/SUMMARY, FREQ | ✅ done; CHISQ/FISHER verified against SAS, BINOMIAL/CMH listings open; UNIVARIATE open |
 | Reporting | PROC REPORT, TABULATE, ODS RTF/HTML | ⬜ next |
 | Statistical PROCs | GLM, MIXED, LIFETEST, PHREG, LOGISTIC (via CRAN packages) | ⬜ planned |
-| End-to-end acceptance | Book programs (Little SAS Book, pharmaceutical programming examples) | 🔄 60 / 154 identical to SAS; pharmaceutical 13 / 34 |
+| End-to-end acceptance | End-to-end textbook programs (introductory and clinical examples) | 🔄 60 / 154 identical to SAS; clinical 13 / 34 |
 | Double programming | PROC COMPARE, ODS OUTPUT | ⬜ round 7 |
 | Migration | Idiomatic tidyverse translation mode | ⬜ planned |
 

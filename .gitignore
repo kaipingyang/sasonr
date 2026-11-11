@@ -8,3 +8,5 @@
 docs/
 inst/sashelp/
 tests/conformance/
+__pycache__/
+*.pyc

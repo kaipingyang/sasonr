@@ -14,12 +14,13 @@
 * Reference pages for every `sas_f_*` function: SAS syntax, differences
   from R, verification status, examples from SAS-verified cases.
 * New site structure: SAS language guides, Developers, Progress.
+* License changed from Apache-2.0 to MIT.
 
 ## Round 6 (2026-11-12): verification
 
 * Function pilot (SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT,
   INTNX, INTCK): 340 of 370 SAS-generated cases identical, none different.
-* Book programs: 60 of 154 identical to SAS on all four layers, none wrong.
+* End-to-end textbook programs: 60 of 154 identical to SAS on all four layers, none wrong.
 * PROC FREQ statistics checked against 57 SAS-generated cases; CHISQ, FISHER
   and EXACT FISHER enabled, other statistics stay gated.
 * Fixed silent differences: SCAN `B` modifier and result length, ROUND for

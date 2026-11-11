@@ -115,18 +115,16 @@ boundaries, argument counts and types, result length and `_ERROR_`.
 
 ## Test suite 3: end-to-end programs from books
 
-Programs extracted from *The Little SAS Book* (5th and 4th editions) and
-*SAS Programming in the Pharmaceutical Industry* (2nd edition, invented
-data). Only our own index and SAS-produced results are kept; book text is
-not redistributed.
+End-to-end example programs from published SAS textbooks, used as an
+internal acceptance suite. Only our own index and the SAS-produced results
+are used; no program text or output from the books is published.
 
-| Book | Programs | Run by SAS | sasonr: all four layers | not supported yet | wrong results |
+| Group | Programs | Run by SAS | sasonr: all layers | not supported yet | wrong results |
 |---|---|---|---|---|---|
-| The Little SAS Book, 5th ed. | 119 | 111 | **45** | 64 | 0 |
-| The Little SAS Book, 4th ed. (not in 5th) | 17 | 9 | **2** | 7 | 0 |
-| SAS Programming in the Pharmaceutical Industry, 2nd ed. | 65 | 34 | **13** | 21 | 0 |
+| Introductory SAS programming examples | 136 | 120 | **47** | 71 | 0 |
+| Clinical (pharmaceutical) programming examples | 65 | 34 | **13** | 21 | 0 |
 
-The pharmaceutical programs are mainly blocked by ODS statements (12) and `OPTIONS MISSING=` (4).
+The clinical programs are mainly blocked by ODS statements (12) and `OPTIONS MISSING=` (4).
 
 ## Test suite 4: SAS rounding
 

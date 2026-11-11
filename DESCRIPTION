@@ -5,7 +5,7 @@ Authors@R: person("Kaiping", "Yang", role = c("aut", "cre"), email = "kaiping.ya
 Description: Deterministically parses SAS programs into a faithful abstract
     syntax tree and compiles DATA steps into tidyverse R code. Unsupported
     language features fail loudly with classed conditions.
-License: Apache License (>= 2)
+License: MIT + file LICENSE
 Encoding: UTF-8
 Imports:
     cli,
