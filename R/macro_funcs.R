@@ -139,7 +139,7 @@ mp_function <- function(nm, src, ses, mode) {
 
 # name = c(arg types: n numeric, c character), result type
 sysfunc_table <- list(
-  compress = list(args = c("c", "c"), min = 1), upcase = list(args = "c", min = 1),
+  compress = list(args = c("c", "c", "c"), min = 1), upcase = list(args = "c", min = 1),
   lowcase = list(args = "c", min = 1), strip = list(args = "c", min = 1),
   trim = list(args = "c", min = 1), left = list(args = "c", min = 1),
   cats = list(args = "c*", min = 1), catx = list(args = "c*", min = 2),
@@ -150,8 +150,9 @@ sysfunc_table <- list(
   mod = list(args = c("n", "n"), min = 2), mdy = list(args = c("n", "n", "n"), min = 3),
   year = list(args = "n", min = 1), month = list(args = "n", min = 1), day = list(args = "n", min = 1),
   index = list(args = c("c", "c"), min = 2), length = list(args = "c", min = 1),
-  substr = list(args = c("c", "n", "n"), min = 2), scan = list(args = c("c", "n", "c"), min = 2),
-  tranwrd = list(args = c("c", "c", "c"), min = 3)
+  substr = list(args = c("c", "n", "n"), min = 2), scan = list(args = c("c", "n", "c", "c"), min = 2),
+  tranwrd = list(args = c("c", "c", "c"), min = 3),
+  intck = list(args = c("c", "n", "n", "c"), min = 3), intnx = list(args = c("c", "n", "n", "c"), min = 3)
 )
 
 sysfunc_ws_significant <- c("cats", "catx", "tranwrd")

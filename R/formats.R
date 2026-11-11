@@ -41,7 +41,8 @@ num_fmt_defaults <- c(
   e8601tm = 8, is8601tm = 8, e8601dn = 10, datetime = 16, dtdate = 7, dtmonyy = 5, dtyear = 4,
   time = 8, tod = 8, hhmm = 5, hour = 2, mmss = 5, monyy = 5, monname = 9, downame = 9,
   worddate = 18, worddatx = 18, weekdate = 29, weekdatx = 29, year = 4, qtr = 1, month = 2,
-  day = 2, weekday = 1, yymm = 7, mmyy = 7, yyq = 6, julian = 5, yymmn = 6, timeampm = 11
+  day = 2, weekday = 1, yymm = 7, mmyy = 7, yyq = 6, julian = 5, yymmn = 6, timeampm = 11,
+  hex = 8
 )
 # date formats with separator variants: yymmddb/c/d/n/p/s, mmddyy..., ddmmyy..., yymm..., mmyy...
 sep_variants <- c(b = " ", c = ":", d = "-", n = "", p = ".", s = "/")
@@ -60,7 +61,7 @@ fmt_base_name <- function(name) {
   NULL
 }
 
-char_fmt_names <- c("", "char", "upcase", "quote")
+char_fmt_names <- c("", "char", "upcase", "quote", "hex")
 
 num_fmt_width_range <- list(
   best = c(1, 32), w = c(1, 32), f = c(1, 32), z = c(1, 32), comma = c(1, 32), commax = c(1, 32),
@@ -150,6 +151,25 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
   if (dollar) {
     s <- build(0L, FALSE, FALSE)
     if (!is.na(s) && nchar(s) <= w) return(pad(s))
+  }
+  if (!commas && !dollar && !zero && is.finite(v) && abs(v) >= 1) {
+    # w.d too narrow for a large value: an integer mantissa and an exponent
+    # (PUT(123456789, 5.) is 123E6, PUT(1E10, 8.) is 1E10)
+    n <- nchar(sprintf("%.0f", abs(v)))
+    for (k in seq(n, 1L)) {
+      m <- sas_f_round(abs(v) / 10^(n - k))
+      ex <- n - k
+      if (m >= 10^k) {
+        m <- m / 10
+        ex <- ex + 1
+      }
+      while (m >= 10 && m %% 10 == 0) {
+        m <- m / 10
+        ex <- ex + 1
+      }
+      s <- paste0(if (v < 0) "-", sprintf("%.0f", m), if (ex > 0) paste0("E", ex))
+      if (nchar(s) <= w) return(just_right(s, w))
+    }
   }
   b <- sas_fmt_best(v, w)
   if (!grepl("*", b, fixed = TRUE)) return(b)
@@ -411,9 +431,17 @@ sas_format <- function(x, fmt = NULL) {
   if (is.character(x)) {
     w <- fmt$w
     if (fmt$name == "quote" && is.na(w)) w <- max(nchar(x), 0L) + 2L
+    if (!fmt$name %in% char_fmt_names) abort_unsupported(paste0("format ", fmt$text))
+    if (fmt$name == "hex" && is.na(w)) w <- 4L
     out <- switch(fmt$name,
       upcase = toupper(x),
-      quote = paste0("\"", gsub("\"", "\"\"", sas_rtrim(x), fixed = TRUE), "\""),
+      quote = {
+        inner <- gsub("\"", "\"\"", sas_rtrim(x), fixed = TRUE)
+        # too long for the width: the text is cut so that the closing quote fits
+        if (!is.na(w)) inner <- substr(inner, 1L, w - 2L)
+        paste0("\"", inner, "\"")
+      },
+      hex = fmt_hex_char(x, w),
       x
     )
     if (!is.na(w)) out <- just_left(out, w)
@@ -442,9 +470,27 @@ sas_format <- function(x, fmt = NULL) {
       negparen = fmt_negparen(v, w, d),
       e = fmt_e(v, w, fmt$d),
       pvalue = fmt_pvalue(v, w, d),
+      hex = fmt_hex_num(v, w),
       fmt_date_value(v, bn$base, w, bn$sep, fmt$d)
     )
   }, character(1), USE.NAMES = FALSE)
+}
+
+# $HEXw.: two hex digits per byte of the value padded with blanks to w/2 bytes
+fmt_hex_char <- function(x, w) {
+  n <- (w + 1L) %/% 2L
+  vapply(x, function(s) {
+    b <- charToRaw(enc2native(s))
+    if (length(b) < n) b <- c(b, rep(as.raw(0x20), n - length(b)))
+    substr(toupper(paste(as.character(b[seq_len(min(n, length(b)))]), collapse = "")), 1L, w)
+  }, "", USE.NAMES = FALSE)
+}
+
+# HEX16.: the IEEE 754 bytes of the value (big-endian); other widths write the
+# integer part in two's complement, which is not implemented
+fmt_hex_num <- function(v, w) {
+  if (w != 16L) abort_unsupported(paste0("format HEX", w, ". for numeric values (only HEX16.)"))
+  toupper(paste(as.character(writeBin(as.double(v), raw(), size = 8L, endian = "big")), collapse = ""))
 }
 
 #' Format width actually used (explicit or default) for a spec
@@ -678,6 +724,14 @@ read_anydate <- function(t) {
       if (is.na(v) || !grepl(":", s, fixed = TRUE)) NA_real_ else floor(v / 86400)
     },
     function(s) if (grepl("^[0-9]{8}$", s) && as.numeric(substr(s, 1, 4)) > 1581) read_date3(s, "ymd") else NA_real_,
+    function(s) {
+      # Julian yyyyddd (2012024 is 24 January 2012)
+      if (!grepl("^[0-9]{7}$", s)) return(NA_real_)
+      y <- as.numeric(substr(s, 1, 4))
+      dd <- as.numeric(substr(s, 5, 7))
+      if (y < 1582 || dd < 1 || dd > (if (y %% 4 == 0 && (y %% 100 != 0 || y %% 400 == 0)) 366 else 365)) return(NA_real_)
+      valid_ymd(y, 1, 1) + dd - 1
+    },
     function(s) if (grepl("^[0-9]{4}[^0-9][0-9]{1,2}[^0-9][0-9]{1,2}$", s)) read_date3(s, "ymd") else NA_real_,
     function(s) read_date3(s, "mdy"),
     function(s) read_date3(s, "dmy"),
@@ -881,7 +935,8 @@ sas_f_put <- function(x, fmt, align = NULL) {
 #' @param qq `""`, `"?"` (no NOTE) or `"??"` (no NOTE, no _ERROR_).
 #' @export
 sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
-  if (is.numeric(s)) s <- strip_both(sas_fmt_best(s, 12L))
+  # a numeric source is converted with BEST12. (right-aligned, leading blanks kept)
+  if (is.numeric(s)) s <- sas_fmt_best(s, 12L)
   w <- fmt$w
   is_char <- fmt$char || isTRUE(user_fmt(fmt$name, TRUE, "invalue")$char)
   vals <- vector(if (is_char) "character" else "numeric", length(s))
