@@ -11,6 +11,12 @@
 #' `.` is `NA_real_`; special missing values `.A`-`.Z` and `._` are encoded as
 #' NaN payloads so that they keep the SAS sort order `._ < . < .A < ... < .Z`.
 #' @param code `"."`, `"._"`, or `".A"`-`".Z"` (the leading dot is optional).
+#' @examples
+#' sas_missing()      # .  (NA_real_)
+#' a <- sas_missing(".A")
+#' is.na(a)
+#' sas_f_missing(a)   # SAS MISSING(.A) is 1
+#' sas_f_max(a, 1)    # missing values are ignored by MAX
 #' @export
 sas_missing <- function(code = ".") {
   code <- toupper(sub(".", "", code, fixed = TRUE))
