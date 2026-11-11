@@ -261,7 +261,7 @@ sql_lower_call <- function(e, ctx) {
     e$args <- lapply(e$args, sql_lower, ctx = ctx)
     return(e)
   }
-  if (!is.null(lag_kind(e$name))) {
+  if (!is.null(lag_kind(e$name)) || e$name %in% c("vlength", "vlabel", "vformat", "vtype", "vname", "vinformat")) {
     abort_syntax(paste0("The ", toupper(e$name), " function is not supported in PROC SQL, it is only valid within the DATA step."), e$line)
   }
   if (e$name == "monotonic") {

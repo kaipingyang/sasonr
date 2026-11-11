@@ -108,7 +108,15 @@ resolve_items <- function(items, st, line = NULL, register = TRUE) {
         if (!is.null(it$text)) disp[it$name] <- it$text
         it$name
       },
-      range = expand_numbered_range(it$from, it$to, line),
+      range = {
+        nms <- expand_numbered_range(it$from, it$to, line)
+        if (!is.null(it$text)) {
+          # the stored name keeps the spelling of the first name of the range
+          base <- split_trailing_digits(it$text)$base
+          disp[nms] <- paste0(base, substring(nms, nchar(base) + 1L))
+        }
+        nms
+      },
       pos_range = {
         a <- match(it$from, st$order)
         b <- match(it$to, st$order)
@@ -521,6 +529,11 @@ an_stmt <- function(s, st) {
       for (sp in s$specs) {
         vv <- resolve_items(sp$vars, st, line, register = FALSE)
         for (v in vv) {
+          old_t <- st$info[[v]]$type
+          if (!is.null(old_t) && !is.na(old_t) && old_t != sp$type) {
+            abort_syntax(if (sp$type == "num") paste0("Numeric length cannot be used with character variable ", v, ".")
+                         else paste0("Character length cannot be used with numeric variable ", v, "."), line)
+          }
           reg_var(st, v, sp$type, if (sp$type == "char") sp$len else NA_integer_, disp = attr(vv, "disp")[v] %|NA|% v)
           if (sp$type == "num") st$numlen[[v]] <- sp$len
         }
@@ -529,7 +542,16 @@ an_stmt <- function(s, st) {
     format = {
       for (sp in s$specs) {
         check_format(sp$fmt, line)
-        for (v in resolve_items(sp$vars, st, line)) st$formats[[v]] <- sp$fmt
+        vv <- resolve_items(sp$vars, st, line, register = FALSE)
+        for (v in vv) {
+          if (is.null(st$info[[v]])) {
+            # first seen in FORMAT: a $w. format fixes the type and length
+            f <- sp$fmt
+            if (isTRUE(f$char) && !is.na(f$w)) reg_var(st, v, "char", f$w, disp = attr(vv, "disp")[v] %|NA|% v)
+            else reg_var(st, v, disp = attr(vv, "disp")[v] %|NA|% v)
+          }
+          st$formats[[v]] <- sp$fmt
+        }
       }
     },
     label = st$labels[names(s$labels)] <- s$labels,
@@ -537,9 +559,11 @@ an_stmt <- function(s, st) {
       for (sp in s$specs) {
         if (is.null(sp$fmt)) next
         if (!infmt_known(sp$fmt)) abort_unsupported(paste0("informat ", sp$fmt$text), line)
-        for (v in resolve_items(sp$vars, st, line, register = FALSE)) {
+        vv <- resolve_items(sp$vars, st, line, register = FALSE)
+        for (v in vv) {
+          dv <- attr(vv, "disp")[v] %|NA|% v
           if (is.null(st$info[[v]])) {
-            if (sp$fmt$char) reg_var(st, v, "char", if (is.na(sp$fmt$w)) 8L else sp$fmt$w) else reg_var(st, v, "num")
+            if (sp$fmt$char) reg_var(st, v, "char", if (is.na(sp$fmt$w)) 8L else sp$fmt$w, disp = dv) else reg_var(st, v, "num", disp = dv)
           }
           st$informats[[v]] <- sp$fmt
         }
@@ -547,20 +571,23 @@ an_stmt <- function(s, st) {
     },
     attrib = {
       for (g in s$groups) {
-        for (v in resolve_items(g$vars, st, line, register = FALSE)) {
-          if (!is.null(g$len)) reg_var(st, v, g$len$type, if (g$len$type == "char") g$len$len else NA_integer_)
+        vv <- resolve_items(g$vars, st, line, register = FALSE)
+        for (v in vv) {
+          dv <- attr(vv, "disp")[v] %|NA|% v
+          if (!is.null(g$len)) reg_var(st, v, g$len$type, if (g$len$type == "char") g$len$len else NA_integer_, disp = dv)
           if (!is.null(g$len) && g$len$type == "num") st$numlen[[v]] <- g$len$len
           if (!is.null(g$format)) {
             check_format(g$format, line)
-            if (is.null(st$info[[v]])) reg_var(st, v, if (g$format$char) "char" else "num", if (g$format$char) (if (is.na(g$format$w)) 8L else g$format$w) else NA_integer_)
+            if (is.null(st$info[[v]])) reg_var(st, v, if (g$format$char) "char" else "num", if (g$format$char) (if (is.na(g$format$w)) 8L else g$format$w) else NA_integer_, disp = dv)
             st$formats[[v]] <- g$format
           }
           if (!is.null(g$informat)) {
             if (!infmt_known(g$informat)) abort_unsupported(paste0("informat ", g$informat$text), line)
+            if (is.null(st$info[[v]]) && isTRUE(g$informat$char) && !is.na(g$informat$w)) reg_var(st, v, "char", g$informat$w, disp = dv)
             st$informats[[v]] <- g$informat
           }
           if (!is.null(g$label)) st$labels[v] <- g$label
-          if (is.null(st$info[[v]])) reg_var(st, v)
+          if (is.null(st$info[[v]])) reg_var(st, v, disp = dv)
         }
       }
     },

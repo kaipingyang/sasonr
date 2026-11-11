@@ -374,8 +374,9 @@ parse_varlist_item <- function(p) {
   }
   if (is_op(p, "-", 1L) && tk_type(p, 2L) == "name") {
     to <- tk_low(p, 2L)
+    text <- tk_val(p)
     advance(p, 3L)
-    return(list(kind = "range", from = nm, to = to))
+    return(list(kind = "range", from = nm, to = to, text = text))
   }
   if (is_op(p, ":", 1L) && tk_adjacent(p, 0L, 1L)) {
     advance(p, 2L)

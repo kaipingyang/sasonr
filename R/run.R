@@ -79,6 +79,16 @@ engine_exec <- function(eng, text, line) {
       if (eng$execute) engine_sql(eng, step$stmt)
       next
     }
+    if (step$type == "proc" && step$name == "datasets") {
+      for (t in step$titles) engine_global(eng, t)
+      eng$steps <- c(eng$steps, list(list(code = paste0("# PROC DATASETS (SAS line ", step$line, "): executed by the engine"),
+                                          level = "PROC", reasons = "PROC DATASETS", line = step$line, outputs = character(), meta = list())))
+      if (eng$execute) {
+        rt_reset()
+        engine_datasets(eng, step)
+      }
+      next
+    }
     if (step$type == "proc") {
       for (t in step$titles) engine_global(eng, t)
       tr <- translate_proc(step, eng$meta, eng$last)
