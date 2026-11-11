@@ -1,0 +1,68 @@
+---
+title: "Architecture"
+---
+
+sasonr treats SAS as the only source language and R as the execution
+engine. Nothing is translated "once and handed over": the SAS program is
+parsed and executed every time, and the generated R code can be inspected.
+
+```
+SAS source
+  │
+  ├─ 1 Lexer (state machine)
+  │      strings, comments, name/date/hex literals, special missing values,
+  │      DATALINES blocks, macro tokens
+  │
+  ├─ 2 Macro processor (pull-based)
+  │      %LET, &&-resolution, %MACRO/%MEND, %IF/%DO, quoting functions,
+  │      global/local symbol tables. It yields one complete step at a time;
+  │      after the step runs, CALL SYMPUT(X) and SQL INTO: values are written
+  │      back before expansion continues.
+  │
+  ├─ 3 Parser → faithful AST
+  │      recursive descent for statements, Pratt parser for expressions with
+  │      the SAS operator precedence (including comparison chains, IN, ><, <>)
+  │      IF/ELSE, DO/END, SELECT/WHEN are kept as written; desugaring happens
+  │      in a separate lowering step.
+  │
+  ├─ 4 Execution
+  │      DATA step → generated tidyverse code (L1 / L2 / L3, see below)
+  │      PROC SQL  → own SQL parser; DuckDB for joins and grouping,
+  │                  SAS semantics (missing values, remerge, CALCULATED) in R
+  │      PROC SORT, PRINT, MEANS/SUMMARY, FREQ, TRANSPOSE, CONTENTS,
+  │      DATASETS, APPEND, DELETE, FORMAT → R implementations
+  │
+  └─ 5 Runtime: SAS value semantics, formats/informats, functions,
+         variable attributes, _ERROR_ and SAS-style log notes
+```
+
+## DATA step compilation levels
+
+The goal is identical end-to-end results, not a replica of the program data
+vector, so each step is compiled to the fastest form that is provably
+equivalent:
+
+| Level | Used when | Generated code |
+|---|---|---|
+| **L1** | no cross-row state | `dplyr::mutate()`, `filter()`, `select()` |
+| **L2** | recognised patterns: BY groups with `FIRST.`/`LAST.`, `RETAIN` accumulators, baseline carry-forward, unconditional `LAG` | grouped vectorised code |
+| **L3** | anything else (conditional `LAG`, `OUTPUT` to several data sets, `DO` loops creating rows, ...) | an explicit row loop that follows SAS execution rules |
+
+The level is decided by analysing the AST. If a vectorised step meets a
+condition that needs row-by-row diagnostics (for example invalid data that
+sets `_ERROR_`), it is re-run as L3.
+
+## Why not regular expressions
+
+SAS syntax is not a regular language: nested `DO`/`END` blocks, nested
+parentheses, operator precedence, context-dependent keywords (`set`, `if`
+and `end` can be variable names) and macro expansion all require a real
+lexer and parser. Regex-based translators reach a ceiling quickly and need
+a fallback such as a language model; sasonr is fully deterministic instead.
+
+## Fail loud
+
+Every statement, option, function and procedure is either implemented and
+verified against SAS output, or rejected with a `sasonr_unsupported`
+condition that names the feature and the SAS line. Silent approximation is
+treated as a bug.

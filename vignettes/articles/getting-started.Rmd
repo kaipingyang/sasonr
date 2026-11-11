@@ -1,0 +1,105 @@
+---
+title: "Getting started"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup}
+library(sasonr)
+```
+
+## Run a SAS program
+
+`sas_run()` takes SAS source code, runs it on the R engine and returns the
+log, the listing and the WORK data sets.
+
+```{r}
+code <- "
+data dm;
+  input usubjid $ age sex $;
+  datalines;
+S01 45 M
+S02 70 F
+S03 .  F
+;
+run;
+
+data adsl;
+  set dm;
+  length agegr1 $5;
+  if missing(age) then agegr1 = 'Miss';
+  else if age < 65 then agegr1 = '<65';
+  else agegr1 = '>=65';
+  put usubjid= age= agegr1=;
+run;
+"
+res <- sas_run(code)
+res$log
+res$work$adsl
+```
+
+Missing values follow SAS rules: a missing numeric value is smaller than any
+number, and character variables keep the length SAS would give them.
+
+## See the generated R code
+
+`sas_translate()` shows the R code that sasonr generates for each step. Simple
+steps become vectorised `dplyr` pipelines; steps with cross-row state such as
+`RETAIN`, `LAG` or `FIRST.`/`LAST.` use grouped vectorised code when the
+result can be proven identical, and an explicit row loop otherwise.
+
+```{r}
+code2 <- "
+data lab;
+  input usubjid $ visit aval;
+  datalines;
+S01 1 10
+S01 2 12
+S02 1 20
+S02 2 18
+;
+run;
+
+data chg;
+  set lab;
+  by usubjid;
+  retain base;
+  if first.usubjid then base = aval;
+  chg = aval - base;
+run;
+"
+tr <- sas_translate(code2)
+cat(tr$steps[[2]]$code)
+sas_run(code2)$work$chg
+```
+
+## Macro language
+
+Macro processing and execution interleave exactly as in SAS: a step is run
+as soon as it is complete, so values created with `CALL SYMPUTX` are
+available to the macro code that follows.
+
+```{r}
+code3 <- "
+%macro check(ds);
+  data _null_;
+    call symputx('n', 3);
+  run;
+  %if &n > 2 %then %put NOTE: &ds is large;
+  %else %put NOTE: &ds is small;
+%mend check;
+%check(adsl)
+"
+sas_run(code3)$log
+```
+
+## Unsupported features fail loudly
+
+sasonr never guesses. A feature that has not been verified against SAS stops
+the program with a classed condition that carries the SAS line number.
+
+```{r, error = TRUE}
+sas_run("data a; x = 1; run; proc report data=a; run;")
+```

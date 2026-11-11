@@ -1,0 +1,20 @@
+---
+title: "Roadmap"
+---
+
+Scope: SDTM, ADaM and TFL programs written in SAS should run with sasonr and
+give the same results as SAS 9.4.
+
+| Milestone | Content | Status |
+|---|---|---|
+| Front end | Lexer, Pratt expressions, faithful DATA step AST, macro processor | ✅ done |
+| DATA step | L1/L2/L3 compilation to tidyverse, PDV rules, `_ERROR_`, INPUT/INFILE | ✅ core done; hash objects, `POINT=`, `UPDATE` open |
+| Functions and formats | ~200 functions, ~80 formats/informats, PROC FORMAT | 🔄 function-by-function verification against SAS started |
+| PROC SQL | Own parser + DuckDB, SAS semantics | ✅ done (dictionary tables open) |
+| Data management PROCs | SORT, PRINT, TRANSPOSE, CONTENTS, DATASETS, APPEND, DELETE | ✅ done; COMPARE, IMPORT/EXPORT open |
+| Descriptive statistics | MEANS/SUMMARY, FREQ | ✅ done; FREQ test statistics awaiting SAS verification; UNIVARIATE open |
+| Reporting | PROC REPORT, TABULATE, ODS RTF/HTML | ⬜ next |
+| Statistical PROCs | GLM, MIXED, LIFETEST, PHREG, LOGISTIC (via CRAN packages) | ⬜ planned |
+| End-to-end acceptance | Book programs (Little SAS Book, pharmaceutical programming examples) | 🔄 SAS results ready, sasonr runs pending |
+
+See [Conformance status](conformance.html) for the current numbers.

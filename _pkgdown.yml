@@ -1,0 +1,38 @@
+url: https://kaipingyang.github.io/sasonr/
+template:
+  bootstrap: 5
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github]
+articles:
+- title: Overview
+  navbar: ~
+  contents:
+  - articles/getting-started
+  - articles/architecture
+- title: Progress
+  contents:
+  - articles/conformance
+  - articles/roadmap
+reference:
+- title: Run and translate SAS programs
+  contents:
+  - sas_run
+  - sas_translate
+- title: Front end (lexer, parser, analysis)
+  contents:
+  - sas_lex
+  - sas_parse
+  - sas_parse_expr
+  - sas_analyze
+- title: Runtime helpers used by generated code
+  desc: >
+    Generated R code calls these helpers to reproduce SAS value semantics
+    (missing values, fixed-length characters, formats, functions). They are
+    exported so that translated code can run on its own.
+  contents:
+  - starts_with("sas_f_")
+  - starts_with("sas_fmt")
+  - starts_with("sas_")
+  - mac_eval

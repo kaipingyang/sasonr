@@ -1,0 +1,133 @@
+---
+title: "Conformance status"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+*Last updated: 2026-11-11 (development round 5).*
+
+sasonr only accepts a feature once its test cases reproduce the output of
+**real SAS 9.4** (TS1M7, Linux). Expected results are never taken from
+documentation examples, book printouts, other interpreters or hand
+derivation: in early experiments each of these was wrong at least once.
+
+## How results are compared
+
+Every test program is run in a fresh SAS session and in sasonr. Four layers
+are compared:
+
+| Layer | What is compared |
+|---|---|
+| **L-DS** | Every WORK data set at the end of the program: data set names, row count, column names and order, every cell (numeric relative tolerance 1e-9, character values without trailing blanks) |
+| **L-ATTR** | Variable type, length, format, informat and label |
+| **L-LOG** | Key log diagnostics in order (`NOTE: The data set ... has N observations`, missing-value notes, uninitialized variables, unresolved macro references, ...) |
+| **L-LST** | Listing output, line by line in order (whitespace normalised) |
+
+Two kinds of failure are tracked first in every round because they are
+*silent*: an L-DS mismatch (wrong result) and a program on which SAS stops
+with an ERROR but sasonr keeps running (too lenient). Unsupported features
+are not failures: sasonr stops with a `sasonr_unsupported` condition.
+
+## Test suite 1: single-feature corpus (1,965 programs)
+
+The programs come from the test corpus of the open-source OpenSAS
+interpreter (Apache-2.0, invented data). SAS ran 1,680 of them normally and
+stopped with an error on 285.
+
+### Current status
+
+| | Programs |
+|---|---|
+| SAS ran normally | 1,680 |
+| sasonr ran to completion | **1,104** |
+| sasonr stopped: feature not supported yet | 552 |
+| sasonr stopped: error | 24 |
+| **All four layers identical to SAS** | **1,031** (93.4% of completed) |
+| L-DS mismatches | 8 (all are session time stamps in `PROC CONTENTS OUT=`) |
+| SAS stopped with an error but sasonr kept running | **0** of 285 |
+
+### Progress by development round
+
+| Round | Added | Completed | All four layers | Silent wrong results |
+|---|---|---|---|---|
+| 1 | Lexer, Pratt expressions, DATA step, tidyverse code generation | — | — | 0 |
+| 2 | Macro processor, PROC SORT / PRINT | 429 | 414 * | 10 * |
+| 3 | `_ERROR_`, ~200 functions, ~80 formats/informats, INPUT/INFILE | 701 | 684 * | 8 * |
+| 4 | Four-layer comparison, variable attributes, log notes, PROC SQL | 906 | 866 | 0 |
+| 5 | PROC MEANS/SUMMARY, FREQ, TRANSPOSE, CONTENTS, DATASETS, APPEND, DELETE | 1,104 | 1,031 | 0 ** |
+
+\* Rounds 2–3 used an earlier, weaker comparison (printed output only).
+\*\* Excluding environment fields (time stamps, file paths) in `PROC CONTENTS`.
+
+### By area (programs SAS ran normally)
+
+| Area | Programs | Completed | All four layers | Not supported yet |
+|---|---|---|---|---|
+| SDTM-style derivations (`sdtm_*`) | 248 | 228 | 222 | 20 |
+| PROC SQL | 124 | 116 | 104 | 8 |
+| Macro language | 78 | 50 | 49 | 21 |
+| INPUT statement | 50 | 48 | 42 | 2 |
+| SET statement | 40 | 20 | 18 | 19 |
+| PROC MEANS | 35 | 31 | 31 | 4 |
+| Formats | 29 | 23 | 23 | 6 |
+| PROC TRANSPOSE | 29 | 28 | 28 | 1 |
+| WHERE | 24 | 17 | 15 | 2 |
+| PROC FREQ | 21 | 20 | 20 | 1 |
+| PROC REPORT | 20 | 0 | 0 | 20 |
+| Hash objects | 19 | 0 | 0 | 19 |
+| PROC UNIVARIATE | 13 | 0 | 0 | 13 |
+
+Note: the `sdtm_*` programs are *single-feature* programs written in an
+SDTM style. They show that common SDTM idioms behave like SAS; they are not
+complete SDTM/ADaM/TFL programs (see test suite 3).
+
+### Most frequent unsupported features
+
+| Programs blocked | Feature |
+|---|---|
+| 35 | PROC UNIVARIATE |
+| 30 | DATA step hash objects (`DECLARE`) |
+| 29 | PROC REPORT |
+| 25 | PROC TABULATE |
+| 13 | `LIBNAME` statement |
+| 12 | `SET ... POINT=` |
+| 10 | `UPDATE` statement |
+| 10 | PROC COMPARE |
+| 10 | PROC EXPORT |
+
+## Test suite 2: function-by-function tests
+
+The feature inventory is exported from SAS itself (`sashelp.vfunc`,
+`dictionary.formats`): 1,096 functions (409 in Base SAS) and 1,032
+formats/informats. Each function gets 20–60 cases covering documented
+examples, missing and special missing values, numeric and character
+boundaries, argument counts and types, result length and `_ERROR_`.
+
+| Stage | Status |
+|---|---|
+| Pilot: SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT, INTNX, INTCK | 370 cases, SAS results generated; **sasonr comparison pending** |
+| ~120 functions frequently used in clinical programming | planned |
+| 207 Base formats and informats | planned |
+
+## Test suite 3: end-to-end programs from books
+
+Programs extracted from *The Little SAS Book* (5th and 4th editions) and
+*SAS Programming in the Pharmaceutical Industry* (2nd edition, invented
+data). Only our own index and SAS-produced results are kept; book text is
+not redistributed.
+
+| Book | Programs | Run by SAS | sasonr |
+|---|---|---|---|
+| The Little SAS Book, 5th ed. | 119 | 111 | pending |
+| The Little SAS Book, 4th ed. (not in 5th) | 17 | 9 | pending |
+| SAS Programming in the Pharmaceutical Industry, 2nd ed. | 65 | 34 | pending |
+
+## Known gaps
+
+- PROC FREQ test statistics (chi-square family, Fisher, binomial, CMH) are
+  implemented but not yet verified against SAS output; they will be checked
+  with dedicated SAS-generated cases before being marked verified.
+- ODS output (HTML/RTF) is not compared yet.
+- No statistical procedures beyond MEANS/FREQ yet.
