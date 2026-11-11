@@ -257,12 +257,32 @@ fuzz_int <- function(x) {
 
 #' SAS ROUND: half away from zero, with fuzz
 #' @export
-sas_f_round <- function(x, unit = 1) {
+sas_f_round <- function(x, unit = 1, .at = NULL) {
+  n <- max(length(x), length(unit))
+  if (n == 0) return(numeric())
+  x <- rep_len(as.numeric(x), n)
+  unit <- rep_len(as.numeric(unit), n)
+  # missing arguments (special missing values included) give an ordinary missing
+  out <- rep(NA_real_, n)
+  bad <- !is.na(unit) & unit <= 0
+  if (any(bad)) note_invalid_arg("round", 2L, .at, list(x, unit), bad, numbered = TRUE)
+  ok <- !is.na(x) & !is.na(unit) & !bad
   q <- x / unit
-  r <- sign(q) * floor(abs(q) + 0.5 + 1e-12 * pmax(1, abs(q)))
-  inv <- 1 / unit
-  exact <- rep_len(abs(inv - round(inv)) < 1e-9 & inv >= 1, length(r))
-  ifelse(exact, r / round(inv), r * unit)
+  # values that are already whole multiples at this magnitude come back unchanged
+  big <- ok & (!is.finite(q) | abs(q) >= 2^52)
+  out[big] <- x[big]
+  k <- ok & !big
+  if (any(k)) {
+    a <- abs(q[k])
+    r <- floor(a)
+    # a halfway point within the fuzz (relative 1e-12, at most 1e-6) rounds away from zero
+    r <- r + (a - r >= 0.5 - pmin(1e-12 * pmax(1, a), 1e-6))
+    r <- sign(q[k]) * r
+    inv <- 1 / unit[k]
+    exact <- abs(inv - round(inv)) < 1e-9 & inv >= 1
+    out[k] <- ifelse(exact, r / round(inv), r * unit[k])
+  }
+  out
 }
 #' @export
 sas_f_int <- function(x) trunc(fuzz_int(x))
@@ -365,13 +385,41 @@ sas_f_catt <- function(...) {
 #' @export
 sas_f_cat <- function(...) do.call(paste0, lapply(list(...), as_sas_chr))
 #' @export
-sas_f_catx <- function(sep, ...) {
-  parts <- lapply(list(...), function(a) strip_both(as_sas_chr(a)))
-  n <- max(lengths(parts))
+sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
+  args <- list(...)
+  # numeric items: BEST32. without blanks (missing values are written, not
+  # skipped: '.', 'A'); only blank character items are skipped
+  parts <- lapply(args, function(a) {
+    if (is.numeric(a)) {
+      a[!is.na(a) & a == 0] <- 0
+      # whole numbers in full (BEST32.), other values with BEST12.
+      whole <- !is.na(a) & a == trunc(a)
+      return(strip_both(ifelse(whole, sas_fmt_best(a, 32L), sas_fmt_best(a, 12L))))
+    }
+    strip_both(a)
+  })
+  n <- max(lengths(parts), length(sep))
   parts <- lapply(parts, rep_len, n)
+  sep <- rep_len(sep, n)
   vapply(seq_len(n), function(i) {
     v <- vapply(parts, `[`, character(1), i)
-    paste(v[nzchar(v)], collapse = rep_len(sep, n)[i])
+    keep <- nzchar(v)
+    out <- paste(v[keep], collapse = sep[i])
+    if (nchar(out) > .len) {
+      # the buffer is too short: blank result, WARNING and _ERROR_
+      cum <- cumsum(ifelse(keep, nchar(v), 0L) + ifelse(keep & cumsum(keep) > 1, nchar(sep[i]), 0L))
+      argn <- which(cum > .len)[1] + 1L
+      rt$notes <- c(rt$notes, paste0(
+        "WARNING: In a call to the CATX function, the buffer allocated for the result was not long enough to contain ",
+        "the concatenation of all the arguments. The correct result would contain ", nchar(out),
+        " characters, but the actual result might either be truncated to ", .len,
+        " character(s) or be completely blank, depending on the calling environment. ",
+        "The following note indicates the left-most argument that caused truncation."))
+      note_invalid_arg("catx", argn, .at, c(list(sep[i]), lapply(args, `[`, min(i, max(lengths(args))))), NULL,
+                       numbered = TRUE, math = FALSE)
+      return("")
+    }
+    out
   }, character(1))
 }
 #' @export
@@ -572,8 +620,10 @@ sas_fmt_best <- function(x, w = 12L) {
     }
     v <- x[i]
     if (v != 0 && w > 15) {
-      # SAS shows at most 15 significant digits
-      v <- signif(v, 15)
+      # SAS shows at most 15 significant digits (sprintf rounds correctly
+      # where signif() loses the last digit for very small magnitudes)
+      v15 <- as.numeric(sprintf("%.15g", v))
+      if (is.finite(v15)) v <- v15
     }
     s <- NA_character_
     if (v == trunc(v) && abs(v) < 10^w) {

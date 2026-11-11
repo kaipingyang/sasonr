@@ -306,8 +306,8 @@ tk_col <- function(p, k = 0L) {
 
 # PUT(x, format [-l|-r|-c]) and INPUT(s, [?|??] informat): the second argument
 # is a format, not an expression.
-parse_put_input_call <- function(p, name, line, col) {
-  arg <- parse_expr(p)
+parse_put_input_call <- function(p, name, line, col, arg_parser = parse_expr) {
+  arg <- arg_parser(p)
   if (tk_type(p) != "comma") abort_syntax(paste0("expected ',' and a format in ", toupper(name), "()"), line)
   advance(p)
   qq <- ""

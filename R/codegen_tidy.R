@@ -192,6 +192,7 @@ gen_call <- function(e, cx) {
   }
   if (e$name == "symget") args <- c(".symtab", args)
   at <- if (cx$mode == "row" && e$name %in% err_fns && !is.null(e$col)) at_code(e) else ""
+  if (e$name == "catx") at <- paste0(at, sprintf(", .len = %dL", as.integer(e$buf_len %||% 200L)))
   sprintf("sas_f_%s(%s%s)", e$name, paste(args, collapse = ", "), at)
 }
 

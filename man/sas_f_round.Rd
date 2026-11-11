@@ -4,7 +4,7 @@
 \alias{sas_f_round}
 \title{SAS ROUND: half away from zero, with fuzz}
 \usage{
-sas_f_round(x, unit = 1)
+sas_f_round(x, unit = 1, .at = NULL)
 }
 \description{
 SAS ROUND: half away from zero, with fuzz

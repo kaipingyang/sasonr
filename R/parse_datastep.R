@@ -61,6 +61,7 @@ parse_data_step <- function(p) {
   advance(p)
   outputs <- list()
   while (tk_type(p) != "semi") {
+    if (tk_type(p) == "str") abort_unsupported("a quoted physical data set name (permanent data set)", tk_line(p))
     if (tk_type(p) != "name") abort_syntax(paste("expected a data set name but found", tok_desc(p)), tk_line(p))
     outputs <- c(outputs, list(parse_ds_ref(p, "output")))
   }
@@ -94,6 +95,7 @@ parse_data_step <- function(p) {
 
 parse_ds_ref <- function(p, context) {
   line <- tk_line(p)
+  if (tk_type(p) == "str") abort_unsupported("a quoted physical data set name (permanent data set)", line)
   name <- tk_low(p)
   advance(p)
   if (tk_type(p) == "dot" && tk_type(p, 1L) == "name" && tk_adjacent(p, -1L, 0L)) {
@@ -482,6 +484,7 @@ parse_set <- function(p, kind) {
   datasets <- list()
   opts <- list()
   while (tk_type(p) != "semi") {
+    if (tk_type(p) == "str") abort_unsupported("a quoted physical data set name (permanent data set)", tk_line(p))
     if (tk_type(p) == "name" && is_op(p, "=", 1L)) {
       opt <- tk_low(p)
       oline <- tk_line(p)
@@ -675,15 +678,17 @@ parse_label <- function(p) {
   line <- tk_line(p)
   advance(p)
   labels <- character()
+  texts <- character()
   while (tk_type(p) == "name" && is_op(p, "=", 1L)) {
     nm <- tk_low(p)
+    texts[nm] <- tk_val(p)
     advance(p, 2L)
     if (tk_type(p) != "str") abort_syntax("expected a quoted label", line)
     labels[nm] <- tk_val(p)
     advance(p)
   }
   expect_semi(p, "LABEL")
-  list(stmt = "label", labels = labels, line = line)
+  list(stmt = "label", labels = labels, texts = texts, line = line)
 }
 
 parse_array <- function(p) {
@@ -970,21 +975,30 @@ parse_input_group <- function(p, line) {
     }
   }
   advance(p)
+  # stored names keep the spelling of the program (a range takes it from its first name)
+  texts <- character()
   names <- unlist(lapply(vars, function(it) {
-    switch(it$kind, name = it$name, range = expand_numbered_range(it$from, it$to, line),
-           abort_unsupported("this variable list form in an INPUT group", line))
+    nms <- switch(it$kind, name = it$name, range = expand_numbered_range(it$from, it$to, line),
+                  abort_unsupported("this variable list form in an INPUT group", line))
+    tx <- if (it$kind == "name") it$text %||% it$name else {
+      base <- if (is.null(it$text)) NULL else split_trailing_digits(it$text)$base
+      if (is.null(base)) nms else paste0(base, substring(nms, nchar(base) + 1L))
+    }
+    texts <<- c(texts, tx)
+    nms
   }))
   if (!any(vapply(fmts, function(f) f$k == "fmt", logical(1)))) abort_syntax("INPUT informat list without an informat", line)
   out <- list()
   j <- 0L
-  for (nm in names) {
+  for (q in seq_along(names)) {
+    nm <- names[q]
     repeat {
       j <- j %% length(fmts) + 1L
       f <- fmts[[j]]
       if (f$k == "fmt") break
       out <- c(out, list(f))
     }
-    out <- c(out, list(list(k = "var", name = nm, text = nm, char = f$fmt$char, mode = "formatted", fmt = f$fmt,
+    out <- c(out, list(list(k = "var", name = nm, text = texts[q], char = f$fmt$char, mode = "formatted", fmt = f$fmt,
                             amp = FALSE, tilde = FALSE, qq = "", colon = FALSE)))
   }
   out

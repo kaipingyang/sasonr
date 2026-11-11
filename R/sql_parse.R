@@ -691,6 +691,7 @@ parse_sql_modify_col <- function(p) {
 
 parse_sql_expr <- function(p, min_bp = 1L) {
   lhs <- parse_sql_prefix(p)
+  chain_rhs <- NULL
   repeat {
     line <- tk_line(p)
     col <- tk_col(p)
@@ -722,10 +723,14 @@ parse_sql_expr <- function(p, min_bp = 1L) {
         next
       }
       rhs <- parse_sql_expr(p, 4L)
-      lhs <- list(node = "compare", op = sub(":", "", info$op, fixed = TRUE), colon = endsWith(info$op, ":"),
-                  lhs = lhs, rhs = rhs, line = line)
+      cmp <- list(node = "compare", op = sub(":", "", info$op, fixed = TRUE), colon = endsWith(info$op, ":"),
+                  lhs = if (is.null(chain_rhs)) lhs else chain_rhs, rhs = rhs, line = line)
+      # a <= b <= c is (a <= b) and (b <= c), as in the DATA step
+      lhs <- if (is.null(chain_rhs)) cmp else list(node = "binary", op = "and", lhs = lhs, rhs = cmp, line = line, col = col)
+      chain_rhs <- rhs
       next
     }
+    chain_rhs <- NULL
     rhs <- parse_sql_expr(p, if (info$right) info$bp else info$bp + 1L)
     lhs <- list(node = "binary", op = info$op, lhs = lhs, rhs = rhs, line = line, col = col)
   }
@@ -863,7 +868,11 @@ parse_sql_prefix <- function(p) {
   if (low == "case") return(parse_sql_case(p))
   if (low == "null" && !tk_type(p, 1L) %in% c("lparen", "dot")) abort_unsupported("the NULL keyword as a value", line)
   if (tk_type(p, 1L) == "lparen") {
-    if (low %in% c("put", "input")) return(parse_call(p))
+    if (low %in% c("put", "input")) {
+      # the first argument is an SQL expression (columns, table.column)
+      advance(p, 2L)
+      return(parse_put_input_call(p, low, line, col, arg_parser = function(p) parse_sql_expr(p)))
+    }
     return(parse_sql_call(p))
   }
   if (tk_type(p, 1L) == "dot" && tk_type(p, 2L) == "name" && tk_adjacent(p, 0L, 1L)) {
@@ -889,7 +898,8 @@ parse_sql_call <- function(p) {
     advance(p, 2L)
     return(list(node = "call", name = name, args = list(list(node = "star", line = line)), distinct = FALSE, line = line, col = col))
   }
-  if (is_kw(p, "distinct")) {
+  # UNIQUE is a synonym of DISTINCT in summary functions: count(unique x)
+  if (is_kw(p, "distinct") || (is_kw(p, "unique") && tk_type(p, 1L) %in% c("name", "lparen"))) {
     distinct <- TRUE
     advance(p)
   }

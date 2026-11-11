@@ -82,6 +82,7 @@ reg_var <- function(st, name, type = NA_character_, len = NA_integer_, kind = "d
     st$order <- c(st$order, name)
     inf <- list(type = type, len = len, kind = kind, disp = disp, retained = retained, init = init)
   } else {
+    inf$label_only <- NULL
     if (is.na(inf$type) && !is.na(type)) {
       inf$type <- type
       inf$len <- len
@@ -181,7 +182,7 @@ expr_type <- function(e, st) {
       if (e$name == "put") {
         a <- expr_type(e$args[[1]], st)
         w <- fmt_width(e$fmt, a$type == "char")
-        if (is.na(w)) w <- if (a$type == "char") a$len else 12L
+        if (is.na(w)) w <- if (a$type == "char") a$len + if (identical(e$fmt$name, "quote")) 2L else 0L else 12L
         return(list(type = "char", len = as.integer(w)))
       }
       if (e$name == "input") {
@@ -289,6 +290,12 @@ an_call <- function(e, st) {
     if (e$name == "put") check_format_width(f, e$line)
     e$args <- lapply(e$args, an_expr, st = st)
     a <- expr_type(e$args[[1]], st)
+    # PUT(123, $5.) writes the number with 5.; PUT('abc', 8.) writes the text with $8.
+    if (e$name == "put" && f$name == "" && !is.na(f$w) && is.na(f$d) && f$char != (a$type == "char") &&
+        is.null(user_fmt("", TRUE))) {
+      e$fmt <- fmt_spec("", f$w, NA_integer_, a$type == "char")
+      return(e)
+    }
     if (e$name == "put" && a$type == "num" && f$char && is.null(user_fmt(f$name, TRUE))) {
       abort_syntax(paste0("The format $", toupper(f$name), " was not found or could not be loaded"), e$line)
     }
@@ -310,6 +317,9 @@ an_call <- function(e, st) {
     spec <- fn_table[[e$name]]
     if (is.null(spec)) abort_unsupported(paste0("function ", toupper(e$name), "()"), e$line)
     nargs <- sum(vapply(e$args, function(a) if (a$node == "of") 2L else 1L, integer(1)))
+    if (length(e$args) > spec$max && e$name %in% fn_max_exact) {
+      abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line)
+    }
     if (length(e$args) > spec$max) {
       # SAS may accept optional arguments beyond those implemented here
       abort_unsupported(paste0("more than ", spec$max, " arguments to ", toupper(e$name)), e$line)
@@ -329,7 +339,27 @@ an_call <- function(e, st) {
     }
     an_expr(a, st)
   })
+  if (is.null(lk)) e$args <- convert_fn_args(e, st)
   e
+}
+
+# SAS converts a numeric argument passed where a function expects a character
+# value with BEST12. (right-aligned), and a character argument passed where it
+# expects a number as if read with the BEST32. informat (invalid data sets
+# _ERROR_).  Only functions whose argument types are listed in fn_arg_types
+# convert; for the others a mismatch keeps the previous behaviour.
+convert_fn_args <- function(e, st) {
+  types <- fn_arg_types[[e$name]]
+  if (is.null(types)) return(e$args)
+  lapply(seq_along(e$args), function(k) {
+    a <- e$args[[k]]
+    want <- if (k <= length(types)) types[k] else NA_character_
+    if (is.na(want) || a$node %in% c("of", "omitted")) return(a)
+    have <- expr_type(a, st)$type
+    if (have == want) return(a)
+    list(node = "call", name = if (want == "char") "cvt_n2c" else "cvt_c2n", args = list(a),
+         line = a$line %||% e$line, col = a$col %||% e$col)
+  })
 }
 
 # Statement annotation ----------------------------------------------------
@@ -386,6 +416,8 @@ an_stmt <- function(s, st) {
         }
         reg_var(st, s$target$name, disp = s$target$text %||% s$target$name)
         assign_target_type(st, s$target$name, s$value, line)
+        # CATX writes into a buffer as long as the target variable
+        if (s$value$node == "call" && identical(s$value$name, "catx")) s$value$buf_len <- st$info[[s$target$name]]$len
       } else {
         s$target <- an_expr(s$target, st)
         s$value <- an_expr(s$value, st)
@@ -554,7 +586,17 @@ an_stmt <- function(s, st) {
         }
       }
     },
-    label = st$labels[names(s$labels)] <- s$labels,
+    label = {
+      st$labels[names(s$labels)] <- s$labels
+      # a LABEL statement fixes the position of a variable it names first;
+      # a variable named only in LABEL is not created (dropped in an_step)
+      for (v in names(s$labels)) {
+        if (is.null(st$info[[v]])) {
+          reg_var(st, v, disp = s$texts[[v]] %||% v)
+          st$info[[v]]$label_only <- TRUE
+        }
+      }
+    },
     informat = {
       for (sp in s$specs) {
         if (is.null(sp$fmt)) next
@@ -669,7 +711,8 @@ an_array <- function(s, st) {
   if (!is.null(init) && length(init) > dim) abort_syntax("too many initial values for array", line)
   for (k in seq_along(elems)) {
     iv <- if (!is.null(init) && k <= length(init)) init[[k]] else NULL
-    reg_var(st, elems[k], type, len, retained = !is.null(iv), init = iv)
+    reg_var(st, elems[k], type, len, retained = !is.null(iv), init = iv,
+            disp = (attr(elems, "disp") %||% character())[elems[k]] %|NA|% elems[k])
     if (st$info[[elems[k]]]$type != type) abort_syntax(paste("array", s$name, "mixes types"), line)
   }
   st$arrays[[s$name]] <- list(
@@ -764,6 +807,12 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
     readers <- st$readers
     if (length(readers) == 0 || !readers[[1]]$stmt %in% c("set", "merge")) {
       abort_syntax("BY statement requires SET or MERGE", st$by$line)
+    }
+  }
+  for (v in st$order) {
+    if (isTRUE(st$info[[v]]$label_only) && !v %in% st$uses) {
+      st$order <- setdiff(st$order, v)
+      st$info[[v]] <- NULL
     }
   }
   for (v in st$order) {

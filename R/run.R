@@ -114,6 +114,7 @@ engine_exec <- function(eng, text, line) {
       # NOTEs that are not data errors (e.g. INPUT going to a new line)
       if (length(rt$notes) > 0 && isTRUE(rt$notes_on)) env$.log <- c(env$.log, rt$notes)
     }
+    if (step$type == "data") engine_store_numlen(eng, tr$outputs)
     notes_on <- isTRUE(rt$notes_on) && eng$step_notes
     eng$log <- c(eng$log, if (notes_on) tr$compile_notes, env$.log)
     if (notes_on) {
@@ -132,6 +133,33 @@ engine_exec <- function(eng, text, line) {
     if (length(env$.meta) > 0) eng$meta[names(env$.meta)] <- env$.meta
   }
   invisible()
+}
+
+# Numeric variables stored with LENGTH < 8 keep only the first bytes of the
+# IEEE 754 value (SAS truncates the mantissa when the observation is written).
+engine_store_numlen <- function(eng, outputs) {
+  for (nm in outputs) {
+    m <- eng$meta[[nm]]
+    d <- get0(nm, envir = eng$wenv, inherits = FALSE)
+    if (is.null(m) || is.null(d)) next
+    short <- names(m$len)[vapply(names(m$len), function(v) identical(m$type[[v]], "num") &&
+                                    isTRUE(m$len[[v]] < 8L), logical(1))]
+    short <- intersect(short, names(d))
+    if (length(short) == 0) next
+    for (v in short) d[[v]] <- sas_num_store(d[[v]], m$len[[v]])
+    assign(nm, d, envir = eng$wenv)
+  }
+}
+
+#' Value of a numeric variable after storage with `len` bytes (3-8)
+#' @export
+sas_num_store <- function(x, len) {
+  ok <- !is.na(x)
+  if (len >= 8L || !any(ok)) return(x)
+  b <- matrix(writeBin(as.double(x[ok]), raw(), size = 8L, endian = "big"), nrow = 8L)
+  b[(len + 1L):8L, ] <- as.raw(0)
+  x[ok] <- readBin(as.vector(b), "double", n = sum(ok), size = 8L, endian = "big")
+  x
 }
 
 # Evaluate generated code; with `stage = TRUE` output data sets go to a scratch

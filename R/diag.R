@@ -42,14 +42,25 @@ arg_ord <- c("first", "second", "third", "fourth", "fifth")
 
 # `args`/`bad`: the argument values and the failing elements; SAS shows the
 # arguments of the failing call, e.g. "Invalid argument to function LOG(-1)".
-note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = NULL) {
+note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = NULL, numbered = FALSE, math = TRUE) {
+  if (numbered) {
+    # "NOTE: Argument 2 to function SCAN('a b c',0) at line 3 column 7 is invalid."
+    i <- if (is.null(bad)) 1L else which(bad)[1]
+    vals <- vapply(args, function(a) {
+      v <- a[min(i, length(a))]
+      if (is.character(v)) paste0("'", if (nzchar(sas_rtrim(v))) sas_rtrim(v) else " ", "'") else trimws(sas_fmt_best(v, 12L))
+    }, "")
+    if (math) rt_count("math", .at, sum(bad %||% TRUE))
+    return(rt_error(sprintf("NOTE: Argument %d to function %s(%s)%s is invalid.", argn, toupper(fname),
+                            paste(vals, collapse = ","), at_text(.at))))
+  }
   what <- if (is.null(argn)) "argument" else paste(arg_ord[argn], "argument")
   call <- toupper(fname)
   if (!is.null(args)) {
     i <- if (is.null(bad)) 1L else which(bad)[1]
     vals <- vapply(args, function(a) {
       v <- a[min(i, length(a))]
-      if (is.character(v)) paste0("'", sas_rtrim(v), "'") else trimws(sas_fmt_best(v, 12L))
+      if (is.character(v)) paste0("'", if (nzchar(sas_rtrim(v))) sas_rtrim(v) else " ", "'") else trimws(sas_fmt_best(v, 12L))
     }, "")
     call <- paste0(call, "(", paste(vals, collapse = ","), ")")
     # the failed call also counts as a place where a mathematical operation

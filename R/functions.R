@@ -280,6 +280,19 @@ scan_words <- function(s, dlm, mods = "") {
   if (grepl("i", md, fixed = TRUE)) set <- unique(c(toupper(set), tolower(set)))
   is_d <- ch %in% set
   if (grepl("k", md, fixed = TRUE)) is_d <- !is_d
+  if (grepl("q", md, fixed = TRUE)) {
+    # delimiters inside quoted substrings do not separate words
+    q <- ""
+    for (i in seq_along(ch)) {
+      if (nzchar(q)) {
+        is_d[i] <- FALSE
+        if (ch[i] == q) q <- ""
+      } else if (ch[i] %in% c("'", "\"")) {
+        is_d[i] <- FALSE
+        q <- ch[i]
+      }
+    }
+  }
   if (grepl("m", md, fixed = TRUE)) {
     # every delimiter separates words: consecutive delimiters give empty words
     grp <- cumsum(is_d)
@@ -299,12 +312,17 @@ sas_f_countw <- function(x, dlm = scan_default_dlm, mods = "") {
 
 #' SCAN(string, n <, delimiters> <, modifiers>)
 #' @export
-sas_f_scan <- function(x, n, dlm = scan_default_dlm, mods = "") {
+sas_f_scan <- function(x, n, dlm = scan_default_dlm, mods = "", .at = NULL) {
   dlm <- dlm %||% scan_default_dlm
+  if (any(grepl("[^abcdfghiklmnpqsuwx ]", tolower(mods)))) abort_unsupported("SCAN modifiers O, R, T")
+  # n = 0, missing or not an integer: invalid argument (blank result, _ERROR_)
+  bad <- is.na(n) | n == 0 | n != trunc(n)
+  if (any(bad)) note_invalid_arg("scan", 2L, .at, list(as_sas_chr(x), n), rep_len(bad, max(length(x), length(n))), numbered = TRUE, math = FALSE)
   rowwise(function(s, k, d, md) {
-    if (is.na(k)) return("")
+    if (is.na(k) || k == 0 || k != trunc(k)) return("")
     w <- scan_words(s, d, md)
-    k <- trunc(k)
+    # B: count words from the end for a positive n (from the start for a negative n)
+    if (grepl("b", tolower(md), fixed = TRUE)) k <- -k
     if (k < 0) k <- length(w) + k + 1
     if (k < 1 || k > length(w)) "" else w[k]
   }, as_sas_chr(x), n, dlm, mods)
@@ -1099,12 +1117,26 @@ interval_or_fail <- function(x, fname, .at) {
                                "r445mon", "r454mon", "r544mon", "week1", "dtweekv", "dtyearv")) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "'"))
   }
-  if (is.null(iv)) {
-    note_invalid_arg(fname, 1L, .at)
-    return(NULL)
-  }
+  if (is.null(iv)) return(NULL)
   if (iv$base %in% c("weekday", "tenday", "semimonth")) abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "'"))
+  # the shift index of YEAR/SEMIYEAR/QTR is in months and of WEEKn (n > 1) in weeks
+  if (iv$shift != 1 && (iv$base %in% c("year", "semiyear", "qtr") || (iv$base == "week" && iv$mult > 1))) {
+    abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (shift index)"))
+  }
+  if (iv$base == "week") {
+    # WEEK.d: weeks start on weekday d (1 = Sunday); the shift is in days
+    iv$wshift <- iv$shift - 1
+    iv$shift <- 1
+  }
   iv
+}
+
+# SAS date values run from 1 January 1582 to 31 December 20000.
+date_in_range <- function(v, iv) {
+  lo <- -138061
+  hi <- 6589335
+  ok <- if (iv$dt) v >= lo * 86400 & v < (hi + 1) * 86400 else v >= lo & v <= hi
+  isTRUE(ok)
 }
 
 # Index of the interval containing value v (calendar-based, before the multiplier).
@@ -1116,7 +1148,7 @@ interval_index <- function(v, iv) {
   d <- if (iv$dt) floor(v / 86400) else floor(v)
   switch(iv$base,
     day = d,
-    week = floor((d + 5) / 7), # weeks start on Sunday; 1960-01-01 was a Friday
+    week = floor((d + 5 - (iv$wshift %||% 0)) / 7), # weeks start on Sunday; 1960-01-01 was a Friday
     month = {
       p <- civil(d)
       (p$y - 1960) * 12 + p$m - 1
@@ -1140,7 +1172,7 @@ interval_start <- function(k, iv) {
   }
   d <- switch(iv$base,
     day = k,
-    week = k * 7 - 5,
+    week = k * 7 - 5 + (iv$wshift %||% 0),
     month = from_ymd(1960 + k %/% 12, k %% 12 + 1, 1),
     qtr = from_ymd(1960 + k %/% 4, (k %% 4) * 3 + 1, 1),
     semiyear = from_ymd(1960 + k %/% 2, (k %% 2) * 6 + 1, 1),
@@ -1156,24 +1188,37 @@ block_first <- function(b, iv) b * iv$mult + (iv$shift - 1)
 #' INTCK(interval, from, to <, 'DISCRETE'|'CONTINUOUS'>)
 #' @export
 sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
+  has_m <- !missing(method)
   rowwise(function(ivt, a, b, m) {
     iv <- interval_or_fail(ivt, "intck", .at)
-    if (is.null(iv) || is.na(a) || is.na(b)) return(NA_real_)
-    m <- tolower(substr(strip_both(m), 1L, 1L))
-    if (m == "c") {
+    mm <- tolower(strip_both(m))
+    ok_m <- nzchar(mm) && (startsWith("continuous", mm) || startsWith("discrete", mm))
+    if (is.null(iv) || !ok_m ||
+        (!is.na(a) && !date_in_range(a, iv)) || (!is.na(b) && !date_in_range(b, iv))) {
+      note_invalid_arg("intck", NULL, .at, c(list(ivt, a, b), if (has_m) list(m)))
+      return(NA_real_)
+    }
+    if (is.na(a) || is.na(b)) return(NA_real_)
+    if (substr(mm, 1L, 1L) == "c") {
       if (iv$base %in% c("day", "hour", "minute", "second", "week")) {
         unit <- switch(iv$base, day = if (iv$dt) 86400 else 1, week = if (iv$dt) 7 * 86400 else 7,
                        hour = 3600, minute = 60, second = 1)
         return(trunc((b - a) / (unit * iv$mult)))
       }
-      # continuous: count whole intervals from a's position
+      # continuous: whole intervals from a's position, rounded toward minus infinity
       n <- 0
-      step <- if (b >= a) 1 else -1
-      repeat {
-        nxt <- sas_f_intnx(ivt, a, n + step, "s")
-        if ((step > 0 && nxt > b) || (step < 0 && nxt < b)) break
-        n <- n + step
-        if (abs(n) > 1e6) break
+      if (b >= a) {
+        repeat {
+          nxt <- sas_f_intnx(ivt, a, n + 1, "s")
+          if (nxt > b || n > 1e6) break
+          n <- n + 1
+        }
+      } else {
+        repeat {
+          n <- n - 1
+          nxt <- sas_f_intnx(ivt, a, n, "s")
+          if (nxt <= b || n < -1e6) break
+        }
       }
       return(n)
     }
@@ -1186,12 +1231,31 @@ sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
 #' INTNX(interval, start, n <, alignment>)
 #' @export
 sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
+  has_al <- !missing(align)
   rowwise(function(ivt, s, k, al) {
     iv <- interval_or_fail(ivt, "intnx", .at)
-    if (is.null(iv) || is.na(s) || is.na(k)) return(NA_real_)
-    al <- tolower(substr(strip_both(al), 1L, 1L))
-    if (!al %in% c("b", "m", "e", "s")) abort_unsupported(paste0("INTNX alignment '", al, "'"))
-    k <- trunc(k)
+    args <- c(list(ivt, s, k), if (has_al) list(al))
+    if (is.null(iv)) {
+      note_invalid_arg("intnx", 1L, .at, args, numbered = TRUE)
+      return(NA_real_)
+    }
+    al <- tolower(strip_both(al))
+    al <- c(b = "b", beginning = "b", m = "m", middle = "m", e = "e", end = "e", s = "s", same = "s", sameday = "s")[al]
+    if (is.na(al)) {
+      note_invalid_arg("intnx", 4L, .at, args, numbered = TRUE)
+      return(NA_real_)
+    }
+    if (is.na(s) || is.na(k)) return(NA_real_)
+    # a non-integer increment is rounded toward minus infinity
+    k <- floor(k)
+    if (!date_in_range(s, iv)) {
+      note_invalid_arg("intnx", NULL, .at, args)
+      return(NA_real_)
+    }
+    if (abs(k) > 1e7 || !date_in_range(interval_start(block_first(block_index(interval_index(s, iv), iv) + k, iv), iv), iv)) {
+      note_invalid_arg("intnx", NULL, .at, args)
+      return(NA_real_)
+    }
     blk <- block_index(interval_index(s, iv), iv) + k
     first <- interval_start(block_first(blk, iv), iv)
     nxt <- interval_start(block_first(blk + 1, iv), iv)
@@ -1230,7 +1294,7 @@ fn_table <- utils::modifyList(fn_table, list(
   compbl = fn_spec("char", 1, 1, "arg"), compress = fn_spec("char", 1, 3, "arg"),
   find = fn_spec("num", 2, 4), findc = fn_spec("num", 2, 4), findw = fn_spec("num", 2, 5),
   indexw = fn_spec("num", 2, 3), verify = fn_spec("num", 2, Inf), count = fn_spec("num", 2, 3),
-  countc = fn_spec("num", 2, 3), countw = fn_spec("num", 1, 3), scan = fn_spec("char", 2, 4, 200L),
+  countc = fn_spec("num", 2, 3), countw = fn_spec("num", 1, 3), scan = fn_spec("char", 2, 4, "arg"),
   transtrn = fn_spec("char", 3, 3, 200L), translate = fn_spec("char", 3, Inf, "arg"),
   propcase = fn_spec("char", 1, 2, "arg"), lengthc = fn_spec("num", 1), lengthm = fn_spec("num", 1),
   "repeat" = fn_spec("char", 2, 2, 200L), quote = fn_spec("char", 1, 2, 200L), dequote = fn_spec("char", 1, 1, "arg"),
@@ -1276,9 +1340,41 @@ fn_table <- utils::modifyList(fn_table, list(
   missing = fn_spec("num", 1)
 ))
 
+# Argument types of functions that convert mismatched arguments (see
+# convert_fn_args()); verified against SAS in the function pilot.
+fn_arg_types <- list(
+  substr = c("char", "num", "num"), scan = c("char", "num", "char", "char"),
+  compress = c("char", "char", "char"), index = c("char", "char"), round = c("num", "num"),
+  intnx = c("char", "num", "num", "char"), intck = c("char", "num", "num", "char"), catx = "char"
+)
+# Functions whose maximum number of arguments is the SAS maximum (more is a
+# compile-time error, ERROR 72-185, rather than an unimplemented option).
+fn_max_exact <- c("substr", "scan", "compress", "index", "round", "intnx", "intck")
+
+fn_table <- utils::modifyList(fn_table, list(cvt_n2c = fn_spec("char", 1, 1, 12L), cvt_c2n = fn_spec("num", 1, 1)))
+
+#' Implicit numeric-to-character conversion of a function argument (BEST12.)
+#' @export
+sas_f_cvt_n2c <- function(x) sas_fmt_best(x, 12L)
+
+#' Implicit character-to-numeric conversion of a function argument
+#' @export
+sas_f_cvt_c2n <- function(x, .at = NULL) {
+  s <- strip_both(x)
+  ok <- grepl("^[-+]?([0-9]+\\.?[0-9]*|\\.[0-9]+)([eE][-+]?[0-9]+)?$", s)
+  out <- rep(NA_real_, length(s))
+  out[ok] <- as.numeric(s[ok])
+  bad <- !ok & nzchar(s) & s != "."
+  if (any(bad)) {
+    rt_error(sprintf("NOTE: Invalid numeric data, '%s' , at line %d column %d.", s[which(bad)[1]],
+                     as.integer(.at[1] %||% NA), as.integer(.at[2] %||% NA)))
+  }
+  out
+}
+
 # Functions whose arguments can be invalid (data error, _ERROR_ = 1).
 err_fns <- c("substr", "sqrt", "exp", "log", "log10", "log2", "mod", "modz", "mdy", "input", "inputn", "fact",
-             "gamma", "arsin", "arcos", "intck", "intnx", "symget",
+             "gamma", "arsin", "arcos", "intck", "intnx", "symget", "scan", "round", "catx", "cvt_c2n",
              "prxparse", "prxmatch", "prxchange", "band", "bor", "bxor", "bnot", "blshift", "brshift")
 
 # Functions that take a variable reference rather than a value.

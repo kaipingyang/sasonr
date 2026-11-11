@@ -214,9 +214,41 @@ mp_action <- function(src) {
     if (src_at(src, k2) == 59L) return(list(kind = "block", a = k2 + 1L, b = e$end - 1L))
     return(list(kind = "do", a = j, b = e$after - 1L))
   }
+  if (src_at(src, j) == 37L && tolower(src_word(src, j + 1L)) == "if" && !is_name_cp(src_at(src, j + 3L))) {
+    # a nested %IF (`%else %if c %then %do; ... %end;`): the action extends over
+    # its %THEN action and its own %ELSE action
+    k <- raw_find_then(src, j + 3L)
+    if (!is.na(k)) {
+      src$i <- k + 5L
+      mp_action(src)
+      j2 <- src_skip_ws(src)
+      if (src_at(src, j2) == 37L && tolower(src_word(src, j2 + 1L)) == "else" && !is_name_cp(src_at(src, j2 + 5L))) {
+        src$i <- j2 + 5L
+        mp_action(src)
+      }
+      return(list(kind = "text", a = j, b = src$i - 1L))
+    }
+  }
   e <- raw_find_stmt_end(src, j)
   src$i <- e$after
   list(kind = "text", a = j, b = e$last)
+}
+
+# Position of the `%` of the first top-level %THEN at or after k (NA if none).
+raw_find_then <- function(src, k) {
+  n <- src$n
+  while (k <= n) {
+    nx <- raw_skip_opaque(src, k)
+    if (!is.na(nx)) {
+      k <- nx
+      next
+    }
+    c <- src$cp[k]
+    if (c == 59L) return(NA_integer_)
+    if (c == 37L && tolower(src_word(src, k + 1L)) == "then" && !is_name_cp(src_at(src, k + 5L))) return(k)
+    k <- k + 1L
+  }
+  NA_integer_
 }
 
 mp_if <- function(src, ses, sink, mode) {

@@ -4,7 +4,7 @@
 \alias{sas_f_scan}
 \title{SCAN(string, n <, delimiters> <, modifiers>)}
 \usage{
-sas_f_scan(x, n, dlm = scan_default_dlm, mods = "")
+sas_f_scan(x, n, dlm = scan_default_dlm, mods = "", .at = NULL)
 }
 \description{
 SCAN(string, n <, delimiters> <, modifiers>)

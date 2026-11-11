@@ -140,6 +140,7 @@ parse_proc_step <- function(p) {
       },
       "sort where" = ,
       "print where" = parse_where(p),
+      "print format" = parse_format_stmt(p),
       "print var" = {
         advance(p)
         items <- list()
@@ -242,6 +243,16 @@ translate_proc <- function(step, meta, last = NULL) {
                 line = step$line, outputs = out$name, meta = res_meta))
   }
   # PROC PRINT
+  # FORMAT statements attach formats for this step only
+  for (fs in Filter(function(s) identical(s$stmt, "format"), step$stmts)) for (sp in fs$specs) check_format(sp$fmt, fs$line)
+  proc_apply_attr_stmts(step$stmts, inp$st)
+  for (v in names(inp$st$formats)) {
+    f <- inp$st$formats[[v]]
+    t <- inp$st$info[[v]]$type
+    if (is.null(f) || is.null(t)) next
+    if (t == "num" && isTRUE(f$char)) abort_syntax(paste0("The character format ", f$text, " cannot be used with numeric variable ", toupper(v)), step$line)
+    if (t == "char" && !isTRUE(f$char)) abort_syntax(paste0("The format $", toupper(f$name), " was not found or could not be loaded"), step$line)
+  }
   var_stmts <- Filter(function(s) s$stmt == "var", step$stmts)
   pvars <- vars
   if (length(var_stmts) > 0) {
@@ -316,10 +327,12 @@ print_num_column <- function(x) {
     return(out)
   }
   # ordinary magnitudes: a common number of decimals, as many as the values
-  # need but no more than fit 7 positions beside the widest integer part
+  # need but no more than 6 minus the widest integer part, and at least 2
+  # when that is less (1253 / 11350.7 / 3098.63 -> 1253.00; 42 / 3.14159 /
+  # 123456789012 -> 42.00)
   ip <- nchar(sprintf("%.0f", trunc(abs(v))))
-  if (max(ip) <= 6L) {
-    dmax <- 6L - max(ip)
+  if (max(ip) <= 15L) {
+    dmax <- max(2L, 6L - max(ip))
     need <- vapply(v, function(x) {
       for (dd in 0:dmax) if (abs(x - round(x, dd)) <= 1e-9 * max(1, abs(x))) return(dd)
       dmax
@@ -335,6 +348,22 @@ print_num_column <- function(x) {
   if (d > 0 && !any(has_e)) s <- sprintf("%.*f", d, sas_f_round(abs(v), 10^-d))
   out[!miss] <- paste0(ifelse(v < 0, "-", ""), s)
   out
+}
+
+# PROC PRINT splits a mixed-case variable name that is wider than its data at
+# a lower-to-upper case boundary into two lines (ToadName -> Toad / Name,
+# MeanDaysRain -> Mean / DaysRain: the shortest widest line, the earliest
+# split on ties); other names follow sql_header_lines().
+print_header_lines <- function(h, dw) {
+  n <- nchar(h)
+  ch <- strsplit(h, "")[[1]]
+  cut <- which(ch[-n] %in% letters & ch[-1] %in% LETTERS)
+  if (n > dw && length(cut) > 0 && !grepl("_", h, fixed = TRUE)) {
+    m <- vapply(cut, function(i) max(i, n - i), 1L)
+    i <- cut[which.min(m)]
+    return(list(lines = c(substr(h, 1L, i), substr(h, i + 1L, n)), width = max(dw, min(m))))
+  }
+  sql_header_lines(h, max(dw, 8L))
 }
 
 #' Render a PROC PRINT listing
@@ -367,7 +396,7 @@ sas_print_listing <- function(d, spec, noobs = FALSE, titles = character()) {
   # headers wider than the data are split (see sql_header_lines())
   hl <- lapply(seq_along(cols), function(k) {
     dw <- max(nchar(cols[[k]]))
-    x <- sql_header_lines(heads[k], max(dw, 8L))
+    x <- print_header_lines(heads[k], dw)
     x$width <- max(dw, nchar(x$lines))
     x
   })
