@@ -137,6 +137,11 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
     if (nchar(s) <= w) return(pad(s))
     s <- build(dd, commas, dollar, lead0 = FALSE)
     if (nchar(s) <= w) return(pad(s))
+    # commas go before decimals (DOLLAR8.2 of 1234.5 is $1234.50)
+    if (commas && dd == d) {
+      s <- build(dd, FALSE, dollar)
+      if (!is.na(s) && nchar(s) <= w) return(pad(s))
+    }
   }
   if (commas) {
     s <- build(0L, FALSE, dollar)

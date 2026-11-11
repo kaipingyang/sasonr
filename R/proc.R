@@ -77,6 +77,10 @@ parse_proc_step <- function(p) {
   if (name %in% c("means", "summary")) return(parse_proc_means(p, line, name))
   if (name == "freq") return(parse_proc_freq(p, line))
   if (name == "transpose") return(parse_proc_transpose(p, line))
+  if (name == "contents") return(parse_proc_contents(p, line))
+  if (name == "datasets") return(parse_proc_datasets(p, line))
+  if (name == "append") return(parse_proc_append(p, line))
+  if (name == "delete") return(parse_proc_delete(p, line))
   if (!name %in% c("sort", "print")) abort_unsupported(paste0("PROC ", toupper(tk_val(p))), line)
   advance(p)
   opts <- list()
@@ -193,6 +197,7 @@ translate_proc <- function(step, meta, last = NULL) {
   if (step$name %in% c("means", "summary")) return(translate_proc_means(step, meta, last))
   if (step$name == "freq") return(translate_proc_freq(step, meta, last))
   if (step$name == "transpose") return(translate_proc_transpose(step, meta, last))
+  if (step$name == "contents") return(translate_proc_contents(step, meta, last))
   inp <- proc_input(step, meta, last)
   vars <- inp$ds$out_names
   header <- sprintf("# ---- PROC %s (SAS line %d)", toupper(step$name), as.integer(step$line))
@@ -227,6 +232,11 @@ translate_proc <- function(step, meta, last = NULL) {
               isTRUE(step$options[["noduprecs"]]) || isTRUE(step$options[["noduprec"]]) || isTRUE(step$options[["nodup"]]), sel)
     )
     m <- proc_meta(inp$st, out_vars, out_names)
+    if (all(by$vars %in% out_vars)) {
+      m$sortedby <- list(vars = out_names[match(by$vars, out_vars)], descending = by$descending,
+                         nodupkey = isTRUE(step$options[["nodupkey"]]) || isTRUE(step$options[["nodupkeys"]]),
+                         noduprec = isTRUE(step$options[["noduprecs"]]) || isTRUE(step$options[["noduprec"]]) || isTRUE(step$options[["nodup"]]))
+    }
     res_meta <- stats::setNames(list(m), out$name)
     return(list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC SORT",
                 line = step$line, outputs = out$name, meta = res_meta))
