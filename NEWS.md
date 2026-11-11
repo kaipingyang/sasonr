@@ -15,6 +15,9 @@
   from R, verification status, examples from SAS-verified cases.
 * New site structure: SAS language guides, Developers, Progress.
 * License changed from Apache-2.0 to MIT.
+* Every `sas_f_*` reference page has examples (194 of 195 functions), each
+  call checked against SAS 9.4; 15 calls that differ from SAS were found and
+  are listed under Known gaps.
 
 ## Round 6 (2026-11-12): verification
 
