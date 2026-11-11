@@ -2,34 +2,48 @@
 title: "To do and future plan"
 ---
 
-*Updated after every development round. Last update: 2026-11-11 (after round 5).*
+*Updated after every development round. Last update: 2026-11-12 (after round 6).*
 
-## Next round (round 6): verification
+## Three ways to use sasonr
 
-| # | Task | Why |
-|---|---|---|
-| 1 | Mask environment fields (creation time, file path) of PROC CONTENTS in the comparison | 8 data set and 31 listing differences are only time stamps and paths; they hide real problems |
-| 2 | Verify PROC FREQ test statistics against SAS (chi-square family, Fisher, binomial confidence limits, CMH) with dedicated SAS-generated cases; until then they stop with `sasonr_unsupported` | Currently checked only against R functions, which may use different defaults |
-| 3 | Run the function pilot (370 cases for SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT, INTNX, INTCK) and fix differences | First function-by-function verification |
-| 4 | Run the 154 book programs with SAS results and publish a baseline | First end-to-end programs, including pharmaceutical examples |
+1. **Run SAS on R** – execute existing SAS programs without a SAS licence.
+2. **Deterministic SAS → R migration** – `sas_translate()` turns SAS into R
+   code without a language model; the translated code is verified by running
+   it against real SAS results.
+3. **R / SAS double programming** – programmer A writes R, programmer B writes
+   SAS and runs it with sasonr; both sides run on the same platform and are
+   compared with PROC COMPARE.
+
+Priority is **correct computation first**: reporting layout comes after the
+numbers are right.
+
+## Next round (round 7): engineering + computation gaps
+
+| # | Task |
+|---|---|
+| 1 | PROC framework refactor: every procedure = parser → PROC IR (option whitelist) → computation that produces SAS-named ODS tables → OUT= / ODS OUTPUT data sets → listing / HTML renderers |
+| 2 | Naming: `sas_f_*` (SAS functions), `sas_fmt_*` (formats), `sas_proc_*` (procedure R API), `sas_rt_*` (runtime helpers, internal); examples taken from SAS-verified cases; regression must be unchanged |
+| 3 | ODS statements and ODS OUTPUT; `OPTIONS MISSING=` (main blockers of the pharmaceutical programs) |
+| 4 | PROC COMPARE (needed for double programming) |
+| 5 | DATA step hash objects, `SET ... POINT=`, `UPDATE`, `LIBNAME` |
+| 6 | Rounding report: sasonr against the SAS rounding suite |
 
 ## Following rounds
 
 | Round | Content |
 |---|---|
-| 7 | PROC REPORT and PROC TABULATE (computation layer), ODS output for TFL |
-| 8 | DATA step hash objects (`DECLARE`), `SET ... POINT=`, `UPDATE`, `LIBNAME` |
-| 9 | PROC UNIVARIATE, PROC COMPARE, PROC RANK, IMPORT/EXPORT |
-| 10+ | Statistical procedures via CRAN packages: GLM (sasLM), MIXED (mmrm), LIFETEST/PHREG (survival), LOGISTIC |
+| 8 | PROC UNIVARIATE, RANK; BINOMIAL and CMH listings; SASHELP data sets |
+| 9 | Statistical procedures (computation via ODS OUTPUT): GLM, MIXED, LIFETEST, PHREG, LOGISTIC – candidate CRAN packages are evaluated against SAS results first |
+| 10 | PROC REPORT and PROC TABULATE computation layer; rendering with a SAS-like theme |
+| 11 | Migration: "idiomatic" translation mode that produces plain tidyverse code for people to maintain, with comments where SAS and R semantics differ |
 
 ## Verification backlog
 
 * Function-by-function tests for about 120 functions frequently used in
   clinical programming, then the remaining Base SAS functions.
 * Format and informat tests for the 207 Base formats and informats.
-* ODS HTML comparison layer (L-HTML).
-* Recover more pharmaceutical book programs (31 cannot run as printed:
-  fragments or files not provided).
+* ODS HTML comparison layer.
+* Clean up `R CMD check` documentation warnings (handled by the renaming in round 7).
 
 ## Open questions
 

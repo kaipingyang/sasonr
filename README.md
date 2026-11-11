@@ -8,6 +8,14 @@ hand-written lexer, recursive-descent parser and Pratt expression parser,
 then executes it in R: DATA steps are compiled into tidyverse code, PROC SQL
 runs on DuckDB. The goal is end-to-end results identical to SAS 9.4.
 
+Three ways to use it:
+
+1. **Run SAS on R** - execute SAS programs without a SAS licence.
+2. **Deterministic SAS to R migration** - `sas_translate()` produces R code
+   without any language model, and the result is verified against SAS output.
+3. **R / SAS double programming** - one programmer writes R, the other writes
+   SAS and runs it with sasonr on the same platform.
+
 Design rules:
 
 - **Deterministic**: no language model is involved at run time.

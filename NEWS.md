@@ -1,5 +1,20 @@
 # sasonr (development version)
 
+## Round 6 (2026-11-12): verification
+
+* Function pilot (SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT,
+  INTNX, INTCK): 340 of 370 SAS-generated cases identical, none different.
+* Book programs: 60 of 154 identical to SAS on all four layers, none wrong.
+* PROC FREQ statistics checked against 57 SAS-generated cases; CHISQ, FISHER
+  and EXACT FISHER enabled, other statistics stay gated.
+* Fixed silent differences: SCAN `B` modifier and result length, ROUND for
+  large values, CATX, INTNX/INTCK, numeric `LENGTH < 8` storage, chained
+  comparisons in PROC SQL, variable order set by LABEL, name case from INPUT
+  groups and arrays, ANYDTDTE Julian dates, `$HEX` with PUTC.
+* Comparison masks environment fields (time stamps, paths) of PROC CONTENTS.
+* Corpus: 1,110 programs completed, 1,066 identical on all four layers, no
+  wrong data sets.
+
 ## Round 5 (2026-11-11)
 
 * New procedures: PROC MEANS / SUMMARY, PROC FREQ (tables, OUT=, chi-square
