@@ -9,3 +9,4 @@ sas_lag(state, key, value, n = 1L)
 \description{
 LAG queue for row-wise (L3) code; one queue per call site
 }
+\keyword{internal}

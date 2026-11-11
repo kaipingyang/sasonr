@@ -134,7 +134,6 @@ find_pos <- function(s, sub, mods, start) {
   if (length(pos) == 0) 0 else as.numeric(max(pos))
 }
 
-#' FIND(string, substring <, modifiers> <, startpos>)
 #' @export
 sas_f_find <- function(x, sub, a3 = NULL, a4 = NULL) {
   mods <- if (is.character(a3)) a3 else if (is.character(a4)) a4 else ""
@@ -142,7 +141,6 @@ sas_f_find <- function(x, sub, a3 = NULL, a4 = NULL) {
   rowwise(find_pos, as_sas_chr(x), as_sas_chr(sub), mods, start, type = numeric(1))
 }
 
-#' FINDC(string, charlist <, modifiers> <, startpos>)
 #' @export
 sas_f_findc <- function(x, chars = "", a3 = NULL, a4 = NULL) {
   mods <- if (is.character(a3)) a3 else if (is.character(a4)) a4 else ""
@@ -193,7 +191,6 @@ sas_f_indexw <- function(x, word, dlm = " ") {
   rowwise(function(s, w, d) as.numeric(word_starts(s, strip_both(w), chars_of(d))), as_sas_chr(x), word, dlm, type = numeric(1))
 }
 
-#' FINDW(string, word <, delimiters> <, modifiers> <, startpos>)
 #' @export
 sas_f_findw <- function(x, word, dlm = " !$%&()*+,-./;<^|", a4 = "", a5 = 1) {
   mods <- if (is.character(a4)) a4 else ""
@@ -310,7 +307,6 @@ sas_f_countw <- function(x, dlm = scan_default_dlm, mods = "") {
   rowwise(function(s, d, md) as.numeric(length(scan_words(s, d, md))), as_sas_chr(x), dlm, mods, type = numeric(1))
 }
 
-#' SCAN(string, n <, delimiters> <, modifiers>)
 #' @export
 sas_f_scan <- function(x, n, dlm = scan_default_dlm, mods = "", .at = NULL) {
   dlm <- dlm %||% scan_default_dlm
@@ -333,7 +329,6 @@ sas_f_transtrn <- function(x, from, to) {
   rowwise(function(s, f, t) if (!nzchar(f)) s else gsub(f, t, s, fixed = TRUE), as_sas_chr(x), as_sas_chr(from), as_sas_chr(to))
 }
 
-#' TRANSLATE(source, to1, from1 <, to2, from2 ...>)
 #' @export
 sas_f_translate <- function(x, ...) {
   pairs <- list(...)
@@ -569,7 +564,6 @@ sas_f_compare <- function(a, b, mods = "") {
   }, as_sas_chr(a), as_sas_chr(b), mods, type = numeric(1))
 }
 
-#' SYMGET: value of a macro variable at execution time
 #' @export
 sas_f_symget <- function(symtab, name, .at = NULL) {
   vapply(strip_both(name), function(nm) {
@@ -646,13 +640,20 @@ prx_compile <- function(re) {
   out
 }
 
+# An invalid regular expression: SAS writes the Perl diagnostic (not
+# reproduced), an ERROR naming the function and the invalid-argument NOTE.
+prx_invalid_note <- function(fname, args, .at) {
+  rt_error(sprintf("ERROR: The regular expression passed to the function %s contains a syntax error.", toupper(fname)))
+  note_invalid_arg(fname, 1L, .at, args = args, numbered = TRUE)
+}
+
 #' @export
 sas_f_prxparse <- function(re, .at = NULL) {
   vapply(re, function(r) {
     if (is.null(rt$prx)) rt$prx <- list()
     p <- prx_compile(r)
     if (is.null(p)) {
-      note_invalid_arg("prxparse", 1L, .at)
+      prx_invalid_note("prxparse", list(r), .at)
       return(NA_real_)
     }
     id <- length(rt$prx) + 1
@@ -669,7 +670,7 @@ sas_f_prxmatch <- function(re, x, .at = NULL) {
     if (is.na(ab[[1]][i])) return(NA_real_)
     p <- prx_compile(ab[[1]][i])
     if (is.null(p)) {
-      note_invalid_arg("prxmatch", 1L, .at)
+      prx_invalid_note("prxmatch", list(ab[[1]][i], ab[[2]][i]), .at)
       return(NA_real_)
     }
     k <- regexpr(p$pattern, ab[[2]][i], perl = TRUE, ignore.case = p$icase)
@@ -684,7 +685,7 @@ sas_f_prxchange <- function(re, times, x, .at = NULL) {
   vapply(seq_along(ab[[3]]), function(i) {
     p <- prx_compile(ab[[1]][i])
     if (is.null(p)) {
-      note_invalid_arg("prxchange", 1L, .at)
+      prx_invalid_note("prxchange", list(ab[[1]][i], ab[[2]][i], ab[[3]][i]), .at)
       return("")
     }
     if (!p$sub) abort_runtime("PRXCHANGE needs a substitution (s/.../.../)")
@@ -698,28 +699,6 @@ sas_f_prxchange <- function(re, times, x, .at = NULL) {
 
 # Numeric functions ------------------------------------------------------------
 
-#' @export
-sas_f_rounde <- function(x, unit = 1) {
-  q <- x / unit
-  f <- floor(q)
-  d <- q - f
-  r <- ifelse(abs(d - 0.5) < 1e-12 * pmax(1, abs(q)), ifelse(f %% 2 == 0, f, f + 1), round(q))
-  r * unit
-}
-#' @export
-sas_f_roundz <- function(x, unit = 1) {
-  # no fuzzing; an exact tie goes to the even multiple
-  q <- x / unit
-  f <- floor(q)
-  r <- ifelse(q - f == 0.5, ifelse(f %% 2 == 0, f, f + 1), round(q))
-  r * unit
-}
-#' @export
-sas_f_intz <- function(x) trunc(x)
-#' @export
-sas_f_floorz <- function(x) floor(x)
-#' @export
-sas_f_ceilz <- function(x) ceiling(x)
 #' @export
 sas_f_modz <- function(a, b, .at = NULL) {
   out <- a - b * trunc(a / b)
@@ -858,8 +837,9 @@ sas_f_divide <- function(a, b) {
 
 trig <- function(f, name, dom = NULL) {
   force(f)
+  force(dom)
   function(x, .at = NULL) {
-    bad <- if (is.null(dom)) rep(FALSE, length(x)) else !is.na(x) & !dom(x)
+    bad <- if (is.null(dom)) rep(FALSE, length(x)) else !is.na(x) & !do.call(dom, list(x))
     if (any(bad)) note_invalid_arg(name, NULL, .at)
     out <- suppressWarnings(f(x))
     out[bad] <- NA_real_
@@ -1001,7 +981,6 @@ sas_f_datejul <- function(j) {
   from_ymd(y, 1, 1) + (j %% 1000) - 1
 }
 
-#' WEEK(date <, 'U'|'V'|'W'>)
 #' @export
 sas_f_week <- function(x, desc = "u") {
   d <- tolower(substr(strip_both(desc), 1L, 1L))
@@ -1185,7 +1164,6 @@ interval_start <- function(k, iv) {
 block_index <- function(k, iv) floor((k - (iv$shift - 1)) / iv$mult)
 block_first <- function(b, iv) b * iv$mult + (iv$shift - 1)
 
-#' INTCK(interval, from, to <, 'DISCRETE'|'CONTINUOUS'>)
 #' @export
 sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
   has_m <- !missing(method)
@@ -1228,7 +1206,6 @@ sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
   }, interval, from, to, method, type = numeric(1))
 }
 
-#' INTNX(interval, start, n <, alignment>)
 #' @export
 sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
   has_al <- !missing(align)
@@ -1353,11 +1330,9 @@ fn_max_exact <- c("substr", "scan", "compress", "index", "round", "intnx", "intc
 
 fn_table <- utils::modifyList(fn_table, list(cvt_n2c = fn_spec("char", 1, 1, 12L), cvt_c2n = fn_spec("num", 1, 1)))
 
-#' Implicit numeric-to-character conversion of a function argument (BEST12.)
 #' @export
 sas_f_cvt_n2c <- function(x) sas_fmt_best(x, 12L)
 
-#' Implicit character-to-numeric conversion of a function argument
 #' @export
 sas_f_cvt_c2n <- function(x, .at = NULL) {
   s <- strip_both(x)
@@ -1383,6 +1358,7 @@ var_info_fns <- c("vname", "vlength", "vtype", "vlabel", "vformat", "vformatn", 
 
 #' CALL SORTN / SORTC: the values in ascending order (missing values first)
 #' @export
+#' @keywords internal
 sas_sort_values <- function(vals) {
   v <- unlist(vals)
   if (is.character(v)) return(as.list(v[order(sas_rtrim(v), method = "radix")]))
@@ -1448,7 +1424,6 @@ sas_f_nvalid <- function(x, opt = "v7") {
   }, as_sas_chr(x), opt, type = numeric(1))
 }
 
-#' PCTL(p, values...): percentile, definition 5 (the default)
 #' @export
 sas_f_pctl <- function(p, ...) {
   m <- num_args(...)

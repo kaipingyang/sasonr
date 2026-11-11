@@ -9,3 +9,4 @@ sas_num_store(x, len)
 \description{
 Value of a numeric variable after storage with \code{len} bytes (3-8)
 }
+\keyword{internal}

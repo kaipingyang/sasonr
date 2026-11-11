@@ -9,3 +9,4 @@ sas_put_fvalue(value, fmt)
 \description{
 Formatted PUT output (\verb{put x 8.2;}): the field keeps its alignment blanks
 }
+\keyword{internal}

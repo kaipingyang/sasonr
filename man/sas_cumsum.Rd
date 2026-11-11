@@ -9,3 +9,4 @@ sas_cumsum(x, init, n)
 \description{
 Running total for a vectorised sum statement (\code{n + x;})
 }
+\keyword{internal}

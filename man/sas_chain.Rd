@@ -9,3 +9,4 @@ sas_chain(args, ops)
 \description{
 Comparison chain \verb{a < b < c}: every operand is evaluated once
 }
+\keyword{internal}

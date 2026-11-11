@@ -46,6 +46,7 @@ parse_global_stmt <- function(p) {
   if (low == "options" || low == "option") {
     advance(p)
     opts <- character()
+    ls <- NULL
     while (tk_type(p) != "semi") {
       if (at_eof(p)) abort_syntax("missing semicolon after OPTIONS", line)
       if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in OPTIONS"), line)
@@ -55,11 +56,16 @@ parse_global_stmt <- function(p) {
       advance(p)
       if (is_op(p, "=")) {
         advance(p)
+        if (opt %in% c("linesize", "ls")) {
+          v <- tk_low(p)
+          ls <- if (identical(v, "max")) 256L else suppressWarnings(as.integer(v))
+          if (is.na(ls) || ls < 64L || ls > 256L) abort_syntax("invalid LINESIZE= value", line)
+        }
         if (tk_type(p) %in% c("name", "num", "str", "str_macro")) advance(p) else abort_syntax("invalid OPTIONS value", line)
       }
     }
     advance(p)
-    return(list(type = "global", kind = "options", opts = opts, line = line))
+    return(list(type = "global", kind = "options", opts = opts, ls = ls, line = line))
   }
   abort_unsupported(paste0("global statement ", toupper(tk_val(p))), line)
 }
@@ -288,6 +294,7 @@ translate_proc <- function(step, meta, last = NULL) {
 
 #' PROC SORT: stable sort (missing values first) with optional NODUPKEY
 #' @export
+#' @keywords internal
 sas_sort_df <- function(d, by, descending = rep(FALSE, length(by)), nodupkey = FALSE, noduprecs = FALSE) {
   d <- d[sas_order(d, by, descending), , drop = FALSE]
   if (nodupkey && nrow(d) > 0) {
@@ -306,6 +313,7 @@ sas_sort_df <- function(d, by, descending = rep(FALSE, length(by)), nodupkey = F
 
 #' Apply FIRSTOBS= / OBS= to a data frame (after WHERE)
 #' @export
+#' @keywords internal
 sas_obs_window <- function(d, firstobs = NULL, obs = NULL) {
   from <- firstobs %||% 1
   to <- min(obs %||% nrow(d), nrow(d))
@@ -338,14 +346,14 @@ print_num_column <- function(x) {
       dmax
     }, 1L)
     d <- max(need)
-    out[!miss] <- sprintf("%.*f", d, sas_f_round(v, 10^-d))
+    out[!miss] <- sprintf("%.*f", d, display_round(v, d))
     return(out)
   }
   s <- trimws(sas_fmt_best(abs(v), 7L))
   has_e <- grepl("E", s, fixed = TRUE)
   dec <- ifelse(grepl(".", s, fixed = TRUE) & !has_e, nchar(sub("^[^.]*\\.", "", s)), 0L)
   d <- max(dec)
-  if (d > 0 && !any(has_e)) s <- sprintf("%.*f", d, sas_f_round(abs(v), 10^-d))
+  if (d > 0 && !any(has_e)) s <- sprintf("%.*f", d, display_round(abs(v), d))
   out[!miss] <- paste0(ifelse(v < 0, "-", ""), s)
   out
 }
@@ -370,6 +378,7 @@ print_header_lines <- function(h, dw) {
 #' @param d Data with an `.obs` column (physical observation numbers).
 #' @param spec List of columns: `name`, `disp`, `char`, `fmt`.
 #' @export
+#' @keywords internal
 sas_print_listing <- function(d, spec, noobs = FALSE, titles = character()) {
   if (nrow(d) == 0) return(character())
   cols <- list()

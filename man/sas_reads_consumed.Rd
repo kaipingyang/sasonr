@@ -9,3 +9,4 @@ sas_reads_consumed(p)
 \description{
 Set the observation counts of the SET data sets to the rows consumed
 }
+\keyword{internal}

@@ -9,3 +9,4 @@ sas_input_at_end(inf)
 \description{
 Is the current record the last one? (INFILE END=)
 }
+\keyword{internal}

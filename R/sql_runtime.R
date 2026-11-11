@@ -15,7 +15,6 @@ sql_norm_key <- function(x) {
   x
 }
 
-#' CASE: (cond1, value1, cond2, value2, ..., else)
 #' @export
 sas_f_sqlcase <- function(...) {
   a <- list(...)
@@ -33,7 +32,6 @@ sas_f_sqlcase <- function(...) {
   out
 }
 
-#' x IN (expression list)
 #' @export
 sas_f_sqlinlist <- function(x, ...) {
   vals <- list(...)
@@ -42,7 +40,6 @@ sas_f_sqlinlist <- function(x, ...) {
   as.numeric(res)
 }
 
-#' LIKE with % and _ wildcards (trailing blanks of the value are ignored)
 #' @export
 sas_f_sqllike <- function(x, pattern, escape = NULL) {
   n <- max(length(x), length(pattern))
@@ -74,7 +71,6 @@ sas_f_sqllike <- function(x, pattern, escape = NULL) {
 
 sql_rx_quote <- function(ch) if (grepl("[][{}()*+?.\\\\^$|]", ch)) paste0("\\", ch) else ch
 
-#' Quantified comparison x op ANY/ALL (values)
 #' @export
 sas_f_sqlquant <- function(x, values, op, quant) {
   f <- switch(op, "=" = sas_eq, "^=" = sas_ne, "<" = sas_lt, "<=" = sas_le, ">" = sas_gt, ">=" = sas_ge)
@@ -86,7 +82,6 @@ sas_f_sqlquant <- function(x, values, op, quant) {
   as.numeric(res)
 }
 
-#' MONOTONIC(): the row number
 #' @export
 sas_f_sqlmonotonic <- function() as.numeric(seq_len(get(".sql_n", envir = parent.frame())))
 
@@ -239,6 +234,7 @@ sql_header_lines <- function(h, width) {
 
 #' PROC SQL report for a query result (as written to the listing)
 #' @export
+#' @keywords internal
 sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
   cols <- rel$cols
   d <- rel$data
@@ -259,6 +255,8 @@ sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
       return(formatC(sas_rtrim(s), width = -widths[k], flag = "-"))
     }
     s <- if (is.null(c$format)) sas_fmt_best(v, 8L) else sas_format(v, c$format)
+    # the listing right-aligns missing values (w.d puts them in the units column)
+    s[is.na(v)] <- trimws(s[is.na(v)])
     formatC(s, width = widths[k])
   })
   head <- lapply(seq_len(nlines), function(j) vapply(seq_along(cols), function(k) {

@@ -12,7 +12,31 @@ ct$mv <- character()
 ct_reset <- function() {
   ct$notes <- character()
   ct$mv <- character()
+  ct$conv <- list()
   invisible()
+}
+
+# Record an implicit type conversion found at compile time ("n2c" or "c2n").
+ct_conversion <- function(kind, line, col) {
+  ct$conv[[kind]] <- c(ct$conv[[kind]], sprintf("%d:%d", as.integer(line), as.integer(col %||% 0L)))
+  invisible()
+}
+
+# SAS lists the places by line, and within a line by the column as text
+# ("95:143 95:195 95:25"), each in a 9-column field.
+conversion_notes <- function() {
+  conv <- ct$conv %||% list()
+  if (length(conv) == 0) return(character())
+  head <- c(n2c = "NOTE: Numeric values have been converted to character values at the places given by: (Line):(Column).",
+            c2n = "NOTE: Character values have been converted to numeric values at the places given by: (Line):(Column).")
+  out <- character()
+  for (k in names(conv)) {
+    places <- unique(conv[[k]])
+    ln <- as.integer(sub(":.*$", "", places))
+    places <- places[order(ln, sub("^.*:", "", places), method = "radix")]
+    out <- c(out, head[[k]], place_lines(sprintf("%-6s", places)))
+  }
+  out
 }
 
 at_key <- function(.at) {
@@ -28,10 +52,41 @@ rt_count <- function(slot, .at, n = 1L) {
   invisible()
 }
 
+# Functions whose missing numeric arguments SAS reports in the
+# "Missing values were generated" NOTE (verified against SAS: ROUND family,
+# INT/FLOOR/CEIL family, INTCK, INTNX).
+mv_note_fns <- c("round", "rounde", "roundz", "int", "intz", "floor", "floorz", "ceil", "ceilz", "intck", "intnx")
+
+#' Arguments of a function call; missing numeric arguments are counted for the
+#' "Missing values were generated" NOTE at the call's position
+#' @export
+#' @keywords internal
+sas_mv_args <- function(.at, ..., .exact = TRUE) {
+  args <- list(...)
+  num <- Filter(function(a) is.numeric(a) && length(a) > 0, args)
+  if (length(num)) do.call(sas_mv_count, c(list(.at), unname(num), list(.exact = .exact)))
+  args
+}
+
+# Functions whose missing *result* SAS counts in the NOTE (verified: ABS, MIN,
+# MAX, SUM, MEAN; SUM/MIN/... ignore missing arguments, so only an all-missing
+# call is counted)
+mv_result_fns <- c("abs", "min", "max", "sum", "mean")
+
+#' Count missing results of a function call for the missing-value NOTE
+#' @export
+#' @keywords internal
+sas_mv_res <- function(res, .at, .exact = TRUE) {
+  if (anyNA(res)) sas_mv_count(.at, res, .exact = .exact)
+  res
+}
+
 #' Count "missing values were generated" for one operation site
 #'
 #' @param .at `c(line, column)` of the operator or function name.
 #' @param ... The operands; rows where any operand is missing are counted.
+#' @param .exact `FALSE` when vectorised code may over-count (the step is re-run row by row).
+#' @keywords internal
 #' @export
 sas_mv_count <- function(.at, ..., .exact = TRUE) {
   args <- list(...)
@@ -48,6 +103,7 @@ sas_mv_count <- function(.at, ..., .exact = TRUE) {
 
 #' Arithmetic operators `+ - *` with SAS missing-value semantics and NOTEs
 #' @export
+#' @keywords internal
 sas_arith <- function(a, b, op, .at = NULL, .exact = TRUE) {
   r <- switch(op, "+" = a + b, "-" = a - b, "*" = a * b)
   if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
@@ -63,11 +119,12 @@ sorted_places <- function(keys) {
 }
 
 place_lines <- function(entries) {
-  # SAS writes the places on lines of at most 132 columns, indented by 6
+  # SAS writes the places on lines of at most LINESIZE columns, indented by 6
   out <- character()
   cur <- "     "
+  ls <- rt$ls %||% 132L
   for (e in entries) {
-    if (nchar(cur) + nchar(e) + 3L > 132L && nchar(cur) > 5L) {
+    if (nchar(cur) + nchar(e) + 3L > ls && nchar(cur) > 5L) {
       out <- c(out, cur)
       cur <- "     "
     }
@@ -93,9 +150,11 @@ step_end_notes <- function() {
   if (isTRUE(rt$flow_note)) out <- "NOTE: SAS went to a new line when INPUT statement reached past the end of a line."
   if (length(rt$mv) > 0) out <- c(out, note_mv_lines(count_entries(rt$mv)))
   if (length(rt$math) > 0) {
+    head <- "NOTE: Mathematical operations could not be performed at the following places. The results of the operations have been set to missing values."
     out <- c(out,
-      "NOTE: Mathematical operations could not be performed at the following places. The results of the operations have been set to ",
-      "      missing values.",
+      if (nchar(head) <= (rt$ls %||% 132L)) head else
+        c("NOTE: Mathematical operations could not be performed at the following places. The results of the operations have been set to ",
+          "      missing values."),
       "      Each place is given by: (Number of times) at (Line):(Column).",
       place_lines(count_entries(rt$math)))
   }
@@ -104,7 +163,7 @@ step_end_notes <- function() {
 
 # Compile-time NOTEs of a step (constant folding).
 compile_notes <- function() {
-  out <- ct$notes
+  out <- c(conversion_notes(), ct$notes)
   if (length(ct$mv) > 0) out <- c(out, note_mv_lines(sorted_places(unique(ct$mv))))
   out
 }
@@ -113,6 +172,7 @@ compile_notes <- function() {
 #'
 #' Returns `d` unchanged.
 #' @export
+#' @keywords internal
 sas_note_read <- function(d, name, where = NULL) {
   rt$reads[[length(rt$reads) + 1L]] <- list(name = name, n = nrow(d), where = where)
   d
@@ -120,6 +180,7 @@ sas_note_read <- function(d, name, where = NULL) {
 
 #' Set the observation counts of the SET data sets to the rows consumed
 #' @export
+#' @keywords internal
 sas_reads_consumed <- function(p) {
   left <- p
   for (k in seq_along(rt$reads)) {

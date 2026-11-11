@@ -16,6 +16,7 @@
 #'   "stopover"), firstobs, obs, pad, lines (N), end_text).
 #' @param instream `TRUE` for DATALINES/CARDS (records are padded to 80).
 #' @export
+#' @keywords internal
 sas_infile_open <- function(lines, line_no = seq_along(lines), opts = list(), instream = TRUE) {
   inf <- new.env(parent = emptyenv())
   first <- opts$firstobs %||% 1
@@ -249,6 +250,7 @@ ptr_value <- function(v, pdv) {
 #' Execute one INPUT statement
 #' @param spec list(items, hold): see the generated code.
 #' @export
+#' @keywords internal
 sas_input_stmt <- function(inf, pdv, spec) {
   inf$pdv <- NULL
   inf$pdv_partial <- NULL
@@ -328,6 +330,7 @@ input_items <- function(inf, pdv, spec) {
 
 #' End of a DATA step iteration: release a record held by a trailing `@`
 #' @export
+#' @keywords internal
 sas_input_iter_end <- function(inf) {
   if (identical(inf$hold, "@")) inf$hold <- ""
   invisible()
@@ -335,6 +338,7 @@ sas_input_iter_end <- function(inf) {
 
 #' Is the current record the last one? (INFILE END=)
 #' @export
+#' @keywords internal
 sas_input_at_end <- function(inf) {
   # in-stream data are read unbuffered: SAS never sets END= to 1 for DATALINES
   if (inf$instream) return(0)
@@ -366,6 +370,7 @@ input_buffer_lines <- function(inf) {
 #' Used by vectorised (L1/L2) code: each iteration executes the INPUT
 #' statement once; the variables it reads start missing in every iteration.
 #' @export
+#' @keywords internal
 sas_read_input <- function(inf, spec, end_var = NULL) {
   vars <- list()
   for (it in spec$items) {
@@ -402,6 +407,7 @@ input_var_names <- function(r) {
 
 #' Read an external text file for INFILE (path relative to the working directory)
 #' @export
+#' @keywords internal
 sas_read_file <- function(path) {
   if (!file.exists(path)) abort_runtime(paste0("Physical file does not exist, ", path))
   lines <- readLines(path, warn = FALSE, encoding = "latin1")

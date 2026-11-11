@@ -9,3 +9,4 @@ sas_err_sync(pdv)
 \description{
 Called from generated L3 code after statements that can raise data errors.
 }
+\keyword{internal}

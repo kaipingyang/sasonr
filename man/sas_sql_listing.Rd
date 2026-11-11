@@ -9,3 +9,4 @@ sas_sql_listing(rel, titles = character(), number = FALSE)
 \description{
 PROC SQL report for a query result (as written to the listing)
 }
+\keyword{internal}

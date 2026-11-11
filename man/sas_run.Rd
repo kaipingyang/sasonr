@@ -23,3 +23,19 @@ The macro processor hands complete steps to the executor one at a time
 (at RUN; / QUIT; / step boundaries), so CALL SYMPUT(X) results are visible to
 the macro code that follows the step, including inside macro bodies.
 }
+\examples{
+res <- sas_run("
+data class;
+  input name $ age;
+  length group $ 5;
+  if age >= 13 then group = 'teen'; else group = 'child';
+  datalines;
+Alice 12
+Bob 14
+;
+run;
+proc print data=class; run;
+")
+res$work$class
+cat(res$listing, sep = "\n")
+}

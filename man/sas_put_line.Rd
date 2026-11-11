@@ -4,8 +4,9 @@
 \alias{sas_put_line}
 \title{Assemble one PUT line per row}
 \usage{
-sas_put_line(..., .lit = NULL)
+sas_put_line(..., .lit = NULL, .ls = rt$ls \%||\% 132L)
 }
 \description{
 Assemble one PUT line per row
 }
+\keyword{internal}

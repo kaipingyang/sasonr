@@ -591,6 +591,7 @@ means_types_wanted <- function(sp, k, for_print) {
 #' @param d Input data (after WHERE).
 #' @param sp Specification built by the translator.
 #' @export
+#' @keywords internal
 sas_proc_means <- function(d, sp) {
   cn <- vapply(sp$class, `[[`, "", "name")
   k <- length(cn)
@@ -789,22 +790,33 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 means_num_text <- function(v, w, maxdec) {
   if (is.na(v)) return(".")
   if (!is.null(maxdec)) {
-    s <- sprintf("%.*f", maxdec, sas_f_round(v, 10^-maxdec))
-    if (nchar(s) <= w) return(s)
+    # too wide: fewer decimals first (12345678.500 with MAXDEC=4), then BEST
+    for (dd in seq(maxdec, 0L)) {
+      # MAXDEC= rounds the exact binary value half up, without the format fuzz
+      # (gold: a mean of 1.2249999999999999 shows as 1.22)
+      s <- sprintf("%.*f", dd, display_round(v, dd, exact = TRUE))
+      if (nchar(s) <= w) return(s)
+    }
     return(trimws(sas_fmt_best(v, w)))
   }
   if (v == 0) return("0")
+  if (v != trunc(v) && (abs(v) >= 1e6 || abs(v) < 1e-4)) {
+    # the gold standard shows SAS choosing other decimals here (1622403.34,
+    # 0.000012500); the rule is not derived yet
+    abort_unsupported("PROC MEANS default decimals for a non-integer statistic of 1E6 or more or below 1E-4 (not verified against SAS; use MAXDEC=)")
+  }
   dec <- max(0L, as.integer(round((w - 2) * 0.7)))
   for (dd in dec:0) {
-    s <- sprintf("%.*f", dd, v)
-    if (nchar(s) <= w - 1L) return(s)
+    s <- sprintf("%.*f", dd, display_round(v, dd))
+    # the minus sign does not count against the field (-218.9158575)
+    if (nchar(sub("^-", "", s)) <= w - 1L) return(s)
   }
   trimws(sas_fmt_best(v, w))
 }
 
 means_stat_text <- function(s, v, sp) {
   if (s %in% c("n", "nmiss")) return(if (is.na(v)) "." else sprintf("%.0f", v))
-  if (s == "t") return(if (is.na(v)) "." else sprintf("%.2f", sas_f_round(v, 0.01)))
+  if (s == "t") return(if (is.na(v)) "." else sprintf("%.2f", display_round(v, 2L)))
   if (s == "prt") return(trimws(fmt_pvalue(v, 6L, 4L)))
   means_num_text(v, sp$fw, sp$maxdec)
 }

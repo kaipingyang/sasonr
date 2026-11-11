@@ -17,7 +17,9 @@ Imports:
     tibble,
     vctrs
 Suggests:
-    testthat (>= 3.0.0)
+    haven,
+    testthat (>= 3.0.0),
+    withr
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
 URL: https://kaipingyang.github.io/sasonr/, https://github.com/kaipingyang/sasonr

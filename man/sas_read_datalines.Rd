@@ -9,3 +9,4 @@ sas_read_datalines(lines, spec)
 \description{
 Read in-stream data lines according to an INPUT specification
 }
+\keyword{internal}

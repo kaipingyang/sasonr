@@ -9,3 +9,4 @@ sas_first(...)
 \description{
 FIRST.x / LAST.x flags from BY variables (pass the BY variables up to x)
 }
+\keyword{internal}

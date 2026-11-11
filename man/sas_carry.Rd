@@ -10,3 +10,4 @@ sas_carry(values, sets, init)
 Row r takes the value of the last assignment k whose flag \code{sets[[k]]} is
 true on that row, otherwise the result of row r - 1 (or \code{init}).
 }
+\keyword{internal}

@@ -9,3 +9,4 @@ sas_idx(i, lo, dim)
 \description{
 Validate an array subscript and convert it to a 1-based position
 }
+\keyword{internal}

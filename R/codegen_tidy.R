@@ -18,6 +18,8 @@ new_cx <- function(mode, an) {
   cx$n_tmp <- 0L
   cx$stages <- list()
   cx$puts <- list()
+  cx$sink <- if (is.null(an$file)) ".log" else ".fput"
+  cx$ls <- if (is.null(an$file)) 132L else an$file$lrecl
   cx
 }
 
@@ -193,7 +195,18 @@ gen_call <- function(e, cx) {
   if (e$name == "symget") args <- c(".symtab", args)
   at <- if (cx$mode == "row" && e$name %in% err_fns && !is.null(e$col)) at_code(e) else ""
   if (e$name == "catx") at <- paste0(at, sprintf(", .len = %dL", as.integer(e$buf_len %||% 200L)))
-  sprintf("sas_f_%s(%s%s)", e$name, paste(args, collapse = ", "), at)
+  if (e$name %in% mv_note_fns && !is.null(e$col) && length(args) > 0) {
+    # count missing arguments once, then call with the evaluated arguments
+    extra <- if (nzchar(at)) sprintf(", list(%s)", sub("^, ", "", at)) else ""
+    return(sprintf("do.call(sas_f_%s, c(sas_mv_args(c(%dL, %dL), %s%s)%s))", e$name, as.integer(e$line),
+                   as.integer(e$col), paste(args, collapse = ", "), if (isTRUE(cx$inexact)) ", .exact = FALSE" else "", extra))
+  }
+  call <- sprintf("sas_f_%s(%s%s)", e$name, paste(args, collapse = ", "), at)
+  if (e$name %in% mv_result_fns && !is.null(e$col)) {
+    call <- sprintf("sas_mv_res(%s, c(%dL, %dL)%s)", call, as.integer(e$line), as.integer(e$col),
+                    if (isTRUE(cx$inexact)) ", .exact = FALSE" else "")
+  }
+  call
 }
 
 # Can evaluating this expression raise a SAS data error (sets _ERROR_)?
@@ -259,8 +272,9 @@ put_line_code <- function(s, cx) {
   }, "")
   # literals and formatted (unnamed, explicit format) items add no trailing blank
   lit <- vapply(s$items, function(it) it$kind == "lit" || (it$kind == "value" && !is.null(it$fmt)), logical(1))
-  if (!any(lit)) return(paste0("sas_put_line(", paste(items, collapse = ", "), ")"))
-  paste0("sas_put_line(", paste(items, collapse = ", "), ", .lit = ", r_lit(lit), ")")
+  ls <- if (identical(cx$ls, 132L) || is.null(cx$ls)) "" else paste0(", .ls = ", cx$ls, "L")
+  if (!any(lit)) return(paste0("sas_put_line(", paste(items, collapse = ", "), ls, ")"))
+  paste0("sas_put_line(", paste(items, collapse = ", "), ", .lit = ", r_lit(lit), ls, ")")
 }
 
 # PUT with pointer controls: every item becomes a positioned piece of text.
@@ -481,8 +495,9 @@ vec_put_code <- function(cx) {
   if (length(cx$puts) == 0) return(character())
   lines <- vapply(cx$puts, `[[`, "", "line")
   guards <- vapply(cx$puts, function(p) if (is.null(p$guard)) "TRUE" else paste0(".d$", p$guard), "")
-  if (length(lines) == 1 && guards == "TRUE") return(paste0(".log <- c(.log, ", lines, ")"))
-  sprintf(".log <- c(.log, sas_put_rows(\n  list(%s),\n  list(%s)\n))",
+  sink <- cx$sink
+  if (length(lines) == 1 && guards == "TRUE") return(sprintf("%s <- c(%s, %s)", sink, sink, lines))
+  sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s)\n))", sink, sink,
           paste(lines, collapse = ",\n       "), paste(guards, collapse = ", "))
 }
 
@@ -885,7 +900,7 @@ gen_row_stmt <- function(s, cx) {
       }
       output_lines(targets)
     },
-    put = paste0(".log <- c(.log, ", put_line_code(s, cx), ")"),
+    put = sprintf("%s <- c(%s, %s)", cx$sink, cx$sink, put_line_code(s, cx)),
     call = if (s$routine %in% c("missing", "sortn", "sortc")) gen_row_call_vars(s, cx) else {
       args <- vapply(s$args, g, "")
       scope <- if (length(args) >= 3) paste0(", scope = ", args[3]) else ""
@@ -981,6 +996,10 @@ translate_step <- function(step, meta, level = "auto") {
     paste0("# ", an$level, ": ", paste(an$reasons, collapse = "; "))
   )
   body <- if (an$level == "L3") gen_row_step(an) else gen_vec_step(an)
+  if (!is.null(an$file)) {
+    body <- c(".fput <- character()", body,
+              sprintf("sas_file_write(%s, .fput, mod = %s)", r_str(an$file$path), if (isTRUE(an$file$mod)) "TRUE" else "FALSE"))
+  }
   uninit <- uninit_vars(an)
   notes <- c(compile_notes(),
              if (length(uninit) > 0) sprintf("NOTE: Variable %s is uninitialized.",

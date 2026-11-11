@@ -9,3 +9,4 @@ sas_sort_values(vals)
 \description{
 CALL SORTN / SORTC: the values in ascending order (missing values first)
 }
+\keyword{internal}

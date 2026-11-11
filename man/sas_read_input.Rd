@@ -10,3 +10,4 @@ sas_read_input(inf, spec, end_var = NULL)
 Used by vectorised (L1/L2) code: each iteration executes the INPUT
 statement once; the variables it reads start missing in every iteration.
 }
+\keyword{internal}

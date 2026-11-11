@@ -6,6 +6,12 @@
 \usage{
 sas_fmt_best(x, w = 12L)
 }
+\arguments{
+\item{x}{Numeric vector.}
+
+\item{w}{Width.}
+}
 \description{
 BESTw. format (right-aligned to width w)
 }
+\keyword{internal}

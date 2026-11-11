@@ -9,3 +9,4 @@ sas_merge_read(pdv, rows, plan, p, reset, in_vars, by)
 \description{
 Execute one MERGE read against the PDV
 }
+\keyword{internal}

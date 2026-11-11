@@ -18,22 +18,226 @@ articles:
   - articles/todo
 reference:
 - title: Run and translate SAS programs
+  desc: Entry points. Run a SAS program on the R engine or translate it into tidyverse R code.
   contents:
   - sas_run
   - sas_translate
+  - sas_export_work
 - title: Front end (lexer, parser, analysis)
   contents:
   - sas_lex
   - sas_parse
   - sas_parse_expr
   - sas_analyze
-- title: Runtime helpers used by generated code
-  desc: >
-    Generated R code calls these helpers to reproduce SAS value semantics
-    (missing values, fixed-length characters, formats, functions). They are
-    exported so that translated code can run on its own.
+- title: SAS values
   contents:
-  - starts_with("sas_f_")
-  - starts_with("sas_fmt")
-  - starts_with("sas_")
-  - mac_eval
+  - sas_missing
+- title: SAS character functions
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_anyalnum
+  - sas_f_anyalpha
+  - sas_f_anydigit
+  - sas_f_anylower
+  - sas_f_anypunct
+  - sas_f_anyspace
+  - sas_f_anyupper
+  - sas_f_byte
+  - sas_f_cat
+  - sas_f_cats
+  - sas_f_catt
+  - sas_f_catx
+  - sas_f_char
+  - sas_f_choosec
+  - sas_f_coalescec
+  - sas_f_collate
+  - sas_f_compare
+  - sas_f_compbl
+  - sas_f_compress
+  - sas_f_count
+  - sas_f_countc
+  - sas_f_countw
+  - sas_f_dequote
+  - sas_f_find
+  - sas_f_findc
+  - sas_f_findw
+  - sas_f_first
+  - sas_f_ifc
+  - sas_f_index
+  - sas_f_indexc
+  - sas_f_indexw
+  - sas_f_left
+  - sas_f_length
+  - sas_f_lengthc
+  - sas_f_lengthm
+  - sas_f_lengthn
+  - sas_f_lowcase
+  - sas_f_notalnum
+  - sas_f_notalpha
+  - sas_f_notdigit
+  - sas_f_notlower
+  - sas_f_notpunct
+  - sas_f_notspace
+  - sas_f_notupper
+  - sas_f_propcase
+  - sas_f_quote
+  - sas_f_rank
+  - sas_f_repeat
+  - sas_f_reverse
+  - sas_f_right
+  - sas_f_scan
+  - sas_f_strip
+  - sas_f_substr
+  - sas_f_substrn
+  - sas_f_translate
+  - sas_f_transtrn
+  - sas_f_tranwrd
+  - sas_f_trim
+  - sas_f_trimn
+  - sas_f_upcase
+  - sas_f_verify
+  - sas_f_whichc
+- title: SAS numeric, truncation and rounding functions
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_abs
+  - sas_f_arcos
+  - sas_f_arsin
+  - sas_f_atan
+  - sas_f_atan2
+  - sas_f_beta
+  - sas_f_ceil
+  - sas_f_ceilz
+  - sas_f_choosen
+  - sas_f_coalesce
+  - sas_f_comb
+  - sas_f_constant
+  - sas_f_cos
+  - sas_f_cosh
+  - sas_f_divide
+  - sas_f_exp
+  - sas_f_fact
+  - sas_f_floor
+  - sas_f_floorz
+  - sas_f_gamma
+  - sas_f_gcd
+  - sas_f_ifn
+  - sas_f_int
+  - sas_f_intz
+  - sas_f_lcm
+  - sas_f_lgamma
+  - sas_f_log
+  - sas_f_log10
+  - sas_f_log2
+  - sas_f_logbeta
+  - sas_f_mod
+  - sas_f_modz
+  - sas_f_perm
+  - sas_f_round
+  - sas_f_rounde
+  - sas_f_roundz
+  - sas_f_sign
+  - sas_f_sin
+  - sas_f_sinh
+  - sas_f_sqrt
+  - sas_f_tan
+  - sas_f_tanh
+  - sas_f_whichn
+- title: SAS descriptive statistics functions
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_cmiss
+  - sas_f_css
+  - sas_f_cv
+  - sas_f_geomean
+  - sas_f_harmean
+  - sas_f_kurtosis
+  - sas_f_largest
+  - sas_f_max
+  - sas_f_mean
+  - sas_f_median
+  - sas_f_min
+  - sas_f_n
+  - sas_f_nmiss
+  - sas_f_ordinal
+  - sas_f_pctl
+  - sas_f_range
+  - sas_f_skewness
+  - sas_f_smallest
+  - sas_f_std
+  - sas_f_stderr
+  - sas_f_sum
+  - sas_f_uss
+  - sas_f_var
+- title: SAS probability and distribution functions
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_cdf
+  - sas_f_cinv
+  - sas_f_finv
+  - sas_f_logcdf
+  - sas_f_logpdf
+  - sas_f_logsdf
+  - sas_f_pdf
+  - sas_f_poisson
+  - sas_f_probbnml
+  - sas_f_probchi
+  - sas_f_probf
+  - sas_f_probit
+  - sas_f_probnorm
+  - sas_f_probt
+  - sas_f_quantile
+  - sas_f_sdf
+  - sas_f_tinv
+- title: SAS date and time functions
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_datdif
+  - sas_f_date
+  - sas_f_datejul
+  - sas_f_datepart
+  - sas_f_datetime
+  - sas_f_day
+  - sas_f_dhms
+  - sas_f_hms
+  - sas_f_hour
+  - sas_f_intck
+  - sas_f_intnx
+  - sas_f_juldate
+  - sas_f_juldate7
+  - sas_f_mdy
+  - sas_f_minute
+  - sas_f_month
+  - sas_f_qtr
+  - sas_f_second
+  - sas_f_time
+  - sas_f_timepart
+  - sas_f_today
+  - sas_f_week
+  - sas_f_weekday
+  - sas_f_year
+  - sas_f_yrdif
+- title: SAS special functions (PUT/INPUT, PRX, bitwise, MISSING)
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_band
+  - sas_f_blshift
+  - sas_f_bnot
+  - sas_f_bor
+  - sas_f_brshift
+  - sas_f_bxor
+  - sas_f_input
+  - sas_f_inputc
+  - sas_f_inputn
+  - sas_f_missing
+  - sas_f_nvalid
+  - sas_f_prxchange
+  - sas_f_prxmatch
+  - sas_f_prxparse
+  - sas_f_put
+  - sas_f_putc
+  - sas_f_putn
+- title: SAS functions related to macro variables
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_symget

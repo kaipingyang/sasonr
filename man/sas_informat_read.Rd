@@ -12,3 +12,4 @@ list(v, ok): the value and FALSE when the data are invalid.
 \description{
 Read text with an informat (one value)
 }
+\keyword{internal}

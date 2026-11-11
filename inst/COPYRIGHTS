@@ -1,0 +1,12 @@
+sasonr is licensed under the Apache License, Version 2.0 (see DESCRIPTION).
+
+inst/registry/semantics.csv
+  The list of entries (function, operator, procedure and domain keys) follows
+  the semantics registry of the sas2r package (inst/rulebook/semantics.yml,
+  Copyright the sas2r authors, Apache License 2.0). The descriptions, the
+  sasonr status and the links to conformance cases are written for sasonr;
+  the status column is derived from sasonr's offline conformance cases, whose
+  gold standard is the output of SAS 9.4.
+
+SAS is a registered trademark of SAS Institute Inc. sasonr is not affiliated
+with SAS Institute Inc.

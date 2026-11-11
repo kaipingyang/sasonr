@@ -4,7 +4,7 @@
 # the result equals row-by-row execution; otherwise it falls back to L3.
 
 decl_stmts <- c("length", "retain", "array", "format", "label", "keep", "drop",
-                "rename", "by", "where", "null", "datalines", "informat", "attrib", "infile")
+                "rename", "by", "where", "null", "datalines", "informat", "attrib", "infile", "file")
 
 is_decl <- function(s) s$stmt %in% decl_stmts
 is_inert <- function(s) is_decl(s) || s$stmt == "put"

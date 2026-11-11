@@ -74,7 +74,8 @@ test_that("arithmetic on special missing values and overflow yields ordinary mis
 test_that("SUBSTR: nonpositive length returns the remainder, invalid position a blank", {
   log <- sas_run("data _null_; a = substr('hello', 2, -1); b = substr('hello', 0, 2); c = substr('hello', 9); d = substr('hello', 2, 9);
     put '[' a '][' b '][' c '][' d ']'; run;")$log
-  expect_equal(grep("^NOTE", log, value = TRUE, invert = TRUE), c("[ello ][ ][ ][ello ]", "a=ello b= c= d=ello _ERROR_=1 _N_=1"))
+  # a blank character value is dumped as one blank (SAS: "b=  c=")
+  expect_equal(grep("^NOTE", log, value = TRUE, invert = TRUE), c("[ello ][ ][ ][ello ]", "a=ello b=  c=  d=ello _ERROR_=1 _N_=1"))
 })
 
 test_that("BESTw. chooses E notation as SAS does", {

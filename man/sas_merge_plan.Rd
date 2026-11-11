@@ -9,3 +9,4 @@ sas_merge_plan(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL)
 \description{
 Build the observation plan of a match-merge (MERGE + BY)
 }
+\keyword{internal}

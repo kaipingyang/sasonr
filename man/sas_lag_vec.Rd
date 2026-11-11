@@ -9,3 +9,4 @@ sas_lag_vec(x, n = 1L)
 \description{
 Vectorised LAG for unconditional calls (L2)
 }
+\keyword{internal}

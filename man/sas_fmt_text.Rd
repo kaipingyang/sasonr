@@ -9,3 +9,4 @@ sas_fmt_text(text)
 \description{
 Parse a format or informat name held in a string (\code{"date9."}, \code{"$char10."})
 }
+\keyword{internal}

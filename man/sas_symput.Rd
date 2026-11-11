@@ -9,3 +9,4 @@ sas_symput(symtab, name, value, trim = TRUE, scope = NULL)
 \description{
 CALL SYMPUT / SYMPUTX
 }
+\keyword{internal}

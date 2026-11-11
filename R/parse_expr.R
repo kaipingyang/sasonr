@@ -210,14 +210,15 @@ parse_prefix <- function(p) {
   t <- tk_type(p)
   v <- tk_val(p)
   line <- tk_line(p)
+  col <- tk_col(p)
   switch(t,
     num = {
       advance(p)
-      return(list(node = "num", value = sas_num_literal(v, line), text = v, kind = "num", line = line))
+      return(list(node = "num", value = sas_num_literal(v, line), text = v, kind = "num", line = line, col = col))
     },
     str = {
       advance(p)
-      return(list(node = "str", value = v, line = line))
+      return(list(node = "str", value = v, line = line, col = col))
     },
     date = ,
     time = ,
@@ -225,11 +226,11 @@ parse_prefix <- function(p) {
       val <- sas_parse_dt_literal(v, t)
       if (is.na(val)) abort_syntax(paste0("invalid ", t, " constant '", v, "'"), line)
       advance(p)
-      return(list(node = "num", value = val, text = v, kind = t, line = line))
+      return(list(node = "num", value = val, text = v, kind = t, line = line, col = col))
     },
     missing = {
       advance(p)
-      return(list(node = "missing", code = v, line = line))
+      return(list(node = "missing", code = v, line = line, col = col))
     },
     str_macro = ,
     macro = ,
@@ -261,6 +262,7 @@ parse_prefix <- function(p) {
 parse_name_primary <- function(p) {
   low <- tk_low(p)
   line <- tk_line(p)
+  col <- tk_col(p)
   if (low == "not" && !tk_type(p, 1L) %in% c("semi", "rparen", "comma", "eof")) {
     advance(p)
     return(list(node = "unary", op = "not", arg = parse_expr(p, 7L), line = line))
@@ -280,7 +282,7 @@ parse_name_primary <- function(p) {
   }
   if (tk_type(p, 1L) == "lparen") return(parse_call(p))
   advance(p)
-  list(node = "var", name = low, text = tk_val(p, -1L), line = line)
+  list(node = "var", name = low, text = tk_val(p, -1L), line = line, col = col)
 }
 
 parse_array_ref <- function(p) {

@@ -6,3 +6,5 @@
 .Renviron
 *.Rproj
 docs/
+inst/sashelp/
+tests/conformance/

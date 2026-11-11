@@ -9,3 +9,4 @@ sas_obs_window(d, firstobs = NULL, obs = NULL)
 \description{
 Apply FIRSTOBS= / OBS= to a data frame (after WHERE)
 }
+\keyword{internal}

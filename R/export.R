@@ -46,6 +46,9 @@ sas_export_work <- function(res, dir) {
     lines <- csv_field(disp)
     lines <- paste(lines, collapse = ",")
     if (nrow(d) > 0 && length(vars) > 0) lines <- c(lines, do.call(paste, c(cols, sep = ",")))
+    # PROC EXPORT writes records of at most LRECL=32767 bytes; longer ones are cut
+    long <- nchar(lines, type = "bytes") > 32767L
+    if (any(long)) lines[long] <- vapply(lines[long], function(l) rawToChar(charToRaw(l)[1:32767]), "")
     writeLines(lines, file.path(dir, paste0(toupper(nm), ".csv")), useBytes = TRUE)
     for (k in seq_along(vars)) {
       v <- vars[k]

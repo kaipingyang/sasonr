@@ -12,3 +12,4 @@ sas_input_stmt(inf, pdv, spec)
 \description{
 Execute one INPUT statement
 }
+\keyword{internal}

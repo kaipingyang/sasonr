@@ -9,3 +9,4 @@ sas_true(x)
 \description{
 Truth value of a SAS expression (missing and 0 are false)
 }
+\keyword{internal}

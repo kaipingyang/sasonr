@@ -21,7 +21,7 @@ test_that("numeric formats follow the SAS width ladder", {
   expect_equal(fmt(-1234, "negparen8."), " (1,234)")
   expect_equal(fmt(123.456, "e12."), " 1.23456E+02")
   expect_equal(fmt(0.00001, "pvalue6.4"), "<.0001")
-  expect_equal(fmt(NA_real_, "8.2"), "       .")
+  expect_equal(fmt(NA_real_, "8.2"), "     .  ") # SAS gold: the missing value sits in the units column
 })
 
 test_that("date, time and datetime formats", {

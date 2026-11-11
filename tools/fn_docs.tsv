@@ -1,0 +1,196 @@
+name	syntax	category	description
+abs	ABS(argument)	numeric	Absolute value.
+anyalnum	ANYALNUM(string <, start>)	character	Position of the first alphanumeric character (0 if none).
+anyalpha	ANYALPHA(string <, start>)	character	Position of the first alphabetic character.
+anydigit	ANYDIGIT(string <, start>)	character	Position of the first digit.
+anylower	ANYLOWER(string <, start>)	character	Position of the first lowercase letter.
+anypunct	ANYPUNCT(string <, start>)	character	Position of the first punctuation character.
+anyspace	ANYSPACE(string <, start>)	character	Position of the first white-space character.
+anyupper	ANYUPPER(string <, start>)	character	Position of the first uppercase letter.
+arcos	ARCOS(argument)	numeric	Arccosine.
+arsin	ARSIN(argument)	numeric	Arcsine.
+atan	ATAN(argument)	numeric	Arctangent.
+atan2	ATAN2(argument-1, argument-2)	numeric	Arctangent of the quotient of two arguments.
+band	BAND(argument-1, argument-2)	special	Bitwise AND of two nonnegative integers.
+beta	BETA(a, b)	numeric	Beta function.
+blshift	BLSHIFT(argument-1, argument-2)	special	Bitwise left shift.
+bnot	BNOT(argument)	special	Bitwise NOT.
+bor	BOR(argument-1, argument-2)	special	Bitwise OR.
+brshift	BRSHIFT(argument-1, argument-2)	special	Bitwise right shift.
+bxor	BXOR(argument-1, argument-2)	special	Bitwise exclusive OR.
+byte	BYTE(n)	character	Character with the given byte code.
+cat	CAT(item-1 <, ..., item-n>)	character	Concatenates without removing blanks.
+cats	CATS(item-1 <, ..., item-n>)	character	Concatenates after removing leading and trailing blanks.
+catt	CATT(item-1 <, ..., item-n>)	character	Concatenates after removing trailing blanks.
+catx	CATX(delimiter, item-1 <, ..., item-n>)	character	Strips items and joins the non-blank ones with a delimiter.
+cdf	CDF(distribution, quantile <, parameters>)	probability	Cumulative distribution function.
+ceil	CEIL(argument)	numeric	Smallest integer >= the argument, with fuzz.
+ceilz	CEILZ(argument)	numeric	Smallest integer >= the argument, without fuzz.
+char	CHAR(string, position)	character	Single character at a position.
+choosec	CHOOSEC(index, value-1 <, ..., value-n>)	character	Character value selected by index.
+choosen	CHOOSEN(index, value-1 <, ..., value-n>)	numeric	Numeric value selected by index.
+cinv	CINV(p, df <, nc>)	probability	Quantile of the chi-square distribution.
+cmiss	CMISS(argument-1 <, ..., argument-n>)	descriptive	Number of missing arguments (numeric or character).
+coalesce	COALESCE(argument-1 <, ..., argument-n>)	numeric	First non-missing numeric argument.
+coalescec	COALESCEC(argument-1 <, ..., argument-n>)	character	First non-blank character argument.
+collate	COLLATE(start-position <, end-position> | <, , length>)	character	String of characters in collating order.
+comb	COMB(n, r)	numeric	Number of combinations.
+compare	COMPARE(string-1, string-2 <, modifiers>)	character	Position of the first difference (signed).
+compbl	COMPBL(source)	character	Compresses runs of blanks to one blank.
+compress	COMPRESS(source <, characters> <, modifiers>)	character	Removes characters from a string.
+constant	CONSTANT(constant <, parameter>)	numeric	Mathematical and machine constants.
+cos	COS(argument)	numeric	Cosine.
+cosh	COSH(argument)	numeric	Hyperbolic cosine.
+count	COUNT(string, substring <, modifiers>)	character	Number of occurrences of a substring.
+countc	COUNTC(string, characters <, modifiers>)	character	Number of occurrences of the listed characters.
+countw	COUNTW(string <, delimiters> <, modifiers>)	character	Number of words.
+css	CSS(argument-1 <, ..., argument-n>)	descriptive	Corrected sum of squares.
+cv	CV(argument-1 <, ..., argument-n>)	descriptive	Coefficient of variation.
+cvt_c2n	(automatic character-to-numeric conversion)	internal	Implicit character-to-numeric conversion of a function argument.
+cvt_n2c	(automatic numeric-to-character conversion)	internal	Implicit numeric-to-character conversion of a function argument.
+datdif	DATDIF(sdate, edate, basis)	datetime	Days between two dates under a day-count basis.
+date	DATE()	datetime	Current date.
+datejul	DATEJUL(julian-date)	datetime	SAS date from a Julian date (yyddd or yyyyddd).
+datepart	DATEPART(datetime)	datetime	Date part of a datetime value.
+datetime	DATETIME()	datetime	Current datetime.
+day	DAY(date)	datetime	Day of the month.
+dequote	DEQUOTE(string)	character	Removes matching quotation marks.
+dhms	DHMS(date, hour, minute, second)	datetime	Datetime from date, hour, minute and second.
+divide	DIVIDE(x, y)	numeric	Division that returns special missing values for division by zero.
+exp	EXP(argument)	numeric	Exponential function.
+fact	FACT(n)	numeric	Factorial.
+find	FIND(string, substring <, modifiers> <, start>)	character	Position of a substring.
+findc	FINDC(string <, characters> <, modifiers> <, start>)	character	Position of a character from a list.
+findw	FINDW(string, word <, delimiters> <, modifiers> <, start>)	character	Position (or number) of a word.
+finv	FINV(p, ndf, ddf <, nc>)	probability	Quantile of the F distribution.
+first	FIRST(string)	character	First character.
+floor	FLOOR(argument)	numeric	Largest integer <= the argument, with fuzz.
+floorz	FLOORZ(argument)	numeric	Largest integer <= the argument, without fuzz.
+gamma	GAMMA(argument)	numeric	Gamma function.
+gcd	GCD(x-1 <, ..., x-n>)	numeric	Greatest common divisor.
+geomean	GEOMEAN(argument-1 <, ..., argument-n>)	descriptive	Geometric mean.
+harmean	HARMEAN(argument-1 <, ..., argument-n>)	descriptive	Harmonic mean.
+hms	HMS(hour, minute, second)	datetime	Time value from hour, minute and second.
+hour	HOUR(time | datetime)	datetime	Hour.
+ifc	IFC(condition, true, false <, missing>)	character	Character value chosen by a condition.
+ifn	IFN(condition, true, false <, missing>)	numeric	Numeric value chosen by a condition.
+index	INDEX(source, excerpt)	character	Position of a substring.
+indexc	INDEXC(source, excerpt-1 <, ..., excerpt-n>)	character	Position of the first character from a list.
+indexw	INDEXW(source, excerpt <, delimiters>)	character	Position of a word.
+input	INPUT(source, <? | ??> informat.)	special	Reads a value with an informat.
+inputc	INPUTC(source, informat <, w>)	special	Reads a character value with an informat given at run time.
+inputn	INPUTN(source, informat <, w <, d>>)	special	Reads a numeric value with an informat given at run time.
+int	INT(argument)	numeric	Integer part, with fuzz.
+intck	INTCK(interval, start, end <, method>)	datetime	Number of interval boundaries between two dates.
+intnx	INTNX(interval, start, increment <, alignment>)	datetime	Date advanced by a number of intervals.
+intz	INTZ(argument)	numeric	Integer part, without fuzz.
+juldate	JULDATE(date)	datetime	Julian date (yyddd) of a SAS date.
+juldate7	JULDATE7(date)	datetime	Seven-digit Julian date (yyyyddd).
+kurtosis	KURTOSIS(argument-1, ..., argument-n)	descriptive	Kurtosis.
+largest	LARGEST(k, value-1 <, ..., value-n>)	descriptive	k-th largest non-missing value.
+lcm	LCM(x-1 <, ..., x-n>)	numeric	Least common multiple.
+left	LEFT(string)	character	Left-aligns a string.
+length	LENGTH(string)	character	Position of the last non-blank character (1 for a blank string).
+lengthc	LENGTHC(string)	character	Length including trailing blanks.
+lengthm	LENGTHM(string)	character	Bytes allocated for the string.
+lengthn	LENGTHN(string)	character	Length without trailing blanks (0 for a blank string).
+lgamma	LGAMMA(argument)	numeric	Natural logarithm of the gamma function.
+log	LOG(argument)	numeric	Natural logarithm.
+log10	LOG10(argument)	numeric	Base-10 logarithm.
+log2	LOG2(argument)	numeric	Base-2 logarithm.
+logbeta	LOGBETA(a, b)	numeric	Logarithm of the beta function.
+logcdf	LOGCDF(distribution, quantile <, parameters>)	probability	Logarithm of the CDF.
+logpdf	LOGPDF(distribution, quantile <, parameters>)	probability	Logarithm of the density.
+logsdf	LOGSDF(distribution, quantile <, parameters>)	probability	Logarithm of the survival function.
+lowcase	LOWCASE(argument)	character	Converts to lowercase.
+max	MAX(argument-1 <, ..., argument-n>)	descriptive	Largest non-missing value.
+mdy	MDY(month, day, year)	datetime	SAS date from month, day and year.
+mean	MEAN(argument-1 <, ..., argument-n>)	descriptive	Mean of the non-missing values.
+median	MEDIAN(value-1 <, ..., value-n>)	descriptive	Median of the non-missing values.
+min	MIN(argument-1 <, ..., argument-n>)	descriptive	Smallest non-missing value.
+minute	MINUTE(time | datetime)	datetime	Minute.
+missing	MISSING(numeric-expression | character-expression)	special	1 if the value is missing (blank for character), else 0.
+mod	MOD(dividend, divisor)	numeric	Remainder, with fuzz; sign of the dividend.
+modz	MODZ(dividend, divisor)	numeric	Remainder without fuzz.
+month	MONTH(date)	datetime	Month.
+n	N(argument-1 <, ..., argument-n>)	descriptive	Number of non-missing values.
+nmiss	NMISS(argument-1 <, ..., argument-n>)	descriptive	Number of missing numeric values.
+notalnum	NOTALNUM(string <, start>)	character	Position of the first non-alphanumeric character.
+notalpha	NOTALPHA(string <, start>)	character	Position of the first non-alphabetic character.
+notdigit	NOTDIGIT(string <, start>)	character	Position of the first non-digit.
+notlower	NOTLOWER(string <, start>)	character	Position of the first character that is not lowercase.
+notpunct	NOTPUNCT(string <, start>)	character	Position of the first non-punctuation character.
+notspace	NOTSPACE(string <, start>)	character	Position of the first non-blank character.
+notupper	NOTUPPER(string <, start>)	character	Position of the first character that is not uppercase.
+nvalid	NVALID(string <, validvarname>)	special	1 if the string is a valid SAS variable name.
+ordinal	ORDINAL(k, argument-1 <, ..., argument-n>)	descriptive	k-th smallest value (missing values first).
+pctl	PCTL(percentage, value-1 <, ..., value-n>)	descriptive	Percentile (definition 5).
+pdf	PDF(distribution, quantile <, parameters>)	probability	Probability density (mass) function.
+perm	PERM(n <, r>)	numeric	Number of permutations.
+poisson	POISSON(m, n)	probability	Poisson cumulative probability.
+probbnml	PROBBNML(p, n, m)	probability	Binomial cumulative probability.
+probchi	PROBCHI(x, df <, nc>)	probability	Chi-square cumulative probability.
+probf	PROBF(x, ndf, ddf <, nc>)	probability	F cumulative probability.
+probit	PROBIT(p)	probability	Standard normal quantile.
+probnorm	PROBNORM(x)	probability	Standard normal cumulative probability.
+probt	PROBT(x, df <, nc>)	probability	t cumulative probability.
+propcase	PROPCASE(argument <, delimiters>)	character	Converts to proper case.
+prxchange	PRXCHANGE(perl-regular-expression, times, source)	special	Substitutes with a Perl regular expression.
+prxmatch	PRXMATCH(regular-expression-id | perl-regular-expression, source)	special	Position of the first match of a Perl regular expression.
+prxparse	PRXPARSE(perl-regular-expression)	special	Compiles a Perl regular expression.
+put	PUT(source, format.)	special	Writes a value with a format.
+putc	PUTC(source, format <, w>)	special	Writes a character value with a format given at run time.
+putn	PUTN(source, format <, w <, d>>)	special	Writes a numeric value with a format given at run time.
+qtr	QTR(date)	datetime	Quarter of the year.
+quantile	QUANTILE(distribution, probability <, parameters>)	probability	Quantile function.
+quote	QUOTE(argument <, character>)	character	Adds quotation marks (trailing blanks kept).
+range	RANGE(argument-1 <, ..., argument-n>)	descriptive	Range of the non-missing values.
+rank	RANK(x)	character	Position of a character in the collating sequence.
+repeat	REPEAT(argument, n)	character	Repeats a string n + 1 times.
+reverse	REVERSE(argument)	character	Reverses a string.
+right	RIGHT(argument)	character	Right-aligns a string.
+round	ROUND(argument <, rounding-unit>)	numeric	Rounds half away from zero to a multiple of the unit, with fuzz.
+rounde	ROUNDE(argument <, rounding-unit>)	numeric	Rounds to a multiple of the unit, ties to even, with fuzz.
+roundz	ROUNDZ(argument <, rounding-unit>)	numeric	Rounds to a multiple of the unit, ties to even, without fuzz.
+scan	SCAN(string, count <, character-list <, modifiers>>)	character	The n-th word.
+sdf	SDF(distribution, quantile <, parameters>)	probability	Survival function.
+second	SECOND(time | datetime)	datetime	Second.
+sign	SIGN(argument)	numeric	Sign of the argument.
+sin	SIN(argument)	numeric	Sine.
+sinh	SINH(argument)	numeric	Hyperbolic sine.
+skewness	SKEWNESS(argument-1, argument-2, argument-3 <, ..., argument-n>)	descriptive	Skewness.
+smallest	SMALLEST(k, value-1 <, ..., value-n>)	descriptive	k-th smallest non-missing value.
+sqlcase	(PROC SQL CASE expression)	internal	PROC SQL CASE expression.
+sqlinlist	(PROC SQL IN list)	internal	PROC SQL IN list.
+sqllike	(PROC SQL LIKE)	internal	PROC SQL LIKE operator.
+sqlmonotonic	MONOTONIC()	internal	PROC SQL MONOTONIC().
+sqlquant	(PROC SQL ANY / ALL)	internal	PROC SQL quantified comparison.
+sqrt	SQRT(argument)	numeric	Square root.
+std	STD(argument-1, argument-2 <, ..., argument-n>)	descriptive	Standard deviation.
+stderr	STDERR(argument-1, argument-2 <, ..., argument-n>)	descriptive	Standard error of the mean.
+strip	STRIP(string)	character	Removes leading and trailing blanks.
+substr	SUBSTR(string, position <, length>)	character	Extracts a substring.
+substrn	SUBSTRN(string, position <, length>)	character	Extracts a substring (zero-length results allowed).
+sum	SUM(argument-1 <, ..., argument-n>)	descriptive	Sum of the non-missing values.
+symget	SYMGET(argument)	macro	Value of a macro variable at run time.
+tan	TAN(argument)	numeric	Tangent.
+tanh	TANH(argument)	numeric	Hyperbolic tangent.
+time	TIME()	datetime	Current time of day.
+timepart	TIMEPART(datetime)	datetime	Time part of a datetime value.
+tinv	TINV(p, df <, nc>)	probability	Quantile of the t distribution.
+today	TODAY()	datetime	Current date.
+translate	TRANSLATE(source, to-1, from-1 <, ..., to-n, from-n>)	character	Replaces characters.
+transtrn	TRANSTRN(source, target, replacement)	character	Replaces substrings (zero-length allowed).
+tranwrd	TRANWRD(source, target, replacement)	character	Replaces substrings.
+trim	TRIM(argument)	character	Removes trailing blanks (one blank for a blank string).
+trimn	TRIMN(argument)	character	Removes trailing blanks (empty for a blank string).
+upcase	UPCASE(argument)	character	Converts to uppercase.
+uss	USS(argument-1 <, ..., argument-n>)	descriptive	Uncorrected sum of squares.
+var	VAR(argument-1, argument-2 <, ..., argument-n>)	descriptive	Variance.
+verify	VERIFY(source, excerpt-1 <, ..., excerpt-n>)	character	Position of the first character not in the excerpts.
+week	WEEK(<date <, descriptor>>)	datetime	Week number of the year.
+weekday	WEEKDAY(date)	datetime	Day of the week (1 = Sunday).
+whichc	WHICHC(string, value-1 <, ..., value-n>)	character	Index of the first matching character value.
+whichn	WHICHN(argument, value-1 <, ..., value-n>)	numeric	Index of the first matching numeric value.
+year	YEAR(date)	datetime	Year.
+yrdif	YRDIF(sdate, edate <, basis>)	datetime	Years between two dates under a day-count basis.

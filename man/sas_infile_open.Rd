@@ -25,3 +25,4 @@ record numbers (external files).}
 \description{
 Open an input stream
 }
+\keyword{internal}

@@ -14,3 +14,4 @@ sas_proc_store(work, outs)
 \description{
 Store PROC output data sets in WORK; returns their metadata
 }
+\keyword{internal}

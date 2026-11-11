@@ -9,3 +9,4 @@ sas_cmp_trunc(op, a, b)
 \description{
 Truncated (colon-modified) character comparison, e.g. \verb{s =: 'AB'}
 }
+\keyword{internal}

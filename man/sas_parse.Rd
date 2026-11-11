@@ -11,10 +11,17 @@ sas_parse(code, resolved = FALSE, sql_open = FALSE)
 
 \item{resolved}{\code{TRUE} when the text has already been through the macro
 processor: \code{&}/\verb{\%} left inside double-quoted strings are then plain text.}
+
+\item{sql_open}{Internal: \code{TRUE} when a PROC SQL step is already open
+(statements before QUIT belong to it).}
 }
 \value{
 A \code{sasonr_program}: a list with element \code{steps}.
 }
 \description{
 Parse a SAS program
+}
+\examples{
+p <- sas_parse("data b; set a; if x > 1; run;")
+str(p$steps[[1]]$stmts, max.level = 1)
 }

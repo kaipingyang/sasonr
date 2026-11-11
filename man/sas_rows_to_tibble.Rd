@@ -9,3 +9,4 @@ sas_rows_to_tibble(rows, proto)
 \description{
 Collect PDV rows written by OUTPUT into a tibble
 }
+\keyword{internal}

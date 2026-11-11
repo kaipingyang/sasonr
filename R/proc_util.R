@@ -255,6 +255,7 @@ proc_out_options <- function(d, m, opts, line = NULL) {
 #' @param work The WORK environment.
 #' @param outs Named list of `list(data, meta)`.
 #' @export
+#' @keywords internal
 sas_proc_store <- function(work, outs) {
   meta <- list()
   for (nm in names(outs)) {

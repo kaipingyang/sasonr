@@ -13,3 +13,4 @@ sas_format(x, fmt = NULL)
 Numeric formats return right-justified fields of width \code{w}; character
 formats return left-justified fields (no width: the value unchanged).
 }
+\keyword{internal}

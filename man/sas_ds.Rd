@@ -17,3 +17,4 @@ sas_ds(
 \description{
 Fetch a WORK data set and apply KEEP=/DROP=/RENAME=/FIRSTOBS=/OBS=
 }
+\keyword{internal}

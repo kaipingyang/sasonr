@@ -9,3 +9,4 @@ sas_parse_dt_literal(text, kind)
 \description{
 Convert a date/time/datetime literal body to its SAS numeric value
 }
+\keyword{internal}

@@ -9,3 +9,4 @@ sas_read_file(path)
 \description{
 Read an external text file for INFILE (path relative to the working directory)
 }
+\keyword{internal}

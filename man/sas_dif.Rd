@@ -9,3 +9,4 @@ sas_dif(state, key, value, n = 1L)
 \description{
 DIF for row-wise code
 }
+\keyword{internal}

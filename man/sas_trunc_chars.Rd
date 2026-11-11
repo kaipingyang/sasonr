@@ -9,3 +9,4 @@ sas_trunc_chars(d, lens)
 \description{
 Truncate character columns to PDV lengths (later data sets of SET/MERGE)
 }
+\keyword{internal}

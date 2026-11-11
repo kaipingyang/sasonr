@@ -13,3 +13,4 @@ Integer vector: \code{NA} for non-missing, 0 for \code{._}, 1 for \code{.},
 \description{
 Rank of SAS missing values
 }
+\keyword{internal}

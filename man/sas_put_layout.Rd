@@ -10,3 +10,4 @@ sas_put_layout(pieces)
 Pieces are written into a line buffer at the current column (overwriting);
 list and named output leave one blank after the value. \code{/} starts a new line.
 }
+\keyword{internal}

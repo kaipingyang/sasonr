@@ -302,12 +302,13 @@ freq_num <- function(v) {
   if (abs(v - round(v)) < 1e-9 * max(1, abs(v))) return(sprintf("%.0f", v))
   trimws(sas_fmt_best(v, 8L))
 }
-freq_pct <- function(v) if (is.na(v)) "." else sprintf("%.2f", sas_f_round(v, 0.01))
+freq_pct <- function(v) if (is.na(v)) "." else sprintf("%.2f", display_round(v, 2L))
 
 #' PROC FREQ engine
 #' @param d Input data (after WHERE).
 #' @param sp Specification built by the translator.
 #' @export
+#' @keywords internal
 sas_proc_freq <- function(d, sp) {
   info <- sp$info
   groups <- if (!is.null(sp$by)) proc_by_groups(d, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(d)))
@@ -900,7 +901,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
 freq_stats_listing <- function(st, tab, vars, info, o, sp) {
   out <- character()
   k <- length(vars)
-  f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", sas_f_round(v, 1e-4))
+  f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
   pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
   if (isTRUE(st$oneway_chi) && isTRUE(o$chisq)) {
     out <- c(out, "   Chi-Square Test", "for Equal Proportions", "",

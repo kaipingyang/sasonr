@@ -9,3 +9,4 @@ sas_cmp(a, b)
 \description{
 Three-way SAS comparison (missing sorts lowest)
 }
+\keyword{internal}

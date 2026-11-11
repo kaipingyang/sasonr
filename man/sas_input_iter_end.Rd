@@ -9,3 +9,4 @@ sas_input_iter_end(inf)
 \description{
 End of a DATA step iteration: release a record held by a trailing \code{@}
 }
+\keyword{internal}

@@ -21,3 +21,8 @@ The macro processor runs first; steps are translated in order. Nothing is
 executed, so macro variables created by CALL SYMPUT are not available to
 later macro code (use \code{\link[=sas_run]{sas_run()}} for that).
 }
+\examples{
+tr <- sas_translate("data b; set a; y = round(x, 0.1); run;",
+                    work = list(a = data.frame(x = c(1.25, 2.35))))
+tr
+}

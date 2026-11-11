@@ -11,3 +11,4 @@ sas_num(x, .at = NULL)
 Normalise an arithmetic result: special missing values and overflow
 (infinite results) become the ordinary missing value, as in SAS.
 }
+\keyword{internal}

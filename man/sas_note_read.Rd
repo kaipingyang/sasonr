@@ -9,3 +9,4 @@ sas_note_read(d, name, where = NULL)
 \description{
 Returns \code{d} unchanged.
 }
+\keyword{internal}

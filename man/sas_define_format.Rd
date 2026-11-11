@@ -14,3 +14,4 @@ nested (format spec or NULL)).}
 \description{
 Register a user-defined format or informat in the run-time catalogue
 }
+\keyword{internal}

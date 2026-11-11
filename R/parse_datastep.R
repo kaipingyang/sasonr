@@ -8,7 +8,12 @@
 #' @param code SAS source code, or a token tibble from [sas_lex()].
 #' @param resolved `TRUE` when the text has already been through the macro
 #'   processor: `&`/`%` left inside double-quoted strings are then plain text.
+#' @param sql_open Internal: `TRUE` when a PROC SQL step is already open
+#'   (statements before QUIT belong to it).
 #' @return A `sasonr_program`: a list with element `steps`.
+#' @examples
+#' p <- sas_parse("data b; set a; if x > 1; run;")
+#' str(p$steps[[1]]$stmts, max.level = 1)
 #' @export
 sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
   toks <- if (is.data.frame(code)) code else sas_lex(code)
@@ -300,6 +305,7 @@ parse_statement <- function(p) {
     call = parse_call_stmt(p),
     input = parse_input(p),
     infile = parse_infile(p),
+    file = parse_file(p),
     datalines = ,
     cards = ,
     lines = ,
@@ -1119,6 +1125,40 @@ parse_infile <- function(p) {
   }
   advance(p)
   list(stmt = "infile", source = src, opts = opts, line = line)
+}
+
+# FILE destination [MOD] [LRECL=n];  destination: 'path', fileref, LOG or PRINT.
+parse_file <- function(p) {
+  line <- tk_line(p)
+  advance(p)
+  if (tk_type(p) %in% c("str", "str_macro")) {
+    dest <- list(kind = "path", path = tk_val(p))
+  } else if (tk_type(p) == "name") {
+    nm <- tk_low(p)
+    dest <- if (nm %in% c("log", "print")) list(kind = nm) else list(kind = "fileref", ref = nm)
+  } else {
+    abort_syntax("expected a file specification after FILE", line)
+  }
+  advance(p)
+  opts <- list(mod = FALSE, lrecl = 32767L)
+  while (tk_type(p) != "semi") {
+    if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in FILE statement"), line)
+    o <- tk_low(p)
+    if (o == "mod" && !is_op(p, "=", 1L)) {
+      opts$mod <- TRUE
+      advance(p)
+      next
+    }
+    if (o == "lrecl" && is_op(p, "=", 1L) && tk_type(p, 2L) == "num") {
+      opts$lrecl <- as.integer(tk_val(p, 2L))
+      if (is.na(opts$lrecl) || opts$lrecl < 1L || opts$lrecl > 1073741823L) abort_syntax("invalid LRECL= value", line)
+      advance(p, 3L)
+      next
+    }
+    abort_unsupported(paste0("FILE option ", toupper(o)), line)
+  }
+  advance(p)
+  list(stmt = "file", dest = dest, opts = opts, line = line)
 }
 
 hex_to_str <- function(h, line = NULL) {

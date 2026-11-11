@@ -51,10 +51,12 @@ new_engine <- function(work, level, execute) {
   rt$prx_cache <- list()
   rt_reset()
   rt$notes_on <- TRUE
+  rt$ls <- 132L
   # step-level NOTEs (data set sizes, observations read, missing values...)
   # and macro WARNINGs in the log; options(sasonr.step_notes = FALSE) turns them off
   eng$step_notes <- isTRUE(getOption("sasonr.step_notes", TRUE))
   rt$on_warn <- if (eng$step_notes) function(msg) eng$log <- c(eng$log, paste("WARNING:", msg))
+  rt$on_error <- function(msg) eng$log <- c(eng$log, paste("ERROR:", msg))
   eng$ses$on_put <- function(line) eng$log <- c(eng$log, line)
   eng
 }
@@ -153,6 +155,7 @@ engine_store_numlen <- function(eng, outputs) {
 
 #' Value of a numeric variable after storage with `len` bytes (3-8)
 #' @export
+#' @keywords internal
 sas_num_store <- function(x, len) {
   ok <- !is.na(x)
   if (len >= 8L || !any(ok)) return(x)
@@ -195,6 +198,7 @@ engine_eval <- function(eng, code, stage = FALSE) {
 engine_global <- function(eng, g) {
   if (g$kind == "filename") rt$filerefs[[g$ref]] <- g$path
   if (g$kind == "options") {
+    if (!is.null(g$ls)) rt$ls <- g$ls
     if ("nonotes" %in% g$opts) rt$notes_on <- FALSE
     if ("notes" %in% g$opts) rt$notes_on <- TRUE
   }
@@ -227,6 +231,10 @@ engine_program <- function(eng, code) {
 #' @param work Named list of input data frames available as `WORK` data sets.
 #' @param level `"auto"` (choose L1/L2/L3 per step) or `"L3"` (force row loops).
 #' @return A `sasonr_translation` object; `$steps[[i]]$code` holds the R code.
+#' @examples
+#' tr <- sas_translate("data b; set a; y = round(x, 0.1); run;",
+#'                     work = list(a = data.frame(x = c(1.25, 2.35))))
+#' tr
 #' @export
 sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
   level <- match.arg(level)
@@ -245,6 +253,21 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #' @return A `sasonr_result`: `$log` (PUT and %PUT lines), `$listing` (procedure
 #'   output), `$work` (output data sets with trailing blanks removed),
 #'   `$translation`, `$macro_vars` (global macro variables).
+#' @examples
+#' res <- sas_run("
+#' data class;
+#'   input name $ age;
+#'   length group $ 5;
+#'   if age >= 13 then group = 'teen'; else group = 'child';
+#'   datalines;
+#' Alice 12
+#' Bob 14
+#' ;
+#' run;
+#' proc print data=class; run;
+#' ")
+#' res$work$class
+#' cat(res$listing, sep = "\n")
 #' @export
 sas_run <- function(code, work = list(), level = c("auto", "L3")) {
   level <- match.arg(level)

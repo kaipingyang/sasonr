@@ -9,3 +9,4 @@ sas_arith(a, b, op, .at = NULL, .exact = TRUE)
 \description{
 Arithmetic operators \verb{+ - *} with SAS missing-value semantics and NOTEs
 }
+\keyword{internal}

@@ -9,3 +9,4 @@ sas_put_rows(lines, guards)
 \description{
 Interleave several guarded PUT statements row by row (L1/L2)
 }
+\keyword{internal}

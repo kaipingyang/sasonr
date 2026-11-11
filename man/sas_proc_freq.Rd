@@ -14,3 +14,4 @@ sas_proc_freq(d, sp)
 \description{
 PROC FREQ engine
 }
+\keyword{internal}

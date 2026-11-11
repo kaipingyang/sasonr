@@ -13,6 +13,7 @@ rt$notes <- character()
 rt$catalog <- new.env(parent = emptyenv())
 
 rt$notes_on <- TRUE
+rt$ls <- 132L # log line size (OPTIONS LINESIZE=)
 
 rt_reset <- function() {
   rt$err <- FALSE
@@ -80,6 +81,7 @@ note_math <- function(.at = NULL, n = 1L) {
 #'
 #' Called from generated L3 code after statements that can raise data errors.
 #' @export
+#' @keywords internal
 sas_err_sync <- function(pdv) {
   if (!rt$err && length(rt$notes) == 0) return(pdv)
   env <- parent.frame()
@@ -96,6 +98,7 @@ sas_err_sync <- function(pdv) {
 #' @param vars PDV variable names in order; `names` their display names;
 #'   `fmts` named list of formats.
 #' @export
+#' @keywords internal
 sas_dump_spec <- function(vars, names, fmts = list()) {
   d <- new.env(parent = emptyenv())
   d$vars <- vars
@@ -106,7 +109,10 @@ sas_dump_spec <- function(vars, names, fmts = list()) {
 }
 
 dump_value <- function(v, fmt) {
-  if (is.character(v)) return(sas_rtrim(if (is.null(fmt)) v else sas_format(v, fmt)))
+  if (is.character(v)) {
+    out <- sas_rtrim(if (is.null(fmt)) v else sas_format(v, fmt))
+    return(ifelse(nzchar(out), out, " "))
+  }
   trimws(sas_format(v, fmt))
 }
 
@@ -116,6 +122,7 @@ dump_value <- function(v, fmt) {
 #' in a step) when an INPUT record is current, then
 #' `var=value ... _ERROR_=1 _N_=n`. At most 20 dumps per step (ERRORS=20).
 #' @export
+#' @keywords internal
 sas_iter_dump <- function(pdv, spec, inf = NULL) {
   err <- pdv[["_error_"]]
   if (is.null(err) || !sas_true(err)) return(character())
@@ -127,6 +134,25 @@ sas_iter_dump <- function(pdv, spec, inf = NULL) {
     v <- spec$vars[k]
     paste0(spec$names[k], "=", dump_value(pdv[[v]], spec$fmts[[v]]))
   }, "")
-  c(out, paste(c(vals, paste0("_ERROR_=", dump_value(err, NULL)), paste0("_N_=", dump_value(pdv[["_n_"]], NULL))),
-               collapse = " "))
+  items <- c(vals, paste0("_ERROR_=", dump_value(err, NULL)), paste0("_N_=", dump_value(pdv[["_n_"]], NULL)))
+  c(out, dump_wrap(items, rt$ls %||% 132L))
+}
+
+# Pack `var=value` items into log lines of at most `ls` columns.  An item that
+# is itself wider than the line is cut at the line size and ends the dump (SAS).
+dump_wrap <- function(items, ls) {
+  lines <- character()
+  cur <- ""
+  for (it in items) {
+    if (nzchar(cur) && nchar(cur) + 1L + nchar(it) > ls) {
+      lines <- c(lines, cur)
+      cur <- ""
+    }
+    if (nchar(it) > ls) {
+      if (nzchar(cur)) lines <- c(lines, cur)
+      return(c(lines, substr(it, 1L, ls)))
+    }
+    cur <- if (nzchar(cur)) paste(cur, it) else it
+  }
+  c(lines, cur)
 }

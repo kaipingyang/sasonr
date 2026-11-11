@@ -9,3 +9,4 @@ sas_set_input(dfs, in_vars = NULL, by = NULL, descending = NULL)
 \description{
 Combine the data sets of a SET statement (concatenate, or interleave with BY)
 }
+\keyword{internal}

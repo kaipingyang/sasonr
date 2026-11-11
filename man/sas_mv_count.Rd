@@ -10,7 +10,10 @@ sas_mv_count(.at, ..., .exact = TRUE)
 \item{.at}{\code{c(line, column)} of the operator or function name.}
 
 \item{...}{The operands; rows where any operand is missing are counted.}
+
+\item{.exact}{\code{FALSE} when vectorised code may over-count (the step is re-run row by row).}
 }
 \description{
 Count "missing values were generated" for one operation site
 }
+\keyword{internal}

@@ -15,3 +15,6 @@ A tibble with columns \code{type}, \code{value}, \code{line}, \code{col}.
 \description{
 Tokenize SAS source code
 }
+\examples{
+sas_lex("x = substr(name, 1, 3); /* comment */")
+}

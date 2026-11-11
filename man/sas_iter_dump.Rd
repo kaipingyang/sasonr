@@ -11,3 +11,4 @@ Returns the log lines: the input buffer (with the RULE line the first time
 in a step) when an INPUT record is current, then
 \verb{var=value ... _ERROR_=1 _N_=n}. At most 20 dumps per step (ERRORS=20).
 }
+\keyword{internal}

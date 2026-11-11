@@ -9,3 +9,4 @@ sas_min_op(a, b)
 \description{
 MIN (><) and MAX (<>) operators
 }
+\keyword{internal}

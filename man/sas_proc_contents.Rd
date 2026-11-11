@@ -18,3 +18,4 @@ sas_proc_contents(work, name, m, sp)
 \description{
 PROC CONTENTS listing and OUT= data set
 }
+\keyword{internal}

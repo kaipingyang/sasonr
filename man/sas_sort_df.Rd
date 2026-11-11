@@ -15,3 +15,4 @@ sas_sort_df(
 \description{
 PROC SORT: stable sort (missing values first) with optional NODUPKEY
 }
+\keyword{internal}

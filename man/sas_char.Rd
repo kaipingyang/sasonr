@@ -9,3 +9,4 @@ sas_char(x, len)
 \description{
 Store a value in a character variable of a given length (truncate / pad)
 }
+\keyword{internal}
