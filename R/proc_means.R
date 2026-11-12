@@ -841,6 +841,12 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 means_default_text <- function(v, w) {
   if (v == 0) return("0")
   a <- abs(v)
+  if (a < .Machine$double.xmin) {
+    # SAS's own output of a subnormal statistic is not part of the 155-point
+    # gold and looks broken ("0.00000E-309" for the smallest subnormal); do not
+    # guess.
+    abort_unsupported("PROC MEANS default display of a subnormal statistic value (not verified against SAS; use MAXDEC=)")
+  }
   neg <- v < 0
   sign_txt <- if (neg) "-" else ""
   e_text <- function(a) {
