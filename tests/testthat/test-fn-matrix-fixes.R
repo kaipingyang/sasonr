@@ -37,13 +37,15 @@ test_that("noncentral F: accurate distribution function and quantile", {
   expect_equal(sas_f_finv(0.95, 2, 10, 1), 5.9925880338395423, tolerance = 1e-12)
 })
 
-test_that("PROBT: central t stays, noncentral t fails loud", {
-  # R's pnt stops at an absolute error of about 1e-13: pt(-40, 100, 5) gives
-  # 2.3e-13 where SAS gives 7.5e-88 (spec 04 Q3: noncentral variants fail loud).
+test_that("PROBT: noncentral t agrees with SAS 9.4 (R's pnt stops at 1e-13)", {
+  # SAS probt(2,10,1) = 0.80761156253037503
+  expect_equal(sas_f_probt(2, 10, 1), 0.80761156253037503, tolerance = 1e-12)
+  # R's pt() returns 2.3e-13 here; SAS gives 7.5e-88, so compare the ratio.
+  expect_equal(sas_f_probt(-40, 100, 5) / 7.5280904809890335e-88, 1, tolerance = 1e-11)
+  expect_equal(sas_f_probt(-5, 100, 1) / 7.5915155338165518e-09, 1, tolerance = 1e-12)
   expect_equal(sas_f_probt(2, 10), 0.96330598261462985, tolerance = 1e-15)
   expect_true(is.na(sas_f_probt(2, 10, NA_real_))) # missing nc gives missing
-  expect_error(sas_f_probt(2, 10, 1), class = "sasonr_unsupported")
-  expect_error(run1("x = probt(2, 10, 1);"), class = "sasonr_unsupported")
+  expect_true(is.na(sas_f_probt(2, 0)))            # df must be positive
 })
 
 test_that("zero-length results of STRIP and TRIMN have LENGTHC 0", {

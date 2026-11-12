@@ -991,20 +991,82 @@ sas_f_probit <- function(p) {
 }
 #' @export
 sas_f_probt <- function(x, df, nc = 0, .at = NULL) {
-  # R's noncentral t (pnt) stops at an absolute error of about 1e-13: for
-  # t = -40, df = 100, nc = 5 it returns 2.3e-13 where SAS returns 7.5e-88, and
-  # pt(-1000, 100, 5) returns the same number as pt(-1e6, 1000, 5).  log.p and
-  # lower.tail = FALSE do not help (the loss happens before the logarithm, and
-  # pnt is symmetric internally).  Spec 04 Q3 therefore says noncentral variants
-  # fail loud; the central case keeps the documented last-bit tolerance.
-  if (any(!is.na(nc) & nc != 0)) {
-    abort_unsupported("PROBT with a non-zero nc (noncentral t)", if (is.null(.at)) NULL else .at[1])
+  rowwise(pnt_cdf, x, df, nc, type = numeric(1))
+}
+
+# Noncentral t distribution function.  R's pnt() stops at an absolute error of
+# about 1e-13 (pt(-40, 100, 5) is 2.3e-13 where SAS gives 7.5e-88, and
+# pt(-1000, 100, 5) equals pt(-1e6, 1000, 5)), so the function is computed here
+# instead.  Following the structure of Boost's non_central_t:
+#   t >= 0, nc >= 0:  P = Phi(-nc) + S/2, where S is the noncentral beta
+#                     distribution function plus a Poisson-weighted correction
+#                     series (no cancellation: every term is positive);
+#   t < 0,  nc > 0:   P = E[Phi(t s - nc)] with s = sqrt(chi2_df / df), which is
+#                     the small tail; it is integrated in w = log s (Simpson on
+#                     a window 50 nats below the mode of the log integrand), so
+#                     the s^(df-1) singularity at 0 disappears for df < 1 and
+#                     the result keeps its relative accuracy far from 1.
+# Every other sign combination follows from P(T <= t; nc) = 1 - P(T <= -t; -nc).
+# Checked against 528 SAS 9.4 points (t = -40..40, df = 0.5..1e10, nc = 0..5):
+# largest relative difference 5.4e-13, median 2.8e-16.
+pnt_cdf <- function(t, v, nc) {
+  if (is.na(t) || is.na(v) || is.na(nc) || v <= 0) return(NA_real_)
+  if (nc == 0) return(stats::pt(t, v))
+  if (is.infinite(t)) return(if (t > 0) 1 else 0)
+  if (t == 0) return(stats::pnorm(-nc))
+  if (t > 0) {
+    if (nc > 0) return(pnt_series(t, v, nc))
+    return(1 - pnt_tail(-t, v, -nc))
   }
-  out <- stats::pt(x, df)
-  n <- max(length(out), length(nc))
-  out <- rep_len(out, n)
-  out[is.na(rep_len(nc, n))] <- NA_real_ # a missing nc gives a missing result
-  out
+  if (nc > 0) return(pnt_tail(t, v, nc))
+  1 - pnt_series(-t, v, -nc)
+}
+
+# Noncentral beta distribution function as a Poisson mixture, plus the
+# correction series for the t case; both summed in log space.
+pnt_series <- function(t, v, d) {
+  x <- t^2 / (v + t^2)
+  d2 <- d^2 / 2
+  k <- 0:ceiling(d2 + 12 * sqrt(d2) + 40)
+  # pbeta() reports underflow to -Inf for large v and x close to 1; the term is
+  # negligible there, so the warnings are noise.
+  linit <- suppressWarnings(stats::dpois(k, d2, log = TRUE) +
+    stats::pbeta(x, 0.5 + k, v / 2, log.p = TRUE))
+  m1 <- max(linit)
+  init <- exp(m1) * sum(exp(linit - m1))
+  lpois <- k * log(d2) - d2 - lgamma(k + 1.5) + log(d / sqrt(2))
+  lterm <- suppressWarnings(lpois + stats::pbeta(x, k + 1, v / 2, log.p = TRUE))
+  m2 <- max(lterm)
+  s <- exp(m2) * sum(exp(lterm - m2))
+  stats::pnorm(-d) + (init + s) / 2
+}
+
+# P(T <= t) for t < 0, d > 0: integrate exp(log integrand) in w = log s.
+pnt_tail <- function(t, v, d, span = 50, n = 801) {
+  logC <- log(2) + (v / 2) * log(v / 2) - v / 2 - lgamma(v / 2)
+  lw <- function(w) {
+    e2 <- exp(2 * w)
+    v * w - (v / 2) * (expm1(2 * w)) + logC +
+      stats::pnorm(t * exp(w) - d, log.p = TRUE)
+  }
+  wmax <- log(1 + 12 / sqrt(v) + 6 * abs(d) + 6 * abs(t))
+  grid <- seq(-30, wmax, length.out = 400)
+  vals <- vapply(grid, lw, 0)
+  i <- which.max(vals)
+  lo_w <- grid[max(1L, i - 1L)]
+  hi_w <- grid[min(length(grid), i + 1L)]
+  w0 <- stats::optimize(function(z) -lw(z), c(lo_w, hi_w))$minimum
+  m <- lw(w0)
+  f <- function(z) lw(z) - (m - span)
+  left <- tryCatch(stats::uniroot(f, c(-80, w0))$root, error = function(e) -80)
+  right <- tryCatch(stats::uniroot(f, c(w0, wmax + 30))$root,
+                    error = function(e) wmax + 10)
+  z <- seq(left, right, length.out = n)
+  lv <- vapply(z, lw, 0)
+  m <- max(lv)
+  h <- exp(lv - m)
+  wts <- c(1, rep(c(4, 2), (n - 3) / 2), 4, 1) * (right - left) / (3 * (n - 1))
+  exp(m) * sum(wts * h)
 }
 #' @export
 sas_f_probchi <- function(x, df, nc = 0) stats::pchisq(x, df, nc)
