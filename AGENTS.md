@@ -101,6 +101,7 @@ the verification reports. Clone/pull it before starting work on a feature.
 | `specs/04_functions_formats_rounding.md` | **the value runtime shared by every layer**: functions, formats/informats, rounding, the display engine |
 | `specs/05_clinical_procs.md` | PROC framework and the clinical procedures |
 | `docs/conformance/` | reports: `case_format.md`, `function_verification.md`, `rounding_gold.md`, `semantics_registry.md`, `sasonr_corpus.md` |
+| `docs/sas_reference/` | structured extracts of the official SAS 9.4 manuals: the documented semantics, the rules that are gold-only, and how to fetch the pages |
 | `harness/`, `tools/` | case generators and probe generators |
 | `cases/` | `own/` (TS1M7 gold) and `ts1m2/` (local TS1M2 gold) |
 
