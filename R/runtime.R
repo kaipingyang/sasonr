@@ -471,6 +471,43 @@ sas_f_substr <- function(x, pos, len = NULL, .at = NULL) {
   out
 }
 #' @export
+# Left-hand SUBSTR: replace part of a character variable in place.  An invalid
+# position is a SAS data error (the variable keeps its value); a replacement
+# shorter than the target window is padded with blanks, a longer one is cut to
+# the room that remains.
+sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
+  x <- as_sas_chr(x)
+  value <- as_sas_chr(value)
+  m <- max(length(x), length(pos), length(value), if (is.null(len)) 1L else length(len))
+  x <- rep_len(x, m)
+  value <- rep_len(value, m)
+  pos <- rep_len(trunc(pos), m)
+  n <- nchar(x)
+  bad <- is.na(pos) | pos < 1 | pos > n
+  if (any(bad)) note_invalid_arg("substr", 2L, .at)
+  if (is.null(len)) {
+    fill <- n - pos + 1L
+  } else {
+    len <- rep_len(trunc(len), m)
+    bad_len <- !bad & (is.na(len) | len < 0)
+    if (any(bad_len)) note_invalid_arg("substr", 3L, .at)
+    fill <- ifelse(is.na(len), n - pos + 1L, pmin(len, n - pos + 1L))
+  }
+  fill[bad] <- 0L
+  fill <- pmax(0L, fill)
+  out <- x
+  for (i in seq_len(m)) {
+    if (is.na(fill[i]) || fill[i] <= 0L) next
+    p <- pos[i]
+    rep_txt <- substr(value[i], 1L, fill[i])
+    pad <- fill[i] - nchar(rep_txt)
+    if (pad > 0L) rep_txt <- paste0(rep_txt, strrep(" ", pad))
+    out[i] <- paste0(substr(x[i], 1L, p - 1L), rep_txt, substr(x[i], p + fill[i], n[i]))
+  }
+  out
+}
+
+#' @export
 sas_f_index <- function(x, s) {
   ab <- recycle2(as_sas_chr(x), s)
   out <- mapply(function(a, b) regexpr(b, a, fixed = TRUE)[1], ab[[1]], ab[[2]], USE.NAMES = FALSE)

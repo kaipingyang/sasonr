@@ -496,6 +496,21 @@ an_stmt <- function(s, st) {
         abort_unsupported("sum statement on character values", line)
       }
     },
+    substr_assign = {
+      if (is.null(st$info[[s$var]])) {
+        abort_unsupported(paste0("SUBSTR assignment to an undeclared variable ", toupper(s$var)), line)
+      }
+      if (!identical(var_type(st, s$var), "char")) abort_unsupported("SUBSTR assignment to a numeric variable", line)
+      st$uses <- c(st$uses, s$var)
+      s$pos <- an_expr(s$pos, st)
+      if (!is.null(s$len)) s$len <- an_expr(s$len, st)
+      s$value <- an_expr(s$value, st)
+      if (!identical(expr_type(s$pos, st)$type, "num")) abort_unsupported("SUBSTR position must be numeric", line)
+      if (!is.null(s$len) && !identical(expr_type(s$len, st)$type, "num")) {
+        abort_unsupported("SUBSTR length must be numeric", line)
+      }
+      if (!identical(expr_type(s$value, st)$type, "char")) abort_unsupported("SUBSTR assignment of a numeric value", line)
+    },
     "if" = {
       s$cond <- an_expr(s$cond, st)
       s$then <- an_stmt(s$then, st)

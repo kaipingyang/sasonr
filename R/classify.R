@@ -46,6 +46,7 @@ stmt_exprs <- function(s) {
   switch(s$stmt,
     assign = list(s$target, s$value),
     sum = list(s$target, s$value),
+    substr_assign = list(s$pos, s$len, s$value),
     "if" = list(s$cond),
     subset_if = ,
     where = list(s$cond),
