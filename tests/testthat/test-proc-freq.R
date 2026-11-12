@@ -194,3 +194,17 @@ proc freq data=d; weight cnt; tables resp / binomial(level='Yes' p=0.3 cl=(wald 
   expect_true(any(grepl("^Wald 0\\.1799 0\\.4701$", lst)))
   expect_true(any(grepl("^Wilson ", lst)))
 })
+test_that("PROC FREQ EXPECTED / DEVIATION / CELLCHI2 add the crosstab cell rows", {
+  res <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq expected deviation cellchi2; weight n; run;"))
+  l <- squish(res$listing)
+  expect_true(any(grepl("^Expected", l)))
+  expect_true(any(grepl("^Deviation", l)))
+  expect_true(any(grepl("^Cell Chi-Square", l)))
+  # fixture totals: A row 32, N column 33, 61 observations -> A/N expected
+  # 17.311, deviation -4.311 (BEST6 in the crosstab)
+  expect_true(any(grepl("17\\.311", l)))
+  expect_true(any(grepl("-4\\.311", l)))
+  # the plain crosstab still has no Expected row
+  res2 <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq; weight n; run;"))
+  expect_false(any(grepl("^Expected", squish(res2$listing))))
+})
