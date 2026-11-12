@@ -7,23 +7,16 @@ freq_table_opts <- c("list", "missing", "missprint", "nocum", "nopercent", "noro
 freq_output_kw <- c("n", "nmiss", "pchi", "lrchi", "ajchi", "mhchi", "chisq", "phi", "contgy", "cramv", "cmh",
                     "cmh1", "cmh2", "cmhcor", "cmhrms", "cmhga", "binomial", "bin")
 
+# Every statistic request (TABLES options, EXACT, OUTPUT keywords) goes
+# through the PROC statistics registry (inst/registry/proc_stats.csv, rows with
+# proc FREQ; proc_stat_check(), the same strict gate as every other PROC
 #
-# statistic request (TABLES options, EXACT, OUTPUT keywords) fails loud until
 #
-# option `sasonr.freq_unsupported_stats = TRUE` opens the gate for development
-# and for the package's own reference-computation tests only.
 #
-# FISHER (2x2 and RxC) and EXACT FISHER -- values within 1e-12 of SAS and the
-# listing line for line.  BINOMIAL and CMH values agree too, but their
-# listings (and CMH's common odds ratio / Breslow-Day tables) do not yet.
-#
-# (inst/registry/proc_stats.csv, rows with proc FREQ).
 freq_stat_gate <- function(k, line) {
   k <- tolower(k)
   if (k == "bin") k <- "binomial"
-  if (!identical(proc_stat_status("FREQ", k), "supported") && !isTRUE(getOption("sasonr.freq_unsupported_stats"))) {
-    abort_unsupported(paste0("PROC FREQ statistic ", toupper(k), " (not yet supported)"), line)
-  }
+  proc_stat_check("FREQ", k, line)
   invisible(k)
 }
 
