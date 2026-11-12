@@ -202,6 +202,7 @@ mac_sysfunc <- function(text, line = NULL) {
   }
   spec <- sysfunc_table[[fname]] %||% sysfunc_spec_from_registry(fname)
   if (is.null(spec)) abort_unsupported(paste0("%SYSFUNC(", toupper(fname), ")"), line)
+  feature_check("function", fname, line)
   args <- if (nzchar(trimws(inner))) mq_split_commas(inner) else character()
   args <- mq_unmask(args)
   if (!fname %in% sysfunc_ws_significant) args <- trimws(args)
