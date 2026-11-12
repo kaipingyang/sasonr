@@ -356,8 +356,23 @@ sas_run <- function(code, work = list(), level = c("auto", "L3"),
   eng$on_error <- on_error
   eng$status <- "ok"
   on.exit(sql_duck_close(eng), add = TRUE)
-  engine_program(eng, code)
+  if (on_error == "sas") {
+    # step ERRORs are handled by engine_exec(); a condition that reaches this
+    # level was raised by the macro processor, whose SAS error handling
+    # (ERROR text, stopping the macro, what %LET receives) is not implemented
+    tryCatch(engine_program(eng, code),
+             sasonr_syntax_error = function(e) macro_error_unsupported(e),
+             sasonr_runtime_error = function(e) macro_error_unsupported(e))
+  } else {
+    engine_program(eng, code)
+  }
   engine_result(eng)
+}
+
+macro_error_unsupported <- function(e) {
+  msg <- sub("^(Syntax error|Runtime error): ", "", conditionMessage(e))
+  rlang::abort(paste0("Unsupported: macro-time error handling (", msg, ")"),
+               class = c("sasonr_unsupported", "sasonr_error"), sas_line = e$sas_line)
 }
 
 # sas_run(code, on_error = "abort") that keeps what ran before an error:

@@ -766,6 +766,9 @@ sql_peek_infix <- function(p) {
   switch(low,
     or = infix("binary", "or", 1L),
     and = infix("binary", "and", 2L),
+    # the MIN / MAX word operators (a min b) are accepted by PROC SQL, not implemented
+    min = ,
+    max = abort_unsupported(paste0("the ", toupper(low), " operator in PROC SQL"), tk_line(p)),
     NULL
   )
 }

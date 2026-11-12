@@ -137,7 +137,13 @@ peek_infix <- function(p) {
   }
   if (t != "name") return(NULL)
   low <- tk_low(p)
-  if (low %in% names(mnemonic_cmp)) return(infix("cmp", mnemonic_cmp[[low]], 3L))
+  if (low %in% names(mnemonic_cmp)) {
+    # GE: / EQ: ... the colon modifier on a mnemonic operator (prefix compare)
+    if (tk_type(p, 1L) == "op" && identical(tk_val(p, 1L), ":")) {
+      return(infix("cmp", paste0(mnemonic_cmp[[low]], ":"), 3L, ntok = 2L))
+    }
+    return(infix("cmp", mnemonic_cmp[[low]], 3L))
+  }
   switch(low,
     or = infix("binary", "or", 1L),
     and = infix("binary", "and", 2L),
@@ -448,6 +454,24 @@ parse_constant <- function(p, what = "constant") {
 }
 
 parse_in_list <- function(p, lhs, negate, line) {
+  # x IN arrayname searches the elements of an array (not implemented); a
+  # name that is not an array is a SAS syntax error, which needs the symbol table
+  if (tk_type(p) == "name" || (is_op(p, ":") && tk_type(p, 1L) == "name")) {
+    abort_unsupported("IN with an array name as the right operand", line)
+  }
+  if (is_op(p, ":")) {
+    # IN: compares prefixes, as =: does: x in: (a, b) is (x =: a) or (x =: b)
+    advance(p)
+    if (!lhs$node %in% c("var", "str", "num")) abort_unsupported("IN: with an operand other than a variable or a constant", line)
+    e <- parse_in_list(p, lhs, FALSE, line)
+    cmp <- lapply(e$items, function(it) {
+      if (!it$node %in% c("str", "num")) abort_unsupported("IN: with a value range or a non-constant item", line)
+      list(node = "compare", op = "=", colon = TRUE, lhs = lhs, rhs = it, line = line)
+    })
+    if (length(cmp) == 0) abort_unsupported("IN: with an empty list", line)
+    out <- Reduce(function(a, b) list(node = "binary", op = "or", lhs = a, rhs = b, line = line), cmp)
+    return(if (negate) list(node = "unary", op = "not", arg = out, line = line) else out)
+  }
   expect_type(p, "lparen", "'(' after IN")
   items <- list()
   repeat {

@@ -226,6 +226,20 @@ sas_lex <- function(text) {
       }
       next
     }
+    # Hexadecimal numeric constants: a digit, hexadecimal digits, then X (0FX = 15)
+    if (is_digit(c)) {
+      is_hex <- function(c) is_digit(c) | (c >= 65L & c <= 70L) | (c >= 97L & c <= 102L)
+      k <- i
+      while (k <= n && is_hex(cp[k])) k <- k + 1L
+      if (at(k) %in% c(88L, 120L) && !is_name_char(at(k + 1L))) {
+        hx <- substr_cp(i, k - 1L)
+        if (nchar(hx) > 13L) abort_unsupported(paste0("hexadecimal constant ", hx, "x with more than 13 digits"), line_of[i])
+        v <- Reduce(function(a, d) a * 16 + d, strtoi(strsplit(hx, "")[[1]], 16L), 0)
+        emit("num", format(v, scientific = FALSE), i)
+        i <- k + 1L
+        next
+      }
+    }
     # Numbers: 12, 1.5, .5, 1e3, 10.
     if (is_digit(c) || (c == 46L && is_digit(nx))) {
       k <- i
