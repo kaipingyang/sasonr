@@ -195,8 +195,9 @@ freq_parse_cl_types <- function(p, line, what) {
   unique(out)
 }
 
-# RELRISK <( relrisk-options )>: CL= and COLUMN= are implemented; the tests
+# RELRISK <( relrisk-options )>: CL= and COLUMN=1 are implemented; COLUMN=2,
 #
+# and fail loud.
 parse_freq_relrisk_opts <- function(p, line) {
   opts <- list(cl = NULL, column = 1L, printall = FALSE)
   expect_type(p, "lparen", "'(' after RELRISK")
@@ -233,8 +234,9 @@ parse_freq_relrisk_opts <- function(p, line) {
   opts
 }
 
-# RISKDIFF <( riskdiff-options )>: CL=, COLUMN= and CORRECT are implemented;
+# RISKDIFF <( riskdiff-options )>: CL= and COLUMN=1 are implemented; COLUMN=2,
 #
+# fail loud.
 parse_freq_riskdiff_opts <- function(p, line) {
   opts <- list(cl = NULL, column = 1L, correct = FALSE, norisks = FALSE)
   expect_type(p, "lparen", "'(' after RISKDIFF")
@@ -1391,7 +1393,9 @@ freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
   if (isTRUE(o$riskdiff)) {
     rd <- o$riskdiff_opts %||% list()
     column <- rd$column %||% 1L
-    if (!column %in% c(1L, 2L)) abort_unsupported(paste0("RISKDIFF COLUMN=", column))
+    #
+    # column 2 estimates and is not implemented yet, so fail loud
+    if (!identical(as.integer(column), 1L)) abort_unsupported(paste0("RISKDIFF COLUMN=", column))
     if (isTRUE(rd$correct)) abort_unsupported("RISKDIFF option CORRECT")
     if (exact_rd) {
       if (any(abs(c(tb, n1, n2) - round(c(tb, n1, n2))) > 1e-9)) {
@@ -1440,7 +1444,9 @@ freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
   if (isTRUE(o$relrisk)) {
     rel <- o$relrisk_opts %||% list()
     column <- rel$column %||% 1L
-    if (!column %in% c(1L, 2L)) abort_unsupported(paste0("RELRISK COLUMN=", column))
+    #
+    # column 2 relative risk and is not implemented yet, so fail loud
+    if (!identical(as.integer(column), 1L)) abort_unsupported(paste0("RELRISK COLUMN=", column))
     a <- tb[1, 1]
     b <- tb[1, 2]
     cc <- tb[2, 1]
