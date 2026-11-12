@@ -98,6 +98,42 @@ data m; merge a b; by k; run;"
   expect_equal(res$work$m$y, 2)
 })
 
+test_that("MERGE walks observations when both inputs repeat a BY group", {
+  # Verified against SAS 9.4: a many-to-many MERGE pairs the two inputs
+  # observation by observation (the shorter input falls back to missing) and a
+  # common non-BY variable keeps the value from the last data set named.
+  code <- "data a; input k x; datalines;
+1 10
+1 11
+2 20
+;
+run;
+data b; input k y; datalines;
+1 100
+1 101
+2 200
+;
+run;
+data m; merge a b; by k; run;
+data c; input k v; datalines;
+1 10
+1 11
+;
+run;
+data d; input k v; datalines;
+1 100
+1 101
+;
+run;
+data m2; merge c d; by k; run;"
+  res <- sas_run(code)
+  expect_equal(res$work$m$k, c(1, 1, 2))
+  expect_equal(res$work$m$x, c(10, 11, 20))
+  expect_equal(res$work$m$y, c(100, 101, 200))
+  expect_equal(res$work$m2$k, c(1, 1))
+  expect_equal(res$work$m2$v, c(100, 101))
+})
+
 test_that("RENAME statement applies before output DROP=; data set WHERE= beats WHERE", {
   code <- "data s; input lane weight; datalines;\n1 410\n3 630\n;\nrun;
 data r(drop=kg); set s; rename weight=kg; run;
