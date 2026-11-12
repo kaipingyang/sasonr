@@ -11,10 +11,12 @@
 #     MEAN = fma(n, c0, Sd) / n
 #     CSS  = fma(-Sd, Sd / n, Sdd),  VAR = CSS / (n - 1),  STD = sqrt(VAR)
 #     USS  = fma(c0, fma(n, c0, 2 * Sd), Sdd)
-# * PROC MEANS: MEAN = SUM / n; USS = fma(SUM, MEAN, CSS); VAR, STD, STDERR and
-#   CV follow from CSS.  The CSS accumulation itself is not reproduced exactly
-#   (about 88 % of random groups), so the CSS family is `approximate` in the
-#   PROC statistics registry.
+# * PROC MEANS: MEAN = SUM / n; the corrected sum of squares is accumulated as
+#   the shifted sums sd = sum(x - c0), sdd = sum((x - c0)^2) about the first
+#   value c0 and finalised with the reported (rounded) mean;
+#   USS = CSS + SUM * MEAN; VAR = CSS / (n - 1); STDERR = sqrt(VAR / n);
+#   CV = 100 * STD / MEAN.  The exact finalisation and the constant-data fuzz
+#   of STD are reproduced in stats_means_css() / stats_means_std() below.
 # The fused multiply-add is emulated exactly in double arithmetic (Dekker's
 # product and Boldo-Melquiond rounding to odd); it is exact when no partial
 # product overflows or underflows, which the callers guarantee by the range
@@ -109,6 +111,47 @@ stats_shift_sums <- function(x) {
   c0 <- x[1]
   d <- x - c0
   list(n = n, c0 = c0, sum = stats_seq_sum(x), sd = stats_seq_sum(d), sdd = stats_seq_sum(d * d))
+}
+
+# PROC MEANS corrected sum of squares of one cell, as SAS 9.4 computes it.
+#
+# SAS accumulates, in observation order and about the first value c0, the
+# shifted sums sd = sum(x - c0) and sdd = sum((x - c0)^2); at the end it has the
+# mean = sum / n and
+#
+#   md  = mean - c0
+#   CSS = sdd                            if |md| <= 1E-14 * |mean|
+#       = sdd - md * (2 * sd - n * md)   otherwise
+#
+# The first form is not a rounding detail: for data that are constant to within
+# 1E-14 relative SAS returns the *uncorrected* sum of squares (the mean is taken
+# to be the first value).  The second form is sum((x - mean)^2) written in the
+# shifted sums with the reported, rounded mean; its rounding differs from both
+# sum(x - c0)^2 - sd^2/n and sum((x - mean)^2) in the last bits.
+#
+# Verified bit for bit on ~3,300 SAS 9.4 groups (tests/conformance/proc_stats/:
+# the means/sql moment probes plus probes of dyadic deviations, translations by
+# powers of two, magnitude ladders 1E-8..1E8, constants, outliers and missing
+# values; see the proc_stats registry row for CSS).
+stats_means_css <- function(x) {
+  n <- length(x)
+  if (n == 0L) return(NA_real_)
+  c0 <- x[1L]
+  mean <- stats_seq_sum(x) / n
+  d <- x - c0
+  sd <- stats_seq_sum(d)
+  sdd <- stats_seq_sum(d * d)
+  md <- mean - c0
+  if (abs(md) <= 1e-14 * abs(mean)) sdd else sdd - md * (2 * sd - n * md)
+}
+
+# PROC MEANS standard deviation: sqrt(VAR) except for constant data, where SAS
+# fuzzes the result to 0.  The fuzz is on the deviation from the mean: SAS
+# returns 0 when VAR <= 2^-86 * MEAN^2, i.e. when STD <= 2^-43 * |MEAN|.
+stats_means_std <- function(var, mean) {
+  if (is.na(var)) return(NA_real_)
+  std <- sqrt(var)
+  if (!is.na(mean) && is.finite(mean) && std <= 2^-43 * abs(mean)) 0 else std
 }
 
 # PROC SQL moment statistics of one group (non-missing values in order).

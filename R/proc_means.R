@@ -511,26 +511,25 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
   val$sumwgt <- if (n > 0) sw else NA_real_
   if (n > 0) {
     plain <- is.null(w) && all(fv == 1)
-    # SUM: sequential double additions in observation order; MEAN = SUM / n
-    # (bit-identical to SAS 9.4).  CSS: shifted sums with a fused multiply-add,
-    # the closest form found (approximate, gated by the PROC statistics
-    # registry); USS = fma(SUM, MEAN, CSS) as SAS derives it.
+    # SUM: sequential double additions in observation order; MEAN = SUM / n;
+    # CSS: shifted sums finalised the way SAS 9.4 does it (stats_means_css);
+    # USS = CSS + SUM * MEAN; VAR = CSS / (n - 1); STD = sqrt(VAR) with SAS's
+    # constant-data fuzz; STDERR = sqrt(VAR / n).  All bit-identical to SAS.
     val$sum <- if (plain) stats_seq_sum(xv) else sum(wf * xv)
     val$min <- min(xv)
     val$max <- max(xv)
     val$range <- val$max - val$min
     val$mean <- if (sw > 0) val$sum / sw else NA_real_
-    if (plain && stats_fma_range_ok(xv)) {
-      sh <- stats_shift_sums(xv)
-      val$css <- stats_fma(-sh$sd, sh$sd / n, sh$sdd)
-      val$uss <- stats_fma(val$sum, val$mean, val$css)
+    if (plain) {
+      val$css <- stats_means_css(xv)
+      val$uss <- val$css + val$sum * val$mean
     } else {
       val$uss <- sum(wf * xv^2)
       val$css <- if (!is.na(val$mean)) sum(wf * (xv - val$mean)^2) else NA_real_
     }
     div <- switch(sp$vardef, df = n - 1, n = n, wdf = sw - 1, weight = sw)
     val$var <- if (div > 0 && !is.na(val$css)) val$css / div else NA_real_
-    val$std <- sqrt(val$var)
+    val$std <- if (plain) stats_means_std(val$var, val$mean) else sqrt(val$var)
     val$cv <- if (!is.na(val$std) && !is.na(val$mean) && val$mean != 0) 100 * val$std / val$mean else NA_real_
     if (sp$vardef == "df" && n > 1 && !is.na(val$var) && sw > 0) {
       val$stderr <- sqrt(val$var / sw)
