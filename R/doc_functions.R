@@ -504,7 +504,7 @@ NULL
 #' @param r Number of chosen elements, an integer from 0 to `n`. Missing gives missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: approximate (29 of 30 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 2.3e-13; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (108 of 330 SAS 9.4 cases agree bit for bit; 222 case(s) differ in the last bits (largest relative difference 2.3e-13; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_comb.R
 #' @family numeric functions
 #' @name sas_f_comb
@@ -589,7 +589,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (337 of 419 SAS 9.4 cases agree bit for bit; 82 case(s) differ in the last bits (largest relative difference -Inf; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_cosh.R
 #' @family numeric functions
 #' @name sas_f_cosh
@@ -824,7 +824,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (620 of 621 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference -Inf; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_exp.R
 #' @family numeric functions
 #' @name sas_f_exp
@@ -982,7 +982,7 @@ NULL
 #' @param ... One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: approximate (30 of 36 SAS 9.4 cases agree bit for bit; 2 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (624 of 636 SAS 9.4 cases agree bit for bit; 8 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_geomean.R
 #' @family descriptive functions
 #' @name sas_f_geomean
@@ -995,7 +995,7 @@ NULL
 #' @param ... One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: partial (31 of 35 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (331 of 335 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_harmean.R
 #' @family descriptive functions
 #' @name sas_f_harmean
@@ -1364,7 +1364,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: approximate (16 of 17 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 9.1e-15; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (617 of 617 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_log.R
 #' @family numeric functions
 #' @name sas_f_log
@@ -1378,7 +1378,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (580 of 618 SAS 9.4 cases agree bit for bit; 38 case(s) differ in the last bits (largest relative difference -Inf; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_log10.R
 #' @family numeric functions
 #' @name sas_f_log10
@@ -1392,7 +1392,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (618 of 618 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_log2.R
 #' @family numeric functions
 #' @name sas_f_log2
@@ -1421,7 +1421,7 @@ NULL
 #' @param ... Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: approximate (24 of 39 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (25 of 39 SAS 9.4 cases agree bit for bit; 9 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_logcdf.R
 #' @family probability functions
 #' @name sas_f_logcdf
@@ -1451,7 +1451,7 @@ NULL
 #' @param ... Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: approximate (22 of 32 SAS 9.4 cases agree bit for bit; 6 case(s) differ in the last bits (largest relative difference 1.4e-15; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (23 of 32 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 1.4e-15; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_logsdf.R
 #' @family probability functions
 #' @name sas_f_logsdf
@@ -1573,7 +1573,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: approximate (37 of 38 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.0e-13; different algorithm)). Contexts where every case agrees: sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (203 of 638 SAS 9.4 cases agree bit for bit; 435 case(s) fail loud (sasonr_unsupported)). Verified domain: arguments that are multiples of 2**-10 below 2**53 in magnitude (the remainder is exact), or a remainder that the 1E-12 fuzz sets to 0; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_mod.R
 #' @family numeric functions
 #' @name sas_f_mod
@@ -1588,7 +1588,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: approximate (27 of 28 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.0e-13; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (614 of 628 SAS 9.4 cases agree bit for bit; 14 case(s) fail loud (sasonr_unsupported)). Verified domain: argument magnitudes 0 or 1E-140..1E140, and a / b not an integer unless the remainder is exactly 0; other inputs fail loud (`sasonr_unsupported`). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_modz.R
 #' @family numeric functions
 #' @name sas_f_modz
@@ -1796,7 +1796,7 @@ NULL
 #' @param r Optional number of elements arranged, an integer from 0 to `n`; when omitted the result is n!.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: partial (28 of 31 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (232 of 331 SAS 9.4 cases agree bit for bit; 96 case(s) differ in the last bits (largest relative difference -Inf; different algorithm); 3 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_perm.R
 #' @family numeric functions
 #' @name sas_f_perm
@@ -2241,7 +2241,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: approximate (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.2e-16; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (356 of 419 SAS 9.4 cases agree bit for bit; 63 case(s) differ in the last bits (largest relative difference 1.2e-16; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_sinh.R
 #' @family numeric functions
 #' @name sas_f_sinh
@@ -2356,7 +2356,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (618 of 618 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_sqrt.R
 #' @family numeric functions
 #' @name sas_f_sqrt
@@ -2482,7 +2482,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (408 of 418 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits (largest relative difference -Inf; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_tanh.R
 #' @family numeric functions
 #' @name sas_f_tanh
@@ -2740,7 +2740,7 @@ NULL
 #' @param basis Optional basis: 'AGE' (default) gives the age in completed years plus a fraction; 'ACT/ACT' divides actual days in each calendar year by 365 or 366; '30/360' uses 30-day months and 360-day years; 'ACT/360' and 'ACT/365' divide actual days by 360 or 365.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: approximate (48 of 51 SAS 9.4 cases agree bit for bit; 3 case(s) differ in the last bits (largest relative difference 4.3e-15; different algorithm)). Contexts where every case agrees: sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (928 of 1551 SAS 9.4 cases agree bit for bit; 623 case(s) fail loud (sasonr_unsupported)). Verified domain: bases 30/360, ACT/365 and ACT/360; AGE only for dates a whole number of years apart; ACT/ACT only within one calendar year or between two 1 January dates; other inputs fail loud (`sasonr_unsupported`). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_yrdif.R
 #' @family datetime functions
 #' @name sas_f_yrdif

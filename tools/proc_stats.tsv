@@ -1,0 +1,77 @@
+# PROC statistics registry specification (tools/update_proc_registry.R builds inst/registry/proc_stats.csv)
+# evidence: case|dataset|column (bit-for-bit column comparison) or case (the whole case must pass); ';'-separated
+proc	statistic	condition	evidence	domain	note
+MEANS	N	default	proc_stats/means_moments_probe|m_sort|n;proc_stats/means_moments_probe|m_rev|n;proc_stats/means_moments_probe|m_class|n;proc_stats/sql_order_probe|m_sort|n;proc_stats/sql_order_probe|m_copy|n;proc_stats/minmax_probe|m_mm|n		
+MEANS	NMISS	default	proc_stats/sql_order_probe|m_sort|nm;proc_stats/sql_order_probe|m_copy|nm;proc_stats/minmax_probe|m_mm|nm		
+MEANS	SUM	default	proc_stats/means_moments_probe|m_sort|s;proc_stats/means_moments_probe|m_rev|s;proc_stats/means_moments_probe|m_class|s;proc_stats/sql_order_probe|m_sort|s;proc_stats/sql_order_probe|m_copy|s		
+MEANS	MEAN	default	proc_stats/means_moments_probe|m_sort|m;proc_stats/means_moments_probe|m_rev|m;proc_stats/means_moments_probe|m_class|m;proc_stats/sql_order_probe|m_sort|m;proc_stats/sql_order_probe|m_copy|m		
+MEANS	STD	default	proc_stats/means_moments_probe|m_sort|sd;proc_stats/means_moments_probe|m_rev|sd;proc_stats/means_moments_probe|m_class|sd;proc_stats/sql_order_probe|m_sort|sd;proc_stats/sql_order_probe|m_copy|sd		
+MEANS	VAR	default	proc_stats/means_moments_probe|m_sort|v;proc_stats/means_moments_probe|m_rev|v;proc_stats/means_moments_probe|m_class|v		
+MEANS	CSS	default	proc_stats/means_moments_probe|m_sort|css;proc_stats/means_moments_probe|m_rev|css;proc_stats/means_moments_probe|m_class|css;proc_stats/sql_order_probe|m_sort|css;proc_stats/sql_order_probe|m_copy|css		
+MEANS	USS	default	proc_stats/means_moments_probe|m_sort|uss;proc_stats/means_moments_probe|m_rev|uss;proc_stats/means_moments_probe|m_class|uss;proc_stats/sql_order_probe|m_sort|uss;proc_stats/sql_order_probe|m_copy|uss		
+MEANS	STDERR	default	proc_stats/means_moments_probe|m_sort|se;proc_stats/means_moments_probe|m_rev|se;proc_stats/means_moments_probe|m_class|se		
+MEANS	CV	default	proc_stats/means_moments_probe|m_sort|cv;proc_stats/means_moments_probe|m_rev|cv;proc_stats/means_moments_probe|m_class|cv		
+MEANS	SKEWNESS	default	proc_stats/means_moments_probe|m_sort|sk;proc_stats/means_moments_probe|m_rev|sk;proc_stats/means_moments_probe|m_class|sk		
+MEANS	KURTOSIS	default	proc_stats/means_moments_probe|m_sort|ku;proc_stats/means_moments_probe|m_rev|ku;proc_stats/means_moments_probe|m_class|ku		
+MEANS	MIN	default	proc_stats/minmax_probe|m_mm|mn		
+MEANS	MAX	default	proc_stats/minmax_probe|m_mm|mx		
+MEANS	RANGE	default	proc_stats/minmax_probe|m_mm|rg		
+MEANS	SUMWGT	default	proc_stats/minmax_probe|m_mm|sw		
+MEANS	MEDIAN	default	proc_stats/quantiles_probe|m_q|med	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P50	default	proc_stats/quantiles_probe|m_q|p50	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	Q1	default	proc_stats/quantiles_probe|m_q|q1	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P25	default	proc_stats/quantiles_probe|m_q|p25	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	Q3	default	proc_stats/quantiles_probe|m_q|q3	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P75	default	proc_stats/quantiles_probe|m_q|p75	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	QRANGE	default	proc_stats/quantiles_probe|m_q|qr	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P1	default	proc_stats/quantiles_probe|m_q|p1	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P5	default	proc_stats/quantiles_probe|m_q|p5	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P10	default	proc_stats/quantiles_probe|m_q|p10	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P90	default	proc_stats/quantiles_probe|m_q|p90	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P95	default	proc_stats/quantiles_probe|m_q|p95	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P99	default	proc_stats/quantiles_probe|m_q|p99	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	MODE	default	proc_stats/quantiles_probe|m_q|mode	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+MEANS	P20	default			
+MEANS	P30	default			
+MEANS	P40	default			
+MEANS	P60	default			
+MEANS	P70	default			
+MEANS	P80	default			
+MEANS	T	default			
+MEANS	PRT	default			
+MEANS	LCLM	default			
+MEANS	UCLM	default			
+MEANS	*	weight			
+MEANS	*	freq			
+MEANS	*	vardef			
+MEANS	*	qntldef			
+SQL	N	default	proc_stats/sql_moments_probe|q_sort|n;proc_stats/sql_moments_probe|q_rev|n;proc_stats/sql_moments_probe|q_all|n;proc_stats/sql_order_probe|q_sort|n;proc_stats/sql_order_probe|q_where|n;proc_stats/sql_order_probe|q_all|n;proc_stats/sql_order_probe|q_allw|n;proc_stats/minmax_probe|q_mm|n;proc_stats/minmax_probe|q_mm|nall		
+SQL	NMISS	default	proc_stats/sql_order_probe|q_sort|nm;proc_stats/sql_order_probe|q_where|nm;proc_stats/sql_order_probe|q_all|nm;proc_stats/sql_order_probe|q_allw|nm;proc_stats/minmax_probe|q_mm|nm		
+SQL	SUM	default	proc_stats/sql_moments_probe|q_sort|s;proc_stats/sql_moments_probe|q_rev|s;proc_stats/sql_moments_probe|q_all|s;proc_stats/sql_order_probe|q_sort|s;proc_stats/sql_order_probe|q_where|s;proc_stats/sql_order_probe|q_all|s;proc_stats/sql_order_probe|q_allw|s	rows read in a known order: no GROUP BY, or GROUP BY on a data set flagged as sorted by the group columns (PROC SORT); otherwise (unsorted data, joins, views, DISTINCT) only integer values with exact sums	
+SQL	MEAN	default	proc_stats/sql_moments_probe|q_sort|m;proc_stats/sql_moments_probe|q_rev|m;proc_stats/sql_moments_probe|q_all|m;proc_stats/sql_order_probe|q_sort|m;proc_stats/sql_order_probe|q_where|m;proc_stats/sql_order_probe|q_all|m;proc_stats/sql_order_probe|q_allw|m	rows read in a known order: no GROUP BY, or GROUP BY on a data set flagged as sorted by the group columns (PROC SORT); otherwise (unsorted data, joins, views, DISTINCT) only integer values with exact sums	AVG is the same statistic
+SQL	USS	default	proc_stats/sql_moments_probe|q_sort|uss;proc_stats/sql_moments_probe|q_rev|uss;proc_stats/sql_moments_probe|q_all|uss;proc_stats/sql_order_probe|q_sort|uss;proc_stats/sql_order_probe|q_where|uss;proc_stats/sql_order_probe|q_all|uss;proc_stats/sql_order_probe|q_allw|uss	rows read in a known order: no GROUP BY, or GROUP BY on a data set flagged as sorted by the group columns (PROC SORT); otherwise (unsorted data, joins, views, DISTINCT) only integer values with exact sums	
+SQL	CSS	default	proc_stats/sql_moments_probe|q_sort|css;proc_stats/sql_moments_probe|q_rev|css;proc_stats/sql_moments_probe|q_all|css;proc_stats/sql_order_probe|q_sort|css;proc_stats/sql_order_probe|q_where|css;proc_stats/sql_order_probe|q_all|css;proc_stats/sql_order_probe|q_allw|css	rows read in a known order: no GROUP BY, or GROUP BY on a data set flagged as sorted by the group columns (PROC SORT); values within 1E-140..1E140 in magnitude	
+SQL	VAR	default	proc_stats/sql_moments_probe|q_sort|v;proc_stats/sql_moments_probe|q_rev|v;proc_stats/sql_moments_probe|q_all|v	rows read in a known order: no GROUP BY, or GROUP BY on a data set flagged as sorted by the group columns (PROC SORT); values within 1E-140..1E140 in magnitude	
+SQL	STD	default	proc_stats/sql_moments_probe|q_sort|sd;proc_stats/sql_moments_probe|q_rev|sd;proc_stats/sql_moments_probe|q_all|sd;proc_stats/sql_order_probe|q_sort|sd;proc_stats/sql_order_probe|q_where|sd;proc_stats/sql_order_probe|q_all|sd;proc_stats/sql_order_probe|q_allw|sd	rows read in a known order: no GROUP BY, or GROUP BY on a data set flagged as sorted by the group columns (PROC SORT); values within 1E-140..1E140 in magnitude	
+SQL	STDERR	default	proc_stats/sql_moments_probe|q_sort|se;proc_stats/sql_moments_probe|q_rev|se;proc_stats/sql_moments_probe|q_all|se		
+SQL	CV	default	proc_stats/sql_moments_probe|q_sort|cv;proc_stats/sql_moments_probe|q_rev|cv;proc_stats/sql_moments_probe|q_all|cv		
+SQL	MIN	default	proc_stats/minmax_probe|q_mm|mn		
+SQL	MAX	default	proc_stats/minmax_probe|q_mm|mx		
+SQL	RANGE	default	proc_stats/minmax_probe|q_mm|rg		
+SQL	SUMWGT	default	proc_stats/minmax_probe|q_mm|sw		
+SQL	MEDIAN	default	proc_stats/quantiles_probe|q_med|med	results of 0 from data that contain both 0 and -0 fail loud (which zero SAS returns is not determined)	
+SQL	T	default			
+SQL	PRT	default			
+FREQ	CHISQ	default	freq_stats/c01_w22_chisq;freq_stats/c10_s22_chisq;freq_stats/c14_l22_chisq;freq_stats/c23_w23_chisq;freq_stats/c27_w34_chisq;freq_stats/c47_oneway_chisq;freq_stats/c50_oneway_small;freq_stats/c33_multi_tables		
+FREQ	FISHER	default	freq_stats/c02_w22_fisher;freq_stats/c11_s22_fisher;freq_stats/c24_w23_fisher;freq_stats/c28_w34_fisher;freq_stats/c30_w34s_fisher		
+FREQ	EXACT_FISHER	default	freq_stats/c07_w22_exact_fisher;freq_stats/c15_l22_fisher_exact;freq_stats/c26_w23_exact_fisher		EXACT FISHER statement
+FREQ	BINOMIAL	default			listing or values not yet verified against SAS
+FREQ	CMH	default			listing or values not yet verified against SAS
+FREQ	CMH1	default			listing or values not yet verified against SAS
+FREQ	CMH2	default			listing or values not yet verified against SAS
+FREQ	RELRISK	default			listing or values not yet verified against SAS
+FREQ	RISKDIFF	default			listing or values not yet verified against SAS
+FREQ	EXPECTED	default			listing or values not yet verified against SAS
+FREQ	EXACT_CHISQ	default			listing or values not yet verified against SAS
+FREQ	TESTP	default			listing or values not yet verified against SAS
+FREQ	TESTF	default			listing or values not yet verified against SAS

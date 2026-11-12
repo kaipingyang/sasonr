@@ -159,8 +159,10 @@ sql_agg_sql <- function(fn, col, distinct) {
 
 # Grouped aggregation: `gid` group of each row (1..G), `aggs` list of
 # list(fn, arg (vector or NULL for *), distinct). Returns a list of vectors of
-# length G.
-sql_duck_aggregate <- function(eng, gid, G, aggs) {
+# length G.  `order_known`: the rows are in the order in which SAS reads them
+# (see sql_select()); otherwise order-dependent statistics fail loud unless
+# their value does not depend on the order.
+sql_duck_aggregate <- function(eng, gid, G, aggs, order_known = TRUE, line = NULL) {
   if (length(aggs) == 0) return(list())
   cols <- list(g = as.integer(gid))
   exprs <- character()
@@ -188,11 +190,11 @@ sql_duck_aggregate <- function(eng, gid, G, aggs) {
                         paste0("SELECT g, ", paste(exprs, collapse = ", "), " FROM sasonr_g GROUP BY g"))
   out <- lapply(seq_along(aggs), function(k) {
     a <- aggs[[k]]
-    # moments in R with sequential double sums, bit-identical to SAS 9.4 (DuckDB
-    # accumulates differently: AVG/STD differed in the last bits)
-    if (a$fn %in% c("sum", "avg", "mean", "std", "var", "css", "cv", "stderr", "uss") && !isTRUE(a$distinct) &&
-        is.numeric(a$arg)) {
-      return(sql_r_moment(a$fn, as.numeric(a$arg), gid, G))
+    sql_stat_gate(a$fn, line)
+    # moments in R the way SAS 9.4 computes them (stats_exact.R; DuckDB
+    # accumulates differently)
+    if (a$fn %in% sql_moment_fns && is.numeric(a$arg)) {
+      return(sql_r_moment(a$fn, as.numeric(a$arg), gid, G, order_known && !isTRUE(a$distinct), isTRUE(a$distinct), line))
     }
     v <- res[[paste0("v", k)]]
     full <- if (is.character(v)) rep(NA_character_, G) else rep(NA_real_, G)
@@ -202,33 +204,41 @@ sql_duck_aggregate <- function(eng, gid, G, aggs) {
     }
     full[res$g] <- v
     if (aggs[[k]]$fn %in% c("count", "freq", "n", "nmiss")) full[is.na(full)] <- 0
+    if (a$fn == "median" && is.numeric(a$arg) && any(full %in% 0)) {
+      negz <- tapply(a$arg %in% 0 & 1 / a$arg < 0, factor(gid, levels = seq_len(G)), any)
+      if (any(negz & full %in% 0)) {
+        abort_unsupported("PROC SQL MEDIAN() of 0 for data that contain both 0 and -0 (sign of the result not determined)", line)
+      }
+    }
     full
   })
   out
 }
 
-sql_r_moment <- function(fn, v, gid, G) {
+sql_moment_fns <- c("sum", "avg", "mean", "std", "var", "css", "cv", "stderr", "uss")
+
+# PROC statistics registry name of a summary function
+sql_stat_name <- function(fn) switch(fn, avg = "MEAN", count = , freq = "N", toupper(fn))
+
+sql_stat_gate <- function(fn, line) proc_stat_check("SQL", sql_stat_name(fn), line)
+
+sql_r_moment <- function(fn, v, gid, G, order_known = TRUE, distinct = FALSE, line = NULL) {
   out <- rep(NA_real_, G)
+  idx <- split(seq_along(v), factor(gid, levels = seq_len(G)))
   for (g in seq_len(G)) {
-    x <- v[gid == g]
+    x <- v[idx[[g]]]
     x <- x[!is.na(x)]
-    n <- length(x)
-    if (n == 0) next
-    s1 <- Reduce(`+`, x)
-    # provisional (updating) mean, then the corrected sum of squares about it (bit-identical to SAS 9.4)
-    m <- 0
-    for (k in seq_len(n)) m <- m + (x[k] - m) / k
-    css <- Reduce(`+`, (x - m)^2)
-    out[g] <- switch(fn,
-      sum = s1,
-      avg = , mean = m,
-      uss = Reduce(`+`, x * x),
-      css = css,
-      var = if (n > 1) css / (n - 1) else NA_real_,
-      std = if (n > 1) sqrt(css / (n - 1)) else NA_real_,
-      stderr = if (n > 1) sqrt(css / (n - 1) / n) else NA_real_,
-      cv = if (n > 1 && m != 0) sqrt(css / (n - 1)) / m * 100 else NA_real_
-    )
+    if (distinct) x <- sort(unique(x))
+    if (length(x) == 0) next
+    if (fn != "sum" && !stats_fma_range_ok(x)) {
+      abort_unsupported(paste0("PROC SQL ", sql_stat_name(fn), "() of values beyond 1E140 or below 1E-140 in magnitude"), line)
+    }
+    if (!order_known && !stats_order_free(fn, x)) {
+      abort_unsupported(paste0("PROC SQL ", sql_stat_name(fn), "() of rows whose order SAS does not keep ",
+                               "(GROUP BY on a data set not sorted by the group columns, a join, a view or DISTINCT): ",
+                               "the result depends on the summation order"), line)
+    }
+    out[g] <- stats_sql_moment(fn, x)
   }
   out[!is.finite(out)] <- NA_real_
   out

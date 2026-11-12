@@ -16,6 +16,7 @@
 \alias{sas_gt}
 \alias{sas_in}
 \alias{sas_is_missing}
+\alias{sas_known_function}
 \alias{sas_last}
 \alias{sas_le}
 \alias{sas_lt}

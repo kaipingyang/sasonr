@@ -9,8 +9,8 @@ options_ignorable <- c(
   "nomprint", "nomlogic", "nosymbolgen", "nomprintnest", "nomlogicnest",
   "formdlim", "pageno", "stimer", "nostimer",
   "fullstimer", "nofullstimer", "msglevel", "errors",
-  # sasonr stops at the first ERROR, so syntax-check mode never starts
-  "nosyntaxcheck"
+  # NOSYNTAXCHECK: after an ERROR the following steps still run (sas_run(on_error = "sas"))
+  "nosyntaxcheck", "syntaxcheck"
 )
 
 parse_global_stmt <- function(p) {
@@ -62,6 +62,10 @@ parse_global_stmt <- function(p) {
           v <- tk_low(p)
           ls <- if (identical(v, "max")) 256L else suppressWarnings(as.integer(v))
           if (is.na(ls) || ls < 64L || ls > 256L) abort_syntax("invalid LINESIZE= value", line)
+        }
+        # the data-error dump limit is fixed at the SAS default ERRORS=20
+        if (opt == "errors" && !identical(tk_low(p), "20")) {
+          abort_unsupported(paste0("OPTIONS ERRORS=", toupper(tk_val(p)), " (only the default ERRORS=20 is implemented)"), line)
         }
         if (tk_type(p) %in% c("name", "num", "str", "str_macro")) advance(p) else abort_syntax("invalid OPTIONS value", line)
       }

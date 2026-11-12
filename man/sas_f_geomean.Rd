@@ -17,7 +17,7 @@ Geometric mean. See the \href{https://documentation.sas.com/doc/en/lefunctionsre
 }
 
 \section{Verification}{
- approximate (30 of 36 SAS 9.4 cases agree bit for bit; 2 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (624 of 636 SAS 9.4 cases agree bit for bit; 8 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

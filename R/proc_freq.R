@@ -16,12 +16,12 @@ freq_output_kw <- c("n", "nmiss", "pchi", "lrchi", "ajchi", "mhchi", "chisq", "p
 # FISHER (2x2 and RxC) and EXACT FISHER -- values within 1e-12 of SAS and the
 # listing line for line.  BINOMIAL and CMH values agree too, but their
 # listings (and CMH's common odds ratio / Breslow-Day tables) do not yet.
-freq_verified_stats <- c("chisq", "fisher", "exact_fisher")
-
+# The verified statistics are read from the PROC statistics registry
+# (inst/registry/proc_stats.csv, rows with proc FREQ).
 freq_stat_gate <- function(k, line) {
   k <- tolower(k)
   if (k == "bin") k <- "binomial"
-  if (!k %in% freq_verified_stats && !isTRUE(getOption("sasonr.freq_unverified_stats"))) {
+  if (!identical(proc_stat_status("FREQ", k), "verified") && !isTRUE(getOption("sasonr.freq_unverified_stats"))) {
     abort_unsupported(paste0("PROC FREQ statistic ", toupper(k), " (not yet verified against SAS)"), line)
   }
   invisible(k)

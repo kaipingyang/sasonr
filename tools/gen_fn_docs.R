@@ -113,7 +113,8 @@ reg_text <- function(r) {
   ctx <- if (nzchar(r$contexts_verified %||% "")) sprintf(" Contexts where every case agrees: %s.", gsub(" ", ", ", r$contexts_verified)) else ""
   head <- switch(r$status,
     verified = sprintf("verified (%d of %d SAS 9.4 cases agree bit for bit).", r$pass, r$cases),
-    partial = sprintf("partial (%d of %d SAS 9.4 cases agree bit for bit; %s).", r$pass, r$cases, r$note),
+    partial = sprintf("partial (%d of %d SAS 9.4 cases agree bit for bit; %s).%s", r$pass, r$cases, r$note,
+                      if (nzchar(r$domain %||% "")) sprintf(" Verified domain: %s; other inputs fail loud (`sasonr_unsupported`).", r$domain) else ""),
     approximate = sprintf("approximate (%d of %d SAS 9.4 cases agree bit for bit; %s).", r$pass, r$cases, r$note),
     not_comparable = sprintf("not comparable (%d SAS 9.4 cases check type and range only; the value depends on the session clock).", r$cases),
     unverified = "unverified (no SAS 9.4 case yet).",

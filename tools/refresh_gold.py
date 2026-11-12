@@ -198,7 +198,7 @@ def collect(cfg, ids, loc, sas_root, gold_l):
             if k in info and k not in new:
                 new[k] = info[k]
         new.pop("hex", None)
-        new.update(sas_version=ver, generated=today, sas_rc=rc, program_sha256=sha)
+        new.update(sas_version=ver, generated=today, sas_rc=rc, program_sha256=sha, gold_version=sanitize.GOLD_VERSION)
         new.setdefault("encoding", "latin1")
         sanitize.write_meta(os.path.join(c, "meta.yaml"), new)
         hits = sanitize.scan([os.path.join(c, "expected"), os.path.join(c, "meta.yaml")], quiet=True)

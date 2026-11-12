@@ -59,17 +59,17 @@ test_that("sasonr.strict: approximate and unverified features fail loud by defau
 
 test_that("sasonr.strict applies to the DATA step, PROC SQL and %SYSFUNC", {
   fn <- sas_feature_registry("functions")
-  skip_if(!"MOD" %in% fn$name[fn$status == "approximate"], "MOD is not approximate")
+  skip_if(!"EXP" %in% fn$name[fn$status == "approximate"], "EXP is not approximate")
   withr::with_options(list(sasonr.strict = NULL), {
-    expect_error(sas_run("data a; y = mod(7, 3); run;"), class = "sasonr_not_verified")
-    expect_error(sas_run("data one; x = 1; run;\nproc sql; create table b as select mod(x, 3) as y from one; quit;"),
+    expect_error(sas_run("data a; y = exp(1); run;"), class = "sasonr_not_verified")
+    expect_error(sas_run("data one; x = 1; run;\nproc sql; create table b as select exp(x) as y from one; quit;"),
                  class = "sasonr_not_verified")
-    expect_error(sas_run("%put %sysfunc(mod(7, 3));"), class = "sasonr_not_verified")
+    expect_error(sas_run("%put %sysfunc(exp(1));"), class = "sasonr_not_verified")
   })
   withr::with_options(list(sasonr.strict = FALSE), {
-    res <- suppressWarnings(sas_run("data a; y = mod(7, 3); run;"))
-    expect_equal(res$work$a$y, 1)
-    expect_warning(sas_run("data a; y = mod(7, 3); run;"), class = "sasonr_unverified")
+    res <- suppressWarnings(sas_run("data a; y = exp(1); run;"))
+    expect_equal(res$work$a$y, exp(1))
+    expect_warning(sas_run("data a; y = exp(1); run;"), class = "sasonr_unverified")
   })
 })
 

@@ -21,7 +21,7 @@ Remainder, with fuzz; sign of the dividend. See the \href{https://documentation.
 }
 
 \section{Verification}{
- approximate (37 of 38 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.0e-13; different algorithm)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (203 of 638 SAS 9.4 cases agree bit for bit; 435 case(s) fail loud (sasonr_unsupported)). Verified domain: arguments that are multiples of 2**-10 below 2**53 in magnitude (the remainder is exact), or a remainder that the 1E-12 fuzz sets to 0; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

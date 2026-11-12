@@ -19,7 +19,7 @@ sql_rel_rows <- function(rel, idx) {
     for (c in rel$cols) if (c$type == "char") d[[c$id]][miss] <- strrep(" ", c$len)
   }
   rownames(d) <- NULL
-  list(data = d, cols = rel$cols, ordered = rel$ordered)
+  list(data = d, cols = rel$cols, ordered = rel$ordered, src = rel$src)
 }
 
 sql_empty_rel <- function(n = 1L) list(data = tibble::tibble(.rows = n), cols = list(), ordered = TRUE)
@@ -67,7 +67,12 @@ sql_table_rel <- function(src, eng, outer) {
                       format = m$formats[[v]], informat = m$informats[[v]], label = m$labels[[v]], src_table = name)
     data[[id]] <- d[[v]]
   }
-  rel <- list(data = tibble::as_tibble(data, .rows = nrow(d)), cols = cols, ordered = TRUE)
+  # `src`: the single data set read in its stored order, with its sort flag
+  # (PROC SQL keeps that order within GROUP BY groups only when the data set
+  # is flagged as sorted by the group columns)
+  rel <- list(data = tibble::as_tibble(data, .rows = nrow(d)), cols = cols, ordered = TRUE,
+              src = list(name = name, sortedby = m$sortedby,
+                         var_of = stats::setNames(vars, vapply(cols, `[[`, "", "id"))))
   if (!is.null(o$where)) {
     ctx <- sql_ctx(eng, rel)
     keep <- sas_true(sql_eval(sql_from_ds_expr(o$where, rel), ctx))
@@ -224,7 +229,10 @@ sql_from <- function(from, where, eng, outer) {
   if (length(from) == 0) return(list(rel = sql_empty_rel(1L), where = where))
   rels <- lapply(from, sql_source_rel, eng = eng, outer = outer)
   rel <- rels[[1]]
-  if (length(from) > 1 || from[[1]]$kind == "join") rel$ordered <- FALSE
+  if (length(from) > 1 || from[[1]]$kind == "join") {
+    rel$ordered <- FALSE
+    rel$src <- NULL
+  }
   rest <- sql_conjuncts(where)
   for (k in seq_along(rels)[-1]) {
     r <- rels[[k]]
@@ -384,7 +392,7 @@ sql_select <- function(q, eng, outer) {
     if (n == 0 && length(group) == 0) {
       vals <- lapply(specs, function(s) if (s$fn %in% c("count", "freq", "n", "nmiss")) 0 else if (s$type == "char") NA_character_ else NA_real_)
     } else {
-      vals <- sql_duck_aggregate(eng, gid, G, specs)
+      vals <- sql_duck_aggregate(eng, gid, G, specs, order_known = sql_group_order_known(rel, group, ctx), line = q$line)
     }
     for (k in seq_along(items)) if (sql_needs_remerge(items[[k]]$expr, group, ctx, item_k = k)) remerge <- TRUE
     if (sql_needs_remerge(q$having, group, ctx)) remerge <- TRUE
@@ -510,6 +518,20 @@ sql_select <- function(q, eng, outer) {
   }
   out$used_outer <- isTRUE(qt$used_outer)
   out
+}
+
+# Does PROC SQL read the rows of each group in the order of `rel`?  Without
+# GROUP BY it reads a single table in its stored order; with GROUP BY it sorts
+# the rows (not stably) unless the data set is flagged as sorted by the group
+# columns (SAS gold tests/conformance/proc_stats/sql_order_probe).
+sql_group_order_known <- function(rel, group, ctx) {
+  if (!isTRUE(rel$ordered)) return(FALSE)
+  if (length(group) == 0) return(TRUE)
+  sb <- rel$src$sortedby
+  if (is.null(sb) || length(group) > length(sb$vars) || any(sb$descending[seq_along(group)])) return(FALSE)
+  ids <- vapply(group, function(g) if (identical(g$node, "col")) sql_col_id(g, ctx) else NA_character_, "")
+  if (anyNA(ids)) return(FALSE)
+  identical(tolower(unname(rel$src$var_of[ids])), tolower(sb$vars[seq_along(group)]))
 }
 
 sql_new_rows <- function(ctx, rel) {

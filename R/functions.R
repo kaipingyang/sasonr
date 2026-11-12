@@ -750,11 +750,56 @@ sas_f_prxchange <- function(re, times, x, .at = NULL) {
 
 #' @export
 sas_f_modz <- function(a, b, .at = NULL) {
-  out <- a - b * trunc(a / b)
+  n <- max(length(a), length(b))
+  a <- rep_len(as.numeric(a), n)
+  b <- rep_len(as.numeric(b), n)
   zero <- !is.na(b) & b == 0
-  if (any(zero & !is.na(a))) note_invalid_arg("modz", NULL, .at, list(a, b), rep_len(zero, length(a)) & !is.na(a))
+  if (any(zero & !is.na(a))) note_invalid_arg("modz", NULL, .at, list(a, b), zero & !is.na(a))
+  mod_domain_check("MODZ", a, b, exact_only = FALSE)
+  out <- mod_exact(a, b)
   out[zero] <- NA_real_
   out
+}
+
+# Remainder a - b * trunc(a / b) with one rounding (SAS 9.4 uses a fused
+# multiply-add: tests/conformance/fn_probe/MOD, 594 of 600 values).
+mod_exact <- function(a, b) {
+  q <- trunc(a / b)
+  out <- rep(NA_real_, length(a))
+  ok <- !is.na(a) & !is.na(b) & b != 0
+  out[ok] <- stats_fma(-b[ok], q[ok], a[ok])
+  out
+}
+
+# Verified domain of MOD and MODZ (registry status partial).  MODZ: the
+# arguments lie within 1E-140..1E140 in magnitude and a / b is not an integer
+# unless the remainder is exactly 0 (SAS then returns 0 where the exact
+# remainder is a few ulps).  MOD (`exact_only`) additionally needs arguments
+# that are multiples of 2^-10 below 2^53 in magnitude (their remainder is exact,
+# so SAS's fuzz cannot change it) or a remainder that the fuzz rule sets to 0.
+mod_domain_check <- function(fname, a, b, exact_only, fuzz_zero = NULL) {
+  ok <- !is.na(a) & !is.na(b) & b != 0
+  if (!any(ok)) return(invisible())
+  aa <- a[ok]
+  bb <- b[ok]
+  rng <- function(x) x == 0 | (abs(x) >= 1e-140 & abs(x) <= 1e140)
+  bad <- !(rng(aa) & rng(bb))
+  qq <- aa / bb
+  r <- stats_fma(-bb, trunc(qq), aa)
+  bad <- bad | (!bad & qq == trunc(qq) & r != 0)
+  if (exact_only) {
+    dy <- function(x) abs(x) < 2^53 & (x * 1024) == trunc(x * 1024)
+    fz <- if (is.null(fuzz_zero)) FALSE else fuzz_zero[ok]
+    bad <- bad | !(dy(aa) & dy(bb) | fz)
+  }
+  if (any(bad)) {
+    i <- which(bad)[1]
+    abort_unsupported(sprintf("%s(%s, %s): outside the verified domain (%s)", fname, format(aa[i], digits = 17),
+                              format(bb[i], digits = 17),
+                              if (exact_only) "arguments that are multiples of 2**-10 below 2**53, or a remainder of 0 after fuzzing" else
+                                "magnitudes 1E-140..1E140; a / b not an integer unless the remainder is 0"))
+  }
+  invisible()
 }
 
 #' @export
@@ -782,13 +827,15 @@ sas_f_uss <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ els
 sas_f_geomean <- function(...) row_stat(function(v) {
   if (length(v) == 0 || any(v < 0)) return(NA_real_)
   if (any(v == 0)) return(0)
-  exp(mean(log(v)))
+  # sequential double sum of the logarithms (closest form found; GEOMEAN is approximate)
+  exp(stats_seq_sum(log(v)) / length(v))
 }, ...)
 #' @export
 sas_f_harmean <- function(...) row_stat(function(v) {
   if (length(v) == 0 || any(v < 0)) return(NA_real_)
   if (any(v == 0)) return(0) # SAS 9.4: a zero value gives 0
-  length(v) / sum(1 / v)
+  # sequential double sum (tests/conformance/fn_probe/GEOMEAN: 300 of 300)
+  length(v) / stats_seq_sum(1 / v)
 }, ...)
 #' @export
 sas_f_skewness <- function(...) row_stat(function(v) {
@@ -1484,7 +1531,9 @@ sas_f_yrdif <- function(start, end, basis = "AGE") {
     b <- floor(b)
     bs <- toupper(strip_both(bs))
     if (bs == "AGE") {
-      # whole years plus the remaining days in a 365-day year (SAS 9.4)
+      # whole years plus the remaining days in a 365-day year (SAS 9.4); the
+      # last bits of a fractional age are not reproduced (fn_probe/YRDIF), so
+      # only whole years are in the verified domain
       sgn <- 1
       if (b < a) {
         t <- a
@@ -1497,6 +1546,9 @@ sas_f_yrdif <- function(start, end, basis = "AGE") {
       da <- doy365(pa)
       db <- doy365(pb)
       yrs <- pb$y - pa$y - as.numeric(db < da)
+      if ((db - da) %% 365 != 0) {
+        abort_unsupported("YRDIF with basis 'AGE' for dates that are not a whole number of years apart (the fraction differs from SAS 9.4 in the last bits)")
+      }
       return(sgn * (yrs + ((db - da) %% 365) / 365))
     }
     if (bs == "30/360" || bs == "360") return(day_count(a, b, "30/360") / 360)
@@ -1514,8 +1566,10 @@ sas_f_yrdif <- function(start, end, basis = "AGE") {
     yb <- civil(b)$y
     ylen <- function(y) from_ymd(y + 1, 1, 1) - from_ymd(y, 1, 1)
     if (ya == yb) return(sgn * (b - a) / ylen(ya))
-    out <- (from_ymd(ya + 1, 1, 1) - a) / ylen(ya) + (yb - ya - 1) + (b - from_ymd(yb, 1, 1)) / ylen(yb)
-    sgn * out
+    if (a != from_ymd(ya, 1, 1) || b != from_ymd(yb, 1, 1)) {
+      abort_unsupported("YRDIF with basis 'ACT/ACT' for dates in different years that are not both 1 January (the sum of the year fractions differs from SAS 9.4 in the last bits)")
+    }
+    sgn * (yb - ya)
   }, start, end, basis, type = numeric(1))
 }
 

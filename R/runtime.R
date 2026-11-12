@@ -326,15 +326,26 @@ sas_f_log2 <- function(x, .at = NULL) {
 }
 #' @export
 sas_f_mod <- function(a, b, .at = NULL) {
-  out <- a - b * trunc(a / b)
+  n <- max(length(a), length(b))
+  a <- rep_len(as.numeric(a), n)
+  b <- rep_len(as.numeric(b), n)
+  out <- mod_exact(a, b)
   zero <- !is.na(b) & b == 0
-  if (any(zero & !is.na(a))) note_invalid_arg("mod", NULL, .at, list(a, b), rep_len(zero, length(a)) & !is.na(a))
+  if (any(zero & !is.na(a))) note_invalid_arg("mod", NULL, .at, list(a, b), zero & !is.na(a))
   out[zero] <- NA_real_
   # fuzz: a remainder within 1e-12 (relative) of 0 or of the divisor is 0
   tol <- 1e-12 * pmax(abs(a), abs(b), 1, na.rm = TRUE)
   near <- !is.na(out) & (abs(out) < tol | abs(abs(out) - abs(b)) < tol)
+  # SAS's fuzz also moves other remainders by a few ulps toward the decimal
+  # result (fn_probe/MOD); only exact remainders are in the verified domain
+  mod_domain_check("MOD", a, b, exact_only = TRUE, fuzz_zero = near)
   out[near] <- 0
-  fuzz_int(out)
+  out <- fuzz_int(out)
+  # a zero remainder of integer arguments has the sign of a (MOD(-1, 1) is -0),
+  # otherwise it is +0 (fn_probe/MOD)
+  z <- !is.na(out) & out == 0
+  out[z] <- ifelse(a[z] < 0 & a[z] == trunc(a[z]) & b[z] == trunc(b[z]), -0, 0)
+  out
 }
 #' @export
 sas_f_missing <- function(x) as.numeric(sas_is_missing(x))

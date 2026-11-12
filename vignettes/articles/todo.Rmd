@@ -25,8 +25,10 @@ come later.
 
 | # | Task |
 |---|---|
-| 0 | Make the 28 `approximate` functions bit-identical to SAS (probability and distribution functions, LOG, MOD, SINH, YRDIF, KURTOSIS, SKEWNESS, ...); with strict mode on by default they stop programs until then |
-| 0a | Verification cases for the 37 `unverified` formats and informats (date separators and other variants), which also fail loud now |
+| 0 | PROC MEANS CSS family (STD, VAR, STDERR, CV, USS, SKEWNESS, KURTOSIS): SAS's accumulation is not yet reproduced (88 % of random groups agree bit for bit); until then these statistics stop programs in strict mode |
+| 0a | Remaining `approximate` functions (probability functions, EXP, LOG10, hyperbolic functions, COMB, PERM, GEOMEAN, SKEWNESS, KURTOSIS): last-bit differences from SAS's math library |
+| 0b | Partial data sets after an execution-time ERROR (on_error = "sas"); OPTIONS ERRORS= other than 20; PROC SQL STDERR / CV |
+| 0c | Verification cases for the 37 `unverified` formats and informats (date separators and other variants) |
 | 1 | Write the specifications of the five focus domains: DATA step, macro language, PROC SQL, functions / formats / rounding, clinical procedures (published under Developers) |
 | 2 | Internal refactor: session state in one object (R6), replacing scattered engine state; no new features, regression must be unchanged |
 | 3 | DATA step specification first: control flow (`RETURN`, `LINK`, `GOTO`, `STOP`, `ABORT`), execution model (multiple `SET`, `UPDATE`, `MODIFY`, `POINT=`, `END=`), PDV details, `INPUT` edge cases, hash objects |
