@@ -496,3 +496,280 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
   out$status <- if (sas_err && !son_err) "lenient" else if (all(out$layers)) "pass" else "fail"
   out
 }
+
+# ---- matrix layout (fn_matrix/, fmt_matrix/) --------------------------------------------
+#
+# One program per function or format (meta.yaml `layout: matrix`); every case is
+# one step between `%put @@BEGIN <case> <context>;` and `%put @@END <case>;`
+# (inputs in cases.csv).  The SAS gold standard holds one data set WORK.MATRIX
+# with one column per case (named like the case, `$` replaced by `_`), the log
+# NOTEs with the case markers, the PUT output and results.txt.  sasonr runs the
+# case blocks with their original line numbers (the header is kept, other lines
+# are blank; the @@COLLECT trailer that builds WORK.MATRIX is SAS-side storage
+# and is not run) and each case is compared with its own part of every layer:
+# ds (its column against sasonr's one-row data set), attr, log and put (the
+# lines between its markers), files (the results.txt records of the case), lst.
+# When sasonr stops (fail loud, syntax or run-time error) in case k, the cases
+# before k are re-run without it, case k gets the status, and the run resumes
+# at case k + 1.
+
+conf_matrix_blocks <- function(lines) {
+  b <- grep("^%put @@BEGIN \\S+ \\S+;\\s*$", lines)
+  e <- grep("^%put @@END \\S+;\\s*$", lines)
+  ids <- sub("^%put @@BEGIN (\\S+) .*$", "\\1", lines[b])
+  if (length(b) != length(e) || any(e < b) || !identical(ids, sub("^%put @@END (\\S+);.*$", "\\1", lines[e]))) {
+    stop("matrix program: unbalanced @@BEGIN / @@END markers")
+  }
+  list(ids = ids, begin = b, end = e, header = seq_len(if (length(b)) b[1] - 1L else length(lines)))
+}
+
+conf_matrix_ds_name <- function(id) gsub("$", "_", id, fixed = TRUE)
+
+# Program text of blocks `idx` with the original line numbers.
+conf_matrix_segment <- function(lines, bl, idx) {
+  out <- character(max(bl$end[idx]))
+  out[bl$header] <- lines[bl$header]
+  for (k in idx) out[bl$begin[k]:bl$end[k]] <- lines[bl$begin[k]:bl$end[k]]
+  out
+}
+
+# Split marked lines into the parts between `@@BEGIN <id>` and `@@END <id>`
+# (inclusive = keep the marker lines, as in put.txt).
+conf_matrix_split <- function(lines, inclusive = FALSE) {
+  out <- list()
+  cur <- NULL
+  for (l in lines) {
+    if (startsWith(l, "@@BEGIN ")) {
+      cur <- strsplit(l, " ", fixed = TRUE)[[1]][2]
+      out[[cur]] <- if (inclusive) l else character()
+      next
+    }
+    if (startsWith(l, "@@END ") || startsWith(l, "@@COLLECT")) {
+      if (!is.null(cur) && inclusive && startsWith(l, "@@END ")) out[[cur]] <- c(out[[cur]], l)
+      cur <- NULL
+      next
+    }
+    if (!is.null(cur)) out[[cur]] <- c(out[[cur]], l)
+  }
+  out
+}
+
+# results.txt records by case (the second word of every record)
+conf_matrix_records <- function(lines) {
+  id <- vapply(strsplit(lines, " ", fixed = TRUE), function(p) if (length(p) >= 2) p[2] else "", "")
+  split(lines, factor(id, levels = unique(id)))
+}
+
+conf_key_messages_marked <- function(lines) {
+  mark <- grepl("^@@(BEGIN|END|COLLECT)\\b", lines, perl = TRUE)
+  if (!any(mark)) return(conf_key_messages(lines))
+  grp <- cumsum(mark)
+  out <- character()
+  for (g in unique(grp)) {
+    seg <- lines[grp == g]
+    if (mark[grp == g][1]) {
+      out <- c(out, sub("\\s+$", "", seg[1]))
+      seg <- seg[-1]
+    }
+    out <- c(out, conf_key_messages(seg))
+  }
+  out
+}
+
+conf_matrix_run_segment <- function(code, data_dir, limit) {
+  d <- tempfile("sasonr_mx_")
+  dir.create(d)
+  for (s in c("out", "lib")) dir.create(file.path(d, s))
+  if (dir.exists(data_dir)) file.copy(data_dir, d, recursive = TRUE)
+  old <- setwd(d)
+  on.exit(setwd(old), add = TRUE)
+  setTimeLimit(elapsed = limit, transient = TRUE)
+  on.exit(setTimeLimit(elapsed = Inf), add = TRUE)
+  res <- tryCatch(
+    withCallingHandlers(sas_run(code), warning = function(w) invokeRestart("muffleWarning")),
+    error = function(e) {
+      m <- conditionMessage(e)
+      structure(list(unsupported = inherits(e, "sasonr_unsupported"), line = suppressWarnings(as.integer(e$sas_line %||% NA)),
+                     msg = paste0("[", class(e)[1], "] ", m), timeout = grepl("time limit", m, fixed = TRUE)),
+                class = "conf_fail")
+    }
+  )
+  setTimeLimit(elapsed = Inf)
+  if (inherits(res, "conf_fail")) {
+    unlink(d, recursive = TRUE)
+    return(res)
+  }
+  res$run_dir <- d
+  res
+}
+
+#' @noRd
+conf_run_matrix <- function(case, keep = NULL, only = NULL) {
+  case <- normalizePath(case)
+  meta <- conf_read_meta(file.path(case, "meta.yaml"))
+  exp <- file.path(case, "expected")
+  lines <- readLines(file.path(case, "program.sas"), warn = FALSE, encoding = "latin1")
+  bl <- conf_matrix_blocks(lines)
+  n <- length(bl$ids)
+  blank <- function(id) list(case = id, meta = meta, status = NA_character_, msg = "", layers = logical(), diffs = character())
+  if (!dir.exists(exp)) return(lapply(stats::setNames(bl$ids, bl$ids), function(id) modifyList(blank(id), list(status = "no_gold"))))
+  data_dir <- file.path(case, "data")
+  per <- as.numeric(meta$timeout %||% 30)
+  segs <- list()
+  owner <- rep(NA_integer_, n)
+  fails <- vector("list", n)
+  run <- function(idx) {
+    r <- conf_matrix_run_segment(conf_matrix_segment(lines, bl, idx), data_dir, per + 5 * length(idx))
+    if (!inherits(r, "conf_fail")) {
+      segs[[length(segs) + 1L]] <<- r
+      owner[idx] <<- length(segs)
+    }
+    r
+  }
+  one_by_one <- function(idx) for (j in idx) {
+    r <- run(j)
+    if (inherits(r, "conf_fail")) fails[[j]] <<- r
+  }
+  start <- 1L
+  while (start <= n) {
+    idx <- start:n
+    r <- run(idx)
+    if (!inherits(r, "conf_fail")) break
+    k <- if (is.na(r$line)) NA_integer_ else which(bl$begin <= r$line & bl$end >= r$line)[1]
+    if (is.na(k) || k < start) {
+      one_by_one(idx)
+      break
+    }
+    if (k > start) {
+      r2 <- run(start:(k - 1L))
+      if (inherits(r2, "conf_fail")) one_by_one(start:(k - 1L))
+    }
+    fails[[k]] <- r
+    start <- k + 1L
+  }
+  on.exit(for (s in segs) unlink(s$run_dir, recursive = TRUE), add = TRUE)
+
+  # SAS side
+  sas_log <- conf_matrix_split(conf_lines(file.path(exp, "log_notes.txt")))
+  sas_put <- conf_matrix_split(conf_lines(file.path(exp, "put.txt")), inclusive = TRUE)
+  rf <- file.path(exp, "files", "results.txt")
+  sas_rec <- conf_matrix_records(if (file.exists(rf)) sub("\\s+$", "", conf_lines(rf)) else character())
+  mx <- list.files(file.path(exp, "datasets"), pattern = "^matrix\\.sas7bdat$", full.names = TRUE)
+  sas_ds <- if (length(mx)) haven::read_sas(mx) else NULL
+  sas_attr <- conf_attrs(file.path(exp, "attrs.csv"), "UTF-8")
+  sas_lst <- conf_norm_lst(conf_lines(file.path(exp, "listing.txt")))
+
+  # sasonr side, per successful segment
+  seg_info <- lapply(seq_along(segs), function(s) {
+    r <- segs[[s]]
+    son_ds <- tempfile("sasonr_ds_")
+    sas_export_work(r, son_ds)
+    a <- conf_attrs(file.path(son_ds, "__attr.csv"), "latin1")
+    unlink(son_ds, recursive = TRUE)
+    rf <- file.path(r$run_dir, "results.txt")
+    if (!is.null(keep)) {
+      kd <- file.path(keep, sprintf("segment_%02d", s))
+      dir.create(kd, recursive = TRUE, showWarnings = FALSE)
+      writeLines(r$log, file.path(kd, "log"), useBytes = TRUE)
+      if (file.exists(rf)) file.copy(rf, kd)
+    }
+    list(log = conf_matrix_split(conf_key_messages_marked(r$log)),
+         put = conf_matrix_split(conf_put_lines(r$log), inclusive = TRUE),
+         rec = conf_matrix_records(if (file.exists(rf)) sub("\\s+$", "", conf_lines(rf, "latin1")) else character()),
+         attr = a, lst = conf_norm_lst(r$listing), log_raw = r$log)
+  })
+
+  out <- list()
+  for (k in seq_len(n)) {
+    id <- bl$ids[k]
+    if (!is.null(only) && !id %in% only) next
+    o <- blank(id)
+    ds <- conf_matrix_ds_name(id)
+    s_log <- sas_log[[id]] %||% character()
+    # SAS "stopped with an ERROR" in this case (the one-case layout used SAS's return
+    # code): an ERROR and the case's step did not complete (no data set / table NOTE).
+    # A function that writes an ERROR line but returns a value (PRXMATCH with an
+    # invalid pattern: SAS return code 0) does not count.
+    done_note <- c(paste0("NOTE: The data set WORK.", toupper(ds), " has "), paste0("NOTE: Table WORK.", toupper(ds), " created"))
+    sas_err <- any(startsWith(s_log, "ERROR")) && !any(startsWith(s_log, done_note[1]) | startsWith(s_log, done_note[2]))
+    if (!is.null(fails[[k]])) {
+      o$msg <- fails[[k]]$msg
+      o$status <- if (sas_err) "both_error" else if (isTRUE(fails[[k]]$unsupported)) "unsupported" else "error"
+      out[[id]] <- o
+      next
+    }
+    si <- seg_info[[owner[k]]]
+    res <- segs[[owner[k]]]
+    o_log <- si$log[[id]] %||% character()
+    son_err <- any(startsWith(o_log, "ERROR"))
+    if (sas_err && !son_err) {
+      o$status <- "lenient"
+      out[[id]] <- o
+      next
+    }
+    d <- list()
+    # ds: the case's column of WORK.MATRIX against sasonr's one-row data set
+    has_e <- !is.null(sas_ds) && ds %in% names(sas_ds)
+    od <- res$work[[tolower(ds)]]
+    has_o <- !is.null(od) && nrow(od) > 0
+    d$ds <- if (!has_e && !has_o) "" else if (has_e != has_o) {
+      sprintf("members SAS=%s sasonr=%s", if (has_e) toupper(ds) else "", if (has_o) toupper(ds) else "")
+    } else {
+      disp <- vapply(names(od), function(v) res$meta[[tolower(ds)]]$disp[[v]] %||% v, "")
+      if (!identical(unname(disp), "r")) {
+        sprintf("%s: columns SAS=r sasonr=%s", toupper(ds), paste(utils::head(disp, 8), collapse = ","))
+      } else if (nrow(od) != 1L) {
+        sprintf("%s: rows SAS=1 sasonr=%d", toupper(ds), nrow(od))
+      } else {
+        a <- sas_ds[[ds]]
+        b <- od[[1]]
+        a <- if (is.character(a)) {
+          bad <- !is.na(a) & !validUTF8(a)
+          a[bad] <- iconv(a[bad], "latin1", "UTF-8")
+          sub("\\s+$", "", a)
+        } else conf_sas_num(a)
+        b <- if (is.character(b)) sas_rtrim(b) else conf_son_num(b)
+        if (is.list(a) != is.list(b)) {
+          sprintf("%s r: type differs", toupper(ds))
+        } else if (!isTRUE(if (is.list(a)) conf_num_eq(a, b) else a == b)) {
+          sv <- if (is.list(a)) (if (is.na(a$miss)) sprintf("%.17g", a$v) else a$miss) else encodeString(a, quote = "'")
+          ov <- if (is.list(b)) (if (is.na(b$miss)) sprintf("%.17g", b$v) else b$miss) else encodeString(b, quote = "'")
+          sprintf("%s row 1 r: SAS=%s sasonr=%s", toupper(ds), sv, ov)
+        } else ""
+      }
+    }
+    # attr
+    ka <- paste("MATRIX", tolower(ds), sep = ".")
+    kb <- paste(toupper(ds), "r", sep = ".")
+    d$attr <- ""
+    if (!is.null(sas_attr[[ka]]) && !is.null(si$attr[[kb]])) {
+      nm <- c("type", "length", "format", "informat", "label")
+      for (i in seq_along(nm)) if (!identical(sas_attr[[ka]][i], si$attr[[kb]][i])) {
+        d$attr <- sprintf("%s %s: SAS=%s sasonr=%s", kb, nm[i], encodeString(sas_attr[[ka]][i], quote = "'"),
+                          encodeString(si$attr[[kb]][i], quote = "'"))
+        break
+      }
+    }
+    d$log <- conf_first_diff(s_log, o_log)
+    d$lst <- conf_first_diff(sas_lst, si$lst, "line ")
+    pe <- sas_put[[id]] %||% character()
+    po <- si$put[[id]] %||% character()
+    d$put <- conf_first_diff(pe, po, "line ")
+    if (nzchar(d$put)) o$tol_put <- conf_tol_diff(pe, po)
+    fe <- sas_rec[[id]] %||% character()
+    fo <- si$rec[[id]] %||% character()
+    if (length(fe) == 0 && length(fo) == 0) {
+      d$files <- ""
+    } else if ((length(fe) == 0) != (length(fo) == 0)) {
+      d$files <- sprintf("files SAS=%s sasonr=%s", if (length(fe)) "results.txt" else "", if (length(fo)) "results.txt" else "")
+    } else {
+      d$files <- conf_first_diff(fe, fo, "results.txt line ")
+      o$tol_files <- if (nzchar(d$files)) conf_tol_diff(fe, fo) else 0
+    }
+    o$diffs <- unlist(d)
+    o$layers <- stats::setNames(!nzchar(o$diffs), names(o$diffs))
+    o$status <- if (all(o$layers)) "pass" else "fail"
+    out[[id]] <- o
+  }
+  out
+}

@@ -551,6 +551,7 @@ an_stmt <- function(s, st) {
         if (!is.null(it$fmt)) {
           if (!infmt_known(it$fmt)) abort_unsupported(paste0("informat ", it$fmt$text), line)
           uf <- user_fmt(it$fmt$name, it$fmt$char, "invalue")
+          if (is.null(uf)) feature_check("informat", fmt_registry_name(it$fmt), line)
           if (isTRUE(uf$char)) it$char <- TRUE
         }
         inf <- st$info[[it$name]]
@@ -658,6 +659,7 @@ an_stmt <- function(s, st) {
       for (sp in s$specs) {
         if (is.null(sp$fmt)) next
         if (!infmt_known(sp$fmt)) abort_unsupported(paste0("informat ", sp$fmt$text), line)
+        if (is.null(user_fmt(sp$fmt$name, sp$fmt$char, "invalue"))) feature_check("informat", fmt_registry_name(sp$fmt), line)
         vv <- resolve_items(sp$vars, st, line, register = FALSE)
         for (v in vv) {
           dv <- attr(vv, "disp")[v] %|NA|% v
@@ -682,6 +684,9 @@ an_stmt <- function(s, st) {
           }
           if (!is.null(g$informat)) {
             if (!infmt_known(g$informat)) abort_unsupported(paste0("informat ", g$informat$text), line)
+            if (is.null(user_fmt(g$informat$name, g$informat$char, "invalue"))) {
+              feature_check("informat", fmt_registry_name(g$informat), line)
+            }
             if (is.null(st$info[[v]]) && isTRUE(g$informat$char) && !is.na(g$informat$w)) reg_var(st, v, "char", g$informat$w, disp = dv)
             st$informats[[v]] <- g$informat
           }

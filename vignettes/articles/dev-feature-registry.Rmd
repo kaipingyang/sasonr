@@ -43,10 +43,19 @@ but some differ in a log NOTE only or fail loud,
 **not_comparable** when its value depends on the session clock (only the
 type and range are compared) and **unverified** when it has no case yet.
 
-The option `sasonr.strict` uses the status at run time: `TRUE` stops a
-program that uses a function, format or informat that is not verified,
-`FALSE` gives a warning of class `sasonr_unverified`; by default (unset)
-nothing is checked.
+The option `sasonr.strict` (default `TRUE`) uses the status at run time:
+a program that uses an `approximate` or `unverified` function, format or
+informat (or one missing from the registry) stops with a condition of class
+`sasonr_not_verified`, a subclass of `sasonr_unsupported`, that names the
+feature, its status and the SAS line. With `options(sasonr.strict = FALSE)`
+the program runs and each such feature gives a warning of class
+`sasonr_unverified`. `verified`, `partial` (the inputs known to differ fail
+loud in both modes) and `not_comparable` features always run.
+
+The cases of a function or format are one SAS program (one step per case,
+inputs listed per case); each case is still compared on its own: the
+value bit for bit, type and length, `_ERROR_`, the log NOTEs of its step
+(with line numbers) and its PUT output.
 
 ## Functions
 

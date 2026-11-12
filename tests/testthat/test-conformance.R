@@ -12,7 +12,8 @@ unsupported_cases <- character()
 
 run_case <- function(name, level = "auto") {
   code <- readLines(file.path(case_dir, paste0(name, ".sas")))
-  res <- suppressWarnings(sas_run(code, level = level))
+  # these programs test the language; approximate functions (MOD) run with a warning
+  res <- withr::with_options(list(sasonr.strict = FALSE), suppressWarnings(sas_run(code, level = level)))
   paste(res$log, collapse = " ;; ")
 }
 

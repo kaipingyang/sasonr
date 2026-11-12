@@ -2,7 +2,7 @@
 title: "To do and future plan"
 ---
 
-*Updated after every development round. Last update: 2026-11-12 (after round 7a and the reference examples).*
+*Updated after every development round. Last update: 2026-11-12 (after round 9: strict by default, compact verification matrices).*
 
 ## Three ways to use sasonr
 
@@ -25,7 +25,8 @@ come later.
 
 | # | Task |
 |---|---|
-| 0 | Fix the 15 function results that differ from SAS (found while generating the reference examples) and gate them until fixed |
+| 0 | Make the 28 `approximate` functions bit-identical to SAS (probability and distribution functions, LOG, MOD, SINH, YRDIF, KURTOSIS, SKEWNESS, ...); with strict mode on by default they stop programs until then |
+| 0a | Verification cases for the 37 `unverified` formats and informats (date separators and other variants), which also fail loud now |
 | 1 | Write the specifications of the five focus domains: DATA step, macro language, PROC SQL, functions / formats / rounding, clinical procedures (published under Developers) |
 | 2 | Internal refactor: session state in one object (R6), replacing scattered engine state; no new features, regression must be unchanged |
 | 3 | DATA step specification first: control flow (`RETURN`, `LINK`, `GOTO`, `STOP`, `ABORT`), execution model (multiple `SET`, `UPDATE`, `MODIFY`, `POINT=`, `END=`), PDV details, `INPUT` edge cases, hash objects |
@@ -43,7 +44,8 @@ come later.
 
 ## Open questions
 
-* Tolerance policy for statistical distribution functions (last-digit
-  differences were observed).
+* Strict mode is on by default (decided 2026-11-12): functions whose
+  results differ from SAS only in the last bits stop programs until they are
+  exact; `options(sasonr.strict = FALSE)` runs them with a warning.
 * Random number functions: reproduce SAS random streams exactly or mark them
   as not comparable.

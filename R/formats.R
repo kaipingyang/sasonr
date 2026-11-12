@@ -514,13 +514,26 @@ sas_format <- function(x, fmt = NULL) {
     w <- fmt$w
     if (fmt$name == "quote" && is.na(w)) w <- max(nchar(x), 0L) + 2L
     if (!fmt$name %in% char_fmt_names) abort_unsupported(paste0("format ", fmt$text))
-    if (fmt$name == "hex" && is.na(w)) w <- 4L
+    # PUT(x, $HEX.) without a width: SAS writes all bytes (result length 2 * length
+    # of the argument), not the default width of the inventory; not modelled
+    if (fmt$name == "hex" && is.na(w)) abort_unsupported("format $HEX. without a width")
     out <- switch(fmt$name,
       upcase = toupper(x),
       quote = {
         inner <- gsub("\"", "\"\"", sas_rtrim(x), fixed = TRUE)
         # too long for the width: the text is cut so that the closing quote fits
-        if (!is.na(w)) inner <- substr(inner, 1L, w - 2L)
+        if (!is.na(w)) {
+          cut <- nchar(inner) > w - 2L
+          # a cut through a doubled quote: SAS keeps neither half (seen once); fail loud
+          if (any(cut & vapply(seq_along(inner), function(i) {
+            if (!cut[i] || w < 3L) return(FALSE)
+            k <- w - 2L
+            rest <- substr(inner[i], 1L, k)
+            m <- regmatches(rest, regexpr("\"+$", rest))
+            length(m) > 0 && nchar(m) %% 2L == 1L
+          }, logical(1)))) abort_unsupported(paste0("format ", fmt$text, " cutting through an embedded quote"))
+          inner <- substr(inner, 1L, w - 2L)
+        }
         paste0("\"", inner, "\"")
       },
       hex = fmt_hex_char(x, w),
@@ -575,7 +588,7 @@ fmt_hex_char <- function(x, w) {
   n <- (w + 1L) %/% 2L
   vapply(x, function(s) {
     b <- charToRaw(enc2native(s))
-    if (length(b) < n) b <- c(b, rep(as.raw(0x20), n - length(b)))
+    # a width beyond the value: SAS writes the bytes of the value only (blank-padded text)
     substr(toupper(paste(as.character(b[seq_len(min(n, length(b)))]), collapse = "")), 1L, w)
   }, "", USE.NAMES = FALSE)
 }

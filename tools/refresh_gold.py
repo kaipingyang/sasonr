@@ -190,7 +190,7 @@ def collect(cfg, ids, loc, sas_root, gold_l):
                                          extra_roots=[sas_root + "/gold/" + cid, sas_root, cfg["transit_sas"]]
                                          + [sas_root + "/_root_%d" % i for i in range(10)] + [
                                                       cfg["transit_local"]],
-                                         inputs=())
+                                         inputs=(), markers=meta.get("layout") == "matrix")
         info = header_info(prog)
         new = dict(meta)
         new.setdefault("case", case_name(c))

@@ -1,5 +1,28 @@
 # sasonr (development version)
 
+## Round 9 (2026-11-12): strict by default, compact verification matrices
+
+* **Strict by default**: `sasonr.strict` now defaults to `TRUE`. A program
+  that uses a function, format or informat whose status in the feature
+  registry is `approximate` (some results differ from SAS 9.4 in the last
+  bits), `unverified` (no SAS case) or that is missing from the registry stops
+  with a condition of class `sasonr_not_verified` (a subclass of
+  `sasonr_unsupported`) naming the feature, its status and the SAS line. Set
+  `options(sasonr.strict = FALSE)` to run such features with a warning of
+  class `sasonr_unverified`. The check now also covers `%SYSFUNC` and the
+  informats of `INPUT`, `INFORMAT` and `ATTRIB` statements (see
+  `?sasonr_strict`).
+* Verification matrices: one SAS program per function, format or informat
+  (inputs listed per case), each case still compared on its own (value bit
+  for bit, type, length, `_ERROR_`, log NOTEs with line numbers, PUT output).
+* Fixes found by the new layout: character formats (`$CHAR`, `$HEX`,
+  `$QUOTE`, `$UPCASE`, `$`) are now actually verified (their earlier cases
+  never ran); `$HEXw.` wider than the value no longer encodes padding blanks;
+  `$HEX.` without a width and `$QUOTEw.` cutting through an embedded quote
+  fail loud; a DATA step stopped by an execution-time ERROR (`SYMGET(' ')`)
+  keeps its incomplete data set like SAS.
+* `OPTIONS NOSYNTAXCHECK` is accepted.
+
 ## Round 8 (2026-11-12): verification matrix and feature registry
 
 * Every implemented function, format and informat now has a verification

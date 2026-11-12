@@ -1,11 +1,19 @@
-"""Generate the function and format verification matrices (one SAS program per case).
+"""Generate the function and format verification matrices (one SAS program per function / format).
 
-    python -I tools/gen_matrix.py functions [NAME ...]   # tests/conformance/fn_matrix/<FN>/<FN>_<id>/
-    python -I tools/gen_matrix.py formats [NAME ...]     # tests/conformance/fmt_matrix/<FMT>/<FMT>_<id>/
+    python -I tools/gen_matrix.py functions [NAME ...]   # tests/conformance/fn_matrix/<FN>/
+    python -I tools/gen_matrix.py formats [NAME ...]     # tests/conformance/fmt_matrix/<FMT>/
 
-Cases are local assets (tests/conformance/ is not in git); the SAS gold standard
-comes from tools/refresh_gold.py and the offline comparison from
-tools/run_conformance.R.  All data are made up.
+Layout (case_format.md, "matrix layout"): per function or format one directory
+with program.sas (all cases), cases.csv (case id, context, SAS expression,
+setup statements, note, group) and meta.yaml (`layout: matrix`); the SAS gold
+standard (expected/: one WORK.MATRIX sas7bdat with one column per case, the
+log NOTEs with the case markers, the PUT output and results.txt) comes from
+tools/refresh_gold.py and the per-case comparison from tools/run_conformance.R.
+Each case is one step between `%put @@BEGIN <case> <context>;` and
+`%put @@END <case>;`, so _ERROR_, the log NOTEs (with their line numbers) and
+the PUT output are attributed to the case; cases expected to stop with an
+ERROR (compile-time errors, group `isolated`) come last.  Cases are local
+assets (tests/conformance/ is not in git).  All data are made up.
 
 Functions: the calls of tools/fn_examples.txt (reference-page examples) and the
 extra calls of tools/fn_matrix.txt, plus generated edge cases.  For each
@@ -239,22 +247,25 @@ def record_lines(cid, rtype):
     return lines
 
 
-def program(area, fn, cid, ctx, expr, setup, rtype, note, source, tags, glob):
-    title = "%s/%s/%s: %s [%s]" % (area, fn, cid, note, expr.replace("*/", "* /"))
-    out = ["/* " + title, "   source: " + source, "   tags: " + ", ".join(tags) + " */",
-           "options nosource2 linesize=max;"]
-    out += glob
-    out.append("%%put @@BEGIN %s %s;" % (cid, ctx))
+def ds_name(cid):
+    """SAS data set / variable name of a case (case ids of character formats start with $)."""
+    return cid.replace("$", "_")
+
+
+def case_block(cid, ctx, expr, setup, rtype):
+    """Lines of one case: %put @@BEGIN <case> <context>; one step (two for PROC SQL); %put @@END <case>;"""
+    ds = ds_name(cid)
+    out = ["%%put @@BEGIN %s %s;" % (cid, ctx)]
     if ctx == "sysfunc":
         out += ["%%let __r=%s;" % expr, "%%put @@M %s [&__r];" % cid]
     elif ctx == "sql":
         out += ["data work.one; x = 1; run;", "proc sql;",
-                "  create table work.%s as select %s as r from work.one;" % (cid, expr), "quit;",
-                "data _null_;", "  set work.%s;" % cid]
+                "  create table work.%s as select %s as r from work.one;" % (ds, expr), "quit;",
+                "data _null_;", "  set work.%s;" % ds]
         out += record_lines(cid, rtype)
         out.append("run;")
     else:
-        out.append("data work.%s;" % cid)
+        out.append("data work.%s;" % ds)
         if setup:
             out.append("  " + setup)
         out.append("  r = %s;" % expr)
@@ -264,6 +275,53 @@ def program(area, fn, cid, ctx, expr, setup, rtype, note, source, tags, glob):
             out.append("  drop s;")
         out.append("run;")
     out.append("%%put @@END %s;" % cid)
+    return out
+
+
+COLLECT = r"""%put @@COLLECT;
+%macro __sasonr_collect(cases);
+  %local i c dsid n rc;
+  data work.matrix;
+  %do i = 1 %to %sysfunc(countw(&cases, %str( )));
+    %let c = %scan(&cases, &i, %str( ));
+    %let n = 0;
+    %let dsid = %sysfunc(open(work.&c));
+    %if &dsid > 0 %then %do;
+      %let n = %sysfunc(attrn(&dsid, nlobs));
+      %let rc = %sysfunc(close(&dsid));
+    %end;
+    %if &n > 0 %then %do;
+      set work.&c(rename=(r=&c));
+    %end;
+  %end;
+  run;
+  proc datasets lib=work nolist nowarn;
+    save matrix;
+  quit;
+%mend __sasonr_collect;"""
+
+
+def matrix_program(area, name, rows, source, tags, glob):
+    """One SAS program for all cases of a function / format (layout: case_format.md, matrix layout)."""
+    main = [r for r in rows if r["group"] != "isolated"]
+    iso = [r for r in rows if r["group"] == "isolated"]
+    out = ["/* %s/%s: verification matrix, %d cases (inputs and notes in cases.csv)" % (area, name, len(rows)),
+           "   source: " + source,
+           "   tags: " + ", ".join(tags),
+           "   one step per case between %put @@BEGIN <case> and %put @@END <case>; cases that stop",
+           "   with an ERROR come last; NOSYNTAXCHECK keeps a compile-time ERROR from putting the later",
+           "   steps into syntax-check mode; after %put @@COLLECT the one-row results are joined into",
+           "   WORK.MATRIX (one column per case) and the per-case data sets are deleted */",
+           "options nosource2 linesize=max nosyntaxcheck;"]
+    out += glob
+    for r in main + iso:
+        out += r["_block"]
+    out += COLLECT.split("\n")
+    names = [ds_name(r["case"]) for r in rows if r["context"] != "sysfunc"]
+    out.append("%__sasonr_collect(")
+    for k in range(0, len(names), 6):
+        out.append("  " + " ".join(names[k:k + 6]))
+    out.append(")")
     return "\n".join(out) + "\n"
 
 
@@ -272,37 +330,54 @@ def case_id(fn, ctx, expr, setup):
     return "%s_%s" % (fn, h)
 
 
+def old_group(case_dir, cid):
+    """isolated when an earlier gold run of the case (one-case layout) ended with an ERROR."""
+    m = os.path.join(case_dir, cid, "meta.yaml")
+    if not os.path.exists(m):
+        return None
+    for ln in open(m, encoding="utf-8"):
+        if ln.startswith("sas_rc:"):
+            try:
+                return "isolated" if int(ln.split(":", 1)[1]) >= 2 else "main"
+            except ValueError:
+                return None
+    return None
+
+
 def write_cases(out_root, fn, cases, rtype, source, tags, glob, area, keep_only):
+    """tests/conformance/<area>/<FN>/: program.sas, cases.csv, meta.yaml (gold: expected/ via refresh_gold.py)."""
     d = os.path.join(out_root, fn)
     os.makedirs(d, exist_ok=True)
+    prev = {}
+    pc = os.path.join(d, "cases.csv")
+    if os.path.exists(pc):
+        with open(pc, newline="") as f:
+            prev = {r["case"]: r.get("group") or "" for r in csv.DictReader(f)}
     rows, seen = [], set()
     for ctx, expr, setup, note in cases:
         cid = case_id(fn, ctx, expr, setup)
         if cid in seen:
             continue
         seen.add(cid)
-        rows.append({"case": cid, "context": ctx, "expr": expr, "setup": setup, "note": note})
-        cd = os.path.join(d, cid)
-        os.makedirs(cd, exist_ok=True)
         # an expression wrapped in another function (lengthc(strip(...))) records that function's type
         rt = rtype
         outer = split_call(expr) if ctx in ("data", "sql") else None
         if outer and outer[0].upper() != fn and INV_TYPES.get(outer[0].upper()):
             rt = INV_TYPES[outer[0].upper()]
-        prog = program(area, fn, cid, "datastep" if ctx == "ce" else ctx, expr, setup, rt, note, source,
-                       tags + (["compile_error"] if ctx == "ce" else []), glob)
-        p = os.path.join(cd, "program.sas")
-        if not os.path.exists(p) or open(p, encoding="latin-1").read() != prog:
-            with open(p, "w", encoding="latin-1", newline="\n") as f:
-                f.write(prog)
-    # drop cases no longer generated
-    for old in os.listdir(d):
-        od = os.path.join(d, old)
-        if os.path.isdir(od) and old not in seen and old.startswith(fn + "_"):
-            import shutil
-            shutil.rmtree(od)
-    with open(os.path.join(d, "cases.csv"), "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["case", "context", "expr", "setup", "note"])
+        grp = "isolated" if ctx == "ce" else (old_group(d, cid) or prev.get(cid) or "main")
+        rows.append({"case": cid, "context": ctx, "expr": expr, "setup": setup, "note": note, "group": grp,
+                     "_block": case_block(cid, "datastep" if ctx == "ce" else ctx, expr, setup, rt)})
+    prog = matrix_program(area, fn, rows, source, tags, glob)
+    p = os.path.join(d, "program.sas")
+    if not os.path.exists(p) or open(p, encoding="latin-1").read() != prog:
+        with open(p, "w", encoding="latin-1", newline="\n") as f:
+            f.write(prog)
+    mp = os.path.join(d, "meta.yaml")
+    if not os.path.exists(mp):
+        with open(mp, "w", newline="\n") as f:
+            f.write("case: %s/%s\nlayout: matrix\n" % (area, fn))
+    with open(pc, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["case", "context", "expr", "setup", "note", "group"], extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
     return len(rows)

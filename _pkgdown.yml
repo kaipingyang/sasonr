@@ -68,6 +68,7 @@ reference:
   - sas_run
   - sas_translate
   - sas_export_work
+  - sasonr_strict
 - title: Front end (lexer, parser, analysis)
   contents:
   - sas_lex
