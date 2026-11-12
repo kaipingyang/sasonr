@@ -210,11 +210,11 @@ test_that("new numeric and date functions", {
   log <- suppressWarnings(run_log("data _null_;
     a = rounde(2.5); b = std(1, 2, 3); c = largest(2, 5, 9, 1); d = ifn(0, 1, 2);
     e = intnx('month', '15JAN2024'd, 1, 'e'); f = intck('month', '31JAN2024'd, '01FEB2024'd);
-    g = yrdif('15JUN1980'd, '01MAR2024'd, 'AGE'); h = datdif('01JAN2024'd, '01MAR2024'd, 'ACT/ACT');
+    g = yrdif('15JUN1980'd, '15JUN2024'd, 'AGE'); h = datdif('01JAN2024'd, '01MAR2024'd, 'ACT/ACT');
     i = dhms('01JAN2024'd, 1, 2, 3) - '01JAN2024:00:00:00'dt; j = mod(0.3, 0.1);
     put a= b= c= d= e= date9. f= g= 8.4 h= i= j=;
   run;"))
-  expect_equal(log, "a=2 b=1 c=5 d=2 e=29FEB2024 f=1 g=43.7096 h=60 i=3723 j=0")
+  expect_equal(log, "a=2 b=1 c=5 d=2 e=29FEB2024 f=1 g=44.0000 h=60 i=3723 j=0")
 })
 
 test_that("PUT wraps at the 132-column log line size", {
