@@ -194,7 +194,9 @@ expr_type <- function(e, st) {
             a <- expr_type(e$args[[1]], st)
             w <- if (a$type == "char") a$len else 12L
           }
-          return(list(type = "char", len = as.integer(w)))
+          # $HEXw. yields w/2 bytes, every other character informat keeps w
+          len <- if (identical(e$fmt$name, "hex")) as.integer(w %/% 2L) else as.integer(w)
+          return(list(type = "char", len = len))
         }
         return(num)
       }

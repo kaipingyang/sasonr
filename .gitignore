@@ -19,3 +19,5 @@ inst/sashelp/
 .sasuser/
 __pycache__/
 *.pyc
+#
+results.txt

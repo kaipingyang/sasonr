@@ -247,3 +247,13 @@ test_that("CALL MISSING / SORTN, STOP, INFORMAT and ATTRIB statements", {
 run;")
   expect_equal(log, "d=15JAN2024 n=0007")
 })
+
+test_that("$HEX informat turns hex digit pairs into bytes", {
+  res <- sas_run("data a; r = input('4142', $hex4.); l = length(r); run;")
+  expect_identical(res$work$a$r, "AB")
+  expect_equal(res$work$a$l, 2)
+  # width 6 gives three bytes
+  res6 <- sas_run("data a; r = input('414243', $hex6.); l = length(r); run;")
+  expect_identical(res6$work$a$r, "ABC")
+  expect_equal(res6$work$a$l, 3)
+})
