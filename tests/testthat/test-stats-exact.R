@@ -3,6 +3,14 @@
 
 hex <- function(x) paste(rev(as.character(writeBin(x, raw()))), collapse = "")
 
+# hex16 text -> double, for the bit-exact expectations below.
+unhex <- function(h) {
+  vapply(h, function(one) {
+    b <- as.raw(strtoi(substring(one, seq(1L, 15L, 2L), seq(2L, 16L, 2L)), 16L))
+    readBin(b, "double", size = 8L, endian = "big")
+  }, 0, USE.NAMES = FALSE)
+}
+
 test_that("the emulated fused multiply-add is exactly rounded", {
   expect_identical(stats_fma(0.1, 10, -1), 5.551115123125783e-17)
   expect_identical(stats_fma(3, 1 / 3, -1), -2^-54) # 3 * (1/3 rounded) - 1, exactly
@@ -45,15 +53,6 @@ test_that("PROC SQL GROUP BY on data not flagged as sorted fails loud for order-
   expect_identical(sorted$work$s$s, c(0.1 + 0.7, 0.2))
 })
 
-test_that("PROC MEANS: STD is approximate (strict fails loud), SUM and MEAN are exact", {
-  code <- "data a; input x @@; datalines;\n0.1 0.2 0.3\n;\nrun;\nproc means data=a noprint; var x; output out=o sum=s mean=m; run;"
-  r <- sas_run(code)
-  expect_identical(r$work$o$s, Reduce(`+`, c(0.1, 0.2, 0.3)))
-  expect_identical(r$work$o$m, Reduce(`+`, c(0.1, 0.2, 0.3)) / 3)
-  withr::with_options(list(sasonr.strict = TRUE),
-    expect_error(sas_run(sub("sum=s mean=m", "std=sd", code, fixed = TRUE)), class = "sasonr_not_verified"))
-})
-
 test_that("MOD and MODZ: exact remainders inside the verified domain, fail loud outside", {
   expect_identical(sas_f_mod(10, 3), 1)
   expect_identical(sas_f_mod(5.5, 2), 1.5)
@@ -67,3 +66,46 @@ test_that("MOD and MODZ: exact remainders inside the verified domain, fail loud 
 test_that("HARMEAN sums the reciprocals in argument order", {
   expect_identical(sas_f_harmean(0.1, 0.2, 0.3), 3 / Reduce(`+`, 1 / c(0.1, 0.2, 0.3)))
 })
+
+test_that("PROC MEANS CSS: shifted sums finalised about the reported mean", {
+  # SAS 9.4: data constant to within 1E-14 relative give the uncorrected
+  # sum of squares (the mean is taken to be the first value)
+  x <- c(1, 1 + 2^-52, 1 + 3 * 2^-52)
+  expect_identical(hex(stats_means_css(x)), "39a4000000000000")
+  # otherwise sdd - md * (2 * sd - n * md) with md = SUM/n - c0
+  expect_identical(hex(stats_means_css(c(0.1, 0.2, 0.3))), "3f947ae147ae147a")
+  expect_identical(hex(stats_means_css(c(1, 2, 3, 4))), "4014000000000000")
+  # one value: no corrected sum of squares
+  expect_identical(stats_means_css(5), 0)
+})
+
+test_that("PROC MEANS STD is fuzzed to 0 for constant data", {
+  # SAS 9.4: a variance within 2^-86 of MEAN^2 gives STD = 0 ...
+  expect_identical(stats_means_std(10 * 2^-104, 1), 0)
+  # ... but STDERR (which is not fuzzed) stays: sqrt(VAR / n)
+  expect_identical(sqrt((10 * 2^-104 / 2) / 3), unhex("3cb4a7e9cb8a3491"))
+  # ordinary data: sqrt(VAR)
+  expect_identical(stats_means_std(2, 1), sqrt(2))
+  expect_true(is.na(stats_means_std(NA_real_, 1)))
+})
+
+test_that("PROC MEANS: CSS, VAR, STD, STDERR, CV and USS are bit-identical to SAS", {
+  code <- paste0(
+    "data a; input g x; datalines;\n",
+    "1 0.1\n1 0.2\n1 0.3\n2 1\n2 2\n2 3\n2 4\n",
+    "3 1\n3 1.0000000000000002\n3 1.0000000000000006\n;\nrun;\n",
+    "proc means data=a noprint; by g; var x;",
+    " output out=o n=n mean=m css=css var=v std=sd stderr=se cv=cv uss=uss; run;"
+  )
+  r <- sas_run(code) # strict mode: every statistic below must be verified
+  o <- r$work$o
+  expect_identical(o$m, unhex(c("3fc999999999999b", "4004000000000000", "3ff0000000000001")))
+  expect_identical(o$css, unhex(c("3f947ae147ae147a", "4014000000000000", "39a4000000000000")))
+  expect_identical(o$v, unhex(c("3f847ae147ae147a", "3ffaaaaaaaaaaaab", "3994000000000000")))
+  expect_identical(o$sd, unhex(c("3fb9999999999999", "3ff4a7e9cb8a3491", "0000000000000000")))
+  expect_identical(o$se, unhex(c("3fad8f7208e6b82c", "3fe4a7e9cb8a3491", "3cb4a7e9cb8a3491")))
+  expect_identical(o$cv, unhex(c("4048ffffffffffff", "4049d1e43e6cc1b5", "0000000000000000")))
+  expect_identical(o$uss, unhex(c("3fc1eb851eb851ed", "403e000000000000", "4008000000000004")))
+})
+
+
