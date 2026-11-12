@@ -186,6 +186,13 @@ gen_call <- function(e, cx) {
                    if (nzchar(e$qq)) paste0(", qq = ", r_str(e$qq)) else "",
                    if (cx$mode == "row" && !is.null(e$col)) at_code(e) else ""))
   }
+  if (e$name == "exist") {
+    # EXIST(member <, type>): the generated DATA step environment carries the
+    # WORK library (`work`, see engine_eval()); SASHELP is read from inst/sashelp
+    a1 <- gen_expr(e$args[[1]], cx)
+    a2 <- if (length(e$args) > 1) gen_expr(e$args[[2]], cx) else "NULL"
+    return(sprintf("sas_f_exist(%s, %s, work)", a1, a2))
+  }
   args <- unlist(lapply(e$args, function(a) {
     if (a$node == "of") vapply(a$vars, var_ref, "", cx = cx) else gen_expr(a, cx)
   }))

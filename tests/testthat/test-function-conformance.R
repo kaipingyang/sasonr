@@ -129,3 +129,23 @@ run;")
   expect_equal(res$work$d$f, 21966)   # 15 Feb -> start of 21-29 block
   expect_equal(res$work$d$g, 21946)   # 20 Jan -> start of 1-15 block of February
 })
+test_that("EXIST() reports WORK and SASHELP members", {
+  res <- sas_run("data work.present; x = 1; run;
+data work.check;
+  e1 = exist('work.present');
+  e2 = exist('work.absent');
+  e3 = exist('present');
+  e4 = exist('work.present', 'DATA');
+run;")
+  expect_equal(res$work$check$e1, 1)
+  expect_equal(res$work$check$e2, 0)
+  expect_equal(res$work$check$e3, 1)
+  expect_equal(res$work$check$e4, 1)
+  # a member of SASHELP (inst/sashelp) and an absent one
+  res2 <- sas_run("data c; e = exist('sashelp.class'); f = exist('sashelp.nope'); run;")
+  expect_equal(res2$work$c$e, 1)
+  expect_equal(res2$work$c$f, 0)
+  # unverified shapes fail loud instead of guessing
+  expect_error(sas_run("data c; e = exist('other.ds'); run;"), class = "sasonr_unsupported")
+  expect_error(sas_run("data c; e = exist('work.x', 'VIEW'); run;"), class = "sasonr_unsupported")
+})

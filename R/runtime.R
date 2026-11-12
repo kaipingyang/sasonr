@@ -508,6 +508,45 @@ sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
 }
 
 #' @export
+# EXIST(member <, type>): 1 when the member exists, 0 otherwise.  WORK and
+# SASHELP are the libraries sasonr knows (R/sashelp.R); any other library, and
+# TYPE values other than ANY/DATA, fail loud because they are not verified.
+sas_f_exist <- function(name, type = NULL, .work = NULL, .at = NULL) {
+  n <- max(length(name), if (is.null(type)) 1L else length(type))
+  nm <- rep_len(as_sas_chr(name), n)
+  ty <- if (is.null(type)) rep_len("ANY", n) else rep_len(toupper(trimws(as_sas_chr(type))), n)
+  vapply(seq_len(n), function(i) sas_exist_one(nm[i], ty[i], .work, .at), 0)
+}
+
+sas_exist_one <- function(nm, type, .work, .at) {
+  nm <- trimws(nm)
+  if (is.na(nm) || !nzchar(nm)) {
+    abort_unsupported("EXIST() of a missing or blank member name (not verified against SAS)")
+  }
+  if (!type %in% c("ANY", "DATA")) {
+    abort_unsupported(paste0("EXIST() with TYPE='", type, "' (only ANY and DATA are verified)"))
+  }
+  dot <- regexpr("\\.", nm)
+  if (dot > 0) {
+    lib <- tolower(substr(nm, 1L, dot - 1L))
+    mem <- substr(nm, dot + 1L, nchar(nm))
+  } else {
+    lib <- "work"
+    mem <- nm
+  }
+  mem <- tolower(trimws(mem))
+  if (!nzchar(mem)) abort_unsupported("EXIST() with an empty member name (not verified against SAS)")
+  if (lib %in% c("work", "w")) {
+    if (is.null(.work)) abort_unsupported("EXIST() outside a DATA step environment")
+    return(as.numeric(mem %in% tolower(ls(.work, all.names = TRUE))))
+  }
+  if (lib == "sashelp") {
+    return(as.numeric(file.exists(file.path(sashelp_dir(), paste0(mem, ".rds")))))
+  }
+  abort_unsupported(paste0("EXIST('", toupper(lib), ".", toupper(mem), "') for a library other than WORK or SASHELP (not verified against SAS)"))
+}
+
+#' @export
 sas_f_index <- function(x, s) {
   ab <- recycle2(as_sas_chr(x), s)
   out <- mapply(function(a, b) regexpr(b, a, fixed = TRUE)[1], ab[[1]], ab[[2]], USE.NAMES = FALSE)

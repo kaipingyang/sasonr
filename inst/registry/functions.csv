@@ -56,6 +56,7 @@
 "DHMS","function","4","4","num num num num","num","8 (numeric)","4-4","data sysfunc sql","sas_f_dhms","partial",49,46,0,3,0,"3 case(s) fail loud (sasonr_unsupported)","fails loud for: DHMS with these arguments (SAS 9.4 behaviour not verified)","2026-11-12"
 "DIVIDE","function","2","2","num num","num","8 (numeric)","2-2","data","sas_f_divide","verified",29,29,0,0,0,"","","2026-11-12"
 "EXP","function","1","1","num","num","8 (numeric)","1-1","","sas_f_exp","approximate",621,620,1,0,0,"1 case(s) differ in the last bits","","2026-11-12"
+"EXIST","function","1","2","char char","num","","1-2","data","sas_f_exist","partial",1,1,0,0,0,"","fails loud for: libraries other than WORK/SASHELP, TYPE other than ANY/DATA","2026-11-13"
 "FACT","function","1","1","num","num","8 (numeric)","1-1","data","sas_f_fact","verified",20,20,0,0,0,"","","2026-11-12"
 "FIND","function","2","4","char char any any","num","8 (numeric)","2-4","data sql","sas_f_find","partial",43,41,0,2,0,"2 case(s) fail loud (sasonr_unsupported)","fails loud for: %SYSFUNC(FIND)","2026-11-12"
 "FINDC","function","2","4","char char any any","num","8 (numeric)","2-4","data","sas_f_findc","verified",44,44,0,0,0,"","","2026-11-12"
