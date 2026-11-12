@@ -55,17 +55,17 @@ test_that("TABLES grouping syntax and LIST / n-way tables", {
 })
 
 test_that("statistics not yet verified against SAS fail loud by default", {
-  for (src in c("proc freq data=d; tables trt / binomial; weight n; run;",
-                "proc freq data=d; by s; tables trt*resp / chisq; weight n; run;",
+  for (src in c("proc freq data=d; by s; tables trt*resp / chisq; weight n; run;",
                 "proc freq data=d; tables s*trt*resp / cmh; weight n; run;",
-                "proc freq data=d; tables trt*resp / alpha=0.1; weight n; run;",
-                "proc freq data=d; tables trt*resp; exact binomial; weight n; run;",
+                "proc freq data=d; tables trt*resp / relrisk; weight n; run;",
+                "proc freq data=d; tables trt / expected; weight n; run;",
                 "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;")) {
     expect_error(sas_run(paste(freq_data, src)), class = "sasonr_unsupported")
   }
-  # plain frequency tables are unaffected; CHISQ / FISHER are verified
+  # plain frequency tables are unaffected; CHISQ / FISHER / BINOMIAL are verified
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / out=o outpct; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq fisher; exact fisher; weight n; run;")))
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt / binomial; weight n; run;")))
 })
 
 test_that("CHISQ / FISHER listing layout and the no-statistics cases (SAS gold)", {
@@ -118,8 +118,10 @@ test_that("CHISQ, FISHER, CMH and BINOMIAL agree with reference computations", {
   expect_equal(st$xpl, stats::fisher.test(tb, alternative = "less")$p.value)
   b <- sasonr:::freq_binomial(c(7, 13))
   ci <- stats::binom.test(7, 20)$conf.int
-  expect_equal(c(b$xl_bin, b$xu_bin), as.numeric(ci))
+  expect_equal(as.numeric(b$cl$exact), as.numeric(ci))
   expect_equal(b$bin, 0.35)
+  half <- 1.959963984540054 * sqrt(0.35 * 0.65 / 20)
+  expect_equal(as.numeric(b$cl$wald), c(0.35 - half, 0.35 + half))
 })
 
 test_that("listing of statistics and fail-loud surfaces", {
@@ -155,4 +157,40 @@ test_that("crosstab headings show variable labels; a long row heading wraps the 
 proc freq data=d; tables a*b; run;")
   expect_true("a(Analysis Value)" %in% res$listing)
   expect_true("          b(Planned Treatment)" %in% res$listing)
+})
+
+test_that("PROC FREQ BINOMIAL prints the proportion, limits and the test", {
+  code <- "
+data d; input resp $ cnt; datalines;
+No 27
+Yes 13
+;
+run;
+proc freq data=d; weight cnt; tables resp / binomial(level='Yes'); run;"
+  lst <- squish(sas_run(code)$listing)
+  expect_true(any(grepl("Binomial Proportion", lst)))
+  expect_true(any(grepl("resp = Yes", lst)))
+  expect_true(any(grepl("^Proportion 0\\.3250$", lst)))
+  expect_true(any(grepl("^ASE 0\\.0741$", lst)))
+  expect_true(any(grepl("95% Lower Conf Limit 0\\.1799$", lst)))
+  expect_true(any(grepl("Exact Conf Limits", lst)))
+  expect_true(any(grepl("95% Upper Conf Limit 0\\.4913$", lst)))
+  expect_true(any(grepl("^Z -2\\.2136$", lst)))
+  expect_true(any(grepl("Two-sided Pr > \\|Z\\| 0\\.0269$", lst)))
+  expect_true(any(grepl("Sample Size = 40", lst)))
+})
+
+test_that("PROC FREQ BINOMIAL confidence limit types and P= option", {
+  code <- "
+data d; input resp $ cnt; datalines;
+No 27
+Yes 13
+;
+run;
+proc freq data=d; weight cnt; tables resp / binomial(level='Yes' p=0.3 cl=(wald wilson)); run;"
+  lst <- squish(sas_run(code)$listing)
+  expect_true(any(grepl("Confidence Limits for the Binomial Proportion", lst)))
+  expect_true(any(grepl("^Test of H0: Proportion = 0.3$", lst)))
+  expect_true(any(grepl("^Wald 0\\.1799 0\\.4701$", lst)))
+  expect_true(any(grepl("^Wilson ", lst)))
 })

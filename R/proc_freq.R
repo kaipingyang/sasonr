@@ -120,6 +120,65 @@ parse_proc_freq <- function(p, line) {
   list(type = "proc", name = "freq", line = line, options = opts, stmts = body$stmts, titles = body$titles)
 }
 
+# BINOMIAL( options ): P=, LEVEL=, CL= (single value or a list), ALPHA=,
+# CORRECT, EXACT.  Unsupported options fail loud rather than being ignored.
+parse_freq_binomial_opts <- function(p, line) {
+  opts <- list(p0 = NULL, level = NULL, cl = NULL, correct = FALSE, exact = FALSE, alpha = NULL)
+  expect_type(p, "lparen", "'(' after BINOMIAL")
+  value_list <- function() {
+    vals <- character()
+    if (tk_type(p) == "lparen") {
+      advance(p)
+      while (tk_type(p) != "rparen") {
+        if (tk_type(p) == "comma") { advance(p); next }
+        vals <- c(vals, tolower(as.character(parse_opt_value(p, "CL", line))))
+      }
+      advance(p)
+    } else {
+      vals <- tolower(as.character(parse_opt_value(p, "CL", line)))
+    }
+    vals
+  }
+  while (tk_type(p) != "rparen") {
+    if (tk_type(p) == "comma") { advance(p); next }
+    if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in BINOMIAL()"), line)
+    k <- tk_low(p)
+    kl <- tk_line(p)
+    if (is_op(p, "=", 1L)) {
+      advance(p, 2L)
+      if (k == "p") {
+        opts$p0 <- as.numeric(parse_opt_value(p, "P", kl))
+      } else if (k == "level") {
+        # LEVEL=2 (a number) selects the second level of the table; LEVEL='x'
+        # selects the level whose formatted value is x.
+        if (tk_type(p) == "num") {
+          opts$level_index <- as.integer(as.numeric(tk_val(p)))
+          advance(p)
+        } else {
+          opts$level <- parse_opt_value(p, "LEVEL", kl)
+        }
+      } else if (k == "cl") {
+        opts$cl <- value_list()
+      } else if (k == "alpha") {
+        opts$alpha <- as.numeric(parse_opt_value(p, "ALPHA", kl))
+      } else {
+        abort_unsupported(paste0("BINOMIAL option ", toupper(k), "="), kl)
+      }
+      next
+    }
+    advance(p)
+    if (k == "correct") {
+      opts$correct <- TRUE
+    } else if (k == "exact") {
+      opts$exact <- TRUE
+    } else {
+      abort_unsupported(paste0("BINOMIAL option ", toupper(k)), kl)
+    }
+  }
+  advance(p)
+  opts
+}
+
 parse_freq_tables <- function(p) {
   line <- tk_line(p)
   advance(p)
@@ -170,7 +229,7 @@ parse_freq_tables <- function(p) {
       if (!k %in% freq_table_opts) abort_unsupported(paste0("TABLES option ", toupper(k)), kl)
       if (k %in% c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "exact")) freq_stat_gate(k, kl)
       advance(p)
-      if (k %in% c("binomial") && tk_type(p) == "lparen") abort_unsupported("BINOMIAL options", kl)
+      if (k == "binomial" && tk_type(p) == "lparen") o$binomial_opts <- parse_freq_binomial_opts(p, kl)
       o[[k]] <- TRUE
     }
   }
@@ -767,21 +826,53 @@ freq_fisher <- function(tb) {
   }
 }
 
-freq_binomial <- function(cnt, alpha = 0.05, p0 = 0.5) {
+# Binomial proportion, its confidence limits (Wald, Wilson, Clopper-Pearson,
+# Agresti-Coull, Jeffreys, and the continuity-corrected Wald/Wilson forms) and
+# the asymptotic test of H0: p = p0.  `cnt` is the count per level (in table
+# order, missing levels excluded), `x_index` selects the level the proportion
+# refers to.
+freq_binomial <- function(cnt, alpha = 0.05, p0 = 0.5, x_index = 1L, cl = NULL, correct = FALSE) {
   n <- sum(cnt)
-  x <- cnt[1]
+  x <- cnt[x_index]
   p <- x / n
   z <- stats::qnorm(1 - alpha / 2)
   ase <- sqrt(p * (1 - p) / n)
-  lo_cp <- if (x == 0) 0 else stats::qbeta(alpha / 2, x, n - x + 1)
-  hi_cp <- if (x == n) 1 else stats::qbeta(1 - alpha / 2, x + 1, n - x)
+  z2 <- z * z
+  lim <- function(v) c(max(0, v[1]), min(1, v[2]))
+  wald <- lim(c(p - z * ase, p + z * ase))
+  cp <- c(if (x <= 0) 0 else stats::qbeta(alpha / 2, x, n - x + 1),
+          if (x >= n) 1 else stats::qbeta(1 - alpha / 2, x + 1, n - x))
+  den <- 1 + z2 / n
+  centre <- (p + z2 / (2 * n)) / den
+  half <- z * sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / den
+  wilson <- lim(c(centre - half, centre + half))
+  nt <- n + z2
+  pt <- (x + z2 / 2) / nt
+  hac <- z * sqrt(pt * (1 - pt) / nt)
+  agresti <- lim(c(pt - hac, pt + hac))
+  jeffreys <- lim(c(if (x <= 0) 0 else stats::qbeta(alpha / 2, x + 0.5, n - x + 0.5),
+                    if (x >= n) 1 else stats::qbeta(1 - alpha / 2, x + 0.5, n - x + 0.5)))
+  # continuity-corrected forms (SAS: 1/(2n) shift for Wald, the score interval
+  # with the ±1 terms for Wilson)
+  wald_c <- lim(c(p - (z * ase + 0.5 / n), p + (z * ase + 0.5 / n)))
+  q <- 1 - p
+  wl <- (2 * n * p + z2 - 1 - z * sqrt(max(0, z2 - 2 - 1 / n + 4 * p * (n * q + 1)))) / (2 * (n + z2))
+  wu <- (2 * n * p + z2 + 1 + z * sqrt(max(0, z2 + 2 - 1 / n + 4 * p * (n * q - 1)))) / (2 * (n + z2))
+  wilson_c <- lim(c(wl, wu))
   ase0 <- sqrt(p0 * (1 - p0) / n)
   zt <- (p - p0) / ase0
-  pone <- if (zt > 0) stats::pnorm(zt, lower.tail = FALSE) else stats::pnorm(zt)
+  ztc <- (abs(p - p0) - 0.5 / n) / ase0 * if (p >= p0) 1 else -1
+  ptail <- function(zv) if (zv >= 0) stats::pnorm(zv, lower.tail = FALSE) else stats::pnorm(zv)
+  pone <- ptail(zt)
+  ponec <- ptail(ztc)
   # exact test: one-sided toward the observed side, two-sided = 2 * one-sided
   xone <- if (p >= p0) stats::pbinom(x - 1, n, p0, lower.tail = FALSE) else stats::pbinom(x, n, p0)
-  list(n = n, bin = p, e_bin = ase, l_bin = max(0, p - z * ase), u_bin = min(1, p + z * ase),
-       xl_bin = lo_cp, xu_bin = hi_cp, e0_bin = ase0, z_bin = zt, pl_bin = pone, p2_bin = min(1, 2 * pone),
+  list(n = n, x = x, bin = p, e_bin = ase,
+       cl = list(wald = wald, wilson = wilson, exact = cp, agresticoull = agresti,
+                 jeffreys = jeffreys, wald_corrected = wald_c, wilson_corrected = wilson_c),
+       correct = correct, alpha = alpha, p0 = p0,
+       e0_bin = ase0, z_bin = zt, pl_bin = pone, p2_bin = min(1, 2 * pone),
+       zc_bin = ztc, plc_bin = ponec, p2c_bin = min(1, 2 * ponec),
        xpl_bin = xone, xp2_bin = min(1, 2 * xone))
 }
 
@@ -846,7 +937,31 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   if (any(as.numeric(tab) < 0)) abort_unsupported("statistics with negative weights")
   if ("binomial" %in% want) {
     if (k != 1) abort_syntax("BINOMIAL is valid only for one-way tables")
-    st <- c(st, freq_binomial(as.numeric(tab), o$alpha %||% 0.05))
+    bo <- o$binomial_opts %||% list()
+    l1 <- lv[[1]]
+    cnt <- as.numeric(tab)
+    is_m <- if (length(l1$values)) freq_is_missing(l1$values) else logical(length(cnt))
+    keep <- !is_m
+    cnt_nm <- cnt[keep]
+    txt <- l1$text[keep]
+    sel <- 1L
+    if (!is.null(bo$level_index)) {
+      if (bo$level_index < 1L || bo$level_index > length(txt)) {
+        abort_runtime(paste0("The value ", bo$level_index, " of the LEVEL= option is not a level of the table variable."))
+      }
+      sel <- bo$level_index
+    } else if (!is.null(bo$level)) {
+      want_txt <- sas_rtrim(as.character(bo$level))
+      hit <- which(sas_rtrim(txt) == want_txt)
+      if (length(hit) == 0) abort_runtime(paste0("The value ", want_txt, " of the LEVEL= option is not a level of the table variable."))
+      sel <- hit[1]
+    }
+    alpha <- bo$alpha %||% o$alpha %||% 0.05
+    st <- c(st, freq_binomial(cnt_nm, alpha, bo$p0 %||% 0.5, sel, bo$cl, isTRUE(bo$correct)))
+    st$bin_level <- txt[sel]
+    st$bin_var <- vars[1]
+    st$bin_cl <- bo$cl
+    st$bin_exact <- isTRUE(bo$exact) || "binomial" %in% sp$exact
   }
   if (any(c("chisq", "fisher") %in% want)) {
     if (k == 1) {
@@ -898,7 +1013,86 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   st
 }
 
+# The BINOMIAL block of a one-way table: proportion, confidence limits and the
+# asymptotic (and optionally exact) test.  Column widths are the ones SAS uses:
+# the proportion block is 32 columns wide, 22 when CL= is given (the limits
+# then go in their own table), 35 when the exact test adds its longer labels.
+freq_binomial_listing <- function(st, info) {
+  f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
+  pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
+  conf_pct <- format((1 - st$alpha) * 100, trim = TRUE, scientific = FALSE)
+  lv <- st$bin_level
+  disp <- info[[st$bin_var]]$disp %||% st$bin_var
+  centre <- function(txt, width) strrep(" ", max(0L, (width - nchar(txt)) %/% 2L))
+  line <- function(lab, val, width) {
+    n <- width - nchar(val)
+    paste0(sprintf(paste0("%-", n, "s"), lab), val)
+  }
+  exact <- isTRUE(st$bin_exact)
+  w_prop <- if (exact) 35L else if (!is.null(st$bin_cl)) 22L else 32L
+  w_test <- if (exact) 35L else 32L
+  out <- character()
+  out <- c(out, paste0(centre("Binomial Proportion", w_prop), "Binomial Proportion"),
+           paste0(centre(paste0(disp, " = ", lv), w_prop), disp, " = ", lv), "")
+  out <- c(out, line(if (exact) "Proportion (P)" else "Proportion", f4(st$bin), w_prop),
+           line("ASE", f4(st$e_bin), w_prop))
+  cl <- st$bin_cl
+  if (is.null(cl)) {
+    out <- c(out, line(paste0(conf_pct, "% Lower Conf Limit"), f4(st$cl$wald[1]), w_prop),
+             line(paste0(conf_pct, "% Upper Conf Limit"), f4(st$cl$wald[2]), w_prop), "",
+             "Exact Conf Limits",
+             line(paste0(conf_pct, "% Lower Conf Limit"), f4(st$cl$exact[1]), w_prop),
+             line(paste0(conf_pct, "% Upper Conf Limit"), f4(st$cl$exact[2]), w_prop), "")
+  } else {
+    types <- if (identical(cl, "all")) c("wald", "wilson", "exact", "agresticoull", "jeffreys") else cl
+    types <- unique(unlist(lapply(types, function(t) {
+      if (t == "all") c("wald", "wilson", "exact", "agresticoull", "jeffreys")
+      else if (t %in% c("wald", "wilson")) if (isTRUE(st$correct)) paste0(t, "_corrected") else t
+      else t
+    })))
+    nm <- c(wald = "Wald", wilson = "Wilson", exact = "Clopper-Pearson (Exact)",
+            agresticoull = "Agresti-Coull", jeffreys = "Jeffreys",
+            wald_corrected = "Wald (Corrected)", wilson_corrected = "Wilson (Corrected)")
+    bad <- setdiff(types, names(nm))
+    if (length(bad)) abort_unsupported(paste0("BINOMIAL CL= ", toupper(bad[1])))
+    rows <- sort(nm[types])
+    l0 <- max(nchar(rows)) + 4L
+    width <- l0 + 21L
+    out <- c(out, paste0(centre("Confidence Limits for the Binomial Proportion", width),
+                         "Confidence Limits for the Binomial Proportion"),
+             paste0(centre(paste0("Proportion = ", f4(st$bin)), width), "Proportion = ", f4(st$bin)), "",
+             paste0(sprintf(paste0("%-", l0, "s"), "Type"), sprintf("%21s", paste0(conf_pct, "% Confidence Limits"))), "")
+    for (r in rows) {
+      key <- names(nm)[match(r, nm)]
+      lim <- st$cl[[key]]
+      out <- c(out, paste0(sprintf(paste0("%-", l0, "s"), r), sprintf("%6s", f4(lim[1])), sprintf("%15s", f4(lim[2]))))
+    }
+    out <- c(out, "")
+  }
+  out <- c(out, paste0("  Test of H0: Proportion = ", freq_num(st$p0)), "")
+  use_c <- isTRUE(st$correct) && !is.null(cl)
+  zt <- if (use_c) st$zc_bin else st$z_bin
+  pone <- if (use_c) st$plc_bin else st$pl_bin
+  ptwo <- if (use_c) st$p2c_bin else st$p2_bin
+  side <- if (zt >= 0) ">" else "<"
+  out <- c(out,
+           line("ASE under H0", f4(st$e0_bin), w_test),
+           line("Z", f4(zt), w_test),
+           line(paste0("One-sided Pr ", side, "  Z"), pv(pone), w_test),
+           line("Two-sided Pr > |Z|", pv(ptwo), w_test))
+  if (use_c) out <- c(out, "", "The asymptotic test includes a continuity correction.")
+  if (exact) {
+    l0 <- max(nchar(c("One-sided Pr >=  P", "Two-sided = 2 * One-sided"))) + 4L
+    side_exact <- if (st$bin >= st$p0) ">=" else "<="
+    out <- c(out, "", "Exact Test",
+             line(paste0("One-sided Pr ", side_exact, "  P"), pv(st$xpl_bin), l0 + 6L),
+             line("Two-sided = 2 * One-sided", pv(st$xp2_bin), l0 + 6L))
+  }
+  c(out, "", freq_sample_size(st))
+}
+
 freq_stats_listing <- function(st, tab, vars, info, o, sp) {
+  if (!is.null(st$bin_var)) return(freq_binomial_listing(st, info))
   out <- character()
   k <- length(vars)
   f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
