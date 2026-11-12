@@ -3,7 +3,7 @@
 
 freq_table_opts <- c("list", "missing", "missprint", "nocum", "nopercent", "norow", "nocol", "nofreq", "sparse",
                      "outpct", "outcum", "chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "noprint", "nowarn",
-                     "exact", "expected", "deviation", "cellchi2")
+                     "exact", "expected", "deviation", "cellchi2", "relrisk", "riskdiff")
 freq_output_kw <- c("n", "nmiss", "pchi", "lrchi", "ajchi", "mhchi", "chisq", "phi", "contgy", "cramv", "cmh",
                     "cmh1", "cmh2", "cmhcor", "cmhrms", "cmhga", "binomial", "bin")
 
@@ -77,7 +77,7 @@ parse_proc_freq <- function(p, line) {
         kws <- character()
         while (tk_type(p) == "name") {
           k <- tk_low(p)
-          if (!k %in% c("fisher", "binomial", "bin")) abort_unsupported(paste0("EXACT ", toupper(k)), sline)
+          if (!k %in% c("fisher", "binomial", "bin", "relrisk", "riskdiff")) abort_unsupported(paste0("EXACT ", toupper(k)), sline)
           freq_stat_gate(paste0("exact_", if (k == "bin") "binomial" else k), sline)
           kws <- c(kws, if (k == "bin") "binomial" else k)
           advance(p)
@@ -173,6 +173,107 @@ parse_freq_binomial_opts <- function(p, line) {
   opts
 }
 
+# One CL= type list: a single name or a parenthesised list of names.
+freq_parse_cl_types <- function(p, line, what) {
+  read_one <- function() {
+    if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in", what, "CL="), line)
+    v <- tk_low(p)
+    advance(p)
+    v
+  }
+  if (tk_type(p) != "lparen") return(read_one())
+  advance(p)
+  out <- character()
+  while (tk_type(p) != "rparen") {
+    if (tk_type(p) == "comma") {
+      advance(p)
+      next
+    }
+    out <- c(out, read_one())
+  }
+  advance(p)
+  unique(out)
+}
+
+# RELRISK <( relrisk-options )>: CL= and COLUMN= are implemented; the tests
+# (EQUAL, EQUIV, NONINF, SUP), MARGIN= and METHOD= are not verified.
+parse_freq_relrisk_opts <- function(p, line) {
+  opts <- list(cl = NULL, column = 1L, printall = FALSE)
+  expect_type(p, "lparen", "'(' after RELRISK")
+  while (tk_type(p) != "rparen") {
+    if (tk_type(p) == "comma") {
+      advance(p)
+      next
+    }
+    if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in RELRISK()"), line)
+    k <- tk_low(p)
+    kl <- tk_line(p)
+    if (is_op(p, "=", 1L)) {
+      advance(p, 2L)
+      if (k == "cl") {
+        types <- freq_parse_cl_types(p, kl, "RELRISK")
+        bad <- setdiff(types, c("wald", "exact", "score"))
+        if (length(bad) > 0) abort_unsupported(paste0("RELRISK CL=", toupper(bad[1])), kl)
+        opts$cl <- types
+      } else if (k == "column") {
+        opts$column <- as.integer(as.numeric(parse_opt_value(p, "COLUMN", kl)))
+      } else {
+        abort_unsupported(paste0("RELRISK option ", toupper(k), "="), kl)
+      }
+      next
+    }
+    advance(p)
+    if (k == "printall") {
+      abort_unsupported("RELRISK option PRINTALL", kl)
+    } else {
+      abort_unsupported(paste0("RELRISK option ", toupper(k)), kl)
+    }
+  }
+  advance(p)
+  opts
+}
+
+# RISKDIFF <( riskdiff-options )>: CL=, COLUMN= and CORRECT are implemented;
+# NORISKS, COMMON and the risk-difference tests are not verified.
+parse_freq_riskdiff_opts <- function(p, line) {
+  opts <- list(cl = NULL, column = 1L, correct = FALSE, norisks = FALSE)
+  expect_type(p, "lparen", "'(' after RISKDIFF")
+  while (tk_type(p) != "rparen") {
+    if (tk_type(p) == "comma") {
+      advance(p)
+      next
+    }
+    if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in RISKDIFF()"), line)
+    k <- tk_low(p)
+    kl <- tk_line(p)
+    if (is_op(p, "=", 1L)) {
+      advance(p, 2L)
+      if (k == "cl") {
+        types <- freq_parse_cl_types(p, kl, "RISKDIFF")
+        types <- sub("^agresticafo$", "ac", types)
+        bad <- setdiff(types, c("wald", "newcombe", "exact", "ac", "ha"))
+        if (length(bad) > 0) abort_unsupported(paste0("RISKDIFF CL=", toupper(bad[1])), kl)
+        opts$cl <- unique(types)
+      } else if (k == "column") {
+        opts$column <- as.integer(as.numeric(parse_opt_value(p, "COLUMN", kl)))
+      } else {
+        abort_unsupported(paste0("RISKDIFF option ", toupper(k), "="), kl)
+      }
+      next
+    }
+    advance(p)
+    if (k == "correct") {
+      opts$correct <- TRUE
+    } else if (k == "norisks") {
+      abort_unsupported("RISKDIFF option NORISKS", kl)
+    } else {
+      abort_unsupported(paste0("RISKDIFF option ", toupper(k)), kl)
+    }
+  }
+  advance(p)
+  opts
+}
+
 parse_freq_tables <- function(p) {
   line <- tk_line(p)
   advance(p)
@@ -221,9 +322,15 @@ parse_freq_tables <- function(p) {
         next
       }
       if (!k %in% freq_table_opts) abort_unsupported(paste0("TABLES option ", toupper(k)), kl)
-      if (k %in% c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "exact")) freq_stat_gate(k, kl)
+      if (k %in% c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "exact", "relrisk", "riskdiff")) freq_stat_gate(k, kl)
       advance(p)
-      if (k == "binomial" && tk_type(p) == "lparen") o$binomial_opts <- parse_freq_binomial_opts(p, kl)
+      if (k == "binomial" && tk_type(p) == "lparen") {
+        o$binomial_opts <- parse_freq_binomial_opts(p, kl)
+      } else if (k == "relrisk" && tk_type(p) == "lparen") {
+        o$relrisk_opts <- parse_freq_relrisk_opts(p, kl)
+      } else if (k == "riskdiff" && tk_type(p) == "lparen") {
+        o$riskdiff_opts <- parse_freq_riskdiff_opts(p, kl)
+      }
       o[[k]] <- TRUE
     }
   }
@@ -278,8 +385,18 @@ translate_proc_freq <- function(step, meta, last) {
   }
   for (rq in requests) {
     if (length(rq$vars) > 1 && any(c("binomial") %in% names(rq$opts))) abort_syntax("BINOMIAL is valid only for one-way tables", rq$line)
+    if (length(rq$vars) != 2 && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
+      abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is verified)", rq$line)
+    }
   }
-  stat_opts <- c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2")
+  if (any(c("relrisk", "riskdiff") %in% exact)) {
+    for (k in intersect(c("relrisk", "riskdiff"), exact)) {
+      if (!any(vapply(requests, function(r) isTRUE(r$opts[[k]]), TRUE))) {
+        abort_unsupported(paste0("EXACT ", toupper(k), " without the ", toupper(k), " option in the TABLES statement"), step$line)
+      }
+    }
+  }
+  stat_opts <- c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff")
   if (!is.null(by) && (length(exact) > 0 || any(vapply(requests, function(r) any(stat_opts %in% names(r$opts)), logical(1))))) {
     abort_unsupported("PROC FREQ statistics with BY groups (listing page layout not verified)", by$line)
   }
@@ -450,8 +567,13 @@ freq_one_request <- function(db, wt, rq, sp) {
   missprint <- isTRUE(o$missprint) && !miss_opt
   anymiss <- Reduce(`|`, lapply(vars, function(v) freq_is_missing(db[[v]])), rep(FALSE, nrow(db)))
   nmiss <- if (miss_opt) 0 else sum(wt[anymiss])
-  if (length(vars) != 2 && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
-    abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for a one-way or n-way table (only the two-way crosstab layout is verified)", rq$line)
+  # The TABLES statement options EXPECTED / DEVIATION / CELLCHI2 apply to
+  # two-way and multiway tables in the default crosstabulation cell format; the
+  # manual states that they have no effect for one-way frequency tables, so
+  # SAS accepts and ignores them there.  The n-way (CROSSLIST-style) cell rows
+  # are not printed by sasonr yet, so that case still fails loud.
+  if (length(vars) > 2 && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
+    abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for an n-way table (only the two-way crosstab layout is verified)", rq$line)
   }
   if (missprint && length(vars) > 1) abort_unsupported("MISSPRINT for multi-way tables", rq$line)
   keep <- if (miss_opt || missprint) rep(TRUE, nrow(db)) else !anymiss
@@ -932,11 +1054,434 @@ freq_cmh <- function(tab, lv) {
   out
 }
 
+# RISKDIFF / RELRISK ----------------------------------------------------------------
+#
+# The risk estimates, risk differences and the odds ratio / relative risk table
+# follow the manual sections "Risks and Risk Differences" and "Odds Ratio and
+# Relative Risks" (docset procstat, FREQ chapter); the cell/layout details are
+# pinned down by the case gold (freq_stats/c04, c05, c06, c09, c13).
+# Exact unconditional confidence limits (the "Exact (Score)" rows) invert two
+# one-sided exact tests based on the per-table score statistic and eliminate the
+# nuisance parameter by the maximum p-value over it, exactly as the manual's
+# subsection "Exact Unconditional Confidence Limits" describes.
+
+freq_clip01 <- function(v) c(max(0, v[1]), min(1, v[2]))
+
+# exact (Clopper-Pearson) confidence limits of a binomial proportion
+freq_cp_ci <- function(x, n, alpha) {
+  c(if (x <= 0) 0 else stats::qbeta(alpha / 2, x, n - x + 1),
+    if (x >= n) 1 else stats::qbeta(1 - alpha / 2, x + 1, n - x))
+}
+
+# Wilson (score) confidence limits of a binomial proportion
+freq_wilson_ci <- function(x, n, alpha) {
+  p <- x / n
+  z <- stats::qnorm(1 - alpha / 2)
+  z2 <- z * z
+  den <- 1 + z2 / n
+  centre <- (p + z2 / (2 * n)) / den
+  half <- z * sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / den
+  freq_clip01(c(centre - half, centre + half))
+}
+
+# constrained maximum likelihood estimates under p1 - p2 = delta (the cubic
+# solution given in the manual; vectorised over the reference-set tables)
+freq_mle_rd_vec <- function(delta, n1, n2, p1h, p2h) {
+  theta <- n2 / n1
+  a <- 1 + theta
+  b <- -(1 + theta + p1h + theta * p2h + delta * (theta + 2))
+  cc <- delta^2 + delta * (2 * p1h + theta + 1) + p1h + theta * p2h
+  dd <- -p1h * delta * (1 + delta)
+  v <- b^3 / (3 * a)^3 - b * cc / (6 * a^2) + dd / (2 * a)
+  inside <- b^2 / (3 * a)^2 - cc / (3 * a)
+  bad <- !is.finite(inside) | inside < 0
+  inside[bad] <- 0
+  u <- sign(v) * sqrt(inside)
+  arg <- ifelse(u == 0, 0, v / u^3)
+  arg[!is.finite(arg)] <- 0
+  arg <- pmin(pmax(arg, -1), 1)
+  w <- (pi + acos(arg)) / 3
+  pt1 <- 2 * u * cos(w) - b / (3 * a)
+  out <- cbind(pt1, pt1 - delta)
+  out[bad, ] <- NA_real_
+  out
+}
+
+# constrained maximum likelihood estimates under p1 / p2 = r
+freq_mle_rr_vec <- function(r, n1, n2, p1h, p2h) {
+  theta <- n2 / n1
+  a <- 1 + theta
+  b <- -(r * (1 + theta * p2h) + theta + p1h)
+  cc <- r * (p1h + theta * p2h)
+  disc <- b^2 - 4 * a * cc
+  ok <- is.finite(disc) & disc >= 0
+  disc[!ok] <- 0
+  pt1 <- (-b - sqrt(disc)) / (2 * a)
+  out <- cbind(pt1, pt1 / r)
+  out[!ok, ] <- NA_real_
+  out
+}
+
+# number of grid points for the nuisance-parameter maximum: the p-values are
+# smooth in p2, so a moderately dense grid plus a local refinement of the
+# largest maxima is accurate and much faster than an exhaustive dense grid
+freq_exact_grid <- function(n1, n2) {
+  if (as.numeric(n1 + 1L) * (n2 + 1L) > 5e5) {
+    abort_unsupported("EXACT RELRISK / RISKDIFF with a reference set this large (only small 2x2 tables are verified)")
+  }
+  if (as.numeric(n1 + 1L) * (n2 + 1L) <= 5000) 4001L else 2001L
+}
+
+# binomial probability matrices on the nuisance grid: A[a, k] = P(a | n1, p1_k)
+freq_prob_grid <- function(x, n, p, K) {
+  p <- pmin(pmax(p, 1e-300), 1 - 1e-16)
+  exp(outer(x, log(p)) + outer(n - x, log1p(-p)) + rep(lchoose(n, x), K))
+}
+
+# maximum over the nuisance parameter of a sum over the selected tables
+freq_sup_nuisance <- function(sel, A, B, g, ff) {
+  v <- colSums(A * (sel %*% B))
+  best <- max(v)
+  if (length(g) < 20001L) {
+    # a coarser grid: refine the largest local maxima
+    K <- length(g)
+    cand <- which(v >= c(-Inf, v[-1L]) & v >= c(v[-1L], -Inf))
+    cand <- cand[order(v[cand], decreasing = TRUE)][seq_len(min(5L, length(cand)))]
+    for (kk in cand) {
+      if (kk > 1L && kk < K) {
+        o <- stats::optimize(function(p2) -ff(p2), interval = c(g[kk - 1L], g[kk + 1L]), maximum = FALSE)
+        best <- max(best, -o$objective)
+      }
+    }
+  }
+  best
+}
+
+# One-sided p-values of the exact unconditional score test of
+# H0: risk difference = delta.  The reference set holds all 2x2 tables with the
+# observed row totals; PU/PL are the maximum over p2 of the probability of the
+# tables with T(a) >= t0 / T(a) <= t0.
+freq_rd_exact_p <- function(delta, x1, x2, n1, n2) {
+  K <- freq_exact_grid(n1, n2)
+  aa <- seq.int(0L, n1)
+  bb <- seq.int(0L, n2)
+  ta <- rep(aa, times = n2 + 1L)
+  tb <- rep(bb, each = n1 + 1L)
+  p1h <- ta / n1
+  p2h <- tb / n2
+  m <- freq_mle_rd_vec(delta, n1, n2, p1h, p2h)
+  if (!all(is.finite(m))) return(c(PU = NA_real_, PL = NA_real_))
+  V <- (n1 + n2) / (n1 + n2 - 1) * (m[, 1] * (1 - m[, 1]) / n1 + m[, 2] * (1 - m[, 2]) / n2)
+  if (any(!is.finite(V)) || any(V <= 0)) return(c(PU = NA_real_, PL = NA_real_))
+  T <- (p1h - p2h - delta) / sqrt(V)
+  t0 <- T[x1 + 1L + x2 * (n1 + 1L)]
+  PU_sel <- matrix(T >= t0, n1 + 1L, n2 + 1L)
+  PL_sel <- matrix(T <= t0, n1 + 1L, n2 + 1L)
+  lo <- max(0, -delta)
+  hi <- min(1, 1 - delta)
+  if (hi <= lo) return(c(PU = NA_real_, PL = NA_real_))
+  g <- seq(lo, hi, length.out = K)
+  p1 <- delta + g
+  A <- freq_prob_grid(aa, n1, p1, K)
+  B <- freq_prob_grid(bb, n2, g, K)
+  ff <- function(p2) sum(PU_sel * outer(dbinom(aa, n1, delta + p2), dbinom(bb, n2, p2)))
+  ffl <- function(p2) sum(PL_sel * outer(dbinom(aa, n1, delta + p2), dbinom(bb, n2, p2)))
+  c(PU = freq_sup_nuisance(PU_sel, A, B, g, ff), PL = freq_sup_nuisance(PL_sel, A, B, g, ffl))
+}
+
+# One-sided p-values of the exact unconditional score test of H0: RR = r.
+freq_rr_exact_p <- function(r, x1, x2, n1, n2) {
+  K <- freq_exact_grid(n1, n2)
+  aa <- seq.int(0L, n1)
+  bb <- seq.int(0L, n2)
+  ta <- rep(aa, times = n2 + 1L)
+  tb <- rep(bb, each = n1 + 1L)
+  p1h <- ta / n1
+  p2h <- tb / n2
+  m <- freq_mle_rr_vec(r, n1, n2, p1h, p2h)
+  if (!all(is.finite(m))) return(c(PU = NA_real_, PL = NA_real_))
+  V <- m[, 1] * (1 - m[, 1]) / n1 + r^2 * m[, 2] * (1 - m[, 2]) / n2
+  T <- (p1h - r * p2h) / sqrt(V)
+  # the all-zero table has both maximum likelihood estimates at the boundary:
+  # its statistic is the limit 0 (the table is consistent with any relative risk)
+  T[1] <- 0
+  if (any(!is.finite(T))) return(c(PU = NA_real_, PL = NA_real_))
+  t0 <- T[x1 + 1L + x2 * (n1 + 1L)]
+  PU_sel <- matrix(T >= t0, n1 + 1L, n2 + 1L)
+  PL_sel <- matrix(T <= t0, n1 + 1L, n2 + 1L)
+  lo <- 0
+  hi <- min(1, 1 / r)
+  if (hi <= lo) return(c(PU = NA_real_, PL = NA_real_))
+  g <- seq(lo, hi, length.out = K)
+  p1 <- r * g
+  A <- freq_prob_grid(aa, n1, p1, K)
+  B <- freq_prob_grid(bb, n2, g, K)
+  ff <- function(p2) sum(PU_sel * outer(dbinom(aa, n1, r * p2), dbinom(bb, n2, p2)))
+  ffl <- function(p2) sum(PL_sel * outer(dbinom(aa, n1, r * p2), dbinom(bb, n2, p2)))
+  c(PU = freq_sup_nuisance(PU_sel, A, B, g, ff), PL = freq_sup_nuisance(PL_sel, A, B, g, ffl))
+}
+
+# bracket [a, b] around a root of f, walking from `start` (f > 0 there) toward
+# `dir` until f turns <= 0; NA counts as "not positive"
+freq_bracket <- function(f, start, dir, step = 0.02, n = 500L) {
+  fs <- f(start)
+  if (!is.finite(fs) || fs <= 0) abort_unsupported("exact confidence limits: the p-value function did not start positive")
+  b <- start
+  for (i in seq_len(n)) {
+    a <- b + dir * step
+    fa <- f(a)
+    if (is.na(fa) || fa <= 0) return(c(a, b))
+    b <- a
+  }
+  abort_unsupported("exact confidence limits: the p-value function did not cross the confidence level")
+}
+
+# bisection for a root between a (f <= 0) and b (f > 0)
+freq_bisect <- function(f, a, b, tol = 1e-7) {
+  fa <- f(a)
+  if (is.na(fa)) abort_unsupported("exact confidence limits: p-value evaluation failed")
+  for (i in seq_len(200L)) {
+    m <- (a + b) / 2
+    fm <- f(m)
+    if (is.na(fm)) abort_unsupported("exact confidence limits: p-value evaluation failed")
+    if ((fm > 0) == (fa > 0)) {
+      a <- m
+      fa <- fm
+    } else {
+      b <- m
+    }
+    if (abs(b - a) < tol) break
+  }
+  (a + b) / 2
+}
+
+# exact unconditional confidence limits for the risk difference (tail method,
+# per-table score statistic; the manual's "Exact Unconditional Confidence Limits")
+freq_rd_exact_ci <- function(x1, x2, n1, n2, alpha) {
+  a2 <- alpha / 2
+  dhat <- x1 / n1 - x2 / n2
+  fU <- function(d) {
+    v <- freq_rd_exact_p(d, x1, x2, n1, n2)["PU"]
+    if (is.na(v)) -Inf else v - a2
+  }
+  fL <- function(d) {
+    v <- freq_rd_exact_p(d, x1, x2, n1, n2)["PL"]
+    if (is.na(v)) -Inf else v - a2
+  }
+  bl <- freq_bracket(fU, dhat, -1, step = 0.05)
+  bu <- freq_bracket(fL, dhat, 1, step = 0.05)
+  c(lower = freq_bisect(fU, bl[1], bl[2], tol = 1e-6), upper = freq_bisect(fL, bu[1], bu[2], tol = 1e-6))
+}
+
+# exact unconditional confidence limits for the relative risk
+freq_rr_exact_ci <- function(x1, x2, n1, n2, alpha) {
+  a2 <- alpha / 2
+  rhat <- (x1 / n1) / (x2 / n2)
+  fU <- function(lr) {
+    v <- freq_rr_exact_p(exp(lr), x1, x2, n1, n2)["PU"]
+    if (is.na(v)) -Inf else v - a2
+  }
+  fL <- function(lr) {
+    v <- freq_rr_exact_p(exp(lr), x1, x2, n1, n2)["PL"]
+    if (is.na(v)) -Inf else v - a2
+  }
+  bl <- freq_bracket(fU, log(rhat), -1, step = 0.05)
+  bu <- freq_bracket(fL, log(rhat), 1, step = 0.05)
+  c(lower = exp(freq_bisect(fU, bl[1], bl[2], tol = 1e-6)), upper = exp(freq_bisect(fL, bu[1], bu[2], tol = 1e-6)))
+}
+
+# Miettinen-Nurminen (score) confidence limits for the relative risk; the
+# manual's score limits include the n/(n-1) bias correction by default
+freq_rr_score_ci <- function(x1, x2, n1, n2, alpha) {
+  n <- n1 + n2
+  p1h <- x1 / n1
+  p2h <- x2 / n2
+  rhat <- p1h / p2h
+  crit <- stats::qchisq(1 - alpha, 1)
+  stat <- function(r) {
+    m <- freq_mle_rr_vec(r, n1, n2, p1h, p2h)
+    if (!all(is.finite(m))) return(Inf)
+    V <- n / (n - 1) * (m[1, 1] * (1 - m[1, 1]) / n1 + r^2 * m[1, 2] * (1 - m[1, 2]) / n2)
+    (p1h - r * p2h)^2 / V
+  }
+  f <- function(lr) {
+    v <- stat(exp(lr))
+    if (is.na(v)) Inf else v - crit
+  }
+  lrhat <- log(rhat)
+  lo <- lrhat
+  while (f(lo) <= 0 && lo > lrhat - 60) lo <- lo - 0.1
+  hi <- lrhat
+  while (f(hi) <= 0 && hi < lrhat + 60) hi <- hi + 0.1
+  if (f(lo) <= 0 || f(hi) <= 0) abort_unsupported("relative risk score confidence limits did not converge")
+  c(lower = exp(freq_bisect(f, lo, lrhat)), upper = exp(freq_bisect(f, hi, lrhat)))
+}
+
+# Wald confidence limits (log scale) for the odds ratio and the relative risk
+freq_or_wald_ci <- function(a, b, cc, dd, alpha) {
+  z <- stats::qnorm(1 - alpha / 2)
+  or <- a * dd / (b * cc)
+  v <- 1 / a + 1 / b + 1 / cc + 1 / dd
+  c(or * exp(-z * sqrt(v)), or * exp(z * sqrt(v)))
+}
+
+freq_rr_wald_ci <- function(x1, x2, n1, n2, alpha) {
+  z <- stats::qnorm(1 - alpha / 2)
+  rr <- (x1 / n1) / (x2 / n2)
+  v <- 1 / x1 + 1 / x2 - 1 / n1 - 1 / n2
+  c(rr * exp(-z * sqrt(v)), rr * exp(z * sqrt(v)))
+}
+
+# Agresti-Caffo confidence limits for the risk difference
+freq_rd_ac_ci <- function(x1, x2, n1, n2, alpha) {
+  z <- stats::qnorm(1 - alpha / 2)
+  p1 <- (x1 + 1) / (n1 + 2)
+  p2 <- (x2 + 1) / (n2 + 2)
+  d <- p1 - p2
+  se <- sqrt(p1 * (1 - p1) / (n1 + 2) + p2 * (1 - p2) / (n2 + 2))
+  c(d - z * se, d + z * se)
+}
+
+# Hauck-Anderson confidence limits for the risk difference
+freq_rd_ha_ci <- function(x1, x2, n1, n2, alpha) {
+  z <- stats::qnorm(1 - alpha / 2)
+  p1 <- x1 / n1
+  p2 <- x2 / n2
+  d <- p1 - p2
+  se <- sqrt(p1 * (1 - p1) / (n1 - 1) + p2 * (1 - p2) / (n2 - 1))
+  cc <- 1 / (2 * min(n1, n2))
+  c(d - (cc + z * se), d + (cc + z * se))
+}
+
+# Newcombe hybrid-score confidence limits for the risk difference
+freq_rd_newcombe_ci <- function(x1, x2, n1, n2, alpha) {
+  p1 <- x1 / n1
+  p2 <- x2 / n2
+  d <- p1 - p2
+  w1 <- freq_wilson_ci(x1, n1, alpha)
+  w2 <- freq_wilson_ci(x2, n2, alpha)
+  c(d - sqrt((p1 - w1[1])^2 + (w2[2] - p2)^2),
+    d + sqrt((w1[2] - p1)^2 + (p2 - w2[1])^2))
+}
+
+# Everything RISKDIFF / RELRISK need for one 2x2 table request.
+freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
+  k <- length(vars)
+  if (k != 2) abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is verified)")
+  tb <- matrix(as.numeric(tab), nrow = dim(tab)[1])
+  if (nrow(tb) != 2L || ncol(tb) != 2L) {
+    abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is verified)")
+  }
+  if (any(tb < 0)) abort_unsupported("RELRISK / RISKDIFF with negative weights")
+  n <- sum(tb)
+  n1 <- sum(tb[1, ])
+  n2 <- sum(tb[2, ])
+  if (n1 <= 0 || n2 <= 0) abort_unsupported("RELRISK / RISKDIFF for a table with an empty row")
+  alpha <- o$alpha %||% 0.05
+  z <- stats::qnorm(1 - alpha / 2)
+  exact_rd <- "riskdiff" %in% sp$exact
+  exact_rel <- "relrisk" %in% sp$exact
+  stat <- list()
+  rate <- function(x, m) {
+    p <- x / m
+    ase <- sqrt(p * (1 - p) / m)
+    list(risk = p, ase = ase, wald = freq_clip01(c(p - z * ase, p + z * ase)),
+         cp = freq_cp_ci(x, m, alpha))
+  }
+  if (isTRUE(o$riskdiff)) {
+    rd <- o$riskdiff_opts %||% list()
+    column <- rd$column %||% 1L
+    if (!column %in% c(1L, 2L)) abort_unsupported(paste0("RISKDIFF COLUMN=", column))
+    if (isTRUE(rd$correct)) abort_unsupported("RISKDIFF option CORRECT")
+    if (exact_rd) {
+      if (any(abs(c(tb, n1, n2) - round(c(tb, n1, n2))) > 1e-9)) {
+        abort_unsupported("EXACT RISKDIFF with non-integer weights (the exact test is enumerated over integer tables)")
+      }
+      if (any(tb == 0)) abort_unsupported("EXACT RISKDIFF with a zero cell (not verified)")
+    }
+    cols <- vector("list", 2L)
+    for (j in 1:2) {
+      x1 <- tb[1, j]
+      x2 <- tb[2, j]
+      r1 <- rate(x1, n1)
+      r2 <- rate(x2, n2)
+      rt <- rate(x1 + x2, n)
+      d <- r1$risk - r2$risk
+      ase_d <- sqrt(r1$risk * (1 - r1$risk) / n1 + r2$risk * (1 - r2$risk) / n2)
+      cols[[j]] <- list(r1 = r1, r2 = r2, rt = rt, diff = d, ase_d = ase_d,
+                        wald = c(d - z * ase_d, d + z * ase_d))
+    }
+    if (exact_rd) {
+      ex <- freq_rd_exact_ci(tb[1, 1], tb[2, 1], n1, n2, alpha)
+      cols[[1]]$exact <- ex
+      # column 2 risks are the complements of the column 1 risks
+      cols[[2]]$exact <- c(-ex[2], -ex[1])
+    }
+    cls <- rd$cl
+    if (!is.null(cls)) {
+      if ("exact" %in% cls && !exact_rd) {
+        abort_unsupported("RISKDIFF CL=EXACT without the EXACT RISKDIFF statement")
+      }
+      vals <- list()
+      for (t in cls) {
+        vals[[t]] <- switch(t,
+          wald = cols[[1]]$wald,
+          ac = freq_rd_ac_ci(tb[1, 1], tb[2, 1], n1, n2, alpha),
+          ha = freq_rd_ha_ci(tb[1, 1], tb[2, 1], n1, n2, alpha),
+          newcombe = freq_rd_newcombe_ci(tb[1, 1], tb[2, 1], n1, n2, alpha),
+          exact = cols[[1]]$exact)
+      }
+      stat$rd_cl <- list(types = cls, vals = vals)
+    }
+    stat$rd <- list(alpha = alpha, column = column, cols = cols, exact = exact_rd,
+                    col_disp = info[[vars[2]]]$disp, col_text = lv[[2]]$text,
+                    cl = !is.null(cls))
+  }
+  if (isTRUE(o$relrisk)) {
+    rel <- o$relrisk_opts %||% list()
+    column <- rel$column %||% 1L
+    if (!column %in% c(1L, 2L)) abort_unsupported(paste0("RELRISK COLUMN=", column))
+    a <- tb[1, 1]
+    b <- tb[1, 2]
+    cc <- tb[2, 1]
+    dd <- tb[2, 2]
+    or <- if (a > 0 && b > 0 && cc > 0 && dd > 0) a * dd / (b * cc) else NA_real_
+    or_ci <- if (is.na(or)) c(NA_real_, NA_real_) else freq_or_wald_ci(a, b, cc, dd, alpha)
+    rr1 <- if (a > 0 && cc > 0) (a / n1) / (cc / n2) else NA_real_
+    rr2 <- if (b > 0 && dd > 0) (b / n1) / (dd / n2) else NA_real_
+    rr1_ci <- if (is.na(rr1)) c(NA_real_, NA_real_) else freq_rr_wald_ci(a, cc, n1, n2, alpha)
+    rr2_ci <- if (is.na(rr2)) c(NA_real_, NA_real_) else freq_rr_wald_ci(b, dd, n1, n2, alpha)
+    st <- list(alpha = alpha, column = column, or = or, or_ci = or_ci, rr1 = rr1, rr1_ci = rr1_ci,
+               rr2 = rr2, rr2_ci = rr2_ci, cl = rel$cl, exact = exact_rel,
+               col_disp = info[[vars[2]]]$disp, col_text = lv[[2]]$text)
+    if (!is.null(rel$cl)) {
+      if ("exact" %in% rel$cl && !exact_rel) {
+        abort_unsupported("RELRISK CL=EXACT without the EXACT RELRISK statement")
+      }
+      if (is.na(rr1)) {
+        abort_unsupported("RELRISK CL= with a zero cell (confidence limits not verified for this table)")
+      }
+      vals <- list()
+      for (t in rel$cl) {
+        vals[[t]] <- switch(t,
+          wald = rr1_ci,
+          score = freq_rr_score_ci(a, cc, n1, n2, alpha),
+          exact = freq_rr_exact_ci(a, cc, n1, n2, alpha))
+      }
+      st$rr <- rr1
+      st$cl_vals <- vals
+    }
+    stat$rel <- st
+  }
+  stat
+}
+
 freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   k <- length(vars)
   want <- c(if (isTRUE(o$chisq)) "chisq", if (isTRUE(o$fisher) || "fisher" %in% sp$exact) "fisher",
             if (isTRUE(o$binomial) || "binomial" %in% sp$exact) "binomial",
-            if (any(c(o$cmh, o$cmh1, o$cmh2) %in% TRUE)) "cmh")
+            if (any(c(o$cmh, o$cmh1, o$cmh2) %in% TRUE)) "cmh",
+            if (isTRUE(o$riskdiff)) "riskdiff", if (isTRUE(o$relrisk)) "relrisk")
   okw <- sp$output$kws
   if (length(okw) > 0) {
     if (any(okw %in% c("pchi", "lrchi", "ajchi", "mhchi", "chisq", "phi", "contgy", "cramv"))) want <- c(want, "chisq")
@@ -1018,6 +1563,9 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   if ("cmh" %in% want) {
     if (k < 2) abort_syntax("CMH requires a two-way or n-way table")
     st <- c(st, freq_cmh(tab, lv))
+  }
+  if (any(c("riskdiff", "relrisk") %in% want)) {
+    st <- c(st, freq_rr_rd_stats(tab, lv, vars, info, o, sp))
   }
   # development hook: the conformance harness collects the computed statistics
   cap <- getOption("sasonr.freq_capture")
@@ -1109,6 +1657,11 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
   k <- length(vars)
   f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
   pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
+  # RISKDIFF / RELRISK print their blocks after the test statistics and share a
+  # single "Statistics for Table of ..." heading and a single Sample Size line.
+  more <- !is.null(st$rd) || !is.null(st$rel)
+  header <- if (k == 2) paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp) else ""
+  did <- FALSE
   if (isTRUE(st$oneway_chi) && isTRUE(o$chisq)) {
     out <- c(out, "   Chi-Square Test", "for Equal Proportions", "",
              paste0("Chi-Square", formatC(f4(st$pchi), width = 10L)), paste0("DF", formatC(sprintf("%.0f", st$df_pchi), width = 18L)),
@@ -1119,6 +1672,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
   } else if (isTRUE(st$nostat) && k == 2) {
     out <- c(out, paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp), "",
              "Row or column sum zero. No statistics computed for this table.", "", freq_sample_size(st))
+    did <- TRUE
   } else if ((isTRUE(o$chisq) || isTRUE(o$fisher) || "fisher" %in% sp$exact) && k == 2 && !is.null(st$pchi)) {
     # FISHER also prints the chi-square table (SAS computes it with every 2-way test)
     rows <- list(c("Chi-Square", st$df_pchi, st$pchi, st$p_pchi), c("Likelihood Ratio Chi-Square", st$df_lrchi, st$lrchi, st$p_lrchi))
@@ -1130,11 +1684,12 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
                            function(r) paste0(formatC(r[1], width = -32L), formatC(f4(as.numeric(r[2])), width = 12L)), ""))
     out <- c(out, paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp), "",
              paste0(formatC("Statistic", width = -27L), "   DF       Value      Prob"), strrep("-", 54), body, "")
+    did <- TRUE
     if (isTRUE(st$small > 0) && !isTRUE(o$nowarn)) {
       out <- c(out, sprintf(" WARNING: %.0f%% of the cells have expected counts less", st$small * 100),
                "          than 5. Chi-Square may not be a valid test.", "")
     }
-    if (is.null(st$fisher)) out <- c(out, freq_sample_size(st))
+    if (is.null(st$fisher) && !more) out <- c(out, freq_sample_size(st))
   }
   if (!is.null(st$fisher) && k == 2) {
     fz <- st$fisher
@@ -1144,13 +1699,13 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
                paste0(formatC("Left-sided Pr <= F", width = -26L), formatC(pv(fz$xpl), width = 8L)),
                paste0(formatC("Right-sided Pr >= F", width = -26L), formatC(pv(fz$xpr), width = 8L)), "",
                paste0(formatC("Table Probability (P)", width = -26L), formatC(pv(fz$xpt), width = 8L)),
-               paste0(formatC("Two-sided Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "",
-               freq_sample_size(st))
+               paste0(formatC("Two-sided Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "")
+      if (!more) out <- c(out, freq_sample_size(st))
     } else {
       out <- c(out, "       Fisher's Exact Test", strrep("-", 34),
                paste0(formatC("Table Probability (P)", width = -26L), formatC(pv(fz$xpt), width = 8L)),
-               paste0(formatC("Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "",
-               freq_sample_size(st))
+               paste0(formatC("Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "")
+      if (!more) out <- c(out, freq_sample_size(st))
     }
   }
   if (!is.null(st$bin)) {
@@ -1176,7 +1731,100 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
              paste0("    2        Row Mean Scores Differ", formatC(sprintf("%.0f", st$df_cmhrms), width = 7L), formatC(f4(st$cmhrms), width = 12L), formatC(pv(st$p_cmhrms), width = 10L)),
              paste0("    3        General Association", formatC(sprintf("%.0f", st$df_cmhga), width = 10L), formatC(f4(st$cmhga), width = 12L), formatC(pv(st$p_cmhga), width = 10L)), "")
   }
+  if (!is.null(st$rd)) {
+    if (!did) {
+      out <- c(out, header, "")
+      did <- TRUE
+    }
+    out <- c(out, freq_riskdiff_listing(st, info))
+  }
+  if (!is.null(st$rel)) {
+    if (!did) {
+      out <- c(out, header, "")
+      did <- TRUE
+    }
+    out <- c(out, freq_relrisk_listing(st, info))
+  }
+  if (more) out <- c(out, freq_sample_size(st))
   out
+}
+
+# RISKDIFF: the column 1 / column 2 "Risk Estimates" tables, the difference row
+# with its exact limits when requested, and (for the selected column) the
+# "Confidence Limits for the Risk Difference" table.  Layout: freq_stats gold
+# c04/c05/c09/c13 (SAS 9.4 TS1M7).
+freq_riskdiff_listing <- function(st, info) {
+  rd <- st$rd
+  f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
+  zlab <- paste0(format_pct_level(rd$alpha), "%")
+  rowline <- function(lab, risk, ase, lo, hi, cp) {
+    paste(lab, f4(risk), f4(ase), f4(lo), f4(hi), f4(cp[1]), f4(cp[2]))
+  }
+  out <- character()
+  for (j in 1:2) {
+    cp <- rd$cols[[j]]
+    out <- c(out, paste0("Column ", j, " Risk Estimates"), "",
+             paste(zlab, "Exact", zlab),
+             "Risk ASE Confidence Limits Confidence Limits",
+             strrep("-", 77),
+             rowline("Row 1", cp$r1$risk, cp$r1$ase, cp$r1$wald[1], cp$r1$wald[2], cp$r1$cp),
+             rowline("Row 2", cp$r2$risk, cp$r2$ase, cp$r2$wald[1], cp$r2$wald[2], cp$r2$cp),
+             rowline("Total", cp$rt$risk, cp$rt$ase, cp$rt$wald[1], cp$rt$wald[2], cp$rt$cp), "")
+    dline <- paste("Difference", f4(cp$diff), f4(cp$ase_d), f4(cp$wald[1]), f4(cp$wald[2]))
+    if (isTRUE(rd$exact)) dline <- paste(dline, f4(cp$exact[1]), f4(cp$exact[2]))
+    out <- c(out, dline, "", "Difference is (Row 1 - Row 2)")
+    if (isTRUE(rd$exact)) {
+      out <- c(out, "Exact confidence limits for the risk difference are based on a score statistic.")
+    }
+    if (j == rd$column && !is.null(st$rd_cl)) {
+      labs <- c(ac = "Agresti-Caffo", exact = "Exact (Score)", ha = "Hauck-Anderson",
+                newcombe = "Newcombe", wald = "Wald")
+      types <- st$rd_cl$types
+      types <- types[order(labs[types])]
+      out <- c(out, "", "Confidence Limits for the Risk Difference",
+               paste("Risk Difference =", f4(cp$diff)), "",
+               paste("Type", zlab, "Confidence Limits"), "")
+      for (t in types) {
+        lim <- st$rd_cl$vals[[t]]
+        out <- c(out, paste(labs[[t]], f4(lim[1]), f4(lim[2])))
+      }
+      out <- c(out, "", paste0("Column ", j, " (", rd$col_disp, " = ", rd$col_text[j], ")"))
+    }
+    out <- c(out, "")
+  }
+  out
+}
+
+# RELRISK: the default "Odds Ratio and Relative Risks" table, or - when CL= is
+# given - the "Confidence Limits for the Relative Risk" table.  Layout:
+# freq_stats gold c04/c06/c13 (SAS 9.4 TS1M7).
+freq_relrisk_listing <- function(st, info) {
+  rel <- st$rel
+  f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
+  zlab <- paste0(format_pct_level(rel$alpha), "%")
+  if (is.null(rel$cl)) {
+    rows <- character()
+    if (!is.na(rel$or)) rows <- c(rows, paste("Odds Ratio", f4(rel$or), f4(rel$or_ci[1]), f4(rel$or_ci[2])))
+    if (!is.na(rel$rr1)) rows <- c(rows, paste("Relative Risk (Column 1)", f4(rel$rr1), f4(rel$rr1_ci[1]), f4(rel$rr1_ci[2])))
+    if (!is.na(rel$rr2)) rows <- c(rows, paste("Relative Risk (Column 2)", f4(rel$rr2), f4(rel$rr2_ci[1]), f4(rel$rr2_ci[2])))
+    out <- c("Odds Ratio and Relative Risks", "",
+             paste("Statistic Value", zlab, "Confidence Limits"), strrep("-", 66), rows)
+    if (length(rows) < 3L) out <- c(out, "", "One or more statistics not computed -- zero cell.")
+    return(c(out, ""))
+  }
+  labs <- c(exact = "Exact (Score)", score = "Score", wald = "Wald")
+  types <- rel$cl
+  types <- types[order(labs[types])]
+  l0 <- max(nchar(labs[types])) + 4L
+  out <- c("Confidence Limits for the Relative Risk",
+           paste("Relative Risk =", f4(rel$rr)), "",
+           paste("Type", zlab, "Confidence Limits"), "")
+  for (t in types) {
+    lim <- rel$cl_vals[[t]]
+    out <- c(out, paste(labs[[t]], f4(lim[1]), f4(lim[2])))
+  }
+  out <- c(out, "", paste0("Column ", rel$column, " (", rel$col_disp, " = ", rel$col_text[rel$column], ")"))
+  c(out, "")
 }
 
 # "Sample Size = n" after the statistics of a table, with the missing count

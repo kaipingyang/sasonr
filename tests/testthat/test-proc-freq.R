@@ -59,14 +59,17 @@ test_that("statistics not yet verified against SAS fail loud by default", {
   # ts1m2/freq_stats/oneway_expected), so it is not in this list
   for (src in c("proc freq data=d; by s; tables trt*resp / chisq; weight n; run;",
                 "proc freq data=d; tables s*trt*resp / cmh; weight n; run;",
-                "proc freq data=d; tables trt*resp / relrisk; weight n; run;",
+                "proc freq data=d; tables trt*resp; exact relrisk; weight n; run;",
                 "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;")) {
     expect_error(sas_run(paste(freq_data, src)), class = "sasonr_unsupported")
   }
-  # plain frequency tables are unaffected; CHISQ / FISHER / BINOMIAL are verified
+  # plain frequency tables are unaffected; CHISQ / FISHER / BINOMIAL and the
+  # RELRISK / RISKDIFF tables are verified
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / out=o outpct; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq fisher; exact fisher; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt / binomial; weight n; run;")))
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk riskdiff; weight n; run;")))
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / riskdiff(cl=(wald newcombe ac ha)); exact riskdiff; weight n; run;")))
 })
 
 test_that("CHISQ / FISHER listing layout and the no-statistics cases (SAS gold)", {
@@ -131,10 +134,51 @@ test_that("listing of statistics and fail-loud surfaces", {
   l <- squish(res$listing)
   expect_true("Statistics for Table of trt by resp" %in% l)
   expect_true(any(startsWith(l, "Two-sided Pr <= P")))
-  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk; run;")), class = "sasonr_unsupported")
-  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt / expected; run;")), class = "sasonr_unsupported")
+  # one-way tables accept and ignore the cell statistics options
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt / expected; run;")))
+  # EXACT RELRISK is not verified: the TS1M7 gold value is not reproducible
+  # from the documented tail-method score statistic, so it fails loud
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk(cl=(wald score)); exact relrisk; weight n; run;")),
+               class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt; output out=o binomial; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp; exact jt; run;")), class = "sasonr_unsupported")
+})
+
+test_that("PROC FREQ RISKDIFF / RELRISK print the risk estimates and the OR/RR table", {
+  res <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk riskdiff; weight n; run;"))
+  l <- squish(res$listing)
+  # table fixture: A 32 (13 N / 19 Y), B 29 (20 N / 9 Y), total 61
+  expect_true("Column 1 Risk Estimates" %in% l)
+  expect_true("Column 2 Risk Estimates" %in% l)
+  expect_true("Risk ASE Confidence Limits Confidence Limits" %in% l)
+  expect_true(any(grepl("^Row 1 0\\.406", l)))
+  expect_true(any(grepl("^Difference -0\\.283", l)))
+  expect_true("Difference is (Row 1 - Row 2)" %in% l)
+  expect_true("Odds Ratio and Relative Risks" %in% l)
+  expect_true(any(grepl("^Odds Ratio 0\\.3079 ", l)))
+  expect_true(any(grepl("^Relative Risk \\(Column 1\\) 0\\.5891 ", l)))
+  expect_equal(utils::tail(l, 1), "Sample Size = 61")
+  # RISKDIFF(CL=...) adds the confidence-limits table for the first column
+  res <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / riskdiff(cl=(wald ac ha newcombe)); weight n; run;"))
+  l <- squish(res$listing)
+  expect_true("Confidence Limits for the Risk Difference" %in% l)
+  expect_true(any(grepl("^Risk Difference = -0\\.283", l)))
+  expect_true(any(grepl("^Agresti-Caffo ", l)))
+  expect_true(any(grepl("^Newcombe ", l)))
+  expect_true(any(grepl("^Column 1 \\(resp = N\\)$", l)))
+  # EXACT RISKDIFF adds the exact limits to the difference row and the CL table
+  res <- sas_run("data e; input a $ b $ w; datalines;
+A N 5
+A Y 12
+B N 15
+B Y 7
+;
+run;
+proc freq data=e; weight w; tables a*b / riskdiff(cl=(wald exact)); exact riskdiff; run;")
+  l <- squish(res$listing)
+  expect_true(any(grepl("^Exact confidence limits for the risk difference are based on a score statistic\\.$", l)))
+  expect_true(any(grepl("^Exact \\(Score\\) -0\\.6502 -0\\.0587$", l)))
+  expect_true(any(grepl("^Difference -0\\.3877 0\\.1486 -0\\.6789 -0\\.0965 -0\\.6502 -0\\.0587$", l)))
 })
 
 test_that("an all-zero stratum kept by WEIGHT / ZEROS shows '.' for the total percent", {

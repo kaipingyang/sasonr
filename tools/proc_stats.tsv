@@ -69,8 +69,10 @@ FREQ	BINOMIAL	default			listing or values not yet verified against SAS
 FREQ	CMH	default			listing or values not yet verified against SAS
 FREQ	CMH1	default			listing or values not yet verified against SAS
 FREQ	CMH2	default			listing or values not yet verified against SAS
-FREQ	RELRISK	default			listing or values not yet verified against SAS
-FREQ	RISKDIFF	default			listing or values not yet verified against SAS
+FREQ	RELRISK	default	freq_stats/c04_w22_relrisk_riskdiff;freq_stats/c13_z22_relrisk_riskdiff		Odds Ratio and Relative Risks table (Wald limits, zero-cell handling) from freq_stats/c04 and c13; the CL= table layout is exercised by c06, which also needs EXACT RELRISK, so c06 is not whole-case evidence (hand-updated: generator needs the proc_stats probe cases)
+FREQ	RISKDIFF	default	freq_stats/c04_w22_relrisk_riskdiff;freq_stats/c05_w22_riskdiff_cl;freq_stats/c09_w22_orderfreq_riskdiff;freq_stats/c13_z22_relrisk_riskdiff		Risk Estimates tables, difference row and CL= Confidence Limits for the Risk Difference table (hand-updated: generator needs the proc_stats probe cases)
+FREQ	EXACT_RISKDIFF	default	freq_stats/c05_w22_riskdiff_cl		EXACT RISKDIFF statement: exact unconditional score limits (listing text)
+FREQ	EXACT_RELRISK	default			EXACT RELRISK: TS1M7 gold c06 says 0.0901, the documented tail-method score statistic computes 0.08997; the SAS nuisance search is undocumented - fails loud (known blocker)
 FREQ	EXPECTED	default			listing or values not yet verified against SAS
 FREQ	EXACT_CHISQ	default			listing or values not yet verified against SAS
 FREQ	TESTP	default			listing or values not yet verified against SAS
