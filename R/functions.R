@@ -1102,58 +1102,38 @@ mills_corr <- function(x) {
   1 + s
 }
 
-# P(T <= t) for t < 0, d > 0: integrate exp(log integrand) in w = log s.
-# The integrand is evaluated relative to its mode, with the exponent difference
-# formed from O(1) pieces: the logs are around -200, and computing their
-# difference directly would leave a 3e-14 relative error in the result.
-pnt_tail <- function(t, v, d, span = 50, n = 4001) {
-  logC <- log(2) + (v / 2) * log(v / 2) - v / 2 - lgamma(v / 2)
-  lw <- function(w) {
-    v * w - (v / 2) * (expm1(2 * w)) + logC +
-      log_pnorm(t * exp(w) - d)
-  }
-  wmax <- log(1 + 12 / sqrt(v) + 6 * abs(d) + 6 * abs(t))
-  grid <- seq(-30, wmax, length.out = 400)
-  vals <- vapply(grid, lw, 0)
-  i <- which.max(vals)
-  lo_w <- grid[max(1L, i - 1L)]
-  hi_w <- grid[min(length(grid), i + 1L)]
-  w0 <- stats::optimize(function(z) -lw(z), c(lo_w, hi_w))$minimum
-  m <- lw(w0)
-  f <- function(z) lw(z) - (m - span)
-  left <- tryCatch(stats::uniroot(f, c(-80, w0))$root, error = function(e) -80)
-  right <- tryCatch(stats::uniroot(f, c(w0, wmax + 30))$root,
-                    error = function(e) wmax + 10)
+# P(T <= t) for t < 0, d > 0, by parts:
+#
+#   P = E[Phi(t S - d)] = |t| * Integral_0^inf  F(s) * phi(t s - d) ds,
+#   F(s) = P(S <= s) = pgamma(v s^2 / 2, v/2)
+#
+# The density of S = sqrt(chi2_v / v) needs exp() of a large negative number
+# (about -120 at the mode), which quantises the result at ulp(120) ~ 3e-14;
+# pgamma() and dnorm() both return small probabilities with full relative
+# accuracy, so the by-parts integrand keeps its last bits.
+pnt_tail <- function(t, v, d, n = 8001) {
+  at <- abs(t)
+  g <- function(s) at * stats::pgamma(v * s * s / 2, v / 2) * stats::dnorm(t * s - d)
 
-  ew0 <- exp(w0)
-  z0 <- t * ew0 - d
-  # exponent difference relative to the mode, in O(1) pieces
-  ldiff <- function(w) {
-    dw <- w - w0
-    e_diff <- ew0 * expm1(dw)
-    e_sum <- ew0 * (2 + expm1(dw))
-    dz <- t * e_diff
-    zsum <- t * e_sum - 2 * d
-    out <- v * dw - (v / 2) * ew0^2 * expm1(2 * dw)
-    if (z0 < -8) {
-      out + log_pnorm_diff(dz, zsum, z0)
-    } else {
-      out + (log_pnorm(z0 + dz) - log_pnorm(z0))
-    }
-  }
-  z <- seq(left, right, length.out = n)
-  # Integrate the values directly rather than exp() of a log ~ -200: the chi
-  # factor is O(1) and Phi() carries the small probability, so their product
-  # keeps its relative accuracy instead of being quantised at ulp(200) ~ 3e-14.
-  chi <- exp(logC + v * z - (v / 2) * expm1(2 * z))
-  phi <- stats::pnorm(t * exp(z) - d)
-  wts <- c(1, rep(c(4, 2), (n - 3) / 2), 4, 1) * (right - left) / (3 * (n - 1))
-  total <- sum(wts * chi * phi)
-  if (is.finite(total) && total > 0) return(total)
-  # fallback (Phi underflowed): the log-space form at least gives the magnitude
-  lv <- vapply(z, ldiff, 0)
-  mm <- max(lv)
-  exp(m + mm) * sum(wts * exp(lv - mm))
+  # the normal factor peaks at s = -d/t; the gamma factor rises around 1
+  s_peak <- max(0, -d / t)
+  smax <- s_peak + (1 + 10 / sqrt(v)) + 14 / at
+  # substitute s = u^2: for v < 2 the integrand behaves like s^v at 0, which
+  # becomes u^(2v+1) and is smooth enough for Simpson
+  gu <- function(u) g(u * u) * 2 * u
+  umax <- sqrt(smax)
+  grid <- seq(0, umax, length.out = 4001)
+  vals <- vapply(grid, gu, 0)
+  m <- max(vals)
+  if (!is.finite(m) || m <= 0) return(0)
+  keep <- which(vals > m * 1e-20)
+  right <- grid[min(length(grid), max(keep) + 1L)]
+
+  z <- seq(0, right, length.out = n)
+  gz <- vapply(z, gu, 0)
+  if (!any(gz > 0)) return(0)
+  wts <- c(1, rep(c(4, 2), (n - 3) / 2), 4, 1) * right / (3 * (n - 1))
+  sum(wts * gz)
 }
 #' @export
 sas_f_probchi <- function(x, df, nc = 0) stats::pchisq(x, df, nc)
