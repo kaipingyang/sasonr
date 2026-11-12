@@ -57,6 +57,7 @@ new_engine <- function(work, level, execute) {
   eng$step_notes <- isTRUE(getOption("sasonr.step_notes", TRUE))
   rt$on_warn <- if (eng$step_notes) function(msg) eng$log <- c(eng$log, paste("WARNING:", msg))
   rt$on_error <- function(msg) eng$log <- c(eng$log, paste("ERROR:", msg))
+  rt$on_note <- function(msg) eng$log <- c(eng$log, msg)
   eng$ses$on_put <- function(line) eng$log <- c(eng$log, line)
   eng
 }
@@ -115,6 +116,11 @@ engine_exec <- function(eng, text, line) {
       for (nm in tr$outputs) assign(nm, env$work[[nm]], envir = eng$wenv)
       # NOTEs that are not data errors (e.g. INPUT going to a new line)
       if (length(rt$notes) > 0 && isTRUE(rt$notes_on)) env$.log <- c(env$.log, rt$notes)
+    }
+    if (step$type == "data" && isTRUE(rt$stop_step)) {
+      # an execution-time ERROR that stops the step (SYMGET): no output data set
+      for (nm in tr$outputs) if (exists(nm, envir = eng$wenv, inherits = FALSE)) rm(list = nm, envir = eng$wenv)
+      env$.log <- c(env$.log, "NOTE: The SAS System stopped processing this step because of errors.")
     }
     if (step$type == "data") engine_store_numlen(eng, tr$outputs)
     notes_on <- isTRUE(rt$notes_on) && eng$step_notes
