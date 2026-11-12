@@ -21,7 +21,7 @@ Remainder without fuzz. See the \href{https://documentation.sas.com/doc/en/lefun
 }
 
 \section{Verification}{
- approximate (27 of 28 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.0e-13; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (614 of 628 SAS 9.4 cases agree bit for bit; 14 case(s) fail loud (sasonr_unsupported)). Verified domain: argument magnitudes 0 or 1E-140..1E140, and a / b not an integer unless the remainder is exactly 0; other inputs fail loud (\code{sasonr_unsupported}). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

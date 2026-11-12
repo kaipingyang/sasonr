@@ -30,7 +30,8 @@ test_that("PDV types and lengths follow first use", {
 })
 
 test_that("unknown functions and formats fail loud", {
-  expect_error(sas_translate("data _null_; x = notafunction(1); run;"), class = "sasonr_unsupported")
+  # not a SAS 9.4 function: SAS's compile-time ERROR 68-185
+  expect_error(sas_translate("data _null_; x = notafunction(1); run;"), class = "sasonr_syntax_error")
   expect_error(sas_translate("data _null_; x = 1; put x= mystery8.; run;"), class = "sasonr_unsupported")
   expect_error(sas_translate("data _null_; x = '1' + 1; run;"), class = "sasonr_unsupported")
 })

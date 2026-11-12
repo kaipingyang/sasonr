@@ -1,5 +1,48 @@
 # sasonr (development version)
 
+## Round 10 (2026-11-12): exact procedure statistics, verified domains, SAS error model
+
+* **PROC statistics registry** (`inst/registry/proc_stats.csv`,
+  `sas_proc_stat_registry()`): one row per procedure x statistic (MEANS /
+  SUMMARY, PROC SQL summary functions, FREQ statistics) with its status,
+  built from SAS gold probes (about 1,700 random groups, sorted, reversed and
+  shuffled). In strict mode an `approximate` or `unverified` statistic stops
+  the program (`sasonr_not_verified`, naming the procedure and the statistic).
+* Algorithms aligned with SAS 9.4, bit for bit: sums are sequential double
+  additions in observation order (R's `sum()` is extended precision); PROC SQL
+  MEAN, CSS, USS, VAR and STD use the first value of the group as a shift and
+  fused multiply-adds (emulated exactly); PROC MEANS quantiles interpolate
+  `x[j] + g * (x[j+1] - x[j])`; MODE keeps the first value of a run.
+* PROC SQL reorders the rows of a GROUP BY group unless the data set is
+  flagged as sorted by the group columns: order-dependent statistics on such
+  rows (and after joins, views, DISTINCT) fail loud unless the values are
+  integers with exact sums.
+* Not reproduced exactly and therefore `approximate` (fail loud in strict
+  mode): PROC MEANS CSS and everything derived from it (STD, VAR, STDERR, CV,
+  USS, SKEWNESS, KURTOSIS, confidence limits), PROC SQL STDERR and CV.
+* **Verified domains** for functions whose differences are confined to
+  identifiable inputs (status `partial`, domain in the registry and on the
+  reference page; other inputs fail loud): MOD, MODZ (now an exact
+  fused-multiply-add remainder), YRDIF (30/360, ACT/365, ACT/360; AGE and
+  ACT/ACT only where exact). HARMEAN and GEOMEAN sum in argument order. LOG
+  values are all bit-identical (617 cases); LOG stays `approximate` only
+  because the BEST32. display of one value differs (BEST widths above 16 are
+  partly undetermined).
+* Targeted function probes (several hundred random arguments each) found
+  last-bit differences in EXP, LOG10, COSH, TANH and PERM: they are now
+  `approximate`.
+* **SAS error model**: `sas_run(on_error = c("sas", "abort"))`, default
+  `"sas"` (option `sasonr.on_error`). After a SAS ERROR the step is not run,
+  syntax-check mode (OBS=0) applies to the rest of the program (DATA steps
+  create empty data sets, global statements and macro code still run),
+  PROC SQL errors set NOEXEC for that PROC SQL only, `SYSERR`/`SYSCC` follow
+  SAS, and the result has `status = "error"`, `errors` and `error_line`.
+  `sasonr_unsupported` always aborts. Calls of names that are not SAS
+  functions are SAS's ERROR 68-185; unknown SET options are syntax errors.
+* Conformance gold version 2: the log layer keeps SAS's error-handling
+  messages and WORK is captured after an ERROR; cases where SAS and sasonr
+  both stop now also compare WORK, the log and the PUT output.
+
 ## Round 9 (2026-11-12): strict by default, compact verification matrices
 
 * **Strict by default**: `sasonr.strict` now defaults to `TRUE`. A program

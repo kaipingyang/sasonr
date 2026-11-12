@@ -495,6 +495,11 @@ parse_set <- function(p, kind) {
       opt <- tk_low(p)
       oline <- tk_line(p)
       advance(p, 2L)
+      set_opts <- c("end", "nobs", "point", "key", "indsname", "curobs", "open", "keyreset")
+      if (!opt %in% set_opts) {
+        # not an option of the SET/MERGE statement: SAS's syntax ERROR 22-322
+        abort_syntax(paste0("expected a data set name or a ", toupper(kind), " statement option but found ", toupper(opt), "="), oline)
+      }
       if (!opt %in% c("end", "nobs") || (kind == "merge" && opt == "nobs")) {
         abort_unsupported(paste0(toupper(kind), " statement option ", toupper(opt), "="), oline)
       }

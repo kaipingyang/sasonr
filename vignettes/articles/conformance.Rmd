@@ -162,20 +162,29 @@ SAS:
 
 | Layer | Cases |
 |---|---|
-| Our own cases (parser, functions, FREQ statistics, rounding, semantics, function and format matrices) | 7,826 |
+| Our own cases (parser, functions, FREQ statistics, rounding, semantics, function and format matrices, function probes, procedure statistic probes, error handling) | 7,849 |
 | Single-feature corpus and book programs | 2,119 |
 
-Round 9: 7,910 of 9,945 cases bit-identical (including programs on which
-SAS and sasonr both stop with an ERROR), 1,970 fail loud, no program on
-which SAS stops with an ERROR runs in sasonr. Five data set values differ
-from SAS in the last bits, all in procedure statistics (PROC SQL `MEAN`,
-PROC MEANS `STD`/`SKEWNESS`); they are listed under Known gaps.
+Round 10: 7,891 of 9,968 cases bit-identical (including programs on which
+SAS and sasonr both stop with an ERROR; for the new error-handling cases the
+data sets SAS leaves behind and the log are compared too), 2,015 fail loud,
+**no data set value differs silently** and no program on which SAS stops with
+an ERROR runs in sasonr. Procedure statistics are now verified per statistic
+(see the feature registry): sums, means, counts, minima, maxima and quantiles
+of PROC MEANS and PROC SQL are bit-identical to SAS; PROC MEANS standard
+deviations and the statistics derived from them are not yet and stop the
+program in strict mode.
 
 ## Known gaps
 
-- Five procedure statistics differ from SAS in the last bits (PROC SQL
-  `MEAN` of three rounding cases, PROC MEANS `STD` and `SKEWNESS`); they are
-  not yet gated by strict mode.
+- PROC MEANS `CSS` and everything derived from it (`STD`, `VAR`, `STDERR`,
+  `CV`, `USS`, `SKEWNESS`, `KURTOSIS`, confidence limits) and PROC SQL
+  `STDERR`/`CV` are approximate (about 88 % of random groups agree bit for
+  bit); in strict mode they stop the program.
+- `EXP`, `LOG10`, `COSH`, `TANH`, `PERM` and the probability functions
+  differ from SAS in the last bits for some arguments.
+- After an execution-time ERROR in a DATA step the partly written data sets
+  are not reproduced yet (fail loud).
 
 - Function examples: 698 SAS-verified calls were generated for the reference
   pages; **15 calls return a different value from SAS** (CAT, CATT, COUNTC,

@@ -156,7 +156,22 @@ KEY = [
     r"WARNING: Apparent (symbolic reference|invocation of macro)",
     r"ERROR( \d+-\d+)?:",
 ]
+# Gold version 2 (meta.yaml `gold_version: 2`): the key set also keeps the
+# messages that describe how SAS handles an ERROR (syntax-check mode, steps
+# stopped, data sets not replaced), and the epilogue leaves syntax-check mode
+# so that WORK is captured after an ERROR.  Older gold keeps the old set.
+KEY_V2 = [
+    r"NOTE: Due to ERROR\(s\) above, SAS set option OBS=0, enabling syntax check mode\.",
+    r"NOTE: Statement not executed due to NOEXEC option\.",
+    r"NOTE: The SAS System stopped processing this step because of errors\.",
+    r"NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements\.",
+    r"WARNING: The data set WORK\.\S+ may be incomplete\.",
+    r"WARNING: Data set WORK\.\S+ was not replaced because this step was stopped\.",
+    r"WARNING: Limit set by ERRORS= option reached\.",
+]
+GOLD_VERSION = 2
 KEY_RE = re.compile("|".join(f"(?:{k})" for k in KEY))
+KEY_RE_V2 = re.compile("|".join(f"(?:{k})" for k in KEY + KEY_V2))
 ENV_NOISE = re.compile(r"SASUSER|parameter catalog|registry", re.I)
 
 
@@ -177,7 +192,7 @@ def norm_msg(parts):
 MATRIX_MARK_RE = re.compile(r"^@@(BEGIN|END|COLLECT)\b")
 
 
-def key_messages(lines, markers=False):
+def key_messages(lines, markers=False, version=GOLD_VERSION):
     """Key NOTE/WARNING/ERROR messages, normalised (identical to compare4.py).
 
     markers=True (matrix layout) also keeps the %PUT case markers
@@ -190,7 +205,7 @@ def key_messages(lines, markers=False):
             out.append(l.rstrip())
             i += 1
             continue
-        if KEY_RE.match(l) and not ENV_NOISE.search(l):
+        if (KEY_RE_V2 if version >= 2 else KEY_RE).match(l) and not ENV_NOISE.search(l):
             parts = [l]
             j = i + 1
             while j < len(lines) and re.match(r" {6}\S", lines[j]) and not lines[j].startswith("      real time"):

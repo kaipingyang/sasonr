@@ -38,8 +38,64 @@ res$class <- with(res, ifelse(status %in% c("pass", "both_error"), "pass",
                        ifelse(status == "fail" & fails == "log", "log",
                        ifelse(status == "fail" & !is.na(tol) & tol <= 1e-9 & !grepl("attr|log", fails), "approximate",
                               "mismatch")))))
+# A function case whose value is bit-identical (same hex=) and whose only
+# difference is the BEST32. display in results.txt is a BESTw. (w > 16) edge,
+# not a difference of the function (BEST widths above 16 are partly undetermined).
+hex_of <- function(d, who) sub("^.*?hex=([0-9A-F]+).*$", "\\1", regmatches(d, regexpr(paste0(who, "='[^']*'"), d)))
+disp_only <- vapply(seq_len(nrow(res)), function(i) {
+  if (!identical(res$status[i], "fail") || !identical(res$fails[i], "files") || !grepl("^fn_matrix/", res$case[i])) return(FALSE)
+  d <- res$detail[i]
+  a <- hex_of(d, "SAS")
+  b <- hex_of(d, "sasonr")
+  length(a) == 1 && length(b) == 1 && grepl("^[0-9A-F]{16}$", a) && a == b
+}, logical(1))
+res$class[disp_only] <- "pass"
 res$feature <- sub("^(fn_matrix|fmt_matrix|functions)/([^/]+)/.*$", "\\2", res$case)
 res$area <- sub("/.*$", "", res$case)
+
+# Targeted probes (tests/conformance/fn_probe/<PROBE>/: random inputs, one data
+# set WORK.P with the inputs and one column per call).  Each value is checked
+# by calling the function layer row by row: pass (bit-identical), unsupported
+# (sasonr fails loud: outside the verified domain), approximate (differs).
+probe_calls <- list(
+  MOD = list(r = quote(sas_f_mod(a, b)), rz = quote(sas_f_modz(a, b))),
+  LOG = list(l = quote(sas_f_log(x)), l10 = quote(sas_f_log10(x)), l2 = quote(sas_f_log2(x)),
+             e = quote(sas_f_exp(x / 1000)), s = quote(sas_f_sqrt(x))),
+  SINH = list(s = quote(sas_f_sinh(x)), c = quote(sas_f_cosh(x)), t = quote(sas_f_tanh(x))),
+  COMB = list(c = quote(sas_f_comb(n, k)), p = quote(sas_f_perm(min(n, 170), min(k, n, 170)))),
+  YRDIF = list(age = quote(sas_f_yrdif(d1, d2, "AGE")), aa = quote(sas_f_yrdif(d1, d2, "ACT/ACT")),
+               t3 = quote(sas_f_yrdif(d1, d2, "30/360")), a365 = quote(sas_f_yrdif(d1, d2, "ACT/365")),
+               a360 = quote(sas_f_yrdif(d1, d2, "ACT/360"))),
+  GEOMEAN = list(g = quote(sas_f_geomean(a, b, c, d)), g2 = quote(sas_f_geomean(a, b)), h = quote(sas_f_harmean(a, b, c, d)))
+)
+probe_rows <- list()
+for (pr in names(probe_calls)) {
+  f <- file.path("tests", "conformance", "fn_probe", pr, "expected", "datasets", "p.sas7bdat")
+  if (!file.exists(f)) next
+  P <- as.data.frame(haven::read_sas(f))
+  for (col in names(probe_calls[[pr]])) {
+    call <- probe_calls[[pr]][[col]]
+    fname <- toupper(sub("^sas_f_", "", as.character(call[[1]])))
+    cls <- vapply(seq_len(nrow(P)), function(i) {
+      got <- tryCatch(suppressWarnings(eval(call, as.list(P[i, ]), ns)), sasonr_unsupported = function(e) "u",
+                      error = function(e) "e")
+      if (identical(got, "u")) return("unsupported")
+      if (identical(got, "e")) return("mismatch")
+      want <- as.numeric(P[[col]][i])
+      same <- (is.na(want) && is.na(got)) || (!is.na(want) && !is.na(got) &&
+                                                identical(writeBin(as.numeric(want), raw()), writeBin(as.numeric(got), raw())))
+      if (same) "pass" else "approximate"
+    }, "")
+    probe_rows[[length(probe_rows) + 1L]] <- data.frame(
+      case = sprintf("fn_probe/%s/%s/%d", pr, col, seq_len(nrow(P))), status = "", fails = "", tol = NA_real_,
+      class = cls, feature = fname, area = "fn_probe", stringsAsFactors = FALSE)
+  }
+}
+if (length(probe_rows)) {
+  pr <- do.call(rbind, probe_rows)
+  for (k in setdiff(names(res), names(pr))) pr[[k]] <- NA
+  res <- rbind(res, pr[names(res)])
+}
 
 inv_dir <- file.path("..", "sasonr-conformance", "data", "inventory")
 read_inv <- function(f) {
@@ -95,13 +151,15 @@ hdr <- grep("^## ", mx_lines, value = TRUE)
 env_fns <- toupper(sub("^## (\\S+).*$", "\\1", hdr[grepl("\\benv\\b", hdr)]))
 
 docs <- utils::read.delim("tools/fn_docs.tsv", quote = "", colClasses = "character")
+# verified input domain of `partial` functions (the runtime guard fails loud outside it)
+fn_domains <- utils::read.delim("tools/fn_domains.tsv", quote = "", colClasses = "character", comment.char = "#")
 docs <- docs[!startsWith(docs$name, "cvt_") & !startsWith(docs$name, "sql") & docs$name != "monotonic", ]
 ft <- get("fn_table", ns)
 fn_rows <- lapply(docs$name, function(nm) {
   NM <- toupper(nm)
   inv <- inv_row(NM)
   spec <- ft[[nm]]
-  rows <- res[res$area %in% c("fn_matrix", "functions") & res$feature == NM, , drop = FALSE]
+  rows <- res[res$area %in% c("fn_matrix", "functions", "fn_probe") & res$feature == NM, , drop = FALSE]
   ctx <- c(case_context("fn_matrix", NM))
   rows$context <- if (is.null(ctx)) rep(NA_character_, nrow(rows)) else unname(ctx[sub("^.*/", "", rows$case)])
   # function pilot cases: the context is in the case name of the meta tags (data step unless %SYSFUNC / SQL)
@@ -138,8 +196,9 @@ fn_rows <- lapply(docs$name, function(nm) {
     sasonr_args = if (is.null(spec)) NA else sprintf("%s-%s", spec$min, if (is.infinite(spec$max)) "any" else spec$max),
     contexts_verified = paste(c(data = "data", sysfunc = "sysfunc", sql = "sql")[ok_ctx], collapse = " "),
     impl = paste0("sas_f_", nm), status = s$status, cases = s$cases, pass = s$pass, approximate = s$approximate,
-    log_only = s$log, unsupported = s$unsupported, mismatch = s$mismatch, note = s$note, updated = today,
-    stringsAsFactors = FALSE
+    log_only = s$log, unsupported = s$unsupported, mismatch = s$mismatch, note = s$note,
+    domain = if (s$status == "partial" && NM %in% fn_domains$name) fn_domains$domain[fn_domains$name == NM][1] else "",
+    updated = today, stringsAsFactors = FALSE
   )
 })
 fns <- do.call(rbind, fn_rows)

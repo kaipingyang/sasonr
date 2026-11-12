@@ -4,12 +4,15 @@
 \alias{sas_export_work}
 \title{Write WORK data sets as CSV files with an attribute table}
 \usage{
-sas_export_work(res, dir)
+sas_export_work(res, dir, values = TRUE)
 }
 \arguments{
 \item{res}{A \code{sasonr_result}.}
 
 \item{dir}{Output directory (created if needed).}
+
+\item{values}{Write the \verb{<MEMNAME>.csv} value files (\code{FALSE}: only the
+attribute table, as the conformance harness needs).}
 }
 \description{
 Writes \verb{<MEMNAME>.csv} for each data set of a \code{\link[=sas_run]{sas_run()}} result (column

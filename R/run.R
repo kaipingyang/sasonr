@@ -63,9 +63,19 @@ new_engine <- function(work, level, execute) {
 }
 
 engine_exec <- function(eng, text, line) {
+  if (!identical(eng$on_error, "sas")) return(engine_exec_steps(eng, text, line))
+  eng$phase <- "compile"
+  tryCatch(engine_exec_steps(eng, text, line),
+           sasonr_syntax_error = function(e) engine_step_error(eng, e, text),
+           sasonr_runtime_error = function(e) engine_step_error(eng, e, text))
+  invisible()
+}
+
+engine_exec_steps <- function(eng, text, line) {
   prog <- sas_parse(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE, sql_open = eng$sql_open)
   eng$sql_open <- isTRUE(attr(prog, "sql_open"))
   for (step in prog$steps) {
+    eng$phase <- "compile"
     if (step$type == "global") {
       engine_global(eng, step)
       next
@@ -74,12 +84,27 @@ engine_exec <- function(eng, text, line) {
       eng$sql_opts <- step$options
       next
     }
-    if (step$type == "sql_end") next
+    if (step$type == "sql_end") {
+      if (isTRUE(eng$sql_noexec)) {
+        eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
+        eng$sql_noexec <- FALSE
+      }
+      next
+    }
     if (step$type == "sql") {
+      if (isTRUE(eng$sql_noexec) || isTRUE(eng$syntax_check)) {
+        if (isTRUE(eng$sql_noexec)) eng$log <- c(eng$log, "NOTE: Statement not executed due to NOEXEC option.")
+        next
+      }
       eng$steps <- c(eng$steps, list(list(code = paste0("# PROC SQL ", toupper(step$stmt$kind), " (SAS line ", step$line,
                                                             "): executed by the SQL engine"),
                                           level = "SQL", reasons = "PROC SQL", line = step$line, outputs = character(), meta = list())))
+      eng$phase <- "sql"
       if (eng$execute) engine_sql(eng, step$stmt)
+      next
+    }
+    if (isTRUE(eng$syntax_check)) {
+      engine_check_step(eng, step)
       next
     }
     if (step$type == "proc" && step$name == "datasets") {
@@ -104,6 +129,7 @@ engine_exec <- function(eng, text, line) {
     eng$steps <- c(eng$steps, list(tr))
     if (!eng$execute) next
     vec <- step$type == "data" && tr$level %in% c("L1", "L2")
+    eng$phase <- if (step$type == "data") "execute_data" else "execute"
     env <- engine_eval(eng, tr$code, stage = vec)
     if (vec && (rt$err || isTRUE(rt$mv_rerun))) {
       # A data error in vectorised code: re-run the step row by row (L3) so
@@ -144,10 +170,33 @@ engine_exec <- function(eng, text, line) {
       eng$log <- c(eng$log, step_end_notes(), reads, rt$proc_notes, ds_notes)
     }
     eng$listing <- c(eng$listing, env$.lst)
+    if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
     if (length(env$.meta) > 0) eng$meta[names(env$.meta)] <- env$.meta
     if (length(env$.meta) > 0) eng$meta[names(env$.meta)] <- env$.meta
   }
+  invisible()
+}
+
+# Syntax-check mode (after an ERROR, on_error = "sas"): the step is compiled
+# but not run; a DATA step creates its output data sets with 0 observations.
+engine_check_step <- function(eng, step) {
+  if (step$type == "proc") {
+    if (step$name != "datasets") translate_proc(step, eng$meta, eng$last)
+    err_set_macro(eng, syserr = 3)
+    return(invisible())
+  }
+  tr <- translate_step(step, eng$meta, eng$level)
+  for (nm in tr$outputs) {
+    m <- tr$meta[[nm]]
+    vars <- m$vars %||% character()
+    engine_empty_dataset(eng, nm, vars, m$type)
+    eng$meta[[nm]] <- utils::modifyList(eng$meta[[nm]], m)
+    if (isTRUE(rt$notes_on) && eng$step_notes) {
+      eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and %d variables.", toupper(nm), length(vars)))
+    }
+  }
+  err_set_macro(eng, syserr = 3)
   invisible()
 }
 
@@ -215,6 +264,8 @@ engine_global <- function(eng, g) {
     if (!is.null(g$ls)) rt$ls <- g$ls
     if ("nonotes" %in% g$opts) rt$notes_on <- FALSE
     if ("notes" %in% g$opts) rt$notes_on <- TRUE
+    if ("nosyntaxcheck" %in% g$opts) eng$nosyntaxcheck <- TRUE
+    if ("syntaxcheck" %in% g$opts) eng$nosyntaxcheck <- FALSE
   }
   if (g$kind == "title") {
     keep <- eng$titles[seq_len(min(length(eng$titles), g$level - 1L))]
@@ -264,9 +315,21 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #' the macro code that follows the step, including inside macro bodies.
 #'
 #' @inheritParams sas_translate
+#' @param on_error What a SAS ERROR does (a syntax error, an unknown function,
+#'   a missing input data set, an ERROR in PROC SQL ...). `"sas"` (the
+#'   default; option `sasonr.on_error`) behaves like SAS in batch: the failing
+#'   step is not run, SAS's syntax-check mode (OBS=0) applies to the rest of the
+#'   program (later steps are compiled but not run; global statements and the
+#'   macro language still are), `SYSERR`/`SYSCC` are set and the result has
+#'   `status = "error"`, the ERROR lines in `$log` and WORK as SAS leaves it.
+#'   `"abort"` stops with the classed R condition instead. Features sasonr does
+#'   not support (`sasonr_unsupported`) always stop the run: they are not SAS
+#'   errors.
 #' @return A `sasonr_result`: `$log` (PUT and %PUT lines), `$listing` (procedure
 #'   output), `$work` (output data sets with trailing blanks removed),
-#'   `$translation`, `$macro_vars` (global macro variables).
+#'   `$translation`, `$macro_vars` (global macro variables), `$status`
+#'   (`"ok"` or `"error"`), `$errors` (SAS ERROR messages) and `$error_line`
+#'   (SAS line of the first ERROR).
 #' @examples
 #' res <- sas_run("
 #' data class;
@@ -283,9 +346,13 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #' res$work$class
 #' cat(res$listing, sep = "\n")
 #' @export
-sas_run <- function(code, work = list(), level = c("auto", "L3")) {
+sas_run <- function(code, work = list(), level = c("auto", "L3"),
+                    on_error = getOption("sasonr.on_error", c("sas", "abort"))) {
   level <- match.arg(level)
+  on_error <- match.arg(on_error, c("sas", "abort"))
   eng <- new_engine(work, level, execute = TRUE)
+  eng$on_error <- on_error
+  eng$status <- "ok"
   on.exit(sql_duck_close(eng), add = TRUE)
   engine_program(eng, code)
   out <- lapply(as.list(eng$wenv), function(d) {
@@ -301,7 +368,8 @@ sas_run <- function(code, work = list(), level = c("auto", "L3")) {
     list(log = eng$log, listing = eng$listing, work = out[dsn], meta = eng$meta[intersect(dsn, names(eng$meta))],
          unordered = intersect(eng$unordered, dsn),
          translation = structure(list(steps = eng$steps), class = "sasonr_translation"),
-         macro_vars = mv),
+         macro_vars = mv, status = eng$status, errors = eng$errors %||% character(),
+         error_line = eng$error_line %||% NA_integer_),
     class = "sasonr_result"
   )
 }

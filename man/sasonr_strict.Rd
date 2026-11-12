@@ -26,10 +26,10 @@ from SAS fail loud in both modes) and clock-dependent \code{not_comparable}
 functions (\code{TODAY()}, \code{DATE()}, \code{TIME()}, \code{DATETIME()}) always run.
 }
 \examples{
-# LOG() is approximate: a few results differ from SAS in the last bits
-try(sas_run("data a; y = log(10); run;"))
+# PROBT() is approximate: some results differ from SAS in the last bits
+try(sas_run("data a; y = probt(1.5, 10); run;"))
 old <- options(sasonr.strict = FALSE)
-res <- suppressWarnings(sas_run("data a; y = log(10); run;"))
+res <- suppressWarnings(sas_run("data a; y = probt(1.5, 10); run;"))
 res$work$a$y
 options(old)
 }
