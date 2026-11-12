@@ -835,6 +835,44 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 
 # Listing --------------------------------------------------------------------------
 
+# Default decimals of the printed table with the default FW=12 and no MAXDEC=.
+# [gold]: measured on TS1M2 (155 exactly known doubles, MIN/MAX of
+# one-observation CLASS groups); docs/conformance/means_default_decimals_rule.md.
+means_default_text <- function(v, w) {
+  if (v == 0) return("0")
+  a <- abs(v)
+  neg <- v < 0
+  sign_txt <- if (neg) "-" else ""
+  e_text <- function(a) {
+    ex <- floor(log10(a))
+    repeat {
+      m <- a / 10^ex
+      expstr <- paste0("E", ex)
+      dec <- 12L - 2L - nchar(expstr) - if (neg) 1L else 0L
+      if (dec < 0L) dec <- 0L
+      r <- display_round(m, dec)
+      if (r >= 10) {
+        ex <- ex + 1L
+        next
+      }
+      s <- sprintf("%.*f", dec, r)
+      s <- sub("0+$", "", s)
+      s <- sub("\\.$", "", s)
+      return(paste0(sign_txt, s, "E", ex))
+    }
+  }
+  if (a < 1e-5) return(e_text(a))
+  if (a < 1e-3) return(paste0(sign_txt, sprintf("%.9f", display_round(a, 9L))))
+  if (display_round(a, 7L) >= 1000) {
+    intdigits <- floor(log10(floor(a))) + 1
+    if (intdigits <= 8) return(paste0(sign_txt, sprintf("%.2f", display_round(a, 2L))))
+    int_txt <- sprintf("%.0f", display_round(a, 0L))
+    if (nchar(paste0(sign_txt, int_txt)) <= 12L) return(paste0(sign_txt, int_txt))
+    return(e_text(a))
+  }
+  paste0(sign_txt, sprintf("%.7f", display_round(a, 7L)))
+}
+
 # Default (no MAXDEC=) display of a statistic in a field of width w: a fixed
 # number of decimals for values of ordinary magnitude, fewer for large values.
 means_num_text <- function(v, w, maxdec) {
@@ -854,9 +892,17 @@ means_num_text <- function(v, w, maxdec) {
     return(trimws(sas_fmt_best(v, w)))
   }
   if (v == 0) return("0")
+  if (identical(as.integer(w), 12L)) {
+    # The default decimals of the printed table (FW=12, no MAXDEC=) are
+    # [gold]: no manual sentence covers them.  Measured on TS1M2 with MIN/MAX of
+    # one-observation CLASS groups (155 exactly known doubles,
+    # cases/ts1m2/rounding/means_default_decimals); the rule is recorded in
+    # docs/conformance/means_default_decimals_rule.md.
+    return(means_default_text(v, w))
+  }
   if (v != trunc(v) && (abs(v) >= 1e6 || abs(v) < 1e-4)) {
     # the gold standard shows SAS choosing other decimals here (1622403.34,
-    # 0.000012500); the rule is not derived yet
+    # 0.000012500); the rule is not derived yet for other field widths
     abort_unsupported("PROC MEANS default decimals for a non-integer statistic of 1E6 or more or below 1E-4 (not verified against SAS; use MAXDEC=)")
   }
   dec <- max(0L, as.integer(round((w - 2) * 0.7)))

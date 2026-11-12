@@ -197,3 +197,25 @@ test_that("undetermined panel layouts fail loud instead of printing a wrong rule
                class = "sasonr_unsupported")
 })
 
+
+test_that("default decimals of the printed table (FW=12, no MAXDEC) follow the measured rule", {
+  # [gold] measured on TS1M2 (155 exactly known doubles):
+  # cases/ts1m2/rounding/means_default_decimals and
+  # docs/conformance/means_default_decimals_rule.md
+  n <- means_num_text
+  expect_identical(n(42, 12L, NULL), "42.0000000")
+  expect_identical(n(1.5, 12L, NULL), "1.5000000")
+  expect_identical(n(0, 12L, NULL), "0")
+  expect_identical(n(-1000.5, 12L, NULL), "-1000.50")
+  expect_identical(n(999.99999995, 12L, NULL), "1000.00")
+  expect_identical(n(12345.678, 12L, NULL), "12345.68")
+  expect_identical(n(99999999.9, 12L, NULL), "99999999.90")
+  expect_identical(n(999999999.9, 12L, NULL), "1000000000")
+  expect_identical(n(123456789012.9, 12L, NULL), "123456789013")
+  expect_identical(n(-123456789012.9, 12L, NULL), "-1.234568E11")
+  expect_identical(n(0.000123456, 12L, NULL), "0.000123456")
+  expect_identical(n(0.0009999999999, 12L, NULL), "0.001000000")
+  expect_identical(n(9.9999e-6, 12L, NULL), "9.9999E-6")
+  expect_identical(n(1e-10, 12L, NULL), "1E-10")
+  expect_identical(n(1.23456789e-100, 12L, NULL), "1.23457E-100")
+})
