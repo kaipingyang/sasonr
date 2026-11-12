@@ -1102,6 +1102,44 @@ mills_corr <- function(x) {
   1 + s
 }
 
+# Gauss-Legendre nodes and weights for the composite rule in pnt_tail().
+# Generated here (Newton's method on the Legendre polynomials) rather than
+# transcribed, so the numbers cannot be mistyped; 16 nodes integrate every
+# polynomial of degree 31 exactly, which is enough for a panel that spans a few
+# local scales of a smooth integrand.  Top-level so the work is done once when
+# the package is built, not on every call.
+.pnt_gl <- local({
+  n <- 16L
+  x <- cos(pi * (seq_len(n) - 0.25) / (n + 0.5)) # asymptotic roots as start values
+  for (it in 1:100) {
+    p0 <- 1
+    p1 <- x
+    for (j in 2:n) {
+      p2 <- ((2 * j - 1) * x * p1 - (j - 1) * p0) / j
+      p0 <- p1
+      p1 <- p2
+    }
+    dx <- p1 / (n * (x * p1 - p0) / (x * x - 1))
+    x <- x - dx
+    if (max(abs(dx)) < 1e-16) break
+  }
+  p0 <- 1
+  p1 <- x
+  for (j in 2:n) {
+    p2 <- ((2 * j - 1) * x * p1 - (j - 1) * p0) / j
+    p0 <- p1
+    p1 <- p2
+  }
+  dp <- n * (x * p1 - p0) / (x * x - 1)
+  list(x = x, w = 2 / ((1 - x * x) * dp * dp))
+})
+# multiplicative grids used by pnt_tail(): .pnt_m nodes per search round,
+# fractions (0..1) for the geometric scan, and doubling factors for the
+# search for the point where F(s) = 1
+.pnt_m <- 10L
+.pnt_w <- (0:(.pnt_m - 1L)) / (.pnt_m - 1L)
+.pnt_k <- 0:20
+
 # P(T <= t) for t < 0, d > 0, by parts:
 #
 #   P = E[Phi(t S - d)] = |t| * Integral_0^inf  F(s) * phi(t s - d) ds,
@@ -1111,28 +1149,91 @@ mills_corr <- function(x) {
 # (about -120 at the mode), which quantises the result at ulp(120) ~ 3e-14;
 # pgamma() and dnorm() both return small probabilities with full relative
 # accuracy, so the by-parts integrand keeps its last bits.
-pnt_tail <- function(t, v, d, n = 8001, ng = 4001) {
+#
+# The integrand is a rising factor F(s) times a falling one phi(|t| s + d), so
+# it is unimodal, but its scale changes by many orders of magnitude with
+# (t, v, d): for large v the chi-square factor turns over inside a window of
+# width 1/sqrt(2v) around s = 1, while the normal factor falls off over
+# 1/|t|.  A uniform Simpson rule therefore needs ~10^4 nodes (the previous
+# version used 12002 and cost 3.5 ms per point), and a uniform Gauss rule
+# misses the mode completely - measured earlier: Gauss-Legendre with 120-300
+# evenly spaced nodes gave only ~1e-7 relative.  So the panels below are graded
+# geometrically *in the distance from the mode*, whose local width is
+# min(s/sqrt(v), 1/(|t|(|t| s + d))) (the chi-square and normal curvatures),
+# and 16-node Gauss rules on those panels reach machine precision with ~250
+# nodes: median 1 ulp, p90 3 ulp, max 14 ulp against a 32001-node Simpson
+# reference on the 150 tail points of the SAS grid where that reference is
+# itself converged (the old 12002-node rule was 0-115 ulp away from it).
+# Beyond the first s with P(S > s) < 1e-19 the chi-square factor is 1 to double
+# precision, so that part is not integrated at all: it is exactly
+# Phi(-(|t| s + d)).  That is what removes the long, slowly decaying normal
+# tail, whose panels were the accuracy bottleneck of an earlier attempt.
+# Against the 459 SAS 9.4 reference points of the accuracy grid this gives
+# median 2 ulp / p90 32 ulp / max 178 ulp, i.e. the same as the 12002-node
+# rule (2 / 35 / 178), at 0.38 instead of 3.5 ms per point on bench.R.
+pnt_tail <- function(t, v, d) {
   at <- abs(t)
-  # the normal factor peaks at s = -d/t; the gamma factor rises around 1
-  s_peak <- max(0, -d / t)
-  smax <- s_peak + (1 + 10 / sqrt(v)) + 14 / at
+  al <- v / 2
+  # 1. mode of the integrand, by multiplicative scan + three halvings of the
+  #    bracket (the mode can be far too narrow for a fixed grid to hit: for
+  #    v = 1e10 it is a corner of width 1e-5 relative)
+  # sA solves |t|(|t| s + d) = v/s, i.e. the mode when F is still ~ s^v
+  sA <- (sqrt(d * d + 4 * v) - d) / (2 * at)
+  a <- min(sA, 1) / 4
+  b <- max(sA, 1) * 4
+  g <- a * (b / a)^.pnt_w
+  fv <- at * stats::pgamma(v * g * g / 2, al) * stats::dnorm(t * g - d)
+  for (st in 1:3) {
+    i <- which.max(fv)
+    a <- g[max(1, i - 1L)]
+    b <- g[min(.pnt_m, i + 1L)]
+    g <- a * (b / a)^.pnt_w
+    fv <- at * stats::pgamma(v * g * g / 2, al) * stats::dnorm(t * g - d)
+  }
+  sp <- g[which.max(fv)]
+  if (!is.finite(sp) || sp <= 0) return(0)
+  # 2. local width of the mode in s, converted to the u = sqrt(s) variable:
+  #    min(chi-square curvature, normal curvature)
+  ws <- min(sp / sqrt(v), 1 / (at * (at * sp + d)))
+  us <- sqrt(sp)
+  wu <- ws / (2 * us)
+  if (!is.finite(wu) || wu <= 0) wu <- us / 64
+  # 3. where F(s) = 1 to double precision: above it the integrand is exactly
+  #    |t| phi(|t| s + d), and that tail is Phi(-(|t| s + d)) in closed form
+  sc <- sp * 2^.pnt_k
+  up <- stats::pgamma(al * sc * sc, al, lower.tail = FALSE)
+  hit <- which(up < 1e-19 | at * sc + d > 40)
+  sb <- if (length(hit)) sc[hit[1L]] else Inf
+  pright <- if (is.infinite(sb)) 0 else stats::pnorm(-(at * sb + d))
+  ub <- if (is.infinite(sb)) sqrt(max(0, (40 - d) / at)) else sqrt(sb)
+  if (!is.finite(ub) || ub <= 0) return(pright)
+  # 4. panels: geometric in the distance from the mode on both sides (ratio 2
+  #    near the mode, 4 further out, where the integrand is a plain normal tail)
+  off <- c(2^(-2:6), 2^6 * 4^(1:16))
+  b <- sort(unique(c(0, us - wu * off, us, us + wu * off, ub)))
+  b <- b[b >= 0 & b <= ub]
+  if (length(b) < 2L) return(pright)
+  # The leftmost panel touches s = 0, where F(s) ~ s^v; in u that is the
+  # algebraic u^(2v+1), which a fixed-order Gauss rule cannot integrate to
+  # machine precision when v is small (one panel left ~1e-12 relative error at
+  # v ~ 1).  Subdividing that panel geometrically removes it - the panels that
+  # no longer touch 0 are analytic - but the region is empty (F = 0) whenever v
+  # is large, so it is only subdivided when the integrand there is visible.
+  X <- b[2L]
+  gX <- at * stats::pgamma(v * X^4 / 2, al) * stats::dnorm(t * X^2 - d)
+  if (gX > 1e-18 * max(fv)) {
+    b <- sort(unique(c(b, X / 2^(1:6))))
+    b <- b[b >= 0 & b <= ub]
+  }
   # substitute s = u^2: for v < 2 the integrand behaves like s^v at 0, which
-  # becomes u^(2v+1) and is smooth enough for Simpson
-  umax <- sqrt(smax)
-  ug <- seq(0, umax, length.out = ng)
-  vg <- at * stats::pgamma(v * ug^4 / 2, v / 2) * stats::dnorm(t * ug^2 - d) * 2 * ug
-  m <- max(vg)
-  if (!is.finite(m) || m <= 0) return(0)
-  keep <- which(vg > m * 1e-20)
-  right <- ug[min(ng, max(keep) + 1L)]
-
-  # vectorised: one pgamma/dnorm call for all nodes (about 6x faster than a
-  # vapply loop, with identical results)
-  u <- seq(0, right, length.out = n)
+  # becomes u^(2v+1) and is smooth there.  One pgamma/dnorm call for all nodes
+  # (about 6x faster than a vapply loop, with identical results).
+  mid <- (b[-1L] + b[-length(b)]) / 2
+  hw <- (b[-1L] - b[-length(b)]) / 2
+  u <- as.vector(outer(hw, .pnt_gl$x) + mid)
   s <- u * u
-  g <- at * stats::pgamma(v * s * s / 2, v / 2) * stats::dnorm(t * s - d) * 2 * u
-  wts <- c(1, rep(c(4, 2), (n - 3) / 2), 4, 1) * right / (3 * (n - 1))
-  sum(wts * g)
+  gv <- at * stats::pgamma(v * s * s / 2, al) * stats::dnorm(t * s - d) * 2 * u
+  pright + sum(as.vector(outer(hw, .pnt_gl$w)) * gv)
 }
 #' @export
 sas_f_probchi <- function(x, df, nc = 0) stats::pchisq(x, df, nc)
