@@ -840,6 +840,8 @@ sas_put_line <- function(..., .lit = NULL, .ls = rt$ls %||% 132L) {
 #' @keywords internal
 sas_file_write <- function(path, lines, mod = FALSE) {
   lines <- unlist(strsplit(lines %||% character(), "\n", fixed = TRUE)) %||% character()
+  # a file in a directory that does not exist cannot be opened (SAS ERROR)
+  if (!dir.exists(dirname(path))) abort_runtime(paste0("Physical file does not exist, ", path))
   con <- file(path, open = if (mod) "ab" else "wb")
   on.exit(close(con))
   if (length(lines)) writeLines(lines, con, useBytes = TRUE)

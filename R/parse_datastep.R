@@ -140,8 +140,21 @@ parse_ds_options <- function(p, context) {
       opts$in_var <- tk_low(p)
       expect_type(p, "name", "a variable name after IN=")
     } else if (opt %in% c("firstobs", "obs") && context == "input") {
-      opts[[opt]] <- as.numeric(tk_val(p))
-      expect_type(p, "num", "a number")
+      # n, nK / nM / nG / nT (multiples of 1024), MIN (0) or MAX (the largest count)
+      if (tk_type(p) == "name" && tk_low(p) %in% c("min", "max")) {
+        opts[[opt]] <- if (tk_low(p) == "min") 0 else 2^63 - 1
+        advance(p)
+      } else {
+        v <- as.numeric(tk_val(p))
+        expect_type(p, "num", "a number")
+        if (tk_type(p) == "name" && tk_adjacent(p, -1L, 0L)) {
+          k <- match(tk_low(p), c("k", "m", "g", "t"))
+          if (is.na(k)) abort_syntax(paste0("invalid value for data set option ", toupper(opt), "="), line)
+          v <- v * 1024^k
+          advance(p)
+        }
+        opts[[opt]] <- v
+      }
     } else {
       abort_unsupported(paste0("data set option ", toupper(opt), "= on ", context, " data set"), line)
     }
@@ -516,7 +529,15 @@ parse_set <- function(p, kind) {
         to <- tk_low(p, 1L)
         advance(p, 2L)
         if (tk_type(p) == "lparen") abort_unsupported("data set options on a data set list", line)
-        for (nm in expand_numbered_range(ref$name, to, line)) {
+        nms <- expand_numbered_range(ref$name, to, line)
+        # zero-padded endpoints (ds00-ds02, d08-d12): members keep the padding
+        dg <- function(s) sub("^.*?([0-9]+)$", "\\1", s, perl = TRUE)
+        if (any(startsWith(c(dg(ref$name), dg(to)), "0") & nchar(c(dg(ref$name), dg(to))) > 1L)) {
+          base <- substr(ref$name, 1L, nchar(ref$name) - nchar(dg(ref$name)))
+          width <- max(nchar(dg(ref$name)), nchar(dg(to)))
+          nms <- paste0(base, formatC(as.integer(substring(nms, nchar(base) + 1L)), width = width, flag = "0"))
+        }
+        for (nm in nms) {
           datasets <- c(datasets, list(list(name = nm, options = list(), line = ref$line)))
         }
         next
@@ -717,12 +738,18 @@ parse_array <- function(p) {
   if (is_op(p, "*")) {
     advance(p)
   } else {
-    n1 <- as.integer(tk_val(p))
-    expect_type(p, "num", "an array dimension")
+    # bounds may be negative: array b{-2:2}
+    signed_int <- function(what) {
+      neg <- is_op(p, "-")
+      if (neg) advance(p)
+      v <- as.integer(tk_val(p))
+      expect_type(p, "num", what)
+      if (neg) -v else v
+    }
+    n1 <- signed_int("an array dimension")
     if (is_op(p, ":")) {
       advance(p)
-      n2 <- as.integer(tk_val(p))
-      expect_type(p, "num", "an array upper bound")
+      n2 <- signed_int("an array upper bound")
       lo <- n1
       dim <- n2 - n1 + 1L
     } else {

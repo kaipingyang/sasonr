@@ -303,6 +303,13 @@ an_call <- function(e, st) {
   }
   if (e$name %in% c("put", "input")) {
     f <- e$fmt
+    # PUT(char, name.) with only a character user format $NAME: SAS applies $NAME
+    if (e$name == "put" && !f$char && nzchar(f$name) && is.null(user_fmt(f$name, FALSE)) &&
+        !is.null(user_fmt(f$name, TRUE)) && expr_type(e$args[[1]], st)$type == "char") {
+      f$char <- TRUE
+      f$text <- paste0("$", f$text)
+      e$fmt <- f
+    }
     known <- if (e$name == "put") fmt_known(f) else infmt_known(f)
     if (!known) {
       k <- if (e$name == "put") "format" else "informat"
@@ -387,7 +394,24 @@ an_call <- function(e, st) {
     }
     an_expr(a, st)
   })
+  # an OF list that matches no variable (sum(of zz:)) supplies no argument
+  if (any(vapply(e$args, function(a) identical(a$node, "of"), logical(1)))) {
+    n_res <- sum(vapply(e$args, function(a) if (identical(a$node, "of")) length(a$vars) else 1L, integer(1)))
+    n_min <- max(registry_arg_counts(e$name)[1] %|NA|% 0L, fn_table[[e$name]]$min %||% 0L)
+    if (n_res < n_min) {
+      abort_syntax(paste0("The ", toupper(e$name), " function call does not have enough arguments (ERROR 71-185)"), e$line)
+    }
+  }
   if (is.null(lk)) e$args <- convert_fn_args(e, st)
+  # DIF computes a difference: a character argument is converted to numeric
+  # like any numeric operand (conversion NOTE, invalid data sets _ERROR_)
+  if (!is.null(lk) && lk$kind == "dif" && length(e$args) && e$args[[1]]$node != "of" &&
+      expr_type(e$args[[1]], st)$type == "char") {
+    a <- e$args[[1]]
+    ct_conversion("c2n", a$line %||% e$line, a$col %||% e$col)
+    e$args[[1]] <- list(node = "call", name = "cvt_c2n", args = list(a),
+                        line = a$line %||% e$line, col = a$col %||% e$col, construct = TRUE)
+  }
   e
 }
 
@@ -740,6 +764,13 @@ an_stmt <- function(s, st) {
           return(it)
         }
         an_expr(list(node = "var", name = it$name, text = it$text, line = line), st)
+        # a character user format on a numeric variable: SAS looks for the
+        # numeric format of that name (ERROR 48-59 when there is none)
+        f <- it$fmt
+        if (isTRUE(f$char) && nzchar(f$name %||% "") && identical(st$info[[it$name]]$type, "num") &&
+            !is.null(user_fmt(f$name, TRUE)) && is.null(user_fmt(f$name, FALSE))) {
+          abort_syntax(sprintf("The format %s was not found or could not be loaded. (ERROR 48-59)", toupper(f$name)), line)
+        }
         check_format(it$fmt, line)
         it
       })
@@ -797,6 +828,18 @@ an_array <- function(s, st) {
   } else if (length(s$items) > 0) {
     abort_syntax("_TEMPORARY_ arrays cannot list elements", line)
   }
+  if (!s$char && length(elems) > 0) {
+    # without $, an array of variables already defined as character is a
+    # character array (SAS takes the type of the existing variables)
+    known <- vapply(elems, function(v) st$info[[v]]$type %||% NA_character_, "")
+    if (any(known %in% "char", na.rm = TRUE)) {
+      if (anyNA(known)) abort_unsupported(paste("array", s$name, "of existing character and new variables without $"), line)
+      if (all(known == "char")) {
+        type <- "char"
+        len <- st$info[[elems[1]]]$len
+      }
+    }
+  }
   dim <- if (is.na(s$dim)) length(elems) else s$dim
   if (!s$temporary && length(elems) != dim) abort_syntax("array dimension does not match its elements", line)
   init <- if (is.null(s$init)) NULL else lapply(s$init, const_value)
@@ -833,6 +876,10 @@ an_reader <- function(s, st) {
     if (!is.null(o$drop)) vars <- setdiff(vars, resolve_ds_items(o$drop, m$vars, line))
     out_names <- vars
     if (!is.null(o$rename)) out_names[match(names(o$rename), vars)] <- unname(o$rename)
+    if (anyDuplicated(out_names)) {
+      abort_syntax(sprintf("Variable %s already exists on file WORK.%s.", out_names[anyDuplicated(out_names)],
+                           toupper(ds$name)), line)
+    }
     for (j in seq_along(vars)) {
       v <- vars[j]
       is_char <- identical(m$type[[v]], "char")
@@ -855,7 +902,15 @@ an_reader <- function(s, st) {
   # WHERE= is evaluated against the renamed input variables.
   for (k in seq_along(s$datasets)) {
     w <- s$datasets[[k]]$options$where
-    if (!is.null(w)) s$datasets[[k]]$options$where <- an_where(w, st)
+    if (is.null(w)) next
+    on_file <- s$datasets[[k]]$out_names
+    if (!is.null(on_file)) {
+      miss <- setdiff(expr_var_names(w), on_file)
+      if (length(miss) > 0) {
+        abort_syntax(sprintf("Variable %s is not on file WORK.%s.", miss[1], toupper(s$datasets[[k]]$name)), line)
+      }
+    }
+    s$datasets[[k]]$options$where <- an_where(w, st)
   }
   for (a in c(s$end, s$nobs)) {
     reg_var(st, a, "num", kind = "auto", retained = TRUE)
@@ -1005,4 +1060,11 @@ out_meta <- function(an) {
                           labels = Filter(Negate(is.null), labs), informats = Filter(Negate(is.null), infs))
   }
   res
+}
+
+# Names of the variables an (unanalysed) expression refers to.
+expr_var_names <- function(e) {
+  if (!is.list(e)) return(character())
+  out <- if (identical(e$node, "var") && is.character(e$name)) e$name else character()
+  unique(c(out, unlist(lapply(e, expr_var_names))))
 }

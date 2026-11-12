@@ -109,8 +109,13 @@ mp_function <- function(nm, src, ses, mode) {
       if (is.na(pos) || pos < 1 || pos > nchar(x)) {
         abort_runtime(paste0("Argument 2 to macro function %", toupper(nm), " is out of range"), line)
       }
-      if (is.na(len) || len < 0 || pos + len - 1 > nchar(x)) {
+      if (is.na(len) || len < 0) {
         abort_runtime(paste0("Argument 3 to macro function %", toupper(nm), " is out of range"), line)
+      }
+      if (pos + len - 1 > nchar(x)) {
+        # SAS 9.4: a WARNING, and the rest of the value is returned
+        mac_warn(paste0("Argument 3 to macro function %", toupper(nm), " is out of range."))
+        len <- nchar(x) - pos + 1
       }
       requote(substr(x, pos, pos + len - 1))
     },
@@ -209,8 +214,10 @@ mac_sysfunc <- function(text, line = NULL) {
   if (is.null(spec)) abort_unsupported(paste0("%SYSFUNC(", toupper(fname), ")"), line)
   feature_check("function", fname, line, "sysfunc")
   args <- if (nzchar(trimws(inner))) mq_split_commas(inner) else character()
-  args <- mq_unmask(args)
+  # unquoted leading/trailing blanks are dropped; blanks quoted with %STR()
+  # are data (trim before unmasking)
   if (!fname %in% sysfunc_ws_significant) args <- trimws(args)
+  args <- mq_unmask(args)
   variadic <- length(spec$args) == 1 && endsWith(spec$args, "*")
   if (length(args) < spec$min || (!variadic && length(args) > length(spec$args))) {
     abort_runtime(paste0("The function ", toupper(fname), " referenced by %SYSFUNC has the wrong number of arguments"), line)
@@ -225,6 +232,7 @@ mac_sysfunc <- function(text, line = NULL) {
     switch(types[k],
       n = {
         v <- if (args[k] == ".") NA_real_ else suppressWarnings(as.numeric(args[k]))
+        if (is.na(v) && args[k] != ".") v <- mac_dt_literal(args[k]) %||% NA_real_
         if (is.na(v) && args[k] != ".") {
           abort_runtime(paste0("Argument ", k, " to function ", toupper(fname), " referenced by %SYSFUNC is not a number"), line)
         }

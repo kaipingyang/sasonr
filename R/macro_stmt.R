@@ -284,7 +284,9 @@ mp_if <- function(src, ses, sink, mode) {
 
 # %DO ---------------------------------------------------------------------------
 
-mac_max_iter <- 1e5
+# SAS sets no limit on %DO iterations; sasonr's macro processor needs about
+# 1.5 ms per iteration, so longer loops fail loud instead of running for minutes
+mac_max_iter <- 1e4
 
 mp_do <- function(src, ses, sink, mode) {
   line <- src_line(src)
@@ -313,7 +315,7 @@ mp_do <- function(src, ses, sink, mode) {
     src$i <- e$after
     test <- function() mac_eval_bool(mp_scan_text(cond_src(), ses)$text, paste0("%", toupper(w), " condition"))
     for (iter in seq_len(mac_max_iter + 1)) {
-      if (iter > mac_max_iter) abort_runtime("%DO loop exceeded 100000 iterations", line)
+      if (iter > mac_max_iter) abort_unsupported("a %DO loop of more than 10000 iterations", line)
       if (w == "while" && !test()) break
       mp_scan(mp_sub(src, body_a, e$end - 1L), ses, sink, mode = mode)
       if (w == "until" && test()) break
@@ -346,7 +348,7 @@ mp_do <- function(src, ses, sink, mode) {
   src$i <- e$after
   mv_let(ses, var, mac_num_text(from))
   for (iter in seq_len(mac_max_iter + 1)) {
-    if (iter > mac_max_iter) abort_runtime("%DO loop exceeded 100000 iterations", line)
+    if (iter > mac_max_iter) abort_unsupported("a %DO loop of more than 10000 iterations", line)
     cur <- mac_eval_int(mv_get(ses, var) %||% "", "%DO index")
     if ((by > 0 && cur > to) || (by < 0 && cur < to)) break
     mp_scan(mp_sub(src, body_a, e$end - 1L), ses, sink, mode = mode)

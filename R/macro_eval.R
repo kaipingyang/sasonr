@@ -98,6 +98,8 @@ mac_eval <- function(text, float = FALSE, what = "%EVAL") {
     }
     v <- if (s == ".") NA_real_ else suppressWarnings(as.numeric(s))
     if (!is.na(v) || s == ".") return(num(v))
+    dt <- mac_dt_literal(s)
+    if (!is.null(dt)) return(num(dt))
     list(kind = "str", value = s)
   }
   primary <- function() {
@@ -263,7 +265,7 @@ mac_eval_bool <- function(text, what = "%IF condition") {
 
 mac_sysevalf <- function(text, conv = NULL) {
   v <- mac_eval(text, float = TRUE, what = "%SYSEVALF")
-  if (v$single && is.null(conv)) return(mq_unmask(mq_strip(text)))
+  if (v$single && is.null(conv) && is.null(mac_dt_literal(trimws(mq_unmask(mq_strip(text)))))) return(mq_unmask(mq_strip(text)))
   if (v$kind != "num") {
     sasonr_abort(paste0("A character operand was found in %SYSEVALF: ", mq_unmask(text)), "sasonr_runtime_error")
   }
@@ -292,4 +294,14 @@ mac_float_text <- function(x) {
   if (is.na(x)) return(".")
   if (x == trunc(x) && abs(x) < 1e15) return(sprintf("%.0f", x))
   trimws(sas_fmt_best(x, 16L))
+}
+
+# A date, time or datetime literal ('15JAN2020'd, '12:00't, '...'dt) as an
+# operand of %SYSEVALF or a numeric %SYSFUNC argument: its SAS value, or NULL.
+mac_dt_literal <- function(s) {
+  m <- regmatches(s, regexec("^(['\"])(.*)\\1(dt|d|t)$", s, ignore.case = TRUE))[[1]]
+  if (length(m) == 0) return(NULL)
+  kind <- c(d = "date", t = "time", dt = "datetime")[[tolower(m[4])]]
+  v <- sas_parse_dt_literal(m[3], kind)
+  if (is.na(v)) NULL else v
 }
