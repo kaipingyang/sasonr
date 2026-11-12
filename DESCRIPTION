@@ -1,7 +1,7 @@
 Package: sasonr
 Title: Run SAS Programs on an R Engine
 Version: 0.0.0.9000
-Authors@R: person("Kaiping", "Yang", role = c("aut", "cre"), email = "kaiping.yang@example.com")
+Authors@R: person("Kaiping", "Yang", role = c("aut", "cre"), email = "1260146556@qq.com")
 Description: Deterministically parses SAS programs into a faithful abstract
     syntax tree and compiles DATA steps into tidyverse R code. Unsupported
     language features fail loudly with classed conditions.
