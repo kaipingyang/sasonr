@@ -181,7 +181,7 @@ proc_input <- function(step, meta, last) {
   known <- st$order
   wheres <- utils::tail(Filter(function(s) s$stmt == "where", step$stmts), 1) # the last WHERE wins
   conds <- lapply(wheres, function(w) {
-    e <- an_expr(w$cond, st)
+    e <- an_where(w$cond, st)
     extra <- setdiff(st$order, known)
     if (length(extra) > 0) abort_runtime(paste0("Variable ", extra[1], " is not on file WORK.", toupper(ref$name)), w$line)
     e

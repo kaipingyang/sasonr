@@ -25,10 +25,11 @@ sas_lex <- function(text) {
   cp <- utf8ToInt(enc2utf8(text))
   cp <- cp[cp != 13L] # normalise CRLF
   n <- length(cp)
-  empty <- tibble::tibble(
-    type = character(), value = character(), line = integer(), col = integer()
-  )
-  if (n == 0) return(empty)
+  # tibble::new_tibble(): the same object as tibble::tibble(), without its
+  # per-call column checks (the lexer runs once per statement chunk)
+  if (n == 0) {
+    return(tibble::new_tibble(list(type = character(), value = character(), line = integer(), col = integer()), nrow = 0L))
+  }
 
   is_nl <- cp == 10L
   line_of <- cumsum(c(1L, is_nl))[seq_len(n)]
@@ -319,8 +320,8 @@ sas_lex <- function(text) {
     i <- i + len
   }
 
-  tibble::tibble(
+  tibble::new_tibble(list(
     type = types[seq_len(ntok)], value = values[seq_len(ntok)],
     line = lines[seq_len(ntok)], col = cols[seq_len(ntok)]
-  )
+  ), nrow = ntok)
 }

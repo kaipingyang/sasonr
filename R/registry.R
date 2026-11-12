@@ -3,28 +3,43 @@
 #
 #
 #
-# asks feature_check() about every function, format and informat it accepts
-# (DATA step, PROC SQL and %SYSFUNC).  A feature whose status is `approximate`
+# asks feature_check() about every function, format and informat it accepts,
+# with the context of the call: "data" (DATA step), "where" (WHERE statement or
+# WHERE= option), "sql" (PROC SQL), "sysfunc" (%SYSFUNC/%QSYSFUNC); PUTN, PUTC,
+# INPUTN and INPUTC check the format named at run time ("runtime").  A feature
+# is gated by the option `sasonr.strict` when its status is `approximate` (some
 #
-# `mismatch` or that is missing from the registry is gated by the option
-# `sasonr.strict`:
+# in any other way: value, display, log), `unsupported` (every case fails
 #
-#                   `sasonr_unsupported`) naming the feature, its status and the
-#                   opt-out
+# function also when the context of the call is not among its
 #
 #
-# in every mode) and `not_comparable` (clock-dependent) features always run.
+#                   `sasonr_unsupported`) naming the feature, its status or
+#                   context and the opt-out
+#
+#
+#
+# input domain: its runtime guard fails loud (sasonr_unsupported) outside it in
+# every mode.
+#
+# Internal call nodes for language constructs (PROC SQL CASE, IN lists, LIKE,
+# MONOTONIC(), type conversions) are not SAS functions: the code that builds
+# them marks them as constructs (`construct = TRUE` in the AST node) and the
+# analyzer skips the registry for them; a SAS program cannot create one.
 
 registry_cache <- new.env(parent = emptyenv())
 
 #'
 #'
-#' @param kind `"functions"` or `"formats"`.
-#' @return A data frame, one row per function or per format/informat, as
+#' @param kind `"functions"`, `"formats"` or `"semantics"` (SAS behaviours that
+#'   differ from R defaults -- missing values, fixed-length strings, PROC SQL
+#'   remerge ... -- each with the SAS cases that cover it).
+#' @return A data frame, one row per function, per format/informat or per
 #'
+#'   SAS 9.4.
 #' @keywords internal
 #' @export
-sas_feature_registry <- function(kind = c("functions", "formats")) {
+sas_feature_registry <- function(kind = c("functions", "formats", "semantics")) {
   kind <- match.arg(kind)
   if (is.null(registry_cache[[kind]])) {
     f <- system.file("registry", paste0(kind, ".csv"), package = "sasonr")
@@ -53,7 +68,20 @@ fmt_registry_name <- function(fmt) {
 }
 
 # Registry statuses that are gated by `sasonr.strict` (NA: not in the registry).
-feature_gated <- function(status) is.na(status) || status %in% c("approximate", "unsupported", "mismatch")
+feature_gated <- function(status) is.na(status) || !status %in% c("supported", "partial", "not_comparable")
+
+#
+feature_contexts <- function(name) {
+  reg <- sas_feature_registry("functions")
+  hit <- reg$contexts[toupper(reg$name) == toupper(name) & reg$kind == "function"]
+  if (!length(hit) || is.na(hit[1])) return(character())
+  strsplit(hit[1], " ", fixed = TRUE)[[1]]
+}
+
+feature_context_label <- function(context) {
+  switch(context, data = "the DATA step", where = "a WHERE expression", sql = "PROC SQL",
+         sysfunc = "%SYSFUNC", runtime = "a format named at run time", context)
+}
 
 feature_status_text <- function(status) {
   if (is.na(status)) return("is not in the feature registry (not supported)")
@@ -61,6 +89,7 @@ feature_status_text <- function(status) {
     approximate = "is approximate (some results differ in the last bits)",
     unsupported = "is not supported (no test cases)",
     mismatch = "has results that differ",
+    unsupported = "fails loud in every test case",
     paste("has status", status)
   )
 }
@@ -76,13 +105,17 @@ feature_status_text <- function(status) {
 #'
 #'   SAS feature, its status and the SAS line. This applies to `approximate`
 #'
-#'   ones (no SAS case) and features missing from the registry.
+#'
+#'   case), features missing from the registry, and functions called in a
+#'   context (DATA step, WHERE, PROC SQL, `%SYSFUNC`) in which they have not
+#'
 #' * `FALSE`: the program runs; each such feature gives a warning of class
 #'
 #'
 #'
-#' from SAS fail loud in both modes) and clock-dependent `not_comparable`
-#' functions (`TODAY()`, `DATE()`, `TIME()`, `DATETIME()`) always run.
+#' input domain; other inputs fail loud in both modes) and clock-dependent
+#' `not_comparable` functions (`TODAY()`, `DATE()`, `TIME()`, `DATETIME()`)
+#'
 #'
 #' @name sasonr_strict
 #' @aliases sasonr.strict
@@ -95,19 +128,21 @@ feature_status_text <- function(status) {
 #' options(old)
 NULL
 
-feature_check <- function(kind, name, line = NULL) {
-  # internal call nodes for language constructs (PROC SQL CASE / IN / LIKE /
-  # quantified comparisons, MONOTONIC, type conversion) are not SAS functions
-  if (kind == "function" && (startsWith(tolower(name), "sql") || startsWith(tolower(name), "cvt_") ||
-                             tolower(name) == "monotonic")) return(invisible())
+feature_check <- function(kind, name, line = NULL, context = "data") {
   st <- feature_status(kind, name)
-  if (!feature_gated(st)) return(invisible())
-  what <- sprintf("%s %s %s", kind, toupper(name), feature_status_text(st))
+  if (feature_gated(st)) {
+    what <- sprintf("%s %s %s", kind, toupper(name), feature_status_text(st))
+  } else if (kind == "function" && !context %in% (ctx <- feature_contexts(name))) {
+    what <- sprintf("function %s is not supported in %s (supported in: %s)", toupper(name),
+                    feature_context_label(context), if (length(ctx)) paste(vapply(ctx, feature_context_label, ""), collapse = ", ") else "no context")
+  } else {
+    return(invisible())
+  }
   if (!isFALSE(getOption("sasonr.strict", TRUE))) {
     msg <- paste0("Unsupported: ", what, "; set options(sasonr.strict = FALSE) to run it anyway")
     if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
     rlang::abort(msg, class = c("sasonr_strict_error", "sasonr_unsupported", "sasonr_error"), sas_line = line,
-                 kind = kind, name = toupper(name), status = st)
+                 kind = kind, name = toupper(name), status = st, context = context)
   }
   warning(structure(class = c("sasonr_strict_warning", "warning", "condition"),
                     list(message = paste0("sasonr: ", what, if (!is.null(line)) sprintf(" at line %s", line) else ""),
@@ -150,11 +185,28 @@ registry_defw <- function(kind, fmt) {
 
 # Is `name` a function or CALL routine of SAS 9.4 (inst/registry/sas_function_names.txt,
 # names from the SAS inventory)?  Unknown names are a compile-time ERROR in SAS.
+# Without the inventory nothing can be decided: an error (fail closed).
 sas_known_function <- function(name) {
-  if (is.null(registry_cache$fn_names)) {
-    f <- system.file("registry", "sas_function_names.txt", package = "sasonr")
-    registry_cache$fn_names <- if (nzchar(f)) setdiff(readLines(f), "") else character()
+  if (is.null(registry_cache$fn_names)) registry_cache$fn_names <- sas_function_inventory()
+  toupper(name) %in% registry_cache$fn_names
+}
+
+# Is `fmt` (a format, or an informat with kind = "informat") one of SAS 9.4
+# (inst/registry/sas_format_names.txt, "F NAME" / "I NAME" from the SAS
+# inventory)?  An unknown name is SAS's compile-time ERROR 48-59.
+sas_known_format <- function(fmt, kind = "format") {
+  if (is.null(registry_cache$fmt_names)) {
+    registry_cache$fmt_names <- sas_function_inventory(system.file("registry", "sas_format_names.txt", package = "sasonr"))
   }
-  nm <- registry_cache$fn_names
-  !length(nm) || toupper(name) %in% nm
+  nm <- if (nzchar(fmt$name)) paste0(if (fmt$char) "$", toupper(fmt$name)) else if (fmt$char) "$" else "F"
+  paste(if (kind == "informat") "I" else "F", nm) %in% registry_cache$fmt_names
+}
+
+sas_function_inventory <- function(f = system.file("registry", "sas_function_names.txt", package = "sasonr")) {
+  nm <- if (nzchar(f) && file.exists(f)) setdiff(readLines(f), "") else character()
+  if (!length(nm)) {
+    rlang::abort(paste0("sasonr: the SAS 9.4 inventory (", basename(f %||% ""), ") is missing"),
+                 class = "sasonr_error")
+  }
+  nm
 }
