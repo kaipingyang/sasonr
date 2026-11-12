@@ -786,7 +786,9 @@ mod_domain_check <- function(fname, a, b, exact_only, fuzz_zero = NULL) {
   rng <- function(x) x == 0 | (abs(x) >= 1e-140 & abs(x) <= 1e140)
   bad <- !(rng(aa) & rng(bb))
   qq <- aa / bb
-  r <- stats_fma(-bb, trunc(qq), aa)
+  # the remainder only inside the range (the emulated fma fails loud outside it)
+  r <- rep(NA_real_, length(aa))
+  r[!bad] <- stats_fma(-bb[!bad], trunc(qq[!bad]), aa[!bad])
   bad <- bad | (!bad & qq == trunc(qq) & r != 0)
   if (exact_only) {
     dy <- function(x) abs(x) < 2^53 & (x * 1024) == trunc(x * 1024)
@@ -807,20 +809,23 @@ mod_domain_check <- function(fname, a, b, exact_only, fuzz_zero = NULL) {
 sas_f_median <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else stats::median(v), ...)
 # DATA step moment functions: the moment kernel (stats_exact.R) with the
 # DATA step derivation.  CSS and what follows from it (VAR, STD, STDERR, CV,
-# SKEWNESS, KURTOSIS) are verified on the SAS gold probe fn_probe/STD only
-# for at most 10 non-missing arguments of magnitude 0 or 1E-140..1E140: other
-# rows fail loud.  USS (a plain sequential sum of squares) has no such limit.
+# SKEWNESS, KURTOSIS) are verified on the SAS gold probes fn_probe/STD and
+# fn_probe/SKEWNESS only for at most 9 non-missing arguments of magnitude 0 or
+# 1E-140..1E140 (with 10 values fn_probe/SKEWNESS has 34 of 88 CSS one bit
+# off): other rows fail loud.  USS (a plain sequential sum of squares) has no
+# such limit.  Rows with an argument of magnitude 1E300 or more are invalid
+# (fn_policy.R sets them to missing) and are not computed.
 ds_moments <- function(fname, m, css_based = TRUE) {
   if (!nrow(m) || !ncol(m)) return(stats_moments(matrix(numeric(), 0, 1), "datastep"))
+  m[rowSums(abs(m) >= 1e300, na.rm = TRUE) > 0, ] <- NA_real_
   if (css_based) {
     n <- rowSums(!is.na(m))
-    big <- which(n > 10)
+    big <- which(n > 9)
     if (length(big)) {
-      abort_unsupported(sprintf("%s() of %d non-missing values: verified against SAS 9.4 for at most 10", toupper(fname), n[big[1]]))
+      abort_unsupported(sprintf("%s() of %d non-missing values: verified against SAS 9.4 for at most 9", toupper(fname), n[big[1]]))
     }
-    # magnitudes of 1E300 and more are invalid arguments (fn_policy.R): the row is set to missing
     ax <- abs(m[!is.na(m)])
-    if (any(ax != 0 & (ax < 1e-140 | ax > 1e140) & ax < 1e300)) {
+    if (any(ax != 0 & (ax < 1e-140 | ax > 1e140))) {
       abort_unsupported(sprintf("%s() of values beyond 1E140 or below 1E-140 in magnitude (not verified)", toupper(fname)))
     }
   }
@@ -858,9 +863,14 @@ sas_f_harmean <- function(...) row_stat(function(v) {
 #' @export
 sas_f_skewness <- function(...) {
   sk <- ds_moments("skewness", num_args(...))$skew
-  # SAS 9.4 returns exactly 0 for symmetric data where the kernel leaves a
-  # rounding residue (fn_matrix/SKEWNESS: skewness(2, 0, 4, 4, 5, 5, 7, 9));
-  # whether SAS cuts small values to 0 is not determined
+  # A guard, not a fitted rule.  SAS 9.4 returns exactly 0 for many symmetric
+  # argument lists where the kernel leaves a rounding residue: fn_probe/SKEWNESS
+  # (600 symmetric lists, shuffled or with one value perturbed; at most 9
+  # values) has 143 rows where SAS gives 0 and the kernel |SKEWNESS| <= 1.21E-15,
+  # but SAS also keeps residues as small as 9.99E-16 (n = 3), so no threshold on
+  # the result separates them; every row with SAS's result non-zero agrees bit
+  # for bit (882 of 882 with fn_probe/STD).  Results below 1E-12 in magnitude
+  # therefore fail loud.
   if (any(!is.na(sk) & sk != 0 & abs(sk) < 1e-12)) {
     abort_unsupported("SKEWNESS() with a result below 1E-12 in magnitude (SAS may return 0; not determined)")
   }

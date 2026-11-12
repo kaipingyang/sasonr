@@ -504,51 +504,27 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
   nmiss <- sum(f[miss])
   xv <- x[!miss]
   fv <- f[!miss]
-  wv <- if (is.null(w)) rep(1, length(xv)) else w[!miss]
+  w_used <- if (is.null(w)) NULL else w[!miss]
+  wv <- w_used %||% rep(1, length(xv))
   n <- sum(fv)
   wf <- wv * fv
   val <- list(n = n, nmiss = nmiss)
   if (n > 0) {
-    # Moment statistics: the PROC MEANS kernel (stats_exact.R,
-    # stats_means_moments(); bit-identical to SAS 9.4 on the proc_stats/means_*
-    # probes, also with FREQ and WEIGHT).  The emulated fma needs magnitudes
-    # 0 or 1E-140..1E140.
-    moment_stats <- c("sum", "mean", "css", "uss", "var", "std", "stderr", "cv", "skew", "kurt", "t", "prt",
-                      "lclm", "uclm", "sumwgt")
-    if ((!stats_fma_range_ok(xv) || !stats_fma_range_ok(wf)) && any(stats %in% moment_stats)) {
-      abort_unsupported(paste0("PROC ", toupper(sp$pname %||% "MEANS"),
-                               " moment statistics of values beyond 1E140 or below 1E-140 in magnitude (not verified)"))
-    }
-    k <- stats_means_moments(xv, wf, higher = any(stats %in% c("skew", "kurt")))
+    # Moment statistics: the moment kernel (stats_exact.R, stats_moments()
+    # with the PROC MEANS derivation; bit-identical to SAS 9.4 on the
+    # proc_stats/means_* probes, also with FREQ and WEIGHT).  It fails loud
+    # outside its verified domain (magnitudes, intermediate overflow or
+    # underflow, nearly constant data, the STD cut-off region).
+    k <- stats_moments(xv, "means", freq = if (is.null(sp$freq)) NULL else fv, weight = w_used, vardef = sp$vardef,
+                       need = stats)
     sw <- k$W
     val$sumwgt <- sw
     val$sum <- k$sum
     val$min <- min(xv)
     val$max <- max(xv)
     val$range <- val$max - val$min
-    val$mean <- if (sw > 0) k$mean else NA_real_
-    val$css <- if (sw > 0) k$css else NA_real_
-    val$uss <- if (sw > 0) k$uss else NA_real_
-    div <- switch(sp$vardef, df = n - 1, n = n, wdf = sw - 1, weight = sw)
-    val$var <- if (div > 0 && !is.na(val$css)) val$css / div else NA_real_
-    val$std <- sqrt(val$var)
-    # SAS 9.4 reports STD (and CV) 0 when the variance is negligible against
-    # the squared mean (seen up to VAR/MEAN**2 = 5.6E-31; values from 4.06E-18
-    # on are kept); in between the rule is not known
-    if (!is.na(val$var) && val$var > 0 && !is.na(val$mean) && val$mean != 0) {
-      ratio <- val$var / val$mean^2
-      if (ratio <= 5.6e-31) {
-        val$std <- 0
-      } else if (ratio < 4e-18) {
-        abort_unsupported(paste0("PROC ", toupper(sp$pname %||% "MEANS"),
-                                 " STD of a variance below 4E-18 times the squared mean (SAS's cut-off to 0 not determined)"))
-      }
-    }
-    val$cv <- if (!is.na(val$std) && !is.na(val$mean) && val$mean != 0) 100 * val$std / val$mean else NA_real_
-    # a zero CV of a negative mean is +0 in SAS
-    if (!is.na(val$cv) && val$cv == 0) val$cv <- 0
-    if (sp$vardef == "df" && n > 1 && !is.na(val$var) && sw > 0) {
-      val$stderr <- sqrt(val$var / sw)
+    for (s in c("mean", "css", "uss", "var", "std", "stderr", "cv", "skew", "kurt")) val[[s]] <- k[[s]]
+    if (!is.na(val$stderr)) {
       df <- n - 1
       # T is capped at +-99999.99 (and PRT is computed from the capped value)
       val$t <- if (val$stderr > 0) max(min(val$mean / val$stderr, 99999.99), -99999.99) else NA_real_
@@ -562,34 +538,6 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
       val$uclm1 <- val$mean + q1 * val$stderr
       val$lclm <- if (two_sided) val$lclm2 else val$lclm1
       val$uclm <- if (two_sided) val$uclm2 else val$uclm1
-    }
-    if (any(stats %in% c("skew", "kurt")) && !is.na(val$std) && val$std > 0) {
-      v <- val$var
-      s <- val$std
-      if (sp$vardef == "df" && is.null(w)) {
-        # SKEWNESS approximate (registry); KURTOSIS bit-identical
-        if (n > 2) val$skew <- n * k$m3 / ((n - 1) * (n - 2)) / (v * s)
-        if (n > 3) {
-          val$kurt <- stats_fma(n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)), k$m4 / (v * v),
-                                -3 * (n - 1)^2 / ((n - 2) * (n - 3)))
-        }
-      } else if (sp$vardef == "n" && is.null(w)) {
-        # VARDEF=N (proc_stats/means_css_int_probe m_vn: 600 of 600)
-        val$skew <- k$m3 / (n * (v * s))
-        val$kurt <- k$m4 / (v * v) / n - 3
-      } else {
-        # WEIGHT or VARDEF= WDF / WEIGHT: not verified (gated by the registry)
-        z <- (xv - val$mean) / s
-        if (sp$vardef == "df") {
-          if (n > 2) val$skew <- n / ((n - 1) * (n - 2)) * sum(fv * wv^1.5 * z^3)
-          if (n > 3) val$kurt <- n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)) * sum(fv * wv^2 * z^4) - 3 * (n - 1)^2 / ((n - 2) * (n - 3))
-        } else if (sp$vardef == "n") {
-          val$skew <- sum(fv * wv^1.5 * z^3) / n
-          val$kurt <- sum(fv * wv^2 * z^4) / n - 3
-        } else {
-          abort_unsupported(paste0("SKEWNESS/KURTOSIS with VARDEF=", toupper(sp$vardef)))
-        }
-      }
     }
     q_stats <- intersect(stats, c("median", "p50", "q1", "p25", "q3", "p75", "qrange", "p1", "p5", "p10", "p20",
                                   "p30", "p40", "p60", "p70", "p80", "p90", "p95", "p99"))
@@ -619,7 +567,8 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     out <- stats::setNames(rep(NA_real_, length(stats)), stats)
   }
   for (s in stats) if (!is.null(val[[s]])) out[[s]] <- as.numeric(val[[s]])
-  out[is.nan(out) | is.infinite(out)] <- NA_real_
+  # NaN or an infinite value is an arithmetic accident, never a SAS missing value
+  stats_finite_check(out, "a PROC MEANS statistic", nan = TRUE)
   out
 }
 
@@ -691,7 +640,8 @@ sas_proc_means <- function(d, sp) {
     if (sp$print) means_types_wanted(sp, k, TRUE),
     if (length(sp$outputs) > 0) means_types_wanted(sp, k, FALSE)
   )))
-  all_stats <- unique(c(sp$stats, unlist(lapply(sp$outputs, function(o) {
+  # only what the step prints or writes (as means_stat_gate() checks)
+  all_stats <- unique(c(if (sp$print) sp$stats, unlist(lapply(sp$outputs, function(o) {
     if (length(o$specs) == 0) c("n", "min", "max", "mean", "std") else vapply(o$specs, `[[`, "", "stat")
   }))))
   cells_by <- list()

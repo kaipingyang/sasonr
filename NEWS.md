@@ -1,5 +1,40 @@
 # sasonr (development version)
 
+## Round 12.1 (2026-11-12): review of round 12
+
+An independent review of round 12 found places where the new moment kernel
+could still return a wrong or missing value silently. Two new real-SAS
+probes (nearly constant data with a zero-weight first observation or values a
+few ulps apart; DATA step SKEWNESS of symmetric argument lists) settled the
+open rules.
+
+* **Nothing non-finite becomes a missing value silently.** Every product,
+  fused multiply-add and sum of the moment kernel is checked: an overflow,
+  an underflow below the normal range or a NaN fails loud (`sasonr_unsupported`)
+  in PROC MEANS, PROC SQL and the DATA step functions. The emulated fma no
+  longer falls back to `a * b + c`.
+* **Nearly constant data** (PROC MEANS): SAS treats the mean shift
+  `MEAN - c0` as 0 when it is at most about 1E-14 of the first value; sasonr
+  now does the same (unweighted data), which fixes CSS, VAR and STDERR of such
+  data. Weighted nearly constant data and the narrow undetermined band fail
+  loud.
+* **STD cut-off measured**: SAS reports STD and CV 0 up to VAR / MEAN\*\*2 =
+  1.1966E-26 and keeps them from 1.4312E-26 on (the undetermined band shrank
+  from 5.6E-31..4E-18); in the cut-off region the statistics derived from
+  STD are run only under the conditions a probe covers, others fail loud.
+* **A negative CSS is missing**, now confirmed by SAS (86 of 86 groups,
+  together with USS, VAR, STD, STDERR and CV).
+* **One moment kernel**: `stats_moments()` holds the DATA step, PROC SQL and
+  PROC MEANS derivations, including SKEWNESS / KURTOSIS and the WEIGHT
+  formulas; the fma accumulation reuses the fma core.
+* DATA step CSS, VAR, STD, STDERR, CV and SKEWNESS are verified for at most
+  **9** non-missing arguments (with 10, SAS's CSS differs in the last bit
+  for a third of the new probe rows); the SKEWNESS guard for results below
+  1E-12 stays, now documented with its evidence (SAS returns 0 for many
+  symmetric lists but keeps residues as small as 1E-15 for others).
+* PROC MEANS SKEWNESS with VARDEF=N is `approximate` (one probe value
+  differs); EXCLNPWGT stays unverified and fails loud.
+
 ## Round 12 (2026-11-12): PROC MEANS moment statistics
 
 * **PROC MEANS / SUMMARY CSS family bit-identical to SAS 9.4.** Four new

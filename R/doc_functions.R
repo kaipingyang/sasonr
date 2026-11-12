@@ -647,7 +647,7 @@ NULL
 #' @param ... One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: partial (791 of 942 SAS 9.4 cases agree bit for bit; 151 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (723 of 942 SAS 9.4 cases agree bit for bit; 219 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_css.R
 #' @family descriptive functions
 #' @name sas_f_css
@@ -660,7 +660,7 @@ NULL
 #' @param ... Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: partial (791 of 942 SAS 9.4 cases agree bit for bit; 151 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (723 of 942 SAS 9.4 cases agree bit for bit; 219 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_cv.R
 #' @family descriptive functions
 #' @name sas_f_cv
@@ -1245,7 +1245,7 @@ NULL
 #' @param ... Four or more numeric values. Missing values are ignored; with fewer than 4 nonmissing values or zero variance the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: approximate (281 of 970 SAS 9.4 cases agree bit for bit; 537 case(s) differ in the last bits (largest relative difference 2.3e-14; different algorithm); 152 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (717 of 970 SAS 9.4 cases agree bit for bit; 31 case(s) differ in the last bits; 222 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_kurtosis.R
 #' @family descriptive functions
 #' @name sas_f_kurtosis
@@ -2254,7 +2254,7 @@ NULL
 #' @param ... Three or more numeric values. Missing values are ignored; with fewer than 3 nonmissing values or zero variance the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: approximate (323 of 970 SAS 9.4 cases agree bit for bit; 496 case(s) differ in the last bits (largest relative difference 7.3e-15; different algorithm); 151 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (748 of 970 SAS 9.4 cases agree bit for bit; 222 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; results below 1E-12 in magnitude (other than 0) fail loud (guard: SAS returns 0 for many symmetric lists, fn_probe/SKEWNESS); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_skewness.R
 #' @family descriptive functions
 #' @name sas_f_skewness
@@ -2369,7 +2369,7 @@ NULL
 #' @param ... Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: partial (819 of 970 SAS 9.4 cases agree bit for bit; 151 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (751 of 970 SAS 9.4 cases agree bit for bit; 219 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_std.R
 #' @family descriptive functions
 #' @name sas_f_std
@@ -2382,7 +2382,7 @@ NULL
 #' @param ... Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: partial (789 of 940 SAS 9.4 cases agree bit for bit; 151 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (721 of 940 SAS 9.4 cases agree bit for bit; 219 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_stderr.R
 #' @family descriptive functions
 #' @name sas_f_stderr
@@ -2643,7 +2643,7 @@ NULL
 #' @param ... Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: partial (790 of 941 SAS 9.4 cases agree bit for bit; 151 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (722 of 941 SAS 9.4 cases agree bit for bit; 219 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_var.R
 #' @family descriptive functions
 #' @name sas_f_var

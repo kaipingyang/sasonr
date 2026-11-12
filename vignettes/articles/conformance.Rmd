@@ -167,6 +167,13 @@ SAS:
 | Our own cases (parser, functions, FREQ statistics, rounding, semantics, function and format matrices, function probes, procedure statistic probes, error handling) | 7,854 |
 | Single-feature corpus and book programs | 2,119 |
 
+Round 12.1 (review of round 12): 7,550 of 9,975 cases bit-identical, 2,363
+fail loud, no data set value differs silently. The two new probes (nearly
+constant data for PROC MEANS, symmetric argument lists for DATA step
+SKEWNESS) fail loud as whole programs but fixed the rules for nearly
+constant data, the STD cut-off and negative CSS; the moment kernel now fails
+loud on any overflow, underflow or NaN instead of returning a missing value.
+
 Round 12 (PROC MEANS moment statistics): 7,550 of 9,973 cases
 bit-identical, 2,361 fail loud, no data set value differs silently and no
 program on which SAS stops with an ERROR runs in sasonr. The CSS family of
