@@ -109,3 +109,84 @@ test_that("PROC SUMMARY needs PRINT or OUTPUT; unsupported options fail loud", {
   expect_error(sas_run(paste(d, "proc means data=a; var x; output out=o mean=m / levels; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc means data=a; zzz x; run;")), class = "sasonr_syntax_error")
 })
+
+# Printed-table geometry: every value field is FW= columns wide whatever the
+# value looks like, panels hold as many statistics as fit and the dashed rule is
+# exactly the table width.  All expected values below are SAS 9.4 TS1M2 output
+# for these exact programs (24 observations, so N prints in two columns).
+panel_data <- "
+data p;
+  length g $8;
+  do i = 1 to 24;
+    x = i / 7 + 0.125;
+    g = 'A'; if i > 12 then g = 'B';
+    output;
+  end;
+  drop i;
+run;
+"
+twelve <- "n mean std stderr min max median q1 q3 sum var cv"
+rules_of <- function(res) {
+  l <- squish(res$listing)
+  l[grepl("^-+$", l)]
+}
+# heading lines: everything except the dashed rules and the data rows (a value
+# row starts with a digit, '.' or '-' -- or with one of the two CLASS levels)
+heads_of <- function(res) {
+  l <- squish(res$listing)
+  l[!grepl("^[0-9.<-]", l) & !grepl("^[AB] ", l)]
+}
+
+test_that("twelve statistics print in two panels of 10 + 2 at LINESIZE=132", {
+  res <- sas_run(paste(panel_data, "proc means data=p", twelve, "; var x; run;"))
+  expect_equal(heads_of(res), c(
+    "The MEANS Procedure", "Analysis Variable : x", "Lower Upper",
+    "N Mean Std Dev Std Error Minimum Maximum Median Quartile Quartile Sum",
+    "Analysis Variable : x", "Coeff of", "Variance Variation"
+  ))
+  expect_equal(rules_of(res), c(rep(strrep("-", 128), 2L), rep(strrep("-", 28), 2L)))
+})
+
+test_that("MAXDEC= does not change the table geometry", {
+  res <- sas_run(paste(panel_data, "proc means data=p maxdec=0", twelve, "; var x; run;"))
+  expect_equal(rules_of(res), c(rep(strrep("-", 128), 2L), rep(strrep("-", 28), 2L)))
+  res4 <- sas_run(paste(panel_data, "proc means data=p maxdec=4", twelve, "; var x; run;"))
+  expect_equal(rules_of(res4), rules_of(res))
+})
+
+test_that("fewer statistics use wider gaps (16 columns apart, one panel)", {
+  res <- sas_run(paste(panel_data, "proc means data=p n mean std min max; var x; run;"))
+  expect_equal(rules_of(res), rep(strrep("-", 66), 2L))
+  res9 <- sas_run(paste(panel_data, "options linesize=200; proc means data=p", twelve, "; var x; run;"))
+  expect_equal(rules_of(res9), rep(strrep("-", 178), 2L))
+})
+
+test_that("LINESIZE= sets the panel width", {
+  res <- sas_run(paste(panel_data, "options linesize=100; proc means data=p", twelve, "; var x; run;"))
+  expect_equal(rules_of(res), c(rep(strrep("-", 100), 2L), rep(strrep("-", 60), 2L)))
+  expect_equal(heads_of(res), c(
+    "The MEANS Procedure", "Analysis Variable : x", "Lower",
+    "N Mean Std Dev Std Error Minimum Maximum Median Quartile",
+    "Analysis Variable : x", "Upper Coeff of", "Quartile Sum Variance Variation"
+  ))
+})
+
+test_that("CLASS tables repeat the fixed columns in every panel", {
+  res <- sas_run(paste(panel_data, "proc means data=p", twelve, "; class g; var x; run;"))
+  expect_equal(heads_of(res), c(
+    "The MEANS Procedure", "Analysis Variable : x", "N Lower Upper",
+    "g Obs N Mean Std Dev Std Error Minimum Maximum Median Quartile Quartile",
+    "Analysis Variable : x", "N Coeff of", "g Obs Sum Variance Variation"
+  ))
+  expect_equal(rules_of(res), c(rep(strrep("-", 129), 2L), rep(strrep("-", 59), 2L)))
+})
+
+test_that("undetermined panel layouts fail loud instead of printing a wrong rule", {
+  expect_error(sas_run(paste(panel_data, "proc means data=p fw=8 n mean std min max; var x; run;")),
+               class = "sasonr_unsupported")
+  # a CLASS column keeps its declared length; SAS narrows one that does not fit
+  expect_error(sas_run("data q; length c $200; do i = 1 to 10; c = 'A'; x = i; output; end; drop i; run;
+    proc means data=q n mean std stderr min max median q1 q3 sum var cv; class c; var x; run;"),
+               class = "sasonr_unsupported")
+})
+

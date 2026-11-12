@@ -336,11 +336,14 @@ translate_proc_means <- function(step, meta, last) {
     abort_runtime("Neither the PRINT option nor a valid output statement has been given.", step$line)
   }
   if (length(stats) == 0) stats <- c("n", "mean", "std", "min", "max")
-  # a printed table with ten or more statistics is split into panels; SAS 9.4
-  # sometimes fits one more column per panel than sasonr (rounding/proc/means_*:
-  # rule not determined), so such listings fail loud
-  if (printing && length(stats) >= 10L) {
-    abort_unsupported("PROC MEANS listing with ten or more statistics (panel layout)", step$line)
+  # The panel layout is implemented in means_listing(); the one part of it that
+  # is not derived from SAS output is the heading split for a narrow FW=: below
+  # the default field width SAS re-splits multi-word headings ("Std Error" ->
+  # "Std"/"Error") and abbreviates single words ("Minimum" -> "Min",
+  # "Coefficient of Variation" -> "Coeff of"/"Variation"), which sasonr does not
+  # reproduce.  Ten or more statistics are split into panels like SAS does.
+  if (printing && !is.null(o$fw) && o$fw < 12L) {
+    abort_unsupported("PROC MEANS listing with FW= below the default 12 (SAS re-splits and abbreviates column headings)", step$line)
   }
   vardef <- o$vardef %||% "df"
   ci_stats <- intersect(stats, c("stderr", "t", "prt", "lclm", "uclm"))
@@ -834,6 +837,101 @@ means_stat_col <- function(s, cells, sp) {
   list(parts = parts, width = max(vw, minw), right = TRUE, cells = cells)
 }
 
+# Printed-table geometry ------------------------------------------------------------
+#
+# Measured on SAS 9.4 TS1M2 with LINESIZE= 72..200, 3 to 22 statistics, FW=
+# 4..20, MAXDEC= 0..7, with and without CLASS.  The line is filled left to
+# right as follows.
+#
+#  * Every statistic column is a field of FW= columns (default 12), except
+#    N / N Miss (as wide as the printed counts) and t Value / Pr > |t|; a
+#    column is never narrower than its heading.  The field width does *not*
+#    depend on MAXDEC= or on how many characters a value actually uses: the
+#    same 12-statistic table is 128 + 28 columns wide with MAXDEC=0 and 7.
+#  * The fixed columns (CLASS levels, "N Obs", Variable/Label) and the gap
+#    between the fixed part and the first statistic use the same gap as panel 1
+#    of that table; a CLASS variable keeps its declared length as field width
+#    ("grp $8" prints in 8 columns even though the levels are one character).
+#  * A panel takes as many statistics as fit with two-blank gaps; the gap is
+#    then widened to 4, or 3, if the panel still fits (so consecutive values
+#    are 16, 15 or 14 columns apart).  Remaining statistics go to the next
+#    panel, which repeats the fixed columns.
+#  * The dashes under a table are exactly the table width, so a 12-statistic
+#    table at LINESIZE=132 is 128 + 28 (no CLASS) or 129 + 59 (one CLASS
+#    variable of length 8).
+means_panel_layout <- function(widths, fixed_widths, ls, min_gap = 2L, max_gap = 4L) {
+  n <- length(widths)
+  fixed_width <- function(g) if (length(fixed_widths) > 0) sum(fixed_widths) + g * length(fixed_widths) else 0L
+  fit <- function(from, g, F) {
+    take <- 0L
+    acc <- 0L
+    for (j in seq.int(from, n)) {
+      acc <- acc + widths[j]
+      if (F + acc + (j - from) * g <= ls) take <- j - from + 1L else break
+    }
+    take
+  }
+  # panel 1 also fixes the gap used by the fixed columns
+  best <- NULL
+  for (g in seq.int(max_gap, min_gap)) {
+    F <- fixed_width(g)
+    take <- fit(1L, g, F)
+    if (is.null(best) || take > best$take) best <- list(take = take, gap = g, fixed = F)
+  }
+  g_fixed <- best$gap
+  F0 <- best$fixed
+  if (best$take == 0L) best$take <- 1L
+  panels <- list()
+  pos <- 1L
+  first <- TRUE
+  while (pos <= n) {
+    if (first) {
+      take <- best$take
+      gap <- best$gap
+    } else {
+      take <- fit(pos, min_gap, F0)
+      if (take == 0L) take <- 1L
+      acc <- sum(widths[pos:(pos + take - 1L)])
+      gap <- min_gap
+      for (g in seq.int(max_gap, min_gap)) {
+        if (F0 + acc + (take - 1L) * g <= ls) {
+          gap <- g
+          break
+        }
+      }
+    }
+    acc <- sum(widths[pos:(pos + take - 1L)])
+    panels[[length(panels) + 1L]] <- list(first = pos, last = pos + take - 1L, gap = gap, fixed_gap = g_fixed,
+                                          width = F0 + acc + (take - 1L) * gap)
+    pos <- pos + take
+    first <- FALSE
+  }
+  panels
+}
+
+# render_table() with one gap per column boundary: the fixed part keeps the gap
+# of panel 1, the statistics use each panel's own gap.
+means_render <- function(cols, gaps) {
+  heads <- lapply(cols, function(c) heading_lines(c$parts, c$width))
+  nh <- max(vapply(heads, length, 1L))
+  heads <- lapply(heads, function(h) c(rep("", nh - length(h)), h))
+  widths <- vapply(cols, function(c) as.integer(c$width), 1L)
+  right <- vapply(cols, `[[`, TRUE, "right")
+  join <- function(vals) {
+    cells <- mapply(function(x, w, r) formatC(x, width = if (r) w else -w), vals, widths, right)
+    if (length(cells) == 1L) return(cells)
+    pieces <- character(2L * length(cells) - 1L)
+    pieces[seq.int(1L, 2L * length(cells) - 1L, 2L)] <- cells
+    pieces[seq.int(2L, 2L * length(cells) - 2L, 2L)] <- strrep(" ", gaps)
+    paste(pieces, collapse = "")
+  }
+  hl <- vapply(seq_len(nh), function(j) sas_rtrim(join(vapply(heads, `[`, "", j))), "")
+  n <- length(cols[[1L]]$cells)
+  body <- if (n > 0) vapply(seq_len(n), function(i) sas_rtrim(join(vapply(cols, function(c) c$cells[i], ""))), "") else character()
+  rule <- strrep("-", sum(widths) + sum(gaps))
+  c(hl, rule, body, rule)
+}
+
 means_listing <- function(d, sp, cells_by, print_types) {
   info <- sp$info
   cn <- vapply(sp$class, `[[`, "", "name")
@@ -894,20 +992,36 @@ means_listing <- function(d, sp, cells_by, print_types) {
         if (has_label) fixed[[length(fixed) + 1L]] <- list(parts = "Label", width = max(5L, nchar(lab_cells)), right = FALSE, cells = lab_cells)
       }
       scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp))
-      # panels: as many statistics as fit the line size
-      ls <- 132L
-      pos <- 1L
-      while (pos <= length(scols)) {
-        take <- pos
-        while (take < length(scols) && table_width(c(fixed, scols[pos:(take + 1L)]), 3L) <= ls) take <- take + 1L
-        cols <- c(fixed, scols[pos:take])
-        gap <- if (table_width(cols, 4L) <= ls) 4L else 3L
+      # Panel layout (measured on SAS 9.4 TS1M2, rounding/proc/means_* and the
+      # experiments behind means_panel_layout()).
+      ls <- rt$ls %||% 132L
+      panels <- means_panel_layout(vapply(scols, function(c) as.integer(c$width), 1L),
+                                   vapply(fixed, function(c) as.integer(c$width), 1L), ls)
+      bad <- Filter(function(p) p$width > ls, panels)
+      if (length(bad) > 0) {
+        # SAS squeezes an over-long fixed part (a CLASS variable with a long
+        # length, or a very wide Variable column) by narrowing that column and
+        # redistributing the spare columns; that rule is not determined
+        abort_unsupported("PROC MEANS listing wider than LINESIZE= (SAS narrows the class/fixed columns; rule not determined)")
+      }
+      if (length(fixed) > 0 && (length(panels) >= 3L || ls < 120L)) {
+        # Fixed columns are verified exact for one or two panels at LINESIZE=
+        # 120..200 (CLASS length 1, 4 and 8, one or two CLASS variables, the 38
+        # rounding/proc/means_* gold cases; two analysis variables).  Below
+        # LINESIZE=120 and across three or more statistic panels SAS narrows the
+        # fixed part (the "N Obs" field and the gaps around the CLASS columns)
+        # in a way these measurements do not determine: at LINESIZE=100 a
+        # 12-statistic CLASS table is 92 columns wide where this layout gives 94.
+        abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not determined)")
+      }
+      for (p in panels) {
+        cols <- c(fixed, scols[p$first:p$last])
+        gaps <- c(rep.int(p$fixed_gap, length(fixed)), rep.int(p$gap, p$last - p$first))
         if (!multi) {
           v <- sp$vars[1]
           out <- c(out, paste0("Analysis Variable : ", info[[v]]$disp, " ", info[[v]]$label %||% ""), "")
         }
-        out <- c(out, render_table(cols, gap), "")
-        pos <- take + 1L
+        out <- c(out, means_render(cols, gaps), "")
       }
     }
   }
