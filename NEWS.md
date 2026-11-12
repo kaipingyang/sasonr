@@ -1,5 +1,33 @@
 # sasonr (development version)
 
+## Round 12 (2026-11-12): PROC MEANS moment statistics
+
+* **PROC MEANS / SUMMARY CSS family bit-identical to SAS 9.4.** Four new
+  real-SAS probes (integer data with exact sums; the same patterns at 14
+  offsets; decimal data with missing values, FREQ, WEIGHT, VARDEF=, CLASS x
+  BY and groups of up to 100,000 observations) fixed the algorithm: sums
+  shifted by the first observation of the cell, the mean taken from the
+  plain SUM, and the central sums written as a polynomial in the shift
+  `q = MEAN - c0` evaluated by Horner's rule with fused multiply-adds
+  (`CSS = fma(q, W q - 2 S1, S2)`). SUM with FREQ/WEIGHT accumulates
+  `fma(w, x, SUM)`. CSS, USS, VAR, STD, STDERR, CV, T and KURTOSIS are now
+  verified (`partial`: values beyond 1E140 or below 1E-140 fail loud) with
+  and without FREQ and WEIGHT and for VARDEF=N/WDF/WEIGHT where SAS computes
+  them; the default `proc means` listing no longer stops in strict mode.
+  SKEWNESS stays `approximate` (about 97 % of probe values agree); PRT and
+  the confidence limits stay `approximate` (they need SAS's t distribution).
+* Rules found on the way: T is capped at +-99999.99 (PRT is computed from
+  the capped value); a zero CV of a negative mean is +0; a negative CSS is
+  missing; SAS reports STD 0 when the variance is negligible against the
+  squared mean (a variance between 5.6E-31 and 4E-18 times the squared mean
+  fails loud, the cut-off is not known); STDERR is `sqrt(VAR / SUMWGT)`.
+* The PROC statistics gate checks every condition that applies (FREQ,
+  WEIGHT, VARDEF=, QNTLDEF=, EXCLNPWGT); quantiles and the other order
+  statistics with FREQ or WEIGHT are still unverified.
+* DATA step `SKEWNESS` is bit-identical for up to 10 non-missing arguments
+  (`partial`); `KURTOSIS` moved closer (93 % of the probe rows) but stays
+  `approximate`.
+
 ## Round 11 (2026-11-12): verification integrity
 
 An independent review of round 10 found ways in which results that do not

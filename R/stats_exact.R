@@ -11,10 +11,8 @@
 #     MEAN = fma(n, c0, Sd) / n
 #     CSS  = fma(-Sd, Sd / n, Sdd),  VAR = CSS / (n - 1),  STD = sqrt(VAR)
 #     USS  = fma(c0, fma(n, c0, 2 * Sd), Sdd)
-# * PROC MEANS: MEAN = SUM / n; USS = fma(SUM, MEAN, CSS); VAR, STD, STDERR and
-#   CV follow from CSS.  The CSS accumulation itself is not reproduced exactly
-#   (about 88 % of random groups), so the CSS family is `approximate` in the
-#   PROC statistics registry.
+# * PROC MEANS / SUMMARY: see stats_means_moments() (round 12: every moment
+#   statistic except SKEWNESS bit-identical on the proc_stats/means_* probes).
 # The fused multiply-add is emulated exactly in double arithmetic (Dekker's
 # product and Boldo-Melquiond rounding to odd); it is exact when no partial
 # product overflows or underflows, which the callers guarantee by the range
@@ -137,8 +135,8 @@ stats_order_free <- function(fn, x) {
 # ---- the moment kernel -------------------------------------------------------------
 #
 # One kernel for N, SUM, MEAN, CSS, USS, VAR, STD, STDERR, CV, SKEWNESS and
-# KURTOSIS, shared by the DATA step functions, PROC MEANS (no WEIGHT / FREQ)
-# and the PROC SQL summary functions.  `m` is a matrix with one group per row
+# KURTOSIS, shared by the DATA step functions and the PROC SQL summary
+# functions (PROC MEANS has its own weighted kernel, stats_means_moments()).  `m` is a matrix with one group per row
 # (the values in observation / argument order, NA = missing); every
 # accumulation is a sequential double operation over the non-missing values
 # of a row, vectorised over the rows.  The three callers differ only in how
@@ -150,11 +148,9 @@ stats_order_free <- function(fn, x) {
 #             DATA step functions run only up to 10 arguments)
 #   sql       shifted sums: MEAN = fma(N, c0, Sd) / N, CSS = fma(-Sd, Sd / N, Sdd),
 #             USS = fma(c0, fma(N, c0, 2 Sd), Sdd) (proc_stats/ probes)
-#   means     MEAN = SUM / N, CSS from the shifted sums as for sql,
-#             USS = fma(SUM, MEAN, CSS) (proc_stats/ probes; CSS approximate)
 # VAR = CSS / div (div = N - 1 unless the caller passes its VARDEF divisor),
-# STD = sqrt(VAR).  SKEWNESS and KURTOSIS (VARDEF=DF form) are approximate in
-# every caller (the registries say so).  The emulated fma is exact only for
+# STD = sqrt(VAR).  DATA step SKEWNESS is exact (up to 10 arguments), KURTOSIS
+# approximate (the registry says so).  The emulated fma is exact only for
 # magnitudes 0 or 1E-140..1E140 (stats_fma_range_ok()); callers check it.
 
 # Sequential double sum of the non-missing values of every row (NA: none).
@@ -183,7 +179,7 @@ stats_row_fma_sq <- function(d) {
   acc
 }
 
-stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL) {
+stats_moments <- function(m, method = c("datastep", "sql"), div = NULL) {
   method <- match.arg(method)
   if (!is.matrix(m)) m <- matrix(as.numeric(m), nrow = 1L)
   n <- rowSums(!is.na(m))
@@ -200,13 +196,8 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL)
     sd <- stats_row_seq_sum(d)
     sdd <- stats_row_seq_sum(d * d)
     css <- stats_fma(-sd, sd / n, sdd)
-    if (method == "sql") {
-      mean <- stats_fma(n, c0, sd) / n
-      uss <- stats_fma(c0, stats_fma(n, c0, 2 * sd), sdd)
-    } else {
-      mean <- sum / n
-      uss <- stats_fma(sum, mean, css)
-    }
+    mean <- stats_fma(n, c0, sd) / n
+    uss <- stats_fma(c0, stats_fma(n, c0, 2 * sd), sdd)
   }
   div <- div %||% (n - 1)
   var <- ifelse(div > 0, css / div, NA_real_)
@@ -215,13 +206,30 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL)
   cv <- ifelse(!is.na(std) & mean != 0, if (method == "datastep") std / mean * 100 else 100 * std / mean, NA_real_)
   # a zero CV of negative values is +0 in the DATA step (fn_probe/STD row 603)
   if (method == "datastep") cv[!is.na(cv) & cv == 0] <- 0
-  # skewness and kurtosis (VARDEF=DF) from the standardised deviations
-  z <- (m - mean) / std
-  sz3 <- rowSums(z^3, na.rm = TRUE)
-  sz4 <- rowSums(z^4, na.rm = TRUE)
+  # skewness and kurtosis (VARDEF=DF), DATA step (fn_probe/STD, at most 10
+  # arguments): r = (N - 1) / CSS; SKEWNESS = N A3 / ((N - 1)(N - 2)) with A3
+  # the sum of fma(z z, z, .) over z = d sqrt(r) (749 of 749 rows);
+  # KURTOSIS = fma(N (N + 1) / ((N - 1)(N - 2)(N - 3)), A4, -3 (N - 1)**2 /
+  # ((N - 2)(N - 3))) with A4 the sum of fma(t, t, .) over t = d (d r)
+  # (487 of 523 rows: approximate)
   ok <- !is.na(std) & std > 0
-  skew <- ifelse(ok & n > 2, n / ((n - 1) * (n - 2)) * sz3, NA_real_)
-  kurt <- ifelse(ok & n > 3, n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)) * sz4 - 3 * (n - 1)^2 / ((n - 2) * (n - 3)), NA_real_)
+  r <- (n - 1) / css
+  dd <- if (method == "datastep") d else m - mean
+  z <- dd * sqrt(r)
+  a3 <- rep(0, nrow(m))
+  a4 <- rep(0, nrow(m))
+  for (j in seq_len(ncol(m))) {
+    zj <- z[, j]
+    tj <- dd[, j] * (dd[, j] * r)
+    use <- !is.na(zj) & ok
+    if (any(use)) {
+      a3[use] <- stats_fma(zj[use] * zj[use], zj[use], a3[use])
+      a4[use] <- stats_fma(tj[use], tj[use], a4[use])
+    }
+  }
+  skew <- ifelse(ok & n > 2, n * a3 / ((n - 1) * (n - 2)), NA_real_)
+  kurt <- ifelse(ok & n > 3, stats_fma(n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)), a4, -3 * (n - 1)^2 / ((n - 2) * (n - 3))),
+                 NA_real_)
   out <- list(n = n, sum = sum, mean = mean, css = css, uss = uss, var = var, std = std, stderr = stderr, cv = cv,
               skew = skew, kurt = kurt)
   for (k in setdiff(names(out), "n")) out[[k]][none] <- NA_real_
@@ -233,4 +241,86 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL)
 stats_overflow_missing <- function(v) {
   v[!is.finite(v)] <- NA_real_
   v
+}
+
+# ---- PROC MEANS / SUMMARY --------------------------------------------------------
+#
+# The moment sums of one cell, the way SAS 9.4 PROC MEANS accumulates them
+# (fitted on the real-SAS probes tests/conformance/proc_stats/means_* : integer
+# data with exact sums, the same patterns at 14 offsets, decimals with missing
+# values, FREQ, WEIGHT, VARDEF=, CLASS x BY, n up to 100,000).
+# `x` are the values of the observations that take part (non-missing value,
+# non-missing weight, frequency >= 1) in observation order and `wt` their
+# weights (frequency times the weight, negative weights as 0).  With
+# c0 = x[1] (the first such observation, also when its weight is 0),
+# d = x - c0 and per observation wd = wt * d, t2 = wd * d, t3 = t2 * d:
+#   W  = sequential sum of wt          S  = fma(wt, x, S)  (SUM)
+#   S1 = sequential sum of wd          S2 = sequential sum of t2
+#   S3 = sequential sum of t3          S4 = fma(t3, d, S4)
+# MEAN = S / W and q = MEAN - c0 (the shift of the provisional to the final
+# mean; the central sums are a polynomial in q evaluated by Horner's rule
+# with SAS's fused multiply-adds):
+#   CSS = fma(q, W q - 2 S1, S2)       (0 when S2 = 0; missing when negative)
+#   M3  = fma(q, fma(q, 3 S1 - W q, -3 S2), S3)
+#   M4  = fma(q, q fma(q, W q - 4 S1, 6 S2) - 4 S3, S4)
+#   USS = fma(S, MEAN, CSS)
+# The emulated fma is exact for magnitudes 0 or 1E-140..1E140
+# (stats_fma_range_ok()); the caller checks it.
+# Sequential acc = fma(a[i], b[i], acc) from acc = 0, exactly rounded at every
+# step: the products are split exactly (Dekker) once, vectorised; the loop
+# adds p[i] + e[i] to the accumulator with a two-sum and the rounding-to-odd
+# correction of stats_fma() (scalar arithmetic only).
+stats_fma_accumulate <- function(a, b) {
+  n <- length(a)
+  if (n == 0L) return(0)
+  u <- eft_two_prod(as.double(a), as.double(b))
+  p <- u$p
+  e <- u$e
+  if (any(!is.finite(p) | is.na(e))) {
+    acc <- 0
+    for (i in seq_len(n)) acc <- stats_fma(a[i], b[i], acc)
+    return(acc)
+  }
+  acc <- 0
+  for (i in seq_len(n)) {
+    pi <- p[i]
+    s <- acc + pi
+    bb <- s - acc
+    err <- (acc - (s - bb)) + (pi - bb)
+    ei <- e[i]
+    v <- err + ei
+    if (v != 0) {
+      vb <- v - err
+      r <- (err - (v - vb)) + (ei - vb)
+      if (r != 0) v <- ro_sum(err, ei)
+    }
+    acc <- s + v
+  }
+  acc
+}
+
+stats_means_moments <- function(x, wt, higher = TRUE) {
+  W <- stats_seq_sum(wt)
+  S <- if (all(wt == 1)) stats_seq_sum(x) else stats_fma_accumulate(wt, x)
+  out <- list(W = W, sum = S)
+  if (!(W > 0)) return(out)
+  c0 <- x[1]
+  d <- x - c0
+  wd <- wt * d
+  t2 <- wd * d
+  t3 <- t2 * d
+  s1 <- stats_seq_sum(wd)
+  s2 <- stats_seq_sum(t2)
+  mean <- S / W
+  q <- mean - c0
+  css <- if (s2 == 0) 0 else stats_fma(q, W * q - 2 * s1, s2)
+  if (!is.na(css) && css < 0) css <- NA_real_
+  out <- c(out, list(mean = mean, css = css, uss = stats_fma(S, mean, css)))
+  if (higher) {
+    s3 <- stats_seq_sum(t3)
+    s4 <- stats_fma_accumulate(t3, d)
+    out$m3 <- stats_fma(q, stats_fma(q, 3 * s1 - W * q, -3 * s2), s3)
+    out$m4 <- stats_fma(q, q * stats_fma(q, W * q - 4 * s1, 6 * s2) - 4 * s3, s4)
+  }
+  out
 }

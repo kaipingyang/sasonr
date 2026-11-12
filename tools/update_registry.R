@@ -2,7 +2,9 @@
 # the offline conformance results (never edited by hand).
 #
 # Usage (package root; one R process at a time):
-#   OPENBLAS_NUM_THREADS=1 Rscript tools/run_conformance.R tests/conformance --pattern '/(fn_matrix|fmt_matrix|functions)/' --out /tmp/matrix.csv
+#   OPENBLAS_NUM_THREADS=1 Rscript tools/run_conformance.R tests/conformance --pattern '/(fn_matrix|fmt_matrix|functions)/' --strict false --out /tmp/matrix.csv
+#   (--strict false: in strict mode every approximate function fails loud and
+#   the registry would rebuild itself from its own gate)
 #   Rscript tools/update_registry.R /tmp/matrix.csv [more.csv ...]
 #
 # Inputs: the per-case CSV of tools/run_conformance.R (areas fn_matrix/,

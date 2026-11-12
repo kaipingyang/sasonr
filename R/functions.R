@@ -856,7 +856,16 @@ sas_f_harmean <- function(...) row_stat(function(v) {
   length(v) / stats_seq_sum(1 / v)
 }, ...)
 #' @export
-sas_f_skewness <- function(...) ds_moments("skewness", num_args(...))$skew
+sas_f_skewness <- function(...) {
+  sk <- ds_moments("skewness", num_args(...))$skew
+  # SAS 9.4 returns exactly 0 for symmetric data where the kernel leaves a
+  # rounding residue (fn_matrix/SKEWNESS: skewness(2, 0, 4, 4, 5, 5, 7, 9));
+  # whether SAS cuts small values to 0 is not determined
+  if (any(!is.na(sk) & sk != 0 & abs(sk) < 1e-12)) {
+    abort_unsupported("SKEWNESS() with a result below 1E-12 in magnitude (SAS may return 0; not determined)")
+  }
+  sk
+}
 #' @export
 sas_f_kurtosis <- function(...) ds_moments("kurtosis", num_args(...))$kurt
 

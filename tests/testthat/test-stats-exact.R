@@ -45,13 +45,52 @@ test_that("PROC SQL GROUP BY on data not flagged as sorted fails loud for order-
   expect_identical(sorted$work$s$s, c(0.1 + 0.7, 0.2))
 })
 
-test_that("PROC MEANS: STD is approximate (strict fails loud), SUM and MEAN are exact", {
-  code <- "data a; input x @@; datalines;\n0.1 0.2 0.3\n;\nrun;\nproc means data=a noprint; var x; output out=o sum=s mean=m; run;"
+hexd <- function(h) readBin(as.raw(strtoi(substring(h, seq(1, 15, 2), seq(2, 16, 2)), 16L)), "double", n = 1L, endian = "big")
+
+test_that("PROC MEANS: CSS family bit-identical to SAS 9.4 (round 12 kernel)", {
+  # proc_stats/means_css_int_probe: integer data, so only the CSS formula matters
+  # SAS 9.4: CSS of 2 8 4 = 18.666666666666664 (not the nearest double of 56/3)
+  expect_identical(stats_means_moments(c(2, 8, 4), c(1, 1, 1))$css, 18.666666666666664)
+  # SAS 9.4: 1 4 8 -> 24.666666666666671; 8 9 9 -> 0.66666666666666663
+  expect_identical(stats_means_moments(c(1, 4, 8), c(1, 1, 1))$css, 24.666666666666671)
+  expect_identical(stats_means_moments(c(8, 9, 9), c(1, 1, 1))$css, 0.66666666666666663)
+  code <- "data a; input x @@; datalines;\n0.1 0.2 0.3 0.7\n;\nrun;\nproc means data=a noprint; var x; output out=o sum=s mean=m std=sd css=css; run;"
   r <- sas_run(code)
-  expect_identical(r$work$o$s, Reduce(`+`, c(0.1, 0.2, 0.3)))
-  expect_identical(r$work$o$m, Reduce(`+`, c(0.1, 0.2, 0.3)) / 3)
+  expect_identical(r$work$o$s, Reduce(`+`, c(0.1, 0.2, 0.3, 0.7)))
+  k <- stats_means_moments(c(0.1, 0.2, 0.3, 0.7), rep(1, 4))
+  expect_identical(r$work$o$css, k$css)
+  expect_identical(r$work$o$sd, sqrt(k$css / 3))
+})
+
+test_that("PROC MEANS: WEIGHT sums are fma(w, x, .) and a zero-weight first value is the shift", {
+  # proc_stats/means_css_dec_probe g200 (SAS 9.4): x = 83.2 (w 0), 48.1 (w 3)
+  # -> SUM 144.3, CSS 1.0615508472255895e-13
+  code <- "data a; input x w; datalines;\n83.2 0\n48.1 3\n;\nrun;\nproc means data=a noprint; var x; weight w; output out=o sum=s css=css; run;"
+  r <- sas_run(code)
+  expect_identical(r$work$o$s, 144.3)
+  expect_identical(r$work$o$css, 1.0615508472255895e-13)
+})
+
+test_that("PROC MEANS: T is capped at 99999.99; SKEWNESS stays approximate", {
+  code <- "data a; input x @@; datalines;\n1000000.1 1000000.2\n;\nrun;\nproc means data=a noprint; var x; output out=o t=t; run;"
+  expect_identical(sas_run(code)$work$o$t, 99999.99)
   withr::with_options(list(sasonr.strict = TRUE),
-    expect_error(sas_run(sub("sum=s mean=m", "std=sd", code, fixed = TRUE)), class = "sasonr_not_verified"))
+    expect_error(sas_run(sub("t=t", "skewness=sk", code, fixed = TRUE)), class = "sasonr_not_verified"))
+})
+
+test_that("PROC MEANS: a variance negligible against the squared mean gives STD 0, the undetermined band fails loud", {
+  # proc_stats/means_css_dec_probe g13 (SAS 9.4): STD 0 and CV 0 for VAR/MEAN**2 = 2E-32
+  code <- "data a; input x w; datalines;\n1000000.6063 0\n1000000.594 1.7\n;\nrun;\nproc means data=a noprint; var x; weight w; output out=o std=sd cv=cv; run;"
+  r <- sas_run(code)
+  expect_identical(r$work$o$sd, 0)
+  expect_identical(r$work$o$cv, 0)
+})
+
+test_that("DATA step SKEWNESS is exact up to 10 arguments", {
+  # fn_matrix/SKEWNESS (SAS 9.4): skewness(1, 2, 3, 10) = 1.76363261480388 (hex 3FFC37D6D52BDDDD)
+  expect_identical(sas_f_skewness(1, 2, 3, 10), hexd("3FFC37D6D52BDDDD"))
+  # skewness(2, 4, 4, 4, 5, 5, 7, 9) = 0.81848755335679 (hex 3FEA310CCF3B3760)
+  expect_identical(sas_f_skewness(2, 4, 4, 4, 5, 5, 7, 9), hexd("3FEA310CCF3B3760"))
 })
 
 test_that("MOD and MODZ: exact remainders inside the verified domain, fail loud outside", {

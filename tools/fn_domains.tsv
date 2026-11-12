@@ -9,3 +9,4 @@ VAR	at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140
 CSS	at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140
 STDERR	at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140
 CV	at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140
+SKEWNESS	at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140; results below 1E-12 in magnitude (other than 0) fail loud
