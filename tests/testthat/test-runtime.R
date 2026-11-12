@@ -157,3 +157,16 @@ test_that("invalid programs SAS rejects fail loud", {
 test_that("TIMEw.d writes fractional seconds", {
   expect_equal(sas_run("data _null_; t = 37845.9; put t time12.3; run;")$log, "10:30:45.900")
 })
+
+test_that("left-hand SUBSTR replaces part of a variable (SAS semantics)", {
+  res <- sas_run("data d; length t $6; t='abcdef'; substr(t,2,2)='XY'; r=t; run;")
+  expect_equal(res$work$d$t, "aXYdef")
+  # a replacement longer than the room left is cut to the room
+  res2 <- sas_run("data d; length t $6; t='abcdef'; substr(t,5)='WXYZ'; r=t; run;")
+  expect_equal(res2$work$d$t, "abcdWX")
+  # an invalid position is a data error: NOTE, _ERROR_, variable unchanged
+  res3 <- sas_run("data d; length t $6; t='abcdef'; substr(t,8)='Z'; e=_error_; r=t; run;")
+  expect_equal(res3$work$d$t, "abcdef")
+  expect_equal(res3$work$d$e, 1)
+  expect_true(any(grepl("Invalid second argument to function SUBSTR", res3$log)))
+})

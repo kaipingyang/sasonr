@@ -235,7 +235,7 @@ expr_may_error <- function(e) {
 }
 
 stmt_may_error <- function(s) {
-  if (s$stmt == "input") return(TRUE)
+  if (s$stmt %in% c("input", "substr_assign")) return(TRUE)
   any(vapply(Filter(Negate(is.null), stmt_exprs(s)), expr_may_error, logical(1)))
 }
 
@@ -595,6 +595,13 @@ gen_vec_stmt <- function(s, guard, cx) {
         add_stage(cx, "raw", "dplyr::ungroup()")
       }
     },
+    substr_assign = {
+      v <- s$var
+      at <- sprintf(", .at = c(%dL, %dL)", as.integer(s$line), as.integer(s$col %||% NA_integer_))
+      val <- sprintf("sas_substr_assign(%s, %s, %s, %s%s)", r_name(v), gen_expr(s$pos, cx),
+                     if (is.null(s$len)) "NULL" else gen_expr(s$len, cx), gen_expr(s$value, cx), at)
+      add_stage(cx, "mutate", assign_code(v, val, guard))
+    },
     "if" = gen_vec_if(s, guard, cx),
     subset_if = {
       cond <- sprintf("sas_true(%s)", gen_expr(s$cond, cx))
@@ -868,6 +875,11 @@ gen_row_stmt <- function(s, cx) {
     sum = {
       ref <- var_ref(s$target$name, cx)
       sprintf("%s <- sas_f_sum(%s, %s)", ref, ref, g(s$value))
+    },
+    substr_assign = {
+      at <- sprintf(".at = c(%dL, %dL)", as.integer(s$line), as.integer(s$col %||% NA_integer_))
+      sprintf("%s <- sas_substr_assign(%s, %s, %s, %s, %s)", var_ref(s$var, cx), var_ref(s$var, cx),
+              g(s$pos), if (is.null(s$len)) "NULL" else g(s$len), g(s$value), at)
     },
     "if" = {
       rc <- row_cond(s$cond, cx)
