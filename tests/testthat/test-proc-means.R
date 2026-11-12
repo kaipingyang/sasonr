@@ -1,3 +1,8 @@
+# These tests check the PROC MEANS computations and layouts; several use
+# statistics that are `approximate` in the PROC statistics registry (STD, VAR,
+# CSS ...), so strict mode is off here (the gate is tested in test-stats-exact.R).
+withr::local_options(sasonr.strict = FALSE) # restored at the end of this file
+
 squish <- function(x) {
   x <- gsub("[[:space:]]+", " ", trimws(x))
   x[nzchar(x)]

@@ -66,7 +66,9 @@ test_that("PUT: no blank after literals; formatted items keep their field", {
 })
 
 test_that("arithmetic on special missing values and overflow yields ordinary missing", {
-  log <- sas_run("data _null_; a = .A + 1; b = -.B; c = exp(1000); d = . ** 0; put a= b= c= d=; run;")$log
+  # EXP is approximate (last bits): strict mode off for the overflow case
+  log <- withr::with_options(list(sasonr.strict = FALSE), suppressWarnings(
+    sas_run("data _null_; a = .A + 1; b = -.B; c = exp(1000); d = . ** 0; put a= b= c= d=; run;")))$log
   # EXP overflow is a data error: _ERROR_ is set and the PDV is dumped
   expect_equal(grep("^NOTE", log, value = TRUE, invert = TRUE), c("a=. b=. c=. d=.", "a=. b=. c=. d=. _ERROR_=1 _N_=1"))
 })

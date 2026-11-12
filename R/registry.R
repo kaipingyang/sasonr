@@ -88,9 +88,9 @@ feature_status_text <- function(status) {
 #' @aliases sasonr.strict
 #' @examples
 #'
-#' try(sas_run("data a; y = log(10); run;"))
+#' try(sas_run("data a; y = probt(1.5, 10); run;"))
 #' old <- options(sasonr.strict = FALSE)
-#' res <- suppressWarnings(sas_run("data a; y = log(10); run;"))
+#' res <- suppressWarnings(sas_run("data a; y = probt(1.5, 10); run;"))
 #' res$work$a$y
 #' options(old)
 NULL
@@ -146,4 +146,15 @@ registry_defw <- function(kind, fmt) {
   nm <- if (!nzchar(fmt$name)) (if (fmt$char) "$" else "F") else paste0(if (fmt$char) "$", toupper(fmt$name))
   w <- reg$sas_defw[toupper(reg$name) == nm & reg$kind == kind]
   if (!length(w) || is.na(w[1]) || !nzchar(w[1])) NA_integer_ else as.integer(w[1])
+}
+
+# Is `name` a function or CALL routine of SAS 9.4 (inst/registry/sas_function_names.txt,
+# names from the SAS inventory)?  Unknown names are a compile-time ERROR in SAS.
+sas_known_function <- function(name) {
+  if (is.null(registry_cache$fn_names)) {
+    f <- system.file("registry", "sas_function_names.txt", package = "sasonr")
+    registry_cache$fn_names <- if (nzchar(f)) setdiff(readLines(f), "") else character()
+  }
+  nm <- registry_cache$fn_names
+  !length(nm) || toupper(name) %in% nm
 }
