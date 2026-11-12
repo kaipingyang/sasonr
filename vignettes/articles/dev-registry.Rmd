@@ -16,7 +16,8 @@ offline conformance cases (gold standard: SAS 9.4).
 * **unsupported**: not implemented yet; using it stops the program.
 
 ```{r}
-reg <- sas_feature_registry("semantics")
+reg <- utils::read.csv(system.file("registry", "semantics.csv", package = "sasonr"),
+                       stringsAsFactors = FALSE, colClasses = "character")
 cat(sprintf("Entries: %d (verified %d, partial %d, unsupported %d, not applicable %d)",
             nrow(reg), sum(reg$sasonr_status == "verified"),
             sum(reg$sasonr_status == "partial"),
