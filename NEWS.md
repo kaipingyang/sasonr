@@ -1,5 +1,53 @@
 # sasonr (development version)
 
+## Round 12 (2026-11-13): PROC FREQ statistics, exact MEANS moments, display rules
+
+The dev branch merged the upstream `main` (round 11) and continues with the
+clinical procedures and the value runtime.
+
+* **PROC MEANS moments are bit-identical to SAS 9.4**: CSS, VAR, STD, STDERR,
+  CV and USS are computed with the shifted-sum closed form SAS uses
+  (CSS = sum of squares of the deviations from the reported mean, finalised
+  with the SAS correction term), and USS = CSS + SUM * MEAN.  SKEWNESS and
+  KURTOSIS remain approximate.
+* **The display rules are `[gold]`**: the MAXDEC= display of a printed table,
+  PUT w.d and PROC PRINT w.d share one rounding engine; the default decimals
+  of a printed table (FW=12, no MAXDEC=) follow the rule measured on 155
+  exactly known doubles (E notation below 1E-5, 9 decimals below 1E-3,
+  7 decimals otherwise, the 2-decimal / integer / E branches above 1000, and
+  an E mantissa as wide as the field allows).  Values in the undetermined
+  window of the SAS fuzz and subnormal values fail loud.  The N field of a
+  printed table is never narrower than two columns.
+* **PROC FREQ**: one-way tables ignore EXPECTED / DEVIATION / CELLCHI2 (the
+  manual says they have no effect there); RISKDIFF and RELRISK print the risk
+  estimates, the risk differences (Wald, Agresti-Caffo, Hauck-Anderson,
+  Newcombe and the exact unconditional score limits), the odds ratio and
+  relative risk table and the exact confidence limits; multiway tables print
+  the Cochran-Mantel-Haenszel statistics (SCORES=TABLE / RANK), the common
+  odds ratio and relative risks and the Breslow-Day test; the EXACT statement
+  handles the 2x2 EXACT CHISQ; TESTP= / TESTF= print the specified
+  proportions or frequencies; MISSPRINT lists the missing levels of a two-way
+  table; BY groups print one table per group; fractional weights compute
+  CHISQ but not Fisher; a single-row table prints no statistics block.  The
+  exact RELRISK confidence limit that SAS computes with an internal nuisance
+  search (documented algorithm gives 0.08997 where SAS prints 0.0901) stays
+  fail loud.
+* **PROC SQL computed character columns** get the lengths SAS gives them
+  (CAT family 200, constant arguments the length of the value), and the SQL
+  context of the functions involved is now in the registry.
+* **DATA step**: an assignment to `SUBSTR()` of an undeclared variable
+  creates it as a character variable of length 8, silently truncating an
+  over-long replacement; `EXIST()` reports WORK and SASHELP members (an
+  explicit `TYPE='ANY'` returns 0, as SAS does, because ANY is not a member
+  type); the sign of a zero follows the measured rules in SUM / MEAN / MIN /
+  MAX and in PROC MEANS.
+* **Conformance (own corpus, 758 cases)**: `freq_stats` 56/57,
+  `rounding/proc` 76/84, `functions` 367/370 (23 expected-error cases agree,
+  3 blocked by the upstream `mismatch` status of MDY and CONSTANT),
+  `semantics` 12/13, `fn_examples` 150/184 (the rest are the approximate
+  mathematical functions), `parse_stress` 28/28.  The full test suite is
+  1236 passing with one pre-existing locale failure.
+
 ## Round 11 (2026-11-12): verification integrity
 
 An independent review of round 10 found ways in which results that do not
