@@ -58,18 +58,102 @@ test_that("statistics not yet verified against SAS fail loud by default", {
   # EXPECTED on a one-way table is accepted and ignored by SAS (case
   # ts1m2/freq_stats/oneway_expected), so it is not in this list
   for (src in c("proc freq data=d; by s; tables trt*resp / chisq; weight n; run;",
-                "proc freq data=d; tables s*trt*resp / cmh; weight n; run;",
                 "proc freq data=d; tables trt*resp; exact relrisk; weight n; run;",
-                "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;")) {
+                "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;",
+                "proc freq data=d; tables s*trt*resp / cmh1; weight n; run;")) {
     expect_error(sas_run(paste(freq_data, src)), class = "sasonr_unsupported")
   }
-  # plain frequency tables are unaffected; CHISQ / FISHER / BINOMIAL and the
-  # RELRISK / RISKDIFF tables are verified
+  # plain frequency tables are unaffected; CHISQ / FISHER / BINOMIAL, the
+  # RELRISK / RISKDIFF tables and the multiway CMH summary are verified
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / out=o outpct; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq fisher; exact fisher; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt / binomial; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk riskdiff; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / riskdiff(cl=(wald newcombe ac ha)); exact riskdiff; weight n; run;")))
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / cmh; weight n; run;")))
+  # CMH is verified only for the multiway summary: a two-way table request,
+  # SCORES= on a two-way table and exact statistics on a multiway table fail loud
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / cmh; weight n; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq scores=rank; weight n; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq; exact fisher; weight n; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq scores=ridit; weight n; run;")), class = "sasonr_unsupported")
+})
+
+test_that("PROC FREQ CMH summary: statistics, common OR/RR, Breslow-Day, scores", {
+  # the c51 table (3 strata of a 2x2 table): TS1M7 gold values
+  code <- "data d; input site $ trt $ resp $ cnt; datalines;
+S1 A Yes 10
+S1 A No 5
+S1 B Yes 6
+S1 B No 9
+S2 A Yes 7
+S2 A No 7
+S2 B Yes 4
+S2 B No 11
+S3 A Yes 12
+S3 A No 3
+S3 B Yes 9
+S3 B No 6
+;
+run;
+proc freq data=d; weight cnt; tables site*trt*resp / cmh; run;"
+  res <- sas_run(code)
+  l <- squish(res$listing)
+  expect_true(sum(l == "The FREQ Procedure") >= 2L)
+  expect_true("Summary Statistics for trt by resp" %in% l)
+  expect_true("Controlling for site" %in% l)
+  expect_true("Cochran-Mantel-Haenszel Statistics (Based on Table Scores)" %in% l)
+  expect_true("Statistic Alternative Hypothesis DF Value Prob" %in% l)
+  expect_true("1 Nonzero Correlation 1 5.0567 0.0245" %in% l)
+  expect_true("2 Row Mean Scores Differ 1 5.0567 0.0245" %in% l)
+  expect_true("3 General Association 1 5.0567 0.0245" %in% l)
+  expect_true("Common Odds Ratio and Relative Risks" %in% l)
+  expect_true("Odds Ratio Mantel-Haenszel 0.3557 0.1450 0.8730" %in% l)
+  expect_true("Logit 0.3556 0.1449 0.8727" %in% l)
+  expect_true(any(grepl("^Relative Risk \\(Column 1\\) Mantel-Haenszel 0\\.5949 ", l)))
+  expect_true("Breslow-Day Test for" %in% l)
+  expect_true("Chi-Square 0.0121" %in% l)
+  expect_true("DF 2" %in% l)
+  expect_true("Pr > ChiSq 0.9940" %in% l)
+  expect_identical(utils::tail(l, 1), "Total Sample Size = 89")
+  # per-stratum CHISQ blocks (c56 gold layout)
+  res <- sas_run(sub("cmh", "cmh chisq", code))
+  l <- squish(res$listing)
+  expect_true("Statistics for Table 1 of trt by resp" %in% l)
+  expect_true("Controlling for site=S1" %in% l)
+  expect_true("Chi-Square 1 2.1429 0.1432" %in% l)
+  expect_true("Sample Size = 30" %in% l)
+  expect_identical(utils::tail(l, 1), "Total Sample Size = 89")
+  # SCORES=RANK: rank scores are computed within each stratum (c55 gold values)
+  code2 <- "data d; input site $ dose sev cnt; datalines;
+S1 1 1 7
+S1 1 2 4
+S1 1 3 2
+S1 2 1 5
+S1 2 2 6
+S1 2 3 4
+S1 3 1 2
+S1 3 2 5
+S1 3 3 8
+S2 1 1 9
+S2 1 2 3
+S2 1 3 1
+S2 2 1 6
+S2 2 2 5
+S2 2 3 3
+S2 3 1 3
+S2 3 2 4
+S2 3 3 7
+;
+run;
+proc freq data=d; weight cnt; tables site*dose*sev / cmh scores=rank; run;"
+  res <- sas_run(code2)
+  l <- squish(res$listing)
+  expect_true("Cochran-Mantel-Haenszel Statistics (Based on Rank Scores)" %in% l)
+  expect_true("1 Nonzero Correlation 1 14.1941 0.0002" %in% l)
+  expect_true("2 Row Mean Scores Differ 2 14.3188 0.0008" %in% l)
+  expect_true("3 General Association 4 15.1896 0.0043" %in% l)
+  expect_identical(utils::tail(l, 1), "Total Sample Size = 84")
 })
 
 test_that("CHISQ / FISHER listing layout and the no-statistics cases (SAS gold)", {

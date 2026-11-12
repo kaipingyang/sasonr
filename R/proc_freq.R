@@ -315,6 +315,14 @@ parse_freq_tables <- function(p) {
         } else if (k == "alpha") {
           freq_stat_gate("alpha", kl)
           o$alpha <- as.numeric(parse_opt_value(p, k, kl))
+        } else if (k == "scores") {
+          # SCORES= chooses the row/column scores of the score-based tests and
+          # the CMH statistics (manual: "Scores"); TABLE and RANK are verified
+          # for the multiway CMH listing, RIDIT types are not.
+          freq_stat_gate("scores", kl)
+          v <- tolower(parse_opt_value(p, k, kl))
+          if (!v %in% c("table", "rank")) abort_unsupported(paste0("TABLES option SCORES=", toupper(v)), kl)
+          o$scores <- v
         } else if (k == "plots") {
           v <- tolower(parse_opt_value(p, k, kl))
           if (v != "none") abort_unsupported(paste0("TABLES option PLOTS=", toupper(v)), kl)
@@ -389,6 +397,15 @@ translate_proc_freq <- function(step, meta, last) {
     if (length(rq$vars) > 1 && any(c("binomial") %in% names(rq$opts))) abort_syntax("BINOMIAL is valid only for one-way tables", rq$line)
     if (length(rq$vars) != 2 && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is verified)", rq$line)
+    }
+    # SCORES= affects the Mantel-Haenszel chi-square of a two-way table and the
+    # score-based statistics; only the multiway CMH listing is verified
+    if (!is.null(rq$opts$scores) && length(rq$vars) < 3) {
+      abort_unsupported(paste0("TABLES option SCORES=", toupper(rq$opts$scores),
+                               " for a one-way or two-way table (only the multiway CMH listing is verified)"), rq$line)
+    }
+    if (length(exact) > 0 && length(rq$vars) > 2) {
+      abort_unsupported("EXACT statistics for a multiway table (per-stratum exact tests are not verified)", rq$line)
     }
   }
   if (any(c("relrisk", "riskdiff") %in% exact)) {
@@ -879,6 +896,21 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
                         title = paste("Table", ti, "of", info[[vars[k - 1L]]]$disp, "by", info[[vars[k]]]$disp),
                         stratum = paste("Controlling for", ctl))
       lst <- c(lst, tw$listing)
+      # CHISQ / FISHER of a multiway request print one statistics block after
+      # each stratum table ("Statistics for Table k of ...")
+      if (isTRUE(o$chisq) || isTRUE(o$fisher)) {
+        o2 <- o
+        o2$cmh <- o2$cmh1 <- o2$cmh2 <- NULL
+        o2$relrisk <- o2$riskdiff <- NULL
+        sp2 <- sp
+        sp2$exact <- character()
+        sp2$output <- NULL
+        stv <- freq_request_stats(sub, lv[(k - 1L):k], vars[(k - 1L):k], info, o2, sp2, 0)
+        lst <- c(lst, freq_stats_listing(
+          stv, sub, vars[(k - 1L):k], info, o2, sp2,
+          title = paste("Statistics for Table", ti, "of", info[[vars[k - 1L]]]$disp, "by", info[[vars[k]]]$disp),
+          stratum_line = paste("Controlling for", ctl)))
+      }
     }
   }
   # OUT=
@@ -1012,48 +1044,186 @@ freq_binomial <- function(cnt, alpha = 0.05, p0 = 0.5, x_index = 1L, cl = NULL, 
        xpl_bin = xone, xp2_bin = min(1, 2 * xone))
 }
 
-# Cochran-Mantel-Haenszel statistics over the strata of an n-way table
-# (array with the row and column variables last).
-freq_cmh <- function(tab, lv) {
-  k <- length(dim(tab))
+# Rank scores of the levels of one variable within one stratum (manual:
+# "Scores"): R_i = sum_{k<i} n_k + (n_i + 1) / 2, which gives midranks for
+# tied values.
+freq_rank_scores <- function(marg) {
+  cm <- cumsum(marg)
+  prev <- c(0, cm[-length(cm)])
+  prev + (marg + 1) / 2
+}
+
+# Cochran-Mantel-Haenszel statistics over the strata of an n-way table (array
+# with the row and column variables last).  The manual's "Cochran-Mantel-
+# Haenszel Statistics" section defines all three as the generalized CMH
+# statistic G' V_G^-1 G with the same expected values and covariance matrices
+# and different score matrices:
+#   correlation           row and column scores from SCORES=;
+#   ANOVA (row mean scores) column scores and the R-1 row contrasts;
+#   general association   R-1 row and C-1 column contrasts.
+# RANK scores are computed within each stratum from that stratum's marginals.
+freq_cmh <- function(tab, lv, scores = "table") {
   dims <- dim(tab)
+  k <- length(dims)
   R <- dims[k - 1L]
   C <- dims[k]
-  m <- matrix(tab, ncol = R * C)
-  if (k == 2) m <- matrix(as.numeric(tab), nrow = 1)
-  a <- freq_scores(lv[[k - 1L]])
-  b <- freq_scores(lv[[k]])
-  G <- numeric(R * C)
-  V <- matrix(0, R * C, R * C)
+  q <- if (k == 2L) 1L else prod(dims[seq_len(k - 2L)])
+  m <- matrix(as.numeric(tab), ncol = R * C)
+  IR <- cbind(diag(R - 1), -1)
+  IC <- cbind(diag(C - 1), -1)
+  tbl_r <- freq_scores(lv[[k - 1L]])
+  tbl_c <- freq_scores(lv[[k]])
+  Gc <- 0
+  Vc <- matrix(0, 1, 1)
+  Ga <- numeric(R - 1)
+  Va <- matrix(0, R - 1, R - 1)
+  Gg <- numeric((R - 1) * (C - 1))
+  Vg <- matrix(0, (R - 1) * (C - 1), (R - 1) * (C - 1))
   for (h in seq_len(nrow(m))) {
     th <- matrix(m[h, ], nrow = R)
     nh <- sum(th)
     if (nh < 2) next
     pr <- rowSums(th) / nh
     pc <- colSums(th) / nh
-    G <- G + as.numeric(th) - nh * as.numeric(outer(pr, pc))
+    mm <- nh * outer(pr, pc)
     vr <- diag(pr, R) - outer(pr, pr)
     vc <- diag(pc, C) - outer(pc, pc)
-    V <- V + nh^2 / (nh - 1) * kronecker(vc, vr)
+    V <- (nh^2 / (nh - 1)) * kronecker(vc, vr)
+    if (identical(scores, "rank")) {
+      rs <- freq_rank_scores(rowSums(th))
+      cs <- freq_rank_scores(colSums(th))
+    } else {
+      rs <- tbl_r
+      cs <- tbl_c
+    }
+    Bc <- kronecker(matrix(cs, 1), matrix(rs, 1))
+    Ba <- kronecker(matrix(cs, 1), IR)
+    Bg <- kronecker(IC, IR)
+    d <- as.numeric(th - mm)
+    Gc <- Gc + Bc %*% d
+    Vc <- Vc + Bc %*% V %*% t(Bc)
+    Ga <- Ga + Ba %*% d
+    Va <- Va + Ba %*% V %*% t(Ba)
+    Gg <- Gg + Bg %*% d
+    Vg <- Vg + Bg %*% V %*% t(Bg)
   }
-  q <- function(A) {
-    g <- A %*% G
-    va <- A %*% V %*% t(A)
-    as.numeric(t(g) %*% solve(va, g))
+  qv <- function(g, v) {
+    if (rcond(v) < .Machine$double.eps) {
+      abort_unsupported("CMH statistic with a singular covariance matrix (PROC FREQ sets the statistic to missing; not verified)")
+    }
+    as.numeric(t(g) %*% solve(v, g))
   }
-  Acor <- matrix(kronecker(b, a), nrow = 1)
-  Arms <- kronecker(matrix(1, 1, C) %*% diag(b, C), cbind(diag(R - 1), 0))
-  Arms <- kronecker(matrix(b, 1), cbind(diag(R - 1), 0))
-  Aga <- kronecker(cbind(diag(C - 1), 0), cbind(diag(R - 1), 0))
-  out <- list(cmhcor = q(Acor), df_cmhcor = 1)
+  out <- list(cmhcor = qv(Gc, Vc), df_cmhcor = 1L)
   out$p_cmhcor <- stats::pchisq(out$cmhcor, 1, lower.tail = FALSE)
-  out$cmhrms <- q(Arms)
-  out$df_cmhrms <- R - 1
-  out$p_cmhrms <- stats::pchisq(out$cmhrms, R - 1, lower.tail = FALSE)
-  out$cmhga <- q(Aga)
-  out$df_cmhga <- (R - 1) * (C - 1)
-  out$p_cmhga <- stats::pchisq(out$cmhga, (R - 1) * (C - 1), lower.tail = FALSE)
+  out$cmhrms <- qv(Ga, Va)
+  out$df_cmhrms <- R - 1L
+  out$p_cmhrms <- stats::pchisq(out$cmhrms, R - 1L, lower.tail = FALSE)
+  out$cmhga <- qv(Gg, Vg)
+  out$df_cmhga <- (R - 1L) * (C - 1L)
+  out$p_cmhga <- stats::pchisq(out$cmhga, (R - 1L) * (C - 1L), lower.tail = FALSE)
   out
+}
+
+# Common odds ratio / relative risks and the Breslow-Day test for stratified
+# 2x2 tables (manual: "Adjusted Odds Ratio and Relative Risk Estimates" and
+# "Breslow-Day Test for Homogeneity of the Odds Ratios").  Tables that contain
+# a row or column with a total frequency of 0 are not part of the analysis
+# (the Breslow-Day section says so explicitly; the common estimates use the
+# same nonempty strata, which the gold cases c51-c53 confirm).  A zero cell in
+# a nonempty stratum would need the documented 0.5 correction and its warning;
+# that case is not verified, so it fails loud.
+freq_cmh_common <- function(tab, alpha) {
+  dims <- dim(tab)
+  k <- length(dims)
+  if (dims[k - 1L] != 2L || dims[k] != 2L) return(NULL)
+  m <- matrix(as.numeric(tab), ncol = 4L)
+  z <- stats::qnorm(1 - alpha / 2)
+  # column-major order of one 2x2 stratum: n11, n21, n12, n22
+  a <- m[, 1]
+  cc <- m[, 2]
+  b <- m[, 3]
+  dd <- m[, 4]
+  n <- a + b + cc + dd
+  m1 <- a + b
+  m2 <- cc + dd
+  nc1 <- a + cc
+  nc2 <- b + dd
+  valid <- n > 0 & m1 > 0 & m2 > 0 & nc1 > 0 & nc2 > 0
+  if (!any(valid)) abort_unsupported("CMH common odds ratio / relative risk: no nonempty stratum")
+  if (any(a[valid] == 0 | b[valid] == 0 | cc[valid] == 0 | dd[valid] == 0)) {
+    abort_unsupported("CMH common odds ratio / relative risk with a zero cell in a nonempty stratum (the 0.5 correction and its warning are not verified)")
+  }
+  v <- which(valid)
+  ad <- a * dd / n
+  bc <- b * cc / n
+  or_mh <- sum(ad[v]) / sum(bc[v])
+  if (!is.finite(or_mh) || or_mh <= 0) {
+    abort_unsupported("CMH common odds ratio is undefined (zero denominator)")
+  }
+  # Robins, Breslow and Greenland (1986) variance of log(OR_MH)
+  s2 <- sum((a + dd)[v] * (a * dd)[v] / n[v]^2) / (2 * sum(ad[v])^2) +
+    sum(((a + dd) * (b * cc) + (b + cc) * (a * dd))[v] / n[v]^2) / (2 * sum(ad[v]) * sum(bc[v])) +
+    sum((b + cc)[v] * (b * cc)[v] / n[v]^2) / (2 * sum(bc[v])^2)
+  or_mh_ci <- or_mh * exp(c(-z, z) * sqrt(s2))
+  # Mantel-Haenszel relative risks with the Greenland-Robins variance
+  rr_mh <- function(x1, x2, ncol) {
+    num <- sum((x1 * m2 / n)[v])
+    den <- sum((x2 * m1 / n)[v])
+    rr <- num / den
+    vr <- sum(((m1 * m2 * ncol - x1 * x2 * n) / n^2)[v]) / (num * den)
+    c(rr, rr * exp(c(-z, z) * sqrt(vr)))
+  }
+  rr1 <- rr_mh(a, cc, nc1)
+  rr2 <- rr_mh(b, dd, nc2)
+  # logit (Woolf) estimates over the valid strata
+  orh <- a * dd / (b * cc)
+  vh <- 1 / a + 1 / b + 1 / cc + 1 / dd
+  w <- 1 / vh
+  or_l <- exp(sum(w[v] * log(orh[v])) / sum(w[v]))
+  or_l_ci <- or_l * exp(c(-z, z) / sqrt(sum(w[v])))
+  logit_rr <- function(x1, x2) {
+    rrh <- (x1 / m1) / (x2 / m2)
+    vh <- 1 / x1 - 1 / m1 + 1 / x2 - 1 / m2
+    w <- 1 / vh
+    est <- exp(sum(w[v] * log(rrh[v])) / sum(w[v]))
+    c(est, est * exp(c(-z, z) / sqrt(sum(w[v]))))
+  }
+  rr1l <- logit_rr(a, cc)
+  rr2l <- logit_rr(b, dd)
+  # Breslow-Day: the expected cell (1,1) frequency solves the odds ratio
+  # equation psi = E_b E_c / (E_a E_d) with the stratum margins fixed; the
+  # variance is 1 / (1/E_a + 1/E_b + 1/E_c + 1/E_d)
+  E <- rep(NA_real_, length(n))
+  for (h in v) {
+    if (abs(or_mh - 1) < 1e-10) {
+      E[h] <- m1[h] * nc1[h] / n[h]
+      next
+    }
+    A <- or_mh - 1
+    B <- -(or_mh * (m1[h] + nc1[h]) + m2[h] - nc1[h])
+    Cq <- or_mh * m1[h] * nc1[h]
+    disc <- B^2 - 4 * A * Cq
+    if (!is.finite(disc) || disc < 0) next
+    lo <- max(0, nc1[h] - m2[h])
+    hi <- min(m1[h], nc1[h])
+    roots <- c((-B + sqrt(disc)) / (2 * A), (-B - sqrt(disc)) / (2 * A))
+    roots <- roots[roots >= lo - 1e-9 & roots <= hi + 1e-9]
+    if (length(roots) > 0) E[h] <- roots[1]
+  }
+  kept <- !is.na(E)
+  nev <- sum(kept)
+  bd <- NULL
+  if (nev >= 2L) {
+    Eb <- m1 - E
+    Ec <- nc1 - E
+    Ed <- n - m1 - nc1 + E
+    vE <- 1 / (1 / E + 1 / Eb + 1 / Ec + 1 / Ed)
+    chisq <- sum((a[kept] - E[kept])^2 / vE[kept])
+    df <- nev - 1L
+    bd <- list(chisq = chisq, df = df, p = stats::pchisq(chisq, df, lower.tail = FALSE))
+  }
+  list(ormh = c(or_mh, or_mh_ci), orl = c(or_l, or_l_ci), rr1 = rr1, rr1l = rr1l,
+       rr2 = rr2, rr2l = rr2l, bd = bd)
 }
 
 # RISKDIFF / RELRISK ----------------------------------------------------------------
@@ -1536,8 +1706,10 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       st <- c(st, list(pchi = x2, df_pchi = length(cnt) - 1, p_pchi = stats::pchisq(x2, length(cnt) - 1, lower.tail = FALSE),
                        oneway_small = e < 5))
       st$oneway_chi <- TRUE
+    } else if (k > 2) {
+      # per-stratum CHISQ / FISHER blocks are printed by freq_nway after each
+      # stratum table; the multiway request itself has no pooled chi-square
     } else {
-      if (k > 2) abort_unsupported("CHISQ / FISHER for n-way tables (per-stratum statistics)")
       tb <- matrix(as.numeric(tab), nrow = dim(tab)[1])
       rs <- freq_scores(lv[[1]])
       cs <- freq_scores(lv[[2]])
@@ -1568,7 +1740,11 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   }
   if ("cmh" %in% want) {
     if (k < 2) abort_syntax("CMH requires a two-way or n-way table")
-    st <- c(st, freq_cmh(tab, lv))
+    if (k == 2L) {
+      abort_unsupported("CMH for a two-way table (only the multiway CMH summary listing is verified; use a multiway table request)")
+    }
+    st <- c(st, freq_cmh(tab, lv, if (identical(o$scores, "rank")) "rank" else "table"))
+    st$cmh_common <- freq_cmh_common(tab, o$alpha %||% 0.05)
   }
   if (any(c("riskdiff", "relrisk") %in% want)) {
     st <- c(st, freq_rr_rd_stats(tab, lv, vars, info, o, sp))
@@ -1657,16 +1833,69 @@ freq_binomial_listing <- function(st, info) {
   c(out, "", freq_sample_size(st))
 }
 
-freq_stats_listing <- function(st, tab, vars, info, o, sp) {
+# The CMH summary block of a multiway table request: "The FREQ Procedure" (the
+# summary starts its own page), the three Cochran-Mantel-Haenszel statistics,
+# the common odds ratio / relative risks and the Breslow-Day test for
+# stratified 2x2 tables, closed by "Total Sample Size = n".  Layout: TS1M7 gold
+# freq_stats c51-c57.
+freq_cmh_summary <- function(st, vars, info, o) {
+  f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
+  pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
+  zlab <- paste0(format_pct_level(o$alpha %||% 0.05), "%")
+  scores_txt <- if (identical(o$scores, "rank")) "Rank Scores" else "Table Scores"
+  k <- length(vars)
+  rowd <- info[[vars[k - 1L]]]$disp
+  cold <- info[[vars[k]]]$disp
+  strata_disp <- vapply(vars[seq_len(k - 2L)], function(v) info[[v]]$disp, "")
+  out <- c("The FREQ Procedure", "",
+           paste("Summary Statistics for", rowd, "by", cold),
+           paste("Controlling for", paste(strata_disp, collapse = " ")),
+           paste0("Cochran-Mantel-Haenszel Statistics (Based on ", scores_txt, ")"),
+           "Statistic Alternative Hypothesis DF Value Prob",
+           strrep("-", 63))
+  rows <- list(c("1", "Nonzero Correlation", st$df_cmhcor, st$cmhcor, st$p_cmhcor),
+               c("2", "Row Mean Scores Differ", st$df_cmhrms, st$cmhrms, st$p_cmhrms),
+               c("3", "General Association", st$df_cmhga, st$cmhga, st$p_cmhga))
+  for (r in rows) {
+    out <- c(out, paste(r[1], r[2], sprintf("%.0f", as.numeric(r[3])), f4(as.numeric(r[4])), pv(as.numeric(r[5]))))
+  }
+  cc <- st$cmh_common
+  if (!is.null(cc)) {
+    out <- c(out, "", "Common Odds Ratio and Relative Risks",
+             paste("Statistic Method Value", zlab, "Confidence Limits"), strrep("-", 85),
+             paste("Odds Ratio Mantel-Haenszel", f4(cc$ormh[1]), f4(cc$ormh[2]), f4(cc$ormh[3])),
+             paste("Logit", f4(cc$orl[1]), f4(cc$orl[2]), f4(cc$orl[3])),
+             paste("Relative Risk (Column 1) Mantel-Haenszel", f4(cc$rr1[1]), f4(cc$rr1[2]), f4(cc$rr1[3])),
+             paste("Logit", f4(cc$rr1l[1]), f4(cc$rr1l[2]), f4(cc$rr1l[3])),
+             paste("Relative Risk (Column 2) Mantel-Haenszel", f4(cc$rr2[1]), f4(cc$rr2[2]), f4(cc$rr2[3])),
+             paste("Logit", f4(cc$rr2l[1]), f4(cc$rr2l[2]), f4(cc$rr2l[3])))
+    if (!is.null(cc$bd)) {
+      out <- c(out, "", "Breslow-Day Test for", "Homogeneity of Odds Ratios", strrep("-", 26),
+               paste("Chi-Square", f4(cc$bd$chisq)),
+               paste("DF", sprintf("%.0f", cc$bd$df)),
+               paste("Pr > ChiSq", pv(cc$bd$p)))
+    }
+  }
+  c(out, "", paste("Total Sample Size =", freq_num(st$n)), "")
+}
+
+freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum_line = NULL) {
   if (!is.null(st$bin_var)) return(freq_binomial_listing(st, info))
   out <- character()
   k <- length(vars)
   f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
   pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
+  # the multiway CMH summary is a listing block of its own (manual: "Cochran-
+  # Mantel-Haenszel Statistics"); the per-stratum statistics are printed by
+  # freq_nway right after each stratum table
+  if (k > 2L) {
+    return(if (!is.null(st$cmhcor)) freq_cmh_summary(st, vars, info, o) else character())
+  }
   # RISKDIFF / RELRISK print their blocks after the test statistics and share a
   # single "Statistics for Table of ..." heading and a single Sample Size line.
   more <- !is.null(st$rd) || !is.null(st$rel)
-  header <- if (k == 2) paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp) else ""
+  header <- title %||% paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp)
+  hdr <- if (!is.null(stratum_line)) c(header, stratum_line) else header
   did <- FALSE
   if (isTRUE(st$oneway_chi) && isTRUE(o$chisq)) {
     out <- c(out, "   Chi-Square Test", "for Equal Proportions", "",
@@ -1676,7 +1905,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
                                              "         than 5. Chi-Square may not be a valid test.", ""),
              freq_sample_size(st))
   } else if (isTRUE(st$nostat) && k == 2) {
-    out <- c(out, paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp), "",
+    out <- c(out, hdr, "",
              "Row or column sum zero. No statistics computed for this table.", "", freq_sample_size(st))
     did <- TRUE
   } else if ((isTRUE(o$chisq) || isTRUE(o$fisher) || "fisher" %in% sp$exact) && k == 2 && !is.null(st$pchi)) {
@@ -1688,7 +1917,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp) {
                                             formatC(f4(as.numeric(r[3])), width = 12L), formatC(pv(as.numeric(r[4])), width = 10L)), "")
     body <- c(body, vapply(list(c("Phi Coefficient", st$phi), c("Contingency Coefficient", st$contgy), c("Cramer's V", st$cramv)),
                            function(r) paste0(formatC(r[1], width = -32L), formatC(f4(as.numeric(r[2])), width = 12L)), ""))
-    out <- c(out, paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp), "",
+    out <- c(out, hdr, "",
              paste0(formatC("Statistic", width = -27L), "   DF       Value      Prob"), strrep("-", 54), body, "")
     did <- TRUE
     if (isTRUE(st$small > 0) && !isTRUE(o$nowarn)) {
