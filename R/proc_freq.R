@@ -3,7 +3,7 @@
 
 freq_table_opts <- c("list", "missing", "missprint", "nocum", "nopercent", "norow", "nocol", "nofreq", "sparse",
                      "outpct", "outcum", "chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "noprint", "nowarn",
-                     "exact")
+                     "exact", "expected", "deviation", "cellchi2")
 freq_output_kw <- c("n", "nmiss", "pchi", "lrchi", "ajchi", "mhchi", "chisq", "phi", "contgy", "cramv", "cmh",
                     "cmh1", "cmh2", "cmhcor", "cmhrms", "cmhga", "binomial", "bin")
 
@@ -362,6 +362,13 @@ freq_num <- function(v) {
   trimws(sas_fmt_best(v, 8L))
 }
 freq_pct <- function(v) if (is.na(v)) "." else sprintf("%.2f", display_round(v, 2L))
+# Cell statistics (expected, deviation, cell chi-square): SAS prints them with
+# a six-column width (BEST6.), so 8.7179, -3.718 and 10.909 all take six
+# characters and trailing zeros are dropped.
+freq_stat_num <- function(v) {
+  if (is.na(v)) return(".")
+  trimws(sas_fmt_best(v, 6L))
+}
 
 #' PROC FREQ engine
 #' @param d Input data (after WHERE).
@@ -449,6 +456,9 @@ freq_one_request <- function(db, wt, rq, sp) {
   missprint <- isTRUE(o$missprint) && !miss_opt
   anymiss <- Reduce(`|`, lapply(vars, function(v) freq_is_missing(db[[v]])), rep(FALSE, nrow(db)))
   nmiss <- if (miss_opt) 0 else sum(wt[anymiss])
+  if (length(vars) != 2 && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
+    abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for a one-way or n-way table (only the two-way crosstab layout is verified)", rq$line)
+  }
   if (missprint && length(vars) > 1) abort_unsupported("MISSPRINT for multi-way tables", rq$line)
   keep <- if (miss_opt || missprint) rep(TRUE, nrow(db)) else !anymiss
   dd <- db[keep, , drop = FALSE]
@@ -591,8 +601,13 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   tot <- sum(tab)
   rt_ <- rowSums(tab)
   ct_ <- colSums(tab)
-  show <- c(freq = !isTRUE(o$nofreq), pct = !isTRUE(o$nopercent), row = !isTRUE(o$norow), col = !isTRUE(o$nocol))
-  labels <- c(freq = "Frequency", pct = "Percent", row = "Row Pct", col = "Col Pct")[show]
+  show <- c(freq = !isTRUE(o$nofreq), expected = isTRUE(o$expected), deviation = isTRUE(o$deviation),
+            cellchi2 = isTRUE(o$cellchi2), pct = !isTRUE(o$nopercent), row = !isTRUE(o$norow),
+            col = !isTRUE(o$nocol))
+  show <- show[show]
+  all_labels <- c(freq = "Frequency", expected = "Expected", deviation = "Deviation",
+                  cellchi2 = "Cell Chi-Square", pct = "Percent", row = "Row Pct", col = "Col Pct")
+  labels <- all_labels[names(show)]
   rvals <- lr$text
   cvals <- lc$text
   R <- max(c(9L, nchar(labels), nchar(rvals) + 1L))
@@ -624,7 +639,10 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
     for (s in names(labels)) {
       vals <- vapply(seq_len(nc), function(cc) {
         x <- tab[r, cc]
+        ex <- if (tot > 0) rt_[r] * ct_[cc] / tot else NA_real_
         switch(s, freq = freq_num(x), pct = freq_pct(x / tot * 100),
+               expected = freq_stat_num(ex), deviation = freq_stat_num(if (is.na(ex)) NA_real_ else x - ex),
+               cellchi2 = freq_stat_num(if (is.na(ex) || ex == 0) NA_real_ else (x - ex)^2 / ex),
                row = if (rt_[r] == 0) "." else freq_pct(x / rt_[r] * 100),
                col = if (ct_[cc] == 0) "." else freq_pct(x / ct_[cc] * 100))
       }, "")
@@ -638,7 +656,7 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   tl <- paste0(formatC("Total", width = -R), " ", paste(vapply(ct_, function(x) cell(freq_num(x)), ""), collapse = " "), " ",
                formatC(freq_num(tot), width = 7L))
   lst <- c(lst, sas_rtrim(tl))
-  if (show[["pct"]]) {
+  if ("pct" %in% names(show)) {
     lst <- c(lst, sas_rtrim(paste0(strrep(" ", R), " ", paste(vapply(ct_, function(x) cell(freq_pct(x / tot * 100)), ""), collapse = " "),
                                    " ", formatC(if (tot > 0) freq_pct(100) else ".", width = 7L))))
   }

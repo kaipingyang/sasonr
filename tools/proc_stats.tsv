@@ -71,7 +71,9 @@ FREQ	CMH1	default			listing or values not yet verified against SAS
 FREQ	CMH2	default			listing or values not yet verified against SAS
 FREQ	RELRISK	default			listing or values not yet verified against SAS
 FREQ	RISKDIFF	default			listing or values not yet verified against SAS
-FREQ	EXPECTED	default			listing or values not yet verified against SAS
+FREQ	EXPECTED	default	freq_stats/c03_w22_expected;freq_stats/c12_z22_chisq;freq_stats/c25_w23_expected;freq_stats/c29_w34s_chisq;freq_stats/c31_w34_expected		cell rows of the two-way crosstab
+FREQ	DEVIATION	default	freq_stats/c03_w22_expected;freq_stats/c25_w23_expected;freq_stats/c31_w34_expected		cell rows of the two-way crosstab
+FREQ	CELLCHI2	default	freq_stats/c03_w22_expected;freq_stats/c25_w23_expected;freq_stats/c31_w34_expected		cell rows of the two-way crosstab
 FREQ	EXACT_CHISQ	default			listing or values not yet verified against SAS
 FREQ	TESTP	default			listing or values not yet verified against SAS
 FREQ	TESTF	default			listing or values not yet verified against SAS
