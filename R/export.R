@@ -33,13 +33,15 @@ export_values <- function(x, fmt) {
 #' with columns memname, varnum, name, type, length, format, informat, label.
 #' @param res A `sasonr_result`.
 #' @param dir Output directory (created if needed).
+#' @param values Write the `<MEMNAME>.csv` value files (`FALSE`: only the
+#'   attribute table, as the conformance harness needs).
 #' @examples
 #' res <- sas_run("data a; x = 1.5; y = 'b'; run;")
 #' out <- file.path(tempdir(), "work_csv")
 #' sas_export_work(res, out)
 #' readLines(file.path(out, "A.csv"))
 #' @export
-sas_export_work <- function(res, dir) {
+sas_export_work <- function(res, dir, values = TRUE) {
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
   attr_rows <- list()
   for (nm in names(res$work)) {
@@ -47,14 +49,16 @@ sas_export_work <- function(res, dir) {
     m <- res$meta[[nm]] %||% meta_from_df(d)
     vars <- names(d)
     disp <- vapply(vars, function(v) m$disp[[v]] %||% v, "")
-    cols <- lapply(vars, function(v) csv_field(export_values(d[[v]], m$formats[[v]])))
-    lines <- csv_field(disp)
-    lines <- paste(lines, collapse = ",")
-    if (nrow(d) > 0 && length(vars) > 0) lines <- c(lines, do.call(paste, c(cols, sep = ",")))
-    # PROC EXPORT writes records of at most LRECL=32767 bytes; longer ones are cut
-    long <- nchar(lines, type = "bytes") > 32767L
-    if (any(long)) lines[long] <- vapply(lines[long], function(l) rawToChar(charToRaw(l)[1:32767]), "")
-    writeLines(lines, file.path(dir, paste0(toupper(nm), ".csv")), useBytes = TRUE)
+    if (values) {
+      cols <- lapply(vars, function(v) csv_field(export_values(d[[v]], m$formats[[v]])))
+      lines <- csv_field(disp)
+      lines <- paste(lines, collapse = ",")
+      if (nrow(d) > 0 && length(vars) > 0) lines <- c(lines, do.call(paste, c(cols, sep = ",")))
+      # PROC EXPORT writes records of at most LRECL=32767 bytes; longer ones are cut
+      long <- nchar(lines, type = "bytes") > 32767L
+      if (any(long)) lines[long] <- vapply(lines[long], function(l) rawToChar(charToRaw(l)[1:32767]), "")
+      writeLines(lines, file.path(dir, paste0(toupper(nm), ".csv")), useBytes = TRUE)
+    }
     for (k in seq_along(vars)) {
       v <- vars[k]
       char <- is.character(d[[v]])

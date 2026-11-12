@@ -4,7 +4,12 @@
 \alias{sas_run}
 \title{Run a SAS program on the R engine}
 \usage{
-sas_run(code, work = list(), level = c("auto", "L3"))
+sas_run(
+  code,
+  work = list(),
+  level = c("auto", "L3"),
+  on_error = getOption("sasonr.on_error", c("sas", "abort"))
+)
 }
 \arguments{
 \item{code}{SAS source code.}
@@ -12,11 +17,24 @@ sas_run(code, work = list(), level = c("auto", "L3"))
 \item{work}{Named list of input data frames available as \code{WORK} data sets.}
 
 \item{level}{\code{"auto"} (choose L1/L2/L3 per step) or \code{"L3"} (force row loops).}
+
+\item{on_error}{What a SAS ERROR does (a syntax error, an unknown function,
+a missing input data set, an ERROR in PROC SQL ...). \code{"sas"} (the
+default; option \code{sasonr.on_error}) behaves like SAS in batch: the failing
+step is not run, SAS's syntax-check mode (OBS=0) applies to the rest of the
+program (later steps are compiled but not run; global statements and the
+macro language still are), \code{SYSERR}/\code{SYSCC} are set and the result has
+\code{status = "error"}, the ERROR lines in \verb{$log} and WORK as SAS leaves it.
+\code{"abort"} stops with the classed R condition instead. Features sasonr does
+not support (\code{sasonr_unsupported}) always stop the run: they are not SAS
+errors.}
 }
 \value{
 A \code{sasonr_result}: \verb{$log} (PUT and \%PUT lines), \verb{$listing} (procedure
 output), \verb{$work} (output data sets with trailing blanks removed),
-\verb{$translation}, \verb{$macro_vars} (global macro variables).
+\verb{$translation}, \verb{$macro_vars} (global macro variables), \verb{$status}
+(\code{"ok"} or \code{"error"}), \verb{$errors} (SAS ERROR messages) and \verb{$error_line}
+(SAS line of the first ERROR).
 }
 \description{
 The macro processor hands complete steps to the executor one at a time

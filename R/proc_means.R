@@ -381,6 +381,7 @@ translate_proc_means <- function(step, meta, last) {
     idmin = isTRUE(o$idmin), two_sided = isTRUE(o$clm) || (isTRUE(o$lclm_kw) && isTRUE(o$uclm_kw)),
     outputs = outputs
   )
+  means_stat_gate(spec, step$line)
   header <- sprintf("# ---- PROC %s (SAS line %d)", toupper(pname), as.integer(step$line))
   code <- c(
     header,
@@ -394,6 +395,27 @@ translate_proc_means <- function(step, meta, last) {
   names(static_meta) <- outs
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = paste("PROC", toupper(pname)),
        line = step$line, outputs = outs, meta = static_meta)
+}
+
+# Every statistic the step computes (printed table and OUTPUT data sets) is
+# checked against the PROC statistics registry (proc_stats_registry.R).
+means_stat_gate <- function(spec, line) {
+  stats <- if (spec$print) spec$stats else character()
+  for (o in spec$outputs) {
+    st <- vapply(o$specs, `[[`, "", "stat")
+    stats <- c(stats, if (length(st)) st else c("n", "min", "max", "mean", "std"))
+  }
+  if ("clm" %in% stats) stats <- c(setdiff(stats, "clm"), "lclm", "uclm")
+  qstats <- c("median", "p50", "q1", "p25", "q3", "p75", "qrange", "p1", "p5", "p10", "p20", "p30", "p40",
+              "p60", "p70", "p80", "p90", "p95", "p99")
+  vstats <- c("std", "var", "stderr", "cv", "css", "uss", "skew", "kurt", "t", "prt", "lclm", "uclm")
+  for (s in unique(stats)) {
+    cond <- if (!is.null(spec$weight)) "weight" else if (!is.null(spec$freq)) "freq" else
+      if (s %in% qstats && !identical(as.integer(spec$qntldef), 5L)) "qntldef" else
+      if (s %in% vstats && !identical(spec$vardef, "df")) "vardef" else "default"
+    proc_stat_check(spec$pname, switch(s, skew = "skewness", kurt = "kurtosis", s), line, cond)
+  }
+  invisible()
 }
 
 # Run time ------------------------------------------------------------------------
@@ -431,7 +453,10 @@ means_quantile <- function(x, p, def = 5L) {
     },
     "3" = if (g == 0) at(j) else at(j + 1L),
     "4" = if (j < 1) x[1] else if (j >= n) x[n] else (1 - g) * at(j) + g * at(j + 1L),
-    "5" = if (g == 0) (at(j) + at(j + 1L)) / 2 else at(j + 1L)
+    # SAS 9.4 interpolates x[j] + gamma * (x[j+1] - x[j]) with gamma 1 or 1/2,
+    # so a quantile that falls on x[j+1] can differ from it in the last bits
+    # (tests/conformance/proc_stats/quantiles_probe)
+    "5" = if (j < 1) x[1] else if (j >= n) x[n] else at(j) + (if (g == 0) 0.5 else 1) * (at(j + 1L) - at(j))
   )
 }
 
@@ -482,13 +507,24 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
   val <- list(n = n, nmiss = nmiss)
   val$sumwgt <- if (n > 0) sw else NA_real_
   if (n > 0) {
-    val$sum <- sum(wf * xv)
+    plain <- is.null(w) && all(fv == 1)
+    # SUM: sequential double additions in observation order; MEAN = SUM / n
+    # (bit-identical to SAS 9.4).  CSS: shifted sums with a fused multiply-add,
+    # the closest form found (approximate, gated by the PROC statistics
+    # registry); USS = fma(SUM, MEAN, CSS) as SAS derives it.
+    val$sum <- if (plain) stats_seq_sum(xv) else sum(wf * xv)
     val$min <- min(xv)
     val$max <- max(xv)
     val$range <- val$max - val$min
     val$mean <- if (sw > 0) val$sum / sw else NA_real_
-    val$uss <- sum(wf * xv^2)
-    val$css <- if (!is.na(val$mean)) sum(wf * (xv - val$mean)^2) else NA_real_
+    if (plain && stats_fma_range_ok(xv)) {
+      sh <- stats_shift_sums(xv)
+      val$css <- stats_fma(-sh$sd, sh$sd / n, sh$sdd)
+      val$uss <- stats_fma(val$sum, val$mean, val$css)
+    } else {
+      val$uss <- sum(wf * xv^2)
+      val$css <- if (!is.na(val$mean)) sum(wf * (xv - val$mean)^2) else NA_real_
+    }
     div <- switch(sp$vardef, df = n - 1, n = n, wdf = sw - 1, weight = sw)
     val$var <- if (div > 0 && !is.na(val$css)) val$css / div else NA_real_
     val$std <- sqrt(val$var)
@@ -533,7 +569,13 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
       if ("mode" %in% stats) {
         r <- rle(xs)
         mx <- max(r$lengths)
-        val$mode <- if (mx > 1 || length(r$values) == 1) r$values[which(r$lengths == mx)[1]] else NA_real_
+        # the value of a run is its first observation (0 and -0 tie; SAS keeps the first)
+        k <- which(r$lengths == mx)[1]
+        val$mode <- if (mx > 1 || length(r$values) == 1) xs[sum(r$lengths[seq_len(k - 1L)]) + 1L] else NA_real_
+      }
+      # which of 0 and -0 SAS returns for a zero quantile is not determined
+      if (any(xv == 0 & 1 / xv < 0) && any(unlist(val[c(setdiff(q_stats, "qrange"), "mode")]) %in% 0)) {
+        abort_unsupported("PROC MEANS quantile of 0 for data that contain both 0 and -0 (sign of the result not determined)")
       }
     }
   }

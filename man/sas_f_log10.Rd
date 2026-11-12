@@ -19,7 +19,7 @@ Base-10 logarithm. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (580 of 618 SAS 9.4 cases agree bit for bit; 38 case(s) differ in the last bits (largest relative difference -Inf; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

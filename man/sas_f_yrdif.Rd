@@ -21,7 +21,7 @@ Years between two dates under a day-count basis. See the \href{https://documenta
 }
 
 \section{Verification}{
- approximate (48 of 51 SAS 9.4 cases agree bit for bit; 3 case(s) differ in the last bits (largest relative difference 4.3e-15; different algorithm)). Contexts where every case agrees: sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (928 of 1551 SAS 9.4 cases agree bit for bit; 623 case(s) fail loud (sasonr_unsupported)). Verified domain: bases 30/360, ACT/365 and ACT/360; AGE only for dates a whole number of years apart; ACT/ACT only within one calendar year or between two 1 January dates; other inputs fail loud (\code{sasonr_unsupported}). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
@@ -29,12 +29,14 @@ Years between two dates under a day-count basis. See the \href{https://documenta
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
 
 # 'ACT/ACT' splits the period by calendar year and divides the days in each
-# year by 365 or 366.
-sas_f_yrdif(21915, 23558, "ACT/ACT")  # SAS 9.4: yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/ACT') = 4.49726775956284
+# year by 365 or 366. Across calendar years the sum of the fractions is outside
+# the verified domain (it can differ from SAS in the last bits): sasonr fails loud.
+try(sas_f_yrdif(21915, 23558, "ACT/ACT"))  # SAS 9.4: yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/ACT') = 4.49726775956284
 
 # 'AGE' computes an age in years: one day before the 24th anniversary gives
-# just under 24.
-sas_f_yrdif(14684, 23449, "AGE")  # SAS 9.4: yrdif('15MAR2000'd, '14MAR2024'd, 'AGE') = 23.9972602739726
+# just under 24. Fractional ages are outside the verified domain (last bits):
+# sasonr fails loud; whole years are verified.
+try(sas_f_yrdif(14684, 23449, "AGE"))  # SAS 9.4: yrdif('15MAR2000'd, '14MAR2024'd, 'AGE') = 23.9972602739726
 
 # '30/360' counts 30-day months and 360-day years: 54 months are 4.5 years.
 sas_f_yrdif(21915, 23558, "30/360")  # SAS 9.4: yrdif('01JAN2020'd, '01JUL2024'd, '30/360') = 4.5

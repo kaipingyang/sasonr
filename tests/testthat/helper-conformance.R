@@ -135,7 +135,8 @@ conf_cmp_ds <- function(exp_dir, res) {
   }
   unordered <- toupper(res$unordered %||% character())
   for (m in sort(names(em))) {
-    e <- haven::read_sas(em[[m]])
+    # haven cannot read a data set without variables (SAS writes one when a step stops)
+    e <- tryCatch(haven::read_sas(em[[m]]), error = function(err) tibble::tibble())
     nm <- om[[m]]
     o <- res$work[[nm]]
     disp <- vapply(names(o), function(v) res$meta[[nm]]$disp[[v]] %||% v, "")
@@ -207,6 +208,18 @@ conf_cmp_attr <- function(exp_file, son_file) {
 
 # ---- L-LOG ---------------------------------------------------------------------
 
+# gold_version 2 (meta.yaml): the key set also keeps the messages that describe
+# SAS's handling of an ERROR (tools/sanitize.py KEY_V2)
+conf_key_v2 <- c(
+  "NOTE: Due to ERROR\\(s\\) above, SAS set option OBS=0, enabling syntax check mode\\.",
+  "NOTE: Statement not executed due to NOEXEC option\\.",
+  "NOTE: The SAS System stopped processing this step because of errors\\.",
+  "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements\\.",
+  "WARNING: The data set WORK\\.\\S+ may be incomplete\\.",
+  "WARNING: Data set WORK\\.\\S+ was not replaced because this step was stopped\\.",
+  "WARNING: Limit set by ERRORS= option reached\\."
+)
+
 conf_key_re <- paste0("^(?:", paste(c(
   "NOTE: The data set WORK\\.\\S+ has \\d+ observations and \\d+ variables\\.",
   "NOTE: There were \\d+ observations read from the data set WORK\\.",
@@ -227,6 +240,7 @@ conf_key_re <- paste0("^(?:", paste(c(
   "WARNING: Apparent (symbolic reference|invocation of macro)",
   "ERROR( \\d+-\\d+)?:"
 ), collapse = "|"), ")")
+conf_key_re2 <- paste0(substr(conf_key_re, 1L, nchar(conf_key_re) - 1L), "|", paste(conf_key_v2, collapse = "|"), ")")
 
 conf_norm_msg <- function(parts) {
   ws <- function(x) gsub("\\s+", " ", x, perl = TRUE)
@@ -244,13 +258,14 @@ conf_norm_msg <- function(parts) {
   paste(c(head, rest[nzchar(rest)]), collapse = " | ")
 }
 
-conf_key_messages <- function(lines) {
+conf_key_messages <- function(lines, version = 1L) {
   out <- character()
   i <- 1L
   n <- length(lines)
+  key <- if (version >= 2L) conf_key_re2 else conf_key_re
   while (i <= n) {
     l <- lines[i]
-    if (grepl(conf_key_re, l, perl = TRUE) && !grepl("SASUSER|parameter catalog|registry", l, ignore.case = TRUE)) {
+    if (grepl(key, l, perl = TRUE) && !grepl("SASUSER|parameter catalog|registry", l, ignore.case = TRUE)) {
       parts <- l
       j <- i + 1L
       while (j <= n && grepl("^ {6}\\S", lines[j], perl = TRUE) && !startsWith(lines[j], "      real time")) {
@@ -435,18 +450,45 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
     out$status <- if (sas_rc >= 2L) "both_error" else if (res$rc == 2L) "unsupported" else "error"
     return(out)
   }
+  # sas_run(on_error = "sas"): a SAS ERROR gives a result with status "error"
+  gold_v <- as.integer(meta$gold_version %||% 1L)
+  both_err <- identical(res$status, "error")
+  if (both_err && sas_rc < 2L) {
+    out$msg <- paste("[SAS ERROR in sasonr]", res$errors[1])
+    out$status <- "error"
+    return(out)
+  }
+  if (both_err && gold_v < 2L) {
+    # gold from before version 2 has no WORK captured after an ERROR
+    out$msg <- res$errors[1]
+    out$status <- "both_error"
+    return(out)
+  }
   # SAS ended with an error: sasonr must report one too (then the layers are compared)
   if (sas_rc >= 2L && !any(startsWith(res$log, "ERROR"))) {
     out$status <- "lenient"
     return(out)
   }
   layers <- meta$layers %||% conf_layers_all
+  # both stopped with an ERROR: compare WORK as left behind, the log (ERROR
+  # texts reduced to "ERROR": SAS's syntax messages list its own parser's
+  # expected tokens) and the PUT output
+  if (both_err) layers <- intersect(layers, c("ds", "log", "put"))
   son_ds <- file.path(tempfile("sasonr_ds_"))
   on.exit(unlink(son_ds, recursive = TRUE), add = TRUE)
-  sas_export_work(res, son_ds)
+  sas_export_work(res, son_ds, values = FALSE)
   d <- list()
   sas_log <- conf_lines(file.path(exp, "log_notes.txt"))
-  son_log <- conf_key_messages(res$log)
+  son_log <- conf_key_messages(res$log, gold_v)
+  if (both_err) {
+    # one statement can give SAS several ERROR lines (22-322 and 76-322)
+    norm_err <- function(l) {
+      l <- sub("^ERROR.*$", "ERROR", l)
+      l[!(l == "ERROR" & c("", utils::head(l, -1L)) == "ERROR")]
+    }
+    sas_log <- norm_err(sas_log)
+    son_log <- norm_err(son_log)
+  }
   if ("ds" %in% layers) d$ds <- conf_cmp_ds(file.path(exp, "datasets"), res)
   if ("attr" %in% layers) d$attr <- conf_cmp_attr(file.path(exp, "attrs.csv"), file.path(son_ds, "__attr.csv"))
   if ("log" %in% layers) d$log <- conf_first_diff(sas_log, son_log)
@@ -493,7 +535,8 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
   out$layers <- stats::setNames(!nzchar(out$diffs), names(out$diffs))
   sas_err <- any(startsWith(sas_log, "ERROR"))
   son_err <- any(startsWith(son_log, "ERROR"))
-  out$status <- if (sas_err && !son_err) "lenient" else if (all(out$layers)) "pass" else "fail"
+  out$status <- if (sas_err && !son_err) "lenient" else if (all(out$layers)) (if (both_err) "both_error" else "pass") else "fail"
+  if (both_err) out$msg <- res$errors[1]
   out
 }
 
@@ -560,9 +603,9 @@ conf_matrix_records <- function(lines) {
   split(lines, factor(id, levels = unique(id)))
 }
 
-conf_key_messages_marked <- function(lines) {
+conf_key_messages_marked <- function(lines, version = 1L) {
   mark <- grepl("^@@(BEGIN|END|COLLECT)\\b", lines, perl = TRUE)
-  if (!any(mark)) return(conf_key_messages(lines))
+  if (!any(mark)) return(conf_key_messages(lines, version))
   grp <- cumsum(mark)
   out <- character()
   for (g in unique(grp)) {
@@ -571,7 +614,7 @@ conf_key_messages_marked <- function(lines) {
       out <- c(out, sub("\\s+$", "", seg[1]))
       seg <- seg[-1]
     }
-    out <- c(out, conf_key_messages(seg))
+    out <- c(out, conf_key_messages(seg, version))
   }
   out
 }
@@ -586,7 +629,7 @@ conf_matrix_run_segment <- function(code, data_dir, limit) {
   setTimeLimit(elapsed = limit, transient = TRUE)
   on.exit(setTimeLimit(elapsed = Inf), add = TRUE)
   res <- tryCatch(
-    withCallingHandlers(sas_run(code), warning = function(w) invokeRestart("muffleWarning")),
+    withCallingHandlers(sas_run(code, on_error = "abort"), warning = function(w) invokeRestart("muffleWarning")),
     error = function(e) {
       m <- conditionMessage(e)
       structure(list(unsupported = inherits(e, "sasonr_unsupported"), line = suppressWarnings(as.integer(e$sas_line %||% NA)),
@@ -663,7 +706,7 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
   seg_info <- lapply(seq_along(segs), function(s) {
     r <- segs[[s]]
     son_ds <- tempfile("sasonr_ds_")
-    sas_export_work(r, son_ds)
+    sas_export_work(r, son_ds, values = FALSE)
     a <- conf_attrs(file.path(son_ds, "__attr.csv"), "latin1")
     unlink(son_ds, recursive = TRUE)
     rf <- file.path(r$run_dir, "results.txt")
@@ -673,7 +716,7 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
       writeLines(r$log, file.path(kd, "log"), useBytes = TRUE)
       if (file.exists(rf)) file.copy(rf, kd)
     }
-    list(log = conf_matrix_split(conf_key_messages_marked(r$log)),
+    list(log = conf_matrix_split(conf_key_messages_marked(r$log, as.integer(meta$gold_version %||% 1L))),
          put = conf_matrix_split(conf_put_lines(r$log), inclusive = TRUE),
          rec = conf_matrix_records(if (file.exists(rf)) sub("\\s+$", "", conf_lines(rf, "latin1")) else character()),
          attr = a, lst = conf_norm_lst(r$listing), log_raw = r$log)

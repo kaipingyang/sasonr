@@ -1,0 +1,6 @@
+# Verified input domain of functions whose registry status is partial: the
+# runtime guard (sasonr_unsupported) fires for every other input.
+name	domain
+MOD	arguments that are multiples of 2**-10 below 2**53 in magnitude (the remainder is exact), or a remainder that the 1E-12 fuzz sets to 0
+MODZ	argument magnitudes 0 or 1E-140..1E140, and a / b not an integer unless the remainder is exactly 0
+YRDIF	bases 30/360, ACT/365 and ACT/360; AGE only for dates a whole number of years apart; ACT/ACT only within one calendar year or between two 1 January dates

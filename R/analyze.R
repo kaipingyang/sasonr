@@ -322,7 +322,12 @@ an_call <- function(e, st) {
     e$lag <- lk
   } else {
     spec <- fn_table[[e$name]]
-    if (is.null(spec)) abort_unsupported(paste0("function ", toupper(e$name), "()"), e$line)
+    if (is.null(spec)) {
+      if (!sas_known_function(e$name)) {
+        abort_syntax(paste0("The function ", toupper(e$name), " is unknown, or cannot be accessed. (ERROR 68-185)"), e$line)
+      }
+      abort_unsupported(paste0("function ", toupper(e$name), "()"), e$line)
+    }
     feature_check("function", e$name, e$line)
     nargs <- sum(vapply(e$args, function(a) if (a$node == "of") 2L else 1L, integer(1)))
     # argument counts SAS 9.4 accepts (feature registry, from the SAS inventory): more or fewer is a compile-time ERROR
