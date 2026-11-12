@@ -26,7 +26,7 @@ fn_table <- list(
   datepart = fn_spec("num", 1), timepart = fn_spec("num", 1), hour = fn_spec("num", 1),
   minute = fn_spec("num", 1), second = fn_spec("num", 1), hms = fn_spec("num", 3),
   intck = fn_spec("num", 3), intnx = fn_spec("num", 3, 4), index = fn_spec("num", 2),
-  indexc = fn_spec("num", 2), length = fn_spec("num", 1), lengthn = fn_spec("num", 1),
+  indexc = fn_spec("num", 2, Inf), length = fn_spec("num", 1), lengthn = fn_spec("num", 1),
   cats = fn_spec("char", 1, Inf, 200L), catt = fn_spec("char", 1, Inf, 200L),
   cat = fn_spec("char", 1, Inf, 200L), catx = fn_spec("char", 2, Inf, 200L),
   trim = fn_spec("char", 1, 1, "arg"), trimn = fn_spec("char", 1, 1, "arg"),
@@ -189,6 +189,7 @@ expr_type <- function(e, st) {
         uf <- user_fmt(e$fmt$name, e$fmt$char, "invalue")
         if (e$fmt$char || isTRUE(uf$char)) {
           w <- if (!is.null(uf) && is.na(e$fmt$w)) uf$default_w else e$fmt$w
+          if (is.na(w) && is.null(uf)) w <- registry_defw("informat", e$fmt)
           if (is.na(w)) {
             a <- expr_type(e$args[[1]], st)
             w <- if (a$type == "char") a$len else 12L
@@ -201,7 +202,8 @@ expr_type <- function(e, st) {
       if (is.null(spec) || spec$type == "num") return(num)
       if (identical(spec$len, "arg")) {
         a <- expr_type(e$args[[1]], st)
-        return(list(type = "char", len = if (a$type == "char") a$len else 12L))
+        # SUBSTRN of a number: length 8 (SAS 9.4); others: the BEST12. text
+        return(list(type = "char", len = if (a$type == "char") a$len else if (e$name == "substrn") 8L else 12L))
       }
       list(type = "char", len = spec$len)
     },
@@ -288,6 +290,10 @@ an_call <- function(e, st) {
       abort_unsupported(paste0("format ", f$text), e$line)
     }
     if (e$name == "put") check_format_width(f, e$line)
+    feature_check("function", e$name, e$line)
+    if (is.null(if (e$name == "put") user_fmt(f$name, f$char) else user_fmt(f$name, f$char, "invalue"))) {
+      feature_check(if (e$name == "put") "format" else "informat", fmt_registry_name(f), e$line)
+    }
     e$args <- lapply(e$args, an_expr, st = st)
     a <- expr_type(e$args[[1]], st)
     if (e$name == "input" && a$type == "num") ct_conversion("n2c", e$args[[1]]$line %||% e$line, e$args[[1]]$col %||% e$col)
@@ -317,7 +323,18 @@ an_call <- function(e, st) {
   } else {
     spec <- fn_table[[e$name]]
     if (is.null(spec)) abort_unsupported(paste0("function ", toupper(e$name), "()"), e$line)
+    feature_check("function", e$name, e$line)
     nargs <- sum(vapply(e$args, function(a) if (a$node == "of") 2L else 1L, integer(1)))
+    # argument counts SAS 9.4 accepts (feature registry, from the SAS inventory): more or fewer is a compile-time ERROR
+    sas_n <- registry_arg_counts(e$name)
+    if (!is.null(sas_n)) {
+      if (!is.na(sas_n[2]) && length(e$args) > sas_n[2]) {
+        abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line)
+      }
+      if (length(e$args) < sas_n[1] && nargs < sas_n[1]) {
+        abort_syntax(paste0("The ", toupper(e$name), " function call does not have enough arguments (ERROR 71-185)"), e$line)
+      }
+    }
     if (length(e$args) > spec$max && e$name %in% fn_max_exact) {
       abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line)
     }
@@ -350,7 +367,7 @@ an_call <- function(e, st) {
 # _ERROR_).  Only functions whose argument types are listed in fn_arg_types
 # convert; for the others a mismatch keeps the previous behaviour.
 convert_fn_args <- function(e, st) {
-  types <- fn_arg_types[[e$name]]
+  types <- fn_arg_types[[e$name]] %||% registry_arg_types(e$name, length(e$args))
   if (is.null(types)) return(e$args)
   lapply(seq_along(e$args), function(k) {
     a <- e$args[[k]]
@@ -370,6 +387,7 @@ check_format <- function(fmt, line) {
   if (is.null(fmt)) return(invisible())
   if (!fmt_known(fmt) || (fmt$name == "" && is.na(fmt$w) && !fmt$char)) abort_unsupported(paste0("format ", fmt$text), line)
   check_format_width(fmt, line)
+  if (is.null(user_fmt(fmt$name, fmt$char))) feature_check("format", fmt_registry_name(fmt), line)
 }
 
 check_format_width <- function(fmt, line) {
@@ -380,6 +398,10 @@ check_format_width <- function(fmt, line) {
   if (is.null(rng) && !is.null(fmt_base_name(nm)$sep)) rng <- c(2, 10)
   if (!is.null(rng) && !is.na(fmt$w) && (fmt$w < rng[1] || fmt$w > rng[2])) {
     abort_syntax(paste0("Width specified for format ", toupper(if (nzchar(fmt$name)) fmt$name else "F"), " is invalid"), line)
+  }
+  # PVALUE's default of 4 decimals needs a width of at least 5
+  if (nm == "pvalue" && !is.na(fmt$w) && is.na(fmt$d) && fmt$w <= 4) {
+    abort_syntax(sprintf("The decimal specification of 4 must be less than the width specification of %d (ERROR 156-185)", fmt$w), line)
   }
   if (!is.na(fmt$d) && !is.na(fmt$w) && fmt$d >= fmt$w && nm %in% c("w", "f", "z", "comma", "dollar", "commax", "dollarx")) {
     abort_syntax(paste0("Decimal specified for format ", fmt$text, " is invalid"), line)
@@ -451,7 +473,7 @@ an_stmt <- function(s, st) {
         reg_var(st, s$target$name, disp = s$target$text %||% s$target$name)
         assign_target_type(st, s$target$name, s$value, line)
         # CATX writes into a buffer as long as the target variable
-        if (s$value$node == "call" && identical(s$value$name, "catx")) s$value$buf_len <- st$info[[s$target$name]]$len
+        if (s$value$node == "call" && s$value$name %in% c("catx", "cat", "cats", "catt")) s$value$buf_len <- st$info[[s$target$name]]$len
       } else {
         s$target <- an_expr(s$target, st)
         s$value <- an_expr(s$value, st)

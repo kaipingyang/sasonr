@@ -447,7 +447,15 @@ sql_select <- function(q, eng, outer) {
     if (!is.null(it$length)) col$len <- it$length
     # a computed character column whose DATA step length is the 200 default
     # takes the width of its longest value
-    if (ty$type == "char" && is.null(it$length) && e$node == "call" && identical(fn_table[[e$name]]$len, 200L)) {
+    const_args <- e$node == "call" && length(e$args) > 0 &&
+      all(vapply(e$args, function(a) a$node %in% c("num", "str", "missing"), logical(1)))
+    if (ty$type == "char" && is.null(it$length) && const_args && e$name %in% sql_fold_fns) {
+      # constant arguments: SAS evaluates the call once; the column has the length of the value (SAS 9.4)
+      col$len <- max(1L, nchar(v[1] %||% ""))
+    } else if (ty$type == "char" && is.null(it$length) && const_args && identical(fn_table[[e$name]]$len, 200L) &&
+               e$name %in% sql_200_fns) {
+      col$len <- 200L
+    } else if (ty$type == "char" && is.null(it$length) && e$node == "call" && identical(fn_table[[e$name]]$len, 200L)) {
       col$len <- max(1L, nchar(sas_rtrim(v)))
     }
     if (ty$type == "char") v <- sas_char(v, col$len)
@@ -655,3 +663,8 @@ sql_outer_union <- function(a, b, q, eng) {
   for (c in cols) if (c$type == "char") d[[c$id]] <- sas_char(sas_rtrim(d[[c$id]]), c$len)
   list(data = d, cols = cols, ordered = TRUE)
 }
+
+# PROC SQL lengths of calls with constant arguments (verified in the function
+# matrix): the value's length, or the DATA step default of 200
+sql_fold_fns <- c("cat", "strip", "trim", "compbl")
+sql_200_fns <- c("tranwrd")

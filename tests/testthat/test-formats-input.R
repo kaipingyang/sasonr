@@ -156,7 +156,8 @@ datalines;
 4,,6
 ;
 run;")
-  expect_equal(log, c("a=1 b=x,y c=3", "a=4 b= c=6"))
+  # named output writes a blank value as one blank (SAS 9.4)
+  expect_equal(log, c("a=1 b=x,y c=3", "a=4 b=  c=6"))
   log <- run_log("data _null_; infile datalines missover; input a b c; put a= b= c=;
 datalines;
 1 2
@@ -200,7 +201,7 @@ test_that("new character functions", {
     k = quote('it''s');
     put a= b= c= d= e= f= g= h= i= j= k=;
   run;")
-  expect_equal(log, "a=7 b=3 c=abc d=a b e= f=Hello-World g=cd ab h=3 i=a j=4 k=\"it's\"")
+  expect_equal(log, "a=7 b=3 c=abc d=a b e=  f=Hello-World g=cd ab h=3 i=a j=4 k=\"it's\"")
 })
 
 test_that("new numeric and date functions", {
@@ -211,7 +212,7 @@ test_that("new numeric and date functions", {
     i = dhms('01JAN2024'd, 1, 2, 3) - '01JAN2024:00:00:00'dt; j = mod(0.3, 0.1);
     put a= b= c= d= e= date9. f= g= 8.4 h= i= j=;
   run;")
-  expect_equal(log, "a=2 b=1 c=5 d=2 e=29FEB2024 f=1 g=43.7104 h=60 i=3723 j=0")
+  expect_equal(log, "a=2 b=1 c=5 d=2 e=29FEB2024 f=1 g=43.7096 h=60 i=3723 j=0")
 })
 
 test_that("PUT wraps at the 132-column log line size", {

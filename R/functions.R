@@ -61,10 +61,11 @@ class_chars <- function(mods) {
 
 #' @export
 sas_f_substrn <- function(x, pos, len = NULL) {
-  x <- as_sas_chr(x)
+  x <- if (is.numeric(x)) strip_both(sas_fmt_best(x, 12L)) else x
   rowwise(function(s, p, l) {
     n <- nchar(s)
     if (is.na(p)) return("")
+    if (!is.null(len) && is.na(l)) return("")
     p <- trunc(p)
     e <- if (is.null(len) || is.na(l)) n else p + trunc(l) - 1
     if (!is.null(len) && !is.na(l) && l <= 0) return("")
@@ -157,7 +158,7 @@ sas_f_findc <- function(x, chars = "", a3 = NULL, a4 = NULL) {
     }
     ch <- chars_of(s)
     hit <- ch %in% set
-    if (grepl("k", md, fixed = TRUE)) hit <- !hit
+    if (grepl("[kv]", md)) hit <- !hit
     n <- length(ch)
     if (is.na(st)) st <- if (grepl("b", md, fixed = TRUE)) -n else 1
     if (st > 0) {
@@ -208,9 +209,10 @@ sas_f_findw <- function(x, word, dlm = " !$%&()*+,-./;<^|", a4 = "", a5 = 1) {
     k <- nchar(w)
     if (k == 0) return(0)
     wd <- chars_of(w)
-    st <- if (is.na(st)) 1 else max(1, trunc(st))
-    for (i in seq_len(max(0, n - k + 1))) {
-      if (i < st) next
+    st <- if (is.na(st)) 1 else trunc(st)
+    idx <- seq_len(max(0, n - k + 1))
+    if (st < 0) idx <- rev(idx[idx + k - 1 <= -st]) else idx <- idx[idx >= max(1, st)]
+    for (i in idx) {
       if (all(ch[i:(i + k - 1)] == wd) && (i == 1 || ch[i - 1] %in% dl) && (i + k - 1 == n || ch[i + k] %in% dl)) {
         if (grepl("e", md, fixed = TRUE)) {
           before <- if (i > 1) ch[seq_len(i - 1)] else character()
@@ -262,7 +264,8 @@ sas_f_countc <- function(x, chars = "", mods = "") {
     set <- c(chars_of(cs), class_chars(md))
     if (grepl("i", md, fixed = TRUE)) set <- unique(c(toupper(set), tolower(set)))
     hit <- chars_of(s) %in% set
-    if (grepl("k", md, fixed = TRUE)) hit <- !hit
+    # K and V count the characters that are not in the list
+    if (grepl("[kv]", md)) hit <- !hit
     as.numeric(sum(hit))
   }, as_sas_chr(x), chars, mods, type = numeric(1))
 }
@@ -333,7 +336,8 @@ sas_f_transtrn <- function(x, from, to) {
 sas_f_translate <- function(x, ...) {
   pairs <- list(...)
   x <- as_sas_chr(x)
-  for (k in seq(1, length(pairs), by = 2)) {
+  # an unpaired last to-argument is ignored (SAS 9.4)
+  for (k in seq(1, length(pairs) - 1L, by = 2)) {
     to <- pairs[[k]]
     from <- pairs[[k + 1]]
     x <- rowwise(function(s, t, f) {
@@ -362,17 +366,26 @@ sas_f_propcase <- function(x, dlm = " /-(.\t") {
 }
 
 #' @export
-sas_f_lengthc <- function(x) as.numeric(pmax(nchar(as_sas_chr(x)), 1L))
+# a zero-length value (from TRIMN, STRIP, ...) has length 0; variables and literals are at least 1 long
+sas_f_lengthc <- function(x) as.numeric(nchar(as_sas_chr(x)))
 #' @export
 sas_f_lengthm <- function(x) sas_f_lengthc(x)
 
 #' @export
-sas_f_repeat <- function(x, n) rowwise(function(s, k) strrep(s, max(0, trunc(k)) + 1), as_sas_chr(x), n)
+sas_f_repeat <- function(x, n) {
+  rowwise(function(s, k) {
+    if (is.na(k) || k < 0) return("")
+    if (!nzchar(s)) return("")
+    times <- min(trunc(k), ceiling(32767 / nchar(s))) + 1
+    substr(strrep(s, times), 1L, 32767L)
+  }, as_sas_chr(x), n)
+}
 
 #' @export
 sas_f_quote <- function(x, q = "\"") {
   rowwise(function(s, qq) {
     qq <- substr(qq, 1L, 1L)
+    if (!qq %in% c("'", "\"")) qq <- "\""
     paste0(qq, gsub(qq, strrep(qq, 2), s, fixed = TRUE), qq)
   }, as_sas_chr(x), q)
 }
@@ -380,7 +393,7 @@ sas_f_quote <- function(x, q = "\"") {
 #' @export
 sas_f_dequote <- function(x) {
   rowwise(function(s) {
-    t <- sub("^ +", "", s)
+    t <- s
     if (!nzchar(t)) return(s)
     q <- substr(t, 1L, 1L)
     if (!q %in% c("'", "\"")) return(s)
@@ -412,6 +425,9 @@ class_pos <- function(x, mods, negate, start) {
     if (negate) hit <- !hit
     n <- length(ch)
     if (is.na(st)) st <- 1
+    # a start position that truncates to 0 finds nothing (SAS 9.4)
+    st <- trunc(st)
+    if (st == 0) return(0)
     if (st >= 0) {
       w <- which(hit & seq_len(n) >= max(st, 1))
       if (length(w) == 0) 0 else as.numeric(w[1])
@@ -487,7 +503,7 @@ sas_f_choosec <- function(k, ...) {
   vals <- lapply(list(...), as_sas_chr)
   ab <- do.call(recycle_n, c(list(k), vals))
   vapply(seq_along(ab[[1]]), function(i) {
-    j <- trunc(ab[[1]][i])
+    j <- floor(ab[[1]][i])
     m <- length(vals)
     if (is.na(j) || j == 0 || abs(j) > m) return("")
     if (j < 0) j <- m + j + 1
@@ -499,7 +515,7 @@ sas_f_choosen <- function(k, ...) {
   m <- num_args(...)
   kk <- rep_len(k, nrow(m))
   vapply(seq_len(nrow(m)), function(i) {
-    j <- trunc(kk[i])
+    j <- floor(kk[i])
     if (is.na(j) || j == 0 || abs(j) > ncol(m)) return(NA_real_)
     if (j < 0) j <- ncol(m) + j + 1
     m[i, j]
@@ -566,18 +582,28 @@ sas_f_compare <- function(a, b, mods = "") {
 
 #' @export
 sas_f_symget <- function(symtab, name, .at = NULL) {
-  vapply(strip_both(name), function(nm) {
-    if (inherits(symtab, "sasonr_macro_session")) {
-      v <- mv_get(symtab, tolower(nm))
-      if (is.null(v)) {
-        note_invalid_arg("symget", 1L, .at)
-        return("")
-      }
-      mq_unmask(v)
-    } else {
-      v <- get0(tolower(nm), envir = symtab, inherits = FALSE)
-      if (is.null(v)) "" else v
+  vapply(as_sas_chr(name), function(nm0) {
+    # trailing blanks are ignored; a leading blank makes the name invalid (SAS: blank result,
+    # NOTE "Invalid argument to function SYMGET(' mv ')", _ERROR_)
+    nm <- sas_rtrim(nm0)
+    if (!nzchar(nm)) {
+      rt$stop_step <- TRUE
+      rt_error("ERROR: The macro variable name is either all blank or missing.")
     }
+    if (nchar(nm) > 32) {
+      rt$stop_step <- TRUE
+      rt_error(sprintf("ERROR: Symbolic variable name %s must be 32 or fewer characters long.", toupper(substr(nm, 1L, 33L))))
+    }
+    v <- if (!grepl("^[A-Za-z_][A-Za-z0-9_]*$", nm)) NULL else if (inherits(symtab, "sasonr_macro_session")) {
+      mv_get(symtab, tolower(nm))
+    } else {
+      get0(tolower(nm), envir = symtab, inherits = FALSE)
+    }
+    if (is.null(v)) {
+      note_invalid_arg("symget", NULL, .at, args = list(if (nzchar(nm)) nm0 else " "), math = FALSE, trim = FALSE)
+      return("")
+    }
+    if (inherits(symtab, "sasonr_macro_session")) mq_unmask(v) else v
   }, "", USE.NAMES = FALSE)
 }
 
@@ -691,9 +717,32 @@ sas_f_prxchange <- function(re, times, x, .at = NULL) {
     if (!p$sub) abort_runtime("PRXCHANGE needs a substitution (s/.../.../)")
     n <- ab[[2]][i]
     s <- ab[[3]][i]
-    if (is.na(n) || n < 0) return(gsub(p$pattern, p$repl, s, perl = TRUE, ignore.case = p$icase))
-    for (k in seq_len(n)) s <- sub(p$pattern, p$repl, s, perl = TRUE, ignore.case = p$icase)
-    s
+    if (is.na(n)) return("")
+    if (n == -1 || n >= 2^31) return(gsub(p$pattern, p$repl, s, perl = TRUE, ignore.case = p$icase))
+    if (n < 0) {
+      # SAS 9.4: ERROR, blank result, the step continues (-1E300 and below: invalid argument, see fn_policy)
+      if (n > -1e300) {
+        rt_error(sprintf("ERROR: Argument 2 to the routine PRXCHANGE, the maximum number of replacements, must be nonnegative but the value is %s.",
+                         trimws(sas_fmt_best(n, 12L))))
+      }
+      return("")
+    }
+    n <- trunc(n)
+    if (n == 0) return(s)
+    # replace the first n matches in one pass (later matches are searched in the original text)
+    m <- gregexpr(p$pattern, s, perl = TRUE, ignore.case = p$icase)[[1]]
+    if (m[1] < 0) return(s)
+    k <- min(n, length(m))
+    out <- ""
+    last <- 1L
+    for (j in seq_len(k)) {
+      st <- m[j]
+      len <- attr(m, "match.length")[j]
+      piece <- substr(s, st, st + len - 1L)
+      out <- paste0(out, substr(s, last, st - 1L), sub(p$pattern, p$repl, piece, perl = TRUE, ignore.case = p$icase))
+      last <- st + len
+    }
+    paste0(out, substring(s, last))
   }, "")
 }
 
@@ -715,9 +764,14 @@ sas_f_std <- function(...) row_stat(function(v) if (length(v) < 2) NA_real_ else
 #' @export
 sas_f_var <- function(...) row_stat(function(v) if (length(v) < 2) NA_real_ else stats::var(v), ...)
 #' @export
-sas_f_stderr <- function(...) row_stat(function(v) if (length(v) < 2) NA_real_ else stats::sd(v) / sqrt(length(v)), ...)
+sas_f_stderr <- function(...) row_stat(function(v) {
+  n <- length(v)
+  if (n < 2) return(NA_real_)
+  m <- sum(v) / n
+  sqrt(sum((v - m)^2) / (n - 1) / n) # bit-identical to SAS 9.4 (not sd / sqrt(n))
+}, ...)
 #' @export
-sas_f_cv <- function(...) row_stat(function(v) if (length(v) < 2 || mean(v) == 0) NA_real_ else 100 * stats::sd(v) / mean(v), ...)
+sas_f_cv <- function(...) row_stat(function(v) if (length(v) < 2 || mean(v) == 0) NA_real_ else stats::sd(v) / mean(v) * 100, ...)
 #' @export
 sas_f_range <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else max(v) - min(v), ...)
 #' @export
@@ -725,9 +779,17 @@ sas_f_css <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ els
 #' @export
 sas_f_uss <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else sum(v^2), ...)
 #' @export
-sas_f_geomean <- function(...) row_stat(function(v) if (length(v) == 0 || any(v < 0)) NA_real_ else if (any(v == 0)) 0 else exp(mean(log(v))), ...)
+sas_f_geomean <- function(...) row_stat(function(v) {
+  if (length(v) == 0 || any(v < 0)) return(NA_real_)
+  if (any(v == 0)) return(0)
+  exp(mean(log(v)))
+}, ...)
 #' @export
-sas_f_harmean <- function(...) row_stat(function(v) if (length(v) == 0 || any(v <= 0)) NA_real_ else length(v) / sum(1 / v), ...)
+sas_f_harmean <- function(...) row_stat(function(v) {
+  if (length(v) == 0 || any(v < 0)) return(NA_real_)
+  if (any(v == 0)) return(0) # SAS 9.4: a zero value gives 0
+  length(v) / sum(1 / v)
+}, ...)
 #' @export
 sas_f_skewness <- function(...) row_stat(function(v) {
   n <- length(v)
@@ -781,26 +843,27 @@ sas_f_cmiss <- function(...) {
 #' @export
 sas_f_fact <- function(n, .at = NULL) {
   bad <- !is.na(n) & (n < 0 | n != trunc(n) | n > 170)
-  if (any(bad)) note_invalid_arg("fact", NULL, .at, list(n), bad)
-  out <- factorial(n)
+  out <- suppressWarnings(factorial(n))
   out[bad] <- NA_real_
   out
 }
 #' @export
 sas_f_comb <- function(n, r) {
   out <- choose(n, r)
-  out[is.na(n) | is.na(r) | r > n | r < 0 | n < 0 | n >= 2^53 | r >= 2^53] <- NA_real_
-  sas_num(out)
+  out[is.na(n) | is.na(r) | r > n | r < 0 | n < 0 | n >= 2^53 | r >= 2^53 | is.infinite(out)] <- NA_real_
+  out
 }
 #' @export
 sas_f_perm <- function(n, r = NULL) if (is.null(r)) factorial(n) else factorial(n) / factorial(n - r)
 #' @export
 sas_f_gamma <- function(x, .at = NULL) {
   bad <- !is.na(x) & x <= 0 & x == trunc(x)
-  if (any(bad)) note_invalid_arg("gamma", NULL, .at, list(x), bad)
   out <- suppressWarnings(gamma(x))
-  out[bad] <- NA_real_
-  sas_num(out)
+  # negative arguments by the reflection formula (bit-identical to SAS 9.4 for GAMMA(-0.5))
+  neg <- !is.na(x) & x < 0 & !bad
+  if (any(neg)) out[neg] <- pi / (sin(pi * x[neg]) * suppressWarnings(gamma(1 - x[neg])))
+  out[bad | is.infinite(out)] <- NA_real_
+  out
 }
 #' @export
 sas_f_lgamma <- function(x) lgamma(x)
@@ -821,17 +884,27 @@ sas_f_lcm <- function(...) {
   apply(m, 1, function(r) {
     if (anyNA(r) || any(abs(r) >= 2^53)) return(NA_real_)
     g <- function(a, b) if (b == 0) abs(a) else g(b, a %% b)
-    Reduce(function(a, b) if (a == 0 || b == 0) 0 else abs(a * b) / g(a, b), trunc(r))
+    out <- Reduce(function(a, b) if (a == 0 || b == 0) 0 else abs(a) / g(a, b) * abs(b), trunc(r))
+    # a result beyond 2^53 is missing, without a NOTE (SAS 9.4)
+    if (out > 2^53) NA_real_ else out
   })
 }
 #' @export
 sas_f_divide <- function(a, b) {
   ab <- recycle_n(as.numeric(a), as.numeric(b))
   out <- ab[[1]] / ab[[2]]
+  # x/0 and overflow: .I (positive) or .M (negative); 0/0: .
+  # division by zero: the sign of the numerator only (1/-0 is .I)
+  z0 <- !is.na(ab[[2]]) & ab[[2]] == 0 & !is.na(ab[[1]]) & ab[[1]] != 0
+  out[z0] <- ifelse(ab[[1]][z0] > 0, Inf, -Inf)
+  out[!is.na(out) & out == Inf] <- sas_missing("I")
+  out[!is.na(out) & out == -Inf] <- sas_missing("M")
   z <- !is.na(ab[[2]]) & ab[[2]] == 0
-  out[z & !is.na(ab[[1]]) & ab[[1]] > 0] <- sas_missing("I")
-  out[z & !is.na(ab[[1]]) & ab[[1]] < 0] <- sas_missing("M")
-  out[z & (is.na(ab[[1]]) | ab[[1]] == 0)] <- NA_real_
+  out[z & !is.na(ab[[1]]) & ab[[1]] == 0] <- NA_real_
+  # a missing numerator is passed through (special missing values kept); a missing denominator gives .
+  na <- is.na(ab[[1]])
+  out[na] <- ab[[1]][na]
+  out[!na & is.na(ab[[2]])] <- ab[[2]][!na & is.na(ab[[2]])]
   out
 }
 
@@ -840,7 +913,6 @@ trig <- function(f, name, dom = NULL) {
   force(dom)
   function(x, .at = NULL) {
     bad <- if (is.null(dom)) rep(FALSE, length(x)) else !is.na(x) & !do.call(dom, list(x))
-    if (any(bad)) note_invalid_arg(name, NULL, .at)
     out <- suppressWarnings(f(x))
     out[bad] <- NA_real_
     out
@@ -871,66 +943,193 @@ sas_f_logbeta <- function(a, b) lbeta(a, b)
 
 #' @export
 sas_f_constant <- function(name, p = NULL) {
-  vapply(tolower(strip_both(name)), function(nm) {
+  ab <- recycle_n(tolower(strip_both(as_sas_chr(name))), if (is.null(p)) NA_real_ else as.numeric(p))
+  vapply(seq_along(ab[[1]]), function(i) {
+    nm <- ab[[1]][i]
+    pp <- ab[[2]][i]
+    if (nm == "exactint" && !is.null(p) && !is.na(pp)) {
+      # EXACTINT(n): largest integer stored exactly in n bytes (3 to 8)
+      if (is.na(pp) || pp != trunc(pp) || pp < 2 || pp > 8) {
+        # SAS 9.4 writes an ERROR, sets the result missing and continues (fn_policy counts the place)
+        if (!is.na(pp)) {
+          rt_error("ERROR: The second argument to the CONSTANT function with first argument of EXACTINT must be between 2 and 8.")
+        }
+        return(NA_real_)
+      }
+      return(2^(8 * pp - 11))
+    }
+    if (!is.null(p) && !is.na(pp) && nm %in% c("big", "e", "euler", "logbig", "logmaceps", "logsmall", "maceps", "pi",
+                                              "small", "sqrtbig", "sqrtmaceps", "sqrtsmall")) {
+      return(NA_real_) # a parameter for another constant: invalid (fn_policy)
+    }
     switch(nm,
       pi = pi, e = exp(1), euler = 0.577215664901532860606512,
       big = .Machine$double.xmax, logbig = log(.Machine$double.xmax), sqrtbig = sqrt(.Machine$double.xmax),
-      small = .Machine$double.xmin, logsmall = log(.Machine$double.xmin), sqrtsmall = sqrt(.Machine$double.xmin),
+      # LOGSMALL: SAS 9.4 value (hex C0862336F49C3C4F), not log(SMALL)
+      small = .Machine$double.xmin, logsmall = -708.40183374461219, sqrtsmall = sqrt(.Machine$double.xmin),
       maceps = .Machine$double.eps, logmaceps = log(.Machine$double.eps), sqrtmaceps = sqrt(.Machine$double.eps),
       exactint = 2^53,
-      abort_unsupported(paste0("CONSTANT('", nm, "')"))
+      if (nm %in% c("bigrecip", "golden", "logbigrecip", "logsmallrecip", "smallrecip")) {
+        abort_unsupported(paste0("CONSTANT('", nm, "')"))
+      } else {
+        rt_error(paste0("ERROR: The first argument of the CONSTANT function must be one of the following: BIG, BIGRECIP, E, EULER, ",
+                        "EXACTINT, GOLDEN, LOGBIG, LOGBIGRECIP, LOGMACEPS, LOGSMALL, LOGSMALLRECIP, MACEPS, PI, SMALL, ",
+                        "SMALLRECIP, SQRTBIG, SQRTMACEPS, or SQRTSMALL."))
+        NA_real_
+      }
     )
-  }, 0, USE.NAMES = FALSE)
+  }, 0)
 }
 
 #' @export
 sas_f_probnorm <- function(x) stats::pnorm(x)
 #' @export
-sas_f_probit <- function(p) stats::qnorm(p)
+sas_f_probit <- function(p) {
+  out <- stats::qnorm(p)
+  out[!is.na(out) & out == 0] <- -0 # PROBIT(0.5) is -0 in SAS 9.4
+  out
+}
 #' @export
 sas_f_probt <- function(x, df, nc = 0) stats::pt(x, df, nc)
 #' @export
 sas_f_probchi <- function(x, df, nc = 0) stats::pchisq(x, df, nc)
 #' @export
-sas_f_probf <- function(x, n, d, nc = 0) stats::pf(x, n, d, nc)
+sas_f_probf <- function(x, n, d, nc = 0) {
+  rowwise(function(x, n, d, nc) if (!is.na(nc) && nc > 0) pnf_series(x, n, d, nc) else stats::pf(x, n, d, nc),
+          x, n, d, nc, type = numeric(1))
+}
+
+# Noncentral F distribution function as the Poisson mixture of regularized
+# incomplete beta functions, summed outwards from the largest Poisson weight
+# (R's pnbeta() stops at an absolute error of 1e-9).
+pnf_series <- function(x, n, d, nc) {
+  if (anyNA(c(x, n, d, nc)) || n <= 0 || d <= 0 || nc < 0) return(NA_real_)
+  if (x <= 0) return(0)
+  y <- n * x / (n * x + d)
+  lam <- nc / 2
+  term <- function(j) exp(stats::dpois(j, lam, log = TRUE) + stats::pbeta(y, n / 2 + j, d / 2, log.p = TRUE))
+  j0 <- floor(lam)
+  tot <- term(j0)
+  j <- j0 + 1
+  repeat {
+    t <- term(j)
+    tot <- tot + t
+    if (t < 1e-20 * tot && stats::dpois(j, lam) < 1e-20) break
+    j <- j + 1
+  }
+  j <- j0 - 1
+  while (j >= 0) {
+    t <- term(j)
+    tot <- tot + t
+    if (t < 1e-20 * tot) break
+    j <- j - 1
+  }
+  min(tot, 1)
+}
+
+qnf_series <- function(p, n, d, nc) {
+  if (anyNA(c(p, n, d, nc)) || p < 0 || p > 1) return(NA_real_)
+  if (p == 0) return(0)
+  if (p == 1) return(Inf)
+  x0 <- suppressWarnings(stats::qf(p, n, d, nc))
+  lo <- x0 * (1 - 1e-6)
+  hi <- x0 * (1 + 1e-6)
+  while (pnf_series(lo, n, d, nc) > p) lo <- lo / 2
+  while (pnf_series(hi, n, d, nc) < p) hi <- hi * 2
+  for (k in 1:200) {
+    mid <- (lo + hi) / 2
+    if (mid <= lo || mid >= hi) break
+    if (pnf_series(mid, n, d, nc) < p) lo <- mid else hi <- mid
+  }
+  (lo + hi) / 2
+}
 #' @export
 sas_f_tinv <- function(p, df, nc = 0) stats::qt(p, df, nc)
 #' @export
 sas_f_cinv <- function(p, df, nc = 0) stats::qchisq(p, df, nc)
 #' @export
-sas_f_finv <- function(p, n, d, nc = 0) stats::qf(p, n, d, nc)
+sas_f_finv <- function(p, n, d, nc = 0) {
+  rowwise(function(p, n, d, nc) {
+    if (anyNA(c(p, n, d, nc)) || n <= 0 || d <= 0 || nc < 0) return(NaN)
+    if (nc > 0) qnf_series(p, n, d, nc) else suppressWarnings(stats::qf(p, n, d, nc))
+  },
+          p, n, d, nc, type = numeric(1))
+}
 #' @export
 sas_f_probbnml <- function(p, n, m) stats::pbinom(m, n, p)
 #' @export
 sas_f_poisson <- function(m, n) stats::ppois(n, m)
 
+# distribution names SAS 9.4 accepts (prefixes of these are not decided here: fail loud)
+sas_dist_names <- c("bernoulli", "beta", "binomial", "cauchy", "chisquare", "exponential", "f", "gamma", "gaussian",
+                    "geometric", "genpoisson", "hypergeometric", "igauss", "laplace", "logistic", "lognormal", "negb",
+                    "negbinomial", "normal", "pareto", "poisson", "t", "tweedie", "uniform", "wald", "weibull")
+sas_dist_known <- function(d) nzchar(d) && any(startsWith(sas_dist_names, d) | startsWith(d, sas_dist_names))
+
+# Break a log message into lines of at most LINESIZE columns at blanks (SAS
+# continues on lines indented by `indent`).
+log_wrap <- function(text, indent = 6L, ls = rt$ls %||% 132L) {
+  words <- strsplit(text, " ", fixed = TRUE)[[1]]
+  lines <- character()
+  cur <- ""
+  for (w in words) {
+    cand <- if (nzchar(cur)) paste(cur, w) else w
+    if (nchar(cand) > ls && nzchar(cur)) {
+      lines <- c(lines, cur)
+      cur <- paste0(strrep(" ", indent), w)
+    } else {
+      cur <- cand
+    }
+  }
+  c(lines, cur)
+}
+
 dist_fun <- function(kind, dist, x, args) {
   d <- tolower(strip_both(dist))
   a <- function(k, default) if (length(args) >= k) args[[k]] else default
+  nc <- function(k) if (length(args) >= k) args[[k]] else NULL
+  # a normal standard deviation (or another scale) that is not positive is invalid
+  pos <- function(v) if (is.null(v)) v else ifelse(!is.na(v) & v <= 0, NaN, v)
   f <- switch(d,
-    normal = , gauss = , gaussian = list(p = stats::pnorm, d = stats::dnorm, q = stats::qnorm, a = list(a(1, 0), a(2, 1))),
-    t = list(p = stats::pt, d = stats::dt, q = stats::qt, a = list(a(1, NULL))),
-    chisq = , chisquare = list(p = stats::pchisq, d = stats::dchisq, q = stats::qchisq, a = list(a(1, NULL))),
-    f = list(p = stats::pf, d = stats::df, q = stats::qf, a = list(a(1, NULL), a(2, NULL))),
-    binomial = , binom = list(p = stats::pbinom, d = stats::dbinom, q = stats::qbinom, a = list(a(2, NULL), a(1, NULL))),
-    poisson = list(p = stats::ppois, d = stats::dpois, q = stats::qpois, a = list(a(1, NULL))),
+    normal = , gauss = , gaussian = list(p = stats::pnorm, d = stats::dnorm, q = stats::qnorm, a = list(a(1, 0), pos(a(2, 1)))),
+    t = list(p = stats::pt, d = stats::dt, q = stats::qt, a = list(a(1, NULL), nc(2))),
+    chisq = , chisquare = list(p = stats::pchisq, d = stats::dchisq, q = stats::qchisq, a = list(a(1, NULL), nc(2))),
+    f = list(p = stats::pf, d = stats::df, q = stats::qf, a = list(a(1, NULL), a(2, NULL), nc(3))),
+    binomial = , binom = list(p = stats::pbinom, d = stats::dbinom, q = stats::qbinom, a = list(a(2, NULL), a(1, NULL)), discrete = TRUE),
+    poisson = list(p = stats::ppois, d = stats::dpois, q = stats::qpois, a = list(a(1, NULL)), discrete = TRUE),
     uniform = list(p = stats::punif, d = stats::dunif, q = stats::qunif, a = list(a(1, 0), a(2, 1))),
-    exponential = , expo = list(p = stats::pexp, d = stats::dexp, q = stats::qexp, a = list(1 / a(1, 1))),
+    exponential = , expo = list(p = stats::pexp, d = stats::dexp, q = stats::qexp, a = list(1 / pos(a(1, 1)))),
     beta = list(p = stats::pbeta, d = stats::dbeta, q = stats::qbeta, a = list(a(1, NULL), a(2, NULL))),
-    gamma = list(p = stats::pgamma, d = stats::dgamma, q = stats::qgamma, a = list(a(1, NULL), 1 / a(2, 1))),
-    lognormal = list(p = stats::plnorm, d = stats::dlnorm, q = stats::qlnorm, a = list(a(1, 0), a(2, 1))),
-    abort_unsupported(paste0("distribution '", dist, "'"))
+    gamma = list(p = stats::pgamma, d = stats::dgamma, q = stats::qgamma, a = list(a(1, NULL), 1 / pos(a(2, 1)))),
+    lognormal = list(p = stats::plnorm, d = stats::dlnorm, q = stats::qlnorm, a = list(a(1, 0), pos(a(2, 1)))),
+    if (sas_dist_known(d)) abort_unsupported(paste0("distribution '", dist, "'")) else list(blank = TRUE)
   )
+  if (isTRUE(f$blank)) {
+    # not a SAS distribution: ERROR, missing result (the step continues; fn_policy counts the place)
+    rt_error(log_wrap(sprintf(paste0("ERROR: The first argument of the %s function must be a character string with a value of ",
+                                     "BERNOULLI, BETA, BINOMIAL, CAUCHY, CHISQUARE, EXPONENTIAL, F, GAMMA, GAUSSIAN, GEOMETRIC, ",
+                                     "GENPOISSON, HYPERGEOMETRIC, IGAUSS, LAPLACE, LOGISTIC, LOGNORMAL, NEGB, NORMAL, PARETO, ",
+                                     "POISSON, T, TWEEDIE, UNIFORM, WALD, or WEIBULL."), toupper(kind)), indent = 7L))
+    return(rep(NaN, length(x)))
+  }
+  if (kind == "quantile" && d %in% c("t") && any(!is.na(x) & x == 0.5)) {
+    abort_unsupported("QUANTILE('T', 0.5, ...) (SAS 9.4 returns a value near but not equal to 0)")
+  }
   fa <- Filter(Negate(is.null), f$a)
-  switch(kind,
+  # SAS writes log(0) as -SQRT(BIG) in LOGPDF/LOGCDF/LOGSDF
+  logz <- function(v) ifelse(!is.na(v) & v == -Inf, -sqrt(.Machine$double.xmax), v)
+  out <- suppressWarnings(switch(kind,
     cdf = do.call(f$p, c(list(x), fa)),
-    sdf = 1 - do.call(f$p, c(list(x), fa)),
+    sdf = do.call(f$p, c(list(x), fa, lower.tail = FALSE)),
     pdf = do.call(f$d, c(list(x), fa)),
     quantile = do.call(f$q, c(list(x), fa)),
-    logpdf = log(do.call(f$d, c(list(x), fa))),
-    logcdf = log(do.call(f$p, c(list(x), fa))),
-    logsdf = log(1 - do.call(f$p, c(list(x), fa)))
-  )
+    logpdf = logz(do.call(f$d, c(list(x), fa, log = TRUE))),
+    logcdf = logz(do.call(f$p, c(list(x), fa, log.p = TRUE))),
+    logsdf = logz(do.call(f$p, c(list(x), fa, lower.tail = FALSE, log.p = TRUE)))
+  ))
+  # discrete distributions: p = 0 and p = 1 are valid quantiles; continuous ones: invalid
+  if (kind == "quantile" && !isTRUE(f$discrete)) out[!is.na(x) & (x <= 0 | x >= 1)] <- NaN
+  out
 }
 #' @export
 sas_f_cdf <- function(dist, x, ...) dist_fun("cdf", dist[1], x, list(...))
@@ -963,7 +1162,8 @@ sas_f_time <- function() {
 #' @export
 sas_f_juldate <- function(x) {
   p <- civil(x)
-  out <- ifelse(p$y >= 1900 & p$y < 2000, (p$y %% 100) * 1000 + p$yday, p$y * 1000 + p$yday)
+  # yyddd for years in the YEARCUTOFF window (1940-2039), else yyyyddd
+  out <- ifelse(p$y >= 1940 & p$y < 2040, (p$y %% 100) * 1000 + p$yday, p$y * 1000 + p$yday)
   out[is.na(x)] <- NA_real_
   as.numeric(out)
 }
@@ -1005,49 +1205,60 @@ sas_f_week <- function(x, desc = "u") {
   }, x, d, type = numeric(1))
 }
 
+# Day-count bases of DATDIF and YRDIF (dates are truncated to integers).
+# 30/360: a start on the last day of February or on the 31st counts as the
+# 30th; an end on the 31st counts as the 30th when the start is the 30th or 31st.
 day_count <- function(a, b, basis) {
-  basis <- toupper(strip_both(basis))
-  if (basis == "ACT/ACT" || basis == "ACTUAL") return(b - a)
+  if (basis %in% c("ACT/ACT", "ACTUAL", "ACT/360", "ACT/365")) return(b - a)
   if (basis %in% c("30/360", "360")) {
     pa <- civil(a)
     pb <- civil(b)
-    d1 <- pmin(pa$d, 30)
-    d2 <- ifelse(pb$d == 31 & d1 == 30, 30, pb$d)
+    last_feb <- pa$m == 2 & pa$d == days_in_month(pa$y, 2)
+    d1 <- ifelse(last_feb, 30, pmin(pa$d, 30))
+    d2 <- ifelse(pb$d == 31 & d1 >= 30, 30, pb$d)
     return((pb$y - pa$y) * 360 + (pb$m - pa$m) * 30 + (d2 - d1))
   }
-  if (basis %in% c("ACT/360", "ACT/365")) return(b - a)
-  abort_unsupported(paste0("day-count basis '", basis, "'"))
+  NA_real_
 }
 
 #' @export
 sas_f_datdif <- function(start, end, basis = "ACT/ACT") {
   rowwise(function(a, b, bs) {
     if (is.na(a) || is.na(b)) return(NA_real_)
-    day_count(a, b, bs)
+    day_count(floor(a), floor(b), toupper(strip_both(bs)))
   }, start, end, basis, type = numeric(1))
 }
 
+# day of the year in a 365-day calendar (29 February counts as 28 February)
+doy365 <- function(p) c(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334)[p$m] + pmin(p$d, ifelse(p$m == 2, 28, 31))
+
 #' @export
-sas_f_yrdif <- function(start, end, basis = "ACT/ACT") {
+sas_f_yrdif <- function(start, end, basis = "AGE") {
   rowwise(function(a, b, bs) {
     if (is.na(a) || is.na(b)) return(NA_real_)
+    a <- floor(a)
+    b <- floor(b)
     bs <- toupper(strip_both(bs))
     if (bs == "AGE") {
+      # whole years plus the remaining days in a 365-day year (SAS 9.4)
+      sgn <- 1
+      if (b < a) {
+        t <- a
+        a <- b
+        b <- t
+        sgn <- -1
+      }
       pa <- civil(a)
       pb <- civil(b)
-      yrs <- pb$y - pa$y - as.numeric(pb$m < pa$m | (pb$m == pa$m & pb$d < pa$d))
-      anniv <- function(y) {
-        d <- from_ymd(y, pa$m, pa$d)
-        if (is.na(d)) from_ymd(y, 3, 1) else d
-      }
-      last <- anniv(pa$y + yrs)
-      nxt <- anniv(pa$y + yrs + 1)
-      return(yrs + (b - last) / (nxt - last))
+      da <- doy365(pa)
+      db <- doy365(pb)
+      yrs <- pb$y - pa$y - as.numeric(db < da)
+      return(sgn * (yrs + ((db - da) %% 365) / 365))
     }
     if (bs == "30/360" || bs == "360") return(day_count(a, b, "30/360") / 360)
     if (bs == "ACT/360") return((b - a) / 360)
     if (bs == "ACT/365") return((b - a) / 365)
-    if (bs != "ACT/ACT" && bs != "ACTUAL") abort_unsupported(paste0("YRDIF basis '", bs, "'"))
+    if (bs != "ACT/ACT" && bs != "ACTUAL") return(NA_real_)
     sgn <- 1
     if (b < a) {
       t <- a
@@ -1308,7 +1519,7 @@ fn_table <- utils::modifyList(fn_table, list(
   week = fn_spec("num", 1, 2), datdif = fn_spec("num", 3), yrdif = fn_spec("num", 2, 3),
   intck = fn_spec("num", 3, 4), intnx = fn_spec("num", 3, 4),
   put = fn_spec("char", 1, 1, "fmt"), input = fn_spec("num", 1, 1),
-  putn = fn_spec("char", 2, 4, 200L), putc = fn_spec("char", 2, 3, 200L),
+  putn = fn_spec("char", 2, 4, 200L), putc = fn_spec("char", 2, 3, "arg"),
   inputn = fn_spec("num", 2, 4), inputc = fn_spec("char", 2, 3, 200L),
   vname = fn_spec("char", 1, 1, 200L), vlength = fn_spec("num", 1), vtype = fn_spec("char", 1, 1, 1L),
   vlabel = fn_spec("char", 1, 1, 200L), vformat = fn_spec("char", 1, 1, 200L), vformatn = fn_spec("char", 1, 1, 200L),
@@ -1349,7 +1560,7 @@ sas_f_cvt_c2n <- function(x, .at = NULL) {
 
 # Functions whose arguments can be invalid (data error, _ERROR_ = 1).
 err_fns <- c("substr", "sqrt", "exp", "log", "log10", "log2", "mod", "modz", "mdy", "input", "inputn", "fact",
-             "gamma", "arsin", "arcos", "intck", "intnx", "symget", "scan", "round", "catx", "cvt_c2n",
+             "gamma", "arsin", "arcos", "intck", "intnx", "symget", "scan", "round", "rounde", "roundz", "catx", "cat", "cats", "catt", "cvt_c2n",
              "prxparse", "prxmatch", "prxchange", "band", "bor", "bxor", "bnot", "blshift", "brshift")
 
 # Functions that take a variable reference rather than a value.
@@ -1371,9 +1582,8 @@ sas_sort_values <- function(vals) {
 # Bitwise functions on unsigned 32-bit integers (outside 0..2^32-1: missing).
 bit32_op <- function(a, b, f, name, .at = NULL) {
   ab <- recycle_n(as.numeric(a), as.numeric(b))
-  ok <- !is.na(ab[[1]]) & !is.na(ab[[2]]) & ab[[1]] >= 0 & ab[[2]] >= 0 & ab[[1]] < 2^32 & ab[[2]] < 2^32 &
-    ab[[1]] == trunc(ab[[1]]) & ab[[2]] == trunc(ab[[2]])
-  if (any(!ok & !is.na(ab[[1]]) & !is.na(ab[[2]]))) note_invalid_arg(name, NULL, .at)
+  ab <- lapply(ab, trunc)
+  ok <- !is.na(ab[[1]]) & !is.na(ab[[2]]) & ab[[1]] >= 0 & ab[[2]] >= 0 & ab[[1]] < 2^32 & ab[[2]] < 2^32
   out <- rep(NA_real_, length(ok))
   hi <- function(x) as.integer(floor(x / 65536))
   lo <- function(x) as.integer(x %% 65536)
@@ -1391,8 +1601,9 @@ sas_f_bxor <- function(a, b, .at = NULL) bit32_op(a, b, bitwXor, "bxor", .at)
 #' @export
 sas_f_bnot <- function(a, .at = NULL) bit32_op(a, 2^32 - 1, bitwXor, "bnot", .at)
 bit_shift <- function(a, n, f, name, .at) {
+  a <- trunc(a)
+  n <- trunc(n)
   bad <- !is.na(a) & !is.na(n) & (a < 0 | a >= 2^32 | n < 0 | n > 31)
-  if (any(bad)) note_invalid_arg(name, NULL, .at)
   out <- f(a, n)
   out[bad | is.na(a) | is.na(n)] <- NA_real_
   out
@@ -1400,14 +1611,24 @@ bit_shift <- function(a, n, f, name, .at) {
 #' @export
 sas_f_blshift <- function(a, n, .at = NULL) bit_shift(a, n, function(a, n) (a * 2^n) %% 2^32, "blshift", .at)
 #' @export
-sas_f_brshift <- function(a, n, .at = NULL) bit_shift(a, n, function(a, n) floor(a / 2^n), "brshift", .at)
+sas_f_brshift <- function(a, n, .at = NULL) bit_shift(a, n, function(a, n) floor(a / 2^n) + 0, "brshift", .at)
 
 #' @export
 sas_f_collate <- function(start, end = NULL, len = NULL) {
+  has_end <- !is.null(end)
   rowwise(function(s, e, l) {
-    if (is.na(s)) return("")
-    if (is.na(e)) e <- if (is.na(l)) min(255, s + 199) else s + l - 1
-    codes <- seq(max(0, s), min(255, e))
+    # missing or invalid arguments: blank (and _ERROR_, see fn_policy)
+    if (is.na(s) || s < 0) return("")
+    if (has_end) {
+      if (is.na(e) || e < s) return("")
+      last <- e
+    } else if (!is.na(l)) {
+      if (l <= 0) return("")
+      last <- s + l - 1
+    } else {
+      last <- 255
+    }
+    codes <- seq(trunc(s), min(255, trunc(last)))
     codes <- codes[codes > 0]
     paste(vapply(codes, function(k) iconv(rawToChar(as.raw(k)), "latin1", "UTF-8"), ""), collapse = "")
   }, start, if (is.null(end)) NA_real_ else end, if (is.null(len)) NA_real_ else len)
@@ -1418,8 +1639,12 @@ sas_f_nvalid <- function(x, opt = "v7") {
   rowwise(function(s, o) {
     s <- sas_rtrim(s)
     o <- tolower(strip_both(o))
+    if (!nzchar(o)) o <- "v7"
     if (o == "any") return(as.numeric(nchar(s) >= 1 && nchar(s) <= 32))
     if (o == "nliteral" && grepl("^(['\"]).*\\1[nN]$", s)) return(1)
+    # UPCASE: a V7 name in upper case; other option values are invalid (fn_policy)
+    if (o == "upcase") return(as.numeric(grepl("^[A-Z_][A-Z0-9_]{0,31}$", s)))
+    if (!o %in% c("v7", "nliteral")) return(NA_real_)
     as.numeric(grepl("^[A-Za-z_][A-Za-z0-9_]{0,31}$", s))
   }, as_sas_chr(x), opt, type = numeric(1))
 }

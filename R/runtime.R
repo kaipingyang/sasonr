@@ -233,8 +233,19 @@ args_matrix <- function(args) {
 #' @export
 sas_f_sum <- function(...) {
   m <- args_matrix(list(...))
-  out <- rowSums(m, na.rm = TRUE)
-  out[rowSums(!is.na(m)) == 0] <- NA_real_
+  # sequential double sum (rowSums accumulates in long double; SAS 9.4: SUM(-0) is -0)
+  out <- as.numeric(apply(m, 1, function(r) {
+    v <- r[!is.na(r)]
+    if (length(v) == 0) 0 else Reduce(`+`, v)
+  }))
+  none <- rowSums(!is.na(m)) == 0
+  out[none] <- NA_real_
+  # all arguments missing: SUM(.A) is .A (SAS 9.4); mixed missing kinds are not verified
+  for (i in which(none)) {
+    codes <- unique(sas_miss_code(m[i, ]))
+    if (length(codes) == 1L && codes != 1L) out[i] <- m[i, 1]
+    if (length(codes) > 1L) abort_unsupported("SUM of different special missing values")
+  }
   out
 }
 #' @export
@@ -244,9 +255,15 @@ sas_f_nmiss <- function(...) as.numeric(rowSums(is.na(args_matrix(list(...)))))
 #' @export
 sas_f_mean <- function(...) {
   m <- args_matrix(list(...))
-  out <- rowMeans(m, na.rm = TRUE)
-  out[is.nan(out)] <- NA_real_
-  out
+  # sequential double sum (rowMeans accumulates in long double; SAS 9.4: MEAN(-0) is -0)
+  out <- apply(m, 1, function(r) {
+    v <- r[!is.na(r)]
+    if (length(v) == 0) return(NA_real_)
+    # zeros of both signs: SAS 9.4 gives -0 for MEAN(-0, 0) (rule not determined)
+    if (all(v == 0) && length(unique(1 / v)) > 1) abort_unsupported("MEAN of zeros with different signs")
+    Reduce(`+`, v) / length(v)
+  })
+  as.numeric(out)
 }
 #' @export
 sas_f_min <- function(...) {
@@ -282,20 +299,17 @@ sas_f_sign <- function(x) {
 }
 #' @export
 sas_f_sqrt <- function(x, .at = NULL) {
-  bad <- !is.na(x) & x < 0
-  if (any(bad)) note_invalid_arg("sqrt", NULL, .at, list(x), bad)
-  ifelse(bad, NA_real_, sqrt(pmax(x, 0)))
+  # invalid arguments: see fn_policy (log NOTE, _ERROR_)
+  ifelse(!is.na(x) & x < 0, NA_real_, sqrt(pmax(x, 0)))
 }
 #' @export
 sas_f_exp <- function(x, .at = NULL) {
   out <- exp(x)
-  if (any(is.infinite(out) & !is.na(x))) note_invalid_arg("exp", NULL, .at, list(x), is.infinite(out) & !is.na(x))
   out[is.infinite(out)] <- NA_real_
-  sas_num(out)
+  out
 }
 log_base <- function(x, f, name, .at) {
   bad <- !is.na(x) & x <= 0
-  if (any(bad)) note_invalid_arg(name, NULL, .at, list(x), bad)
   ifelse(bad, NA_real_, f(pmax(x, .Machine$double.xmin)))
 }
 #' @export
@@ -303,7 +317,13 @@ sas_f_log <- function(x, .at = NULL) log_base(x, log, "log", .at)
 #' @export
 sas_f_log10 <- function(x, .at = NULL) log_base(x, log10, "log10", .at)
 #' @export
-sas_f_log2 <- function(x, .at = NULL) log_base(x, log2, "log2", .at)
+sas_f_log2 <- function(x, .at = NULL) {
+  # powers of 2 give the exact exponent; other values log(x) * (1/log(2)) (bit-identical to SAS 9.4)
+  log_base(x, function(v) {
+    e <- log2(v)
+    ifelse(e == round(e) & 2^round(e) == v, round(e), v * 0 + log(v) * (1 / log(2)))
+  }, "log2", .at)
+}
 #' @export
 sas_f_mod <- function(a, b, .at = NULL) {
   out <- a - b * trunc(a / b)
@@ -357,32 +377,41 @@ sas_f_right <- function(x) {
 sas_f_upcase <- function(x) toupper(as_sas_chr(x))
 #' @export
 sas_f_lowcase <- function(x) tolower(as_sas_chr(x))
-#' @export
-sas_f_cats <- function(...) {
-  parts <- lapply(list(...), function(a) strip_both(as_sas_chr(a)))
-  do.call(paste0, parts)
+# CAT, CATS, CATT and CATX write a numeric item with BEST32. (whole numbers)
+# or BEST12. without blanks; missing values are written ('.', 'A').
+cat_num_text <- function(a) {
+  a[!is.na(a) & a == 0] <- 0
+  whole <- !is.na(a) & a == trunc(a)
+  strip_both(ifelse(whole, sas_fmt_best(a, 32L), sas_fmt_best(a, 12L)))
+}
+cat_item <- function(a, trim) if (is.numeric(a)) cat_num_text(a) else trim(a)
+
+# A result longer than the target variable (`.len`, 200 for a new variable):
+# blank result and _ERROR_ = 1, no NOTE (SAS 9.4; CATX also writes a NOTE).
+cat_fit <- function(out, .len) {
+  if (is.null(.len)) return(out)
+  # the CAT functions build their value in a 200-byte buffer: a longer value is
+  # blank (a shorter target variable just truncates, as in t = cats(t, c))
+  if (.len > 200L && any(nchar(out) > 200L)) abort_unsupported("CAT, CATS or CATT result longer than 200 characters")
+  long <- nchar(out) > 200L
+  if (any(long)) {
+    rt_error()
+    out[long] <- ""
+  }
+  out
 }
 #' @export
-sas_f_catt <- function(...) {
-  parts <- lapply(list(...), function(a) sas_rtrim(as_sas_chr(a)))
-  do.call(paste0, parts)
-}
+sas_f_cats <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lapply(list(...), cat_item, trim = strip_both)), .len)
 #' @export
-sas_f_cat <- function(...) do.call(paste0, lapply(list(...), as_sas_chr))
+sas_f_catt <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lapply(list(...), cat_item, trim = sas_rtrim)), .len)
+#' @export
+sas_f_cat <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lapply(list(...), cat_item, trim = identity)), .len)
 #' @export
 sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
   args <- list(...)
   # numeric items: BEST32. without blanks (missing values are written, not
   # skipped: '.', 'A'); only blank character items are skipped
-  parts <- lapply(args, function(a) {
-    if (is.numeric(a)) {
-      a[!is.na(a) & a == 0] <- 0
-      # whole numbers in full (BEST32.), other values with BEST12.
-      whole <- !is.na(a) & a == trunc(a)
-      return(strip_both(ifelse(whole, sas_fmt_best(a, 32L), sas_fmt_best(a, 12L))))
-    }
-    strip_both(a)
-  })
+  parts <- lapply(args, cat_item, trim = strip_both)
   n <- max(lengths(parts), length(sep))
   parts <- lapply(parts, rep_len, n)
   sep <- rep_len(sep, n)
@@ -437,13 +466,14 @@ sas_f_index <- function(x, s) {
   as.numeric(pmax(out, 0L))
 }
 #' @export
-sas_f_indexc <- function(x, chars) {
-  x <- as_sas_chr(x)
-  set <- strsplit(chars, "")[[1]]
-  vapply(x, function(s) {
-    w <- which(strsplit(s, "")[[1]] %in% set)
+sas_f_indexc <- function(x, ...) {
+  # the characters of all excerpts form one set (SAS: INDEXC(source, excerpt-1, ..., excerpt-n))
+  ab <- do.call(recycle_n, c(list(as_sas_chr(x)), lapply(list(...), as_sas_chr)))
+  vapply(seq_along(ab[[1]]), function(i) {
+    set <- unlist(lapply(ab[-1], function(e) strsplit(e[i], "")[[1]]))
+    w <- which(strsplit(ab[[1]][i], "")[[1]] %in% set)
     if (length(w) == 0) 0 else as.numeric(w[1])
-  }, numeric(1), USE.NAMES = FALSE)
+  }, numeric(1))
 }
 #' @export
 sas_f_length <- function(x) {
@@ -511,22 +541,57 @@ sas_parse_dt_literal <- function(text, kind) {
 }
 
 to_date <- function(x) sas_epoch + floor(x)
+
+# SAS calendar ------------------------------------------------------------------
+#
+# Proleptic Gregorian calendar, except that the years divisible by 4000 have
+# no 29 February (SAS 9.4: DAY('31DEC20000'd) is 31; R's Date would be 5 days
+# off).  `g` counts Gregorian days from 1960-01-01; SAS day = g minus the
+# skipped 29 Februaries before it.
+greg_days <- function(y, m, d) {
+  y <- y - (m <= 2)
+  era <- floor(y / 400)
+  yoe <- y - era * 400
+  mp <- (m + 9) %% 12
+  doy <- floor((153 * mp + 2) / 5) + d - 1
+  doe <- yoe * 365 + floor(yoe / 4) - floor(yoe / 100) + doy
+  era * 146097 + doe - 719468 + 3653
+}
+greg_civil <- function(g) {
+  z <- g - 3653 + 719468
+  era <- floor(z / 146097)
+  doe <- z - era * 146097
+  yoe <- floor((doe - floor(doe / 1460) + floor(doe / 36524) - floor(doe / 146096)) / 365)
+  doy <- doe - (365 * yoe + floor(yoe / 4) - floor(yoe / 100))
+  mp <- floor((5 * doy + 2) / 153)
+  d <- doy - floor((153 * mp + 2) / 5) + 1
+  m <- ifelse(mp < 10, mp + 3, mp - 9)
+  list(y = yoe + era * 400 + (m <= 2), m = m, d = d)
+}
+skip4000_g <- greg_days(c(4000, 8000, 12000, 16000, 20000), 3, 1)
+skip4000_sas <- skip4000_g - seq_along(skip4000_g)
+sas_day_to_greg <- function(d) d + findInterval(d, skip4000_sas)
+greg_to_sas_day <- function(g) g - findInterval(g, skip4000_g)
+
 date_part <- function(x, what) {
-  lt <- as.POSIXlt(to_date(x))
-  out <- switch(what,
-    year = lt$year + 1900,
-    month = lt$mon + 1,
-    day = lt$mday,
-    wday = lt$wday + 1
-  )
+  p <- civil(x)
+  out <- switch(what, year = p$y, month = p$m, day = p$d, wday = p$wday)
   as.numeric(ifelse(is.na(x), NA, out))
 }
 from_ymd <- function(y, m, d) {
-  ok <- !is.na(y) & !is.na(m) & !is.na(d) & abs(y) < 1e5 & abs(m) < 1e5 & abs(d) < 1e5
-  txt <- rep(NA_character_, length(ok))
-  txt[ok] <- sprintf("%04d-%02d-%02d", as.integer(y[ok]), as.integer(m[ok]), as.integer(d[ok]))
-  out <- suppressWarnings(as.Date(txt, format = "%Y-%m-%d"))
-  as.numeric(out - sas_epoch)
+  n <- max(length(y), length(m), length(d))
+  y <- rep_len(as.numeric(y), n)
+  m <- rep_len(as.numeric(m), n)
+  d <- rep_len(as.numeric(d), n)
+  ok <- !is.na(y) & !is.na(m) & !is.na(d) & abs(y) < 1e6 & m >= 1 & m <= 12 & d >= 1
+  ok[ok] <- y[ok] == trunc(y[ok]) & m[ok] == trunc(m[ok]) & d[ok] == trunc(d[ok])
+  out <- rep(NA_real_, n)
+  if (!any(ok)) return(out)
+  leap <- (y %% 4 == 0 & y %% 100 != 0) | (y %% 400 == 0 & y %% 4000 != 0)
+  dim <- c(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[pmin(pmax(m, 1), 12)] + (m == 2 & leap)
+  ok <- ok & d <= dim
+  out[ok] <- greg_to_sas_day(greg_days(y[ok], m[ok], d[ok]))
+  out
 }
 days_in_month <- function(y, m) {
   nm <- ifelse(m == 12, 1, m + 1)
@@ -536,9 +601,12 @@ days_in_month <- function(y, m) {
 
 #' @export
 sas_f_mdy <- function(m, d, y, .at = NULL) {
-  out <- from_ymd(y, m, d)
-  bad <- is.na(out) & !is.na(m) & !is.na(d) & !is.na(y)
-  if (any(bad)) note_invalid_arg("mdy", NULL, .at, list(m, d, y), bad)
+  # arguments are truncated to integers; years 0-99 use the YEARCUTOFF window
+  # (1940-2039); valid years 1582-20000 (invalid arguments: fn_policy)
+  y <- floor(y)
+  y <- ifelse(!is.na(y) & y >= 0 & y < 100, ifelse(y < 40, 2000 + y, 1900 + y), y)
+  out <- from_ymd(y, floor(m), floor(d))
+  out[!is.na(y) & (y < 1582 | y > 20000)] <- NA_real_
   out
 }
 #' @export
@@ -556,15 +624,15 @@ sas_f_today <- function() as.numeric(Sys.Date() - sas_epoch)
 #' @export
 sas_f_date <- function() sas_f_today()
 #' @export
-sas_f_datepart <- function(x) floor(x / 86400)
+sas_f_datepart <- function(x) floor(x / 86400) + 0 # DATEPART(-0) is 0
 #' @export
 sas_f_timepart <- function(x) x - floor(x / 86400) * 86400
 #' @export
 sas_f_hour <- function(x) floor((x %% 86400) / 3600)
 #' @export
-sas_f_minute <- function(x) floor((x %% 3600) / 60)
+sas_f_minute <- function(x) ifelse(!is.na(x) & x == 0, x, floor((x %% 3600) / 60)) # MINUTE(-0) is -0
 #' @export
-sas_f_second <- function(x) x %% 60
+sas_f_second <- function(x) ifelse(!is.na(x) & x == 0, x, x %% 60) # SECOND(-0) is -0
 #' @export
 sas_f_hms <- function(h, m, s) h * 3600 + m * 60 + s
 
@@ -680,7 +748,9 @@ sas_fmt_best <- function(x, w = 12L) {
       }
     }
     # tiny values: E notation when it shows at least as many significant digits
-    if (!is.na(sci) && (is.na(s) || sig(sci) > sig(s) || (abs(v) < 1e-6 && sig(sci) >= sig(s)))) s <- sci
+    # (SAS 9.4: BEST12. of 1E-6 is 1E-6; at widths above 15 a value below 1E-5 is written in E notation)
+    if (!is.na(sci) && (is.na(s) || sig(sci) > sig(s) || (abs(v) <= 1e-6 && sig(sci) >= sig(s)) ||
+                        (w > 15L && abs(v) < 1e-5))) s <- sci
     out[i] <- if (is.na(s)) strrep("*", w) else s
   }
   formatC(out, width = w)
@@ -699,7 +769,10 @@ sas_put_value <- function(value, fmt = NULL) {
 #' @export
 sas_put_named <- function(name, value, fmt = NULL) {
   if (length(value) == 0) return(character())
-  paste0(name, "=", sas_put_value(value, fmt))
+  out <- sas_put_value(value, fmt)
+  # a blank character value is written as one blank ("r=  next=..."; gold: fn_examples)
+  if (is.character(value)) out[!nzchar(out)] <- " "
+  paste0(name, "=", out)
 }
 
 #' Assemble one PUT line per row

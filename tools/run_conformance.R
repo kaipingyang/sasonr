@@ -36,7 +36,7 @@ t0 <- Sys.time()
 for (root in roots) {
   root <- normalizePath(root)
   cases <- env$conf_list_cases(root)
-  cases <- cases[grepl(pattern, cases)]
+  cases <- cases[grepl(pattern, cases, perl = TRUE)]
   copies <- list()
   for (k in seq_along(cases)) {
     case <- cases[k]
@@ -54,7 +54,9 @@ for (root in roots) {
       }
       rc <- copies[[area]]
     }
-    r <- env$conf_run_case(case, root_copy = rc, keep = if (nzchar(keep_dir)) file.path(keep_dir, rel))
+    r <- tryCatch(env$conf_run_case(case, root_copy = rc, keep = if (nzchar(keep_dir)) file.path(keep_dir, rel)),
+                  error = function(e) list(status = "error", layers = logical(), diffs = character(),
+                                           msg = paste("[runner]", conditionMessage(e)), meta = meta))
     fails <- names(r$layers)[!r$layers]
     first <- if (length(fails)) r$diffs[[fails[1]]] else r$msg
     rows[[length(rows) + 1L]] <- data.frame(
@@ -67,6 +69,12 @@ for (root in roots) {
       put = if ("put" %in% names(r$layers)) r$layers[["put"]] else NA,
       files = if ("files" %in% names(r$layers)) r$layers[["files"]] else NA,
       known_fail = paste(meta$known_fail %||% character(), collapse = "+"),
+      # diagnostic only (a difference is a failure): the largest relative difference when
+      # the failing layers differ only in numbers (ds, files: hex/best values, put); NA otherwise
+      tol = {
+        tl <- c(if ("files" %in% fails) r$tol_files %||% NA_real_, if ("put" %in% fails) r$tol_put %||% NA_real_)
+        if (length(fails) && all(fails %in% c("ds", "files", "put")) && any(c("files", "put") %in% fails)) max(tl) else NA_real_
+      },
       detail = gsub("[\r\n]+", " ", substr(first, 1, 300))
     )
     if (k %% 200 == 0) {

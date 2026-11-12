@@ -103,8 +103,19 @@ conf_son_num <- function(x) {
                                                           ifelse(code == 1L, ".", paste0(".", miss_label(code)))))
 }
 
+# Numbers must be bit-identical (IEEE 754 pattern; 0 and -0 differ); missing
+# values must be the same kind.  There is no tolerance.
 conf_num_eq <- function(a, b) {
-  same <- (is.na(a$miss) & is.na(b$miss) & (a$v == b$v | abs(a$v - b$v) <= 1e-9 * pmax(abs(a$v), abs(b$v), 1e-300))) |
+  bits <- function(v) {
+    out <- rep(NA_character_, length(v))
+    ok <- !is.na(v)
+    if (any(ok)) {
+      m <- matrix(writeBin(as.double(v[ok]), raw(), size = 8L), nrow = 8L)
+      out[ok] <- apply(m, 2, paste, collapse = "")
+    }
+    out
+  }
+  same <- (is.na(a$miss) & is.na(b$miss) & bits(a$v) == bits(b$v)) |
     (!is.na(a$miss) & !is.na(b$miss) & a$miss == b$miss)
   same[is.na(same)] <- FALSE
   same
@@ -112,7 +123,7 @@ conf_num_eq <- function(a, b) {
 
 # L-DS: expected/datasets/<mem>.sas7bdat (SAS's own data sets, read with
 # haven) against sasonr's WORK: member set, column names and order, row
-# count, values (numbers bit-for-bit, or within 1e-9 relative as before;
+# count, values (numbers bit for bit, no tolerance;
 # character values without trailing blanks).
 conf_cmp_ds <- function(exp_dir, res) {
   ef <- list.files(exp_dir, pattern = "\\.sas7bdat$")
@@ -136,7 +147,12 @@ conf_cmp_ds <- function(exp_dir, res) {
     if (nrow(e) == 0) next
     up <- toupper(names(e))
     skip_cols <- if (all(c("MEMNAME", "NAME", "VARNUM", "NPOS", "ENGINE") %in% up)) which(up %in% c("CRDATE", "MODATE")) else integer()
-    cols_e <- lapply(seq_along(e), function(j) if (is.character(e[[j]])) sub("\\s+$", "", e[[j]]) else conf_sas_num(e[[j]]))
+    latin <- function(x) {
+      bad <- !is.na(x) & !validUTF8(x)
+      x[bad] <- iconv(x[bad], "latin1", "UTF-8")
+      x
+    }
+    cols_e <- lapply(seq_along(e), function(j) if (is.character(e[[j]])) sub("\\s+$", "", latin(e[[j]])) else conf_sas_num(e[[j]]))
     cols_o <- lapply(seq_along(o), function(j) if (is.character(o[[j]])) sas_rtrim(o[[j]]) else conf_son_num(o[[j]]))
     if (m %in% unordered) {
       key <- function(cols) {
@@ -315,6 +331,57 @@ conf_written <- function(dir) {
   sort(f[keep])
 }
 
+# ---- numeric tolerance -------------------------------------------------------------------
+
+# Lines that differ only in numbers (decimal, or IEEE hex after "hex=") within a
+# relative tolerance; returns the largest relative difference, or NA when the
+# lines differ otherwise.
+conf_hex_num <- function(h) {
+  if (!grepl("^[0-9A-Fa-f]{16}$", h)) return(NA_real_)
+  b <- as.raw(strtoi(substring(h, seq(1, 15, 2), seq(2, 16, 2)), 16L))
+  readBin(b, "double", endian = "big")
+}
+conf_tol_diff <- function(s, o) {
+  if (length(s) != length(o)) return(NA_real_)
+  worst <- 0
+  for (k in seq_along(s)) {
+    if (identical(s[k], o[k])) next
+    ts <- strsplit(trimws(s[k]), "\\s+")[[1]]
+    to <- strsplit(trimws(o[k]), "\\s+")[[1]]
+    if (length(ts) != length(to)) return(NA_real_)
+    for (j in seq_along(ts)) {
+      if (identical(ts[j], to[j])) next
+      ps <- sub("^([A-Za-z_][A-Za-z0-9_]*=)?(.*)$", "\\1", ts[j])
+      po <- sub("^([A-Za-z_][A-Za-z0-9_]*=)?(.*)$", "\\1", to[j])
+      if (!identical(ps, po)) return(NA_real_)
+      vs <- substring(ts[j], nchar(ps) + 1L)
+      vo <- substring(to[j], nchar(po) + 1L)
+      if (ps == "hex=") {
+        a <- conf_hex_num(vs)
+        b <- conf_hex_num(vo)
+      } else {
+        a <- suppressWarnings(as.numeric(vs))
+        b <- suppressWarnings(as.numeric(vo))
+      }
+      if (is.na(a) || is.na(b) || !is.finite(a) || !is.finite(b)) return(NA_real_)
+      if (a == b) next
+      if (sign(a) != sign(b)) return(NA_real_)
+      worst <- max(worst, abs(a - b) / max(abs(a), abs(b)))
+    }
+  }
+  worst
+}
+
+# Largest relative difference in an L-DS message "SAS=<num> sasonr=<num>" (NA otherwise).
+conf_ds_rel_diff <- function(r) {
+  m <- regmatches(r$diffs[["ds"]], regexec("SAS=([-0-9.eE+]+) sasonr=([-0-9.eE+]+)$", r$diffs[["ds"]]))[[1]]
+  if (length(m) < 3) return(NA_real_)
+  a <- as.numeric(m[2])
+  b <- as.numeric(m[3])
+  if (is.na(a) || is.na(b) || a == b || sign(a) != sign(b)) return(NA_real_)
+  abs(a - b) / max(abs(a), abs(b))
+}
+
 # ---- one case ----------------------------------------------------------------------------
 
 conf_layers_all <- c("ds", "attr", "log", "lst", "put", "files")
@@ -386,7 +453,12 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
   if ("lst" %in% layers) {
     d$lst <- conf_first_diff(conf_norm_lst(conf_lines(file.path(exp, "listing.txt"))), conf_norm_lst(res$listing), "line ")
   }
-  if ("put" %in% layers) d$put <- conf_first_diff(conf_lines(file.path(exp, "put.txt")), conf_put_lines(res$log), "line ")
+  if ("put" %in% layers) {
+    pe <- conf_lines(file.path(exp, "put.txt"))
+    po <- conf_put_lines(res$log)
+    d$put <- conf_first_diff(pe, po, "line ")
+    if (nzchar(d$put)) out$tol_put <- conf_tol_diff(pe, po)
+  }
   if ("files" %in% layers && own_dir) {
     ef <- if (dir.exists(file.path(exp, "files"))) sort(list.files(file.path(exp, "files"), recursive = TRUE, all.files = TRUE)) else character()
     of <- conf_written(run_dir)
@@ -394,14 +466,17 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
       d$files <- sprintf("files SAS=%s sasonr=%s", paste(ef, collapse = " "), paste(of, collapse = " "))
     } else {
       d$files <- ""
+      tol <- 0
       for (f in ef) {
-        x <- conf_first_diff(sub("\\s+$", "", conf_lines(file.path(exp, "files", f))),
-                             sub("\\s+$", "", conf_lines(file.path(run_dir, f), "latin1")), paste0(f, " line "))
+        a <- sub("\\s+$", "", conf_lines(file.path(exp, "files", f)))
+        b <- sub("\\s+$", "", conf_lines(file.path(run_dir, f), "latin1"))
+        x <- conf_first_diff(a, b, paste0(f, " line "))
         if (nzchar(x)) {
-          d$files <- x
-          break
+          tol <- max(tol, conf_tol_diff(a, b))
+          if (!nzchar(d$files)) d$files <- x
         }
       }
+      out$tol_files <- tol
     }
   }
   if (!is.null(keep)) {

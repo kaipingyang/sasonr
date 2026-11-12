@@ -7,8 +7,12 @@ run1 <- function(stmts, setup = "") {
 }
 
 test_that("$HEXw. and HEX16. write the bytes of the value", {
-  d <- run1("length r $6; r = 'bcd'; h = putc(r, '$hex12.'); x = 1; n = put(x, hex16.); z = put(-0.4 * 0, hex16.);")
+  d <- run1("length r $6 h $12; r = 'bcd'; h = putc(r, '$hex12.'); x = 1; n = put(x, hex16.); z = put(-0.4 * 0, hex16.);")
   expect_equal(d$h, "626364202020")
+  # a new variable gets the length of PUTC's first argument (SAS: putc('abc', '$hex6.') = '616')
+  d2 <- run1("r = putc('abc', '$hex6.'); l = vlength(r);")
+  expect_equal(d2$r, "616")
+  expect_equal(d2$l, 3)
   expect_equal(d$n, "3FF0000000000000")
   expect_equal(sasonr:::fmt_hex_num(-0, 16L), "8000000000000000")
   expect_error(sas_run("data d; x = 1; n = put(x, hex8.); run;"), class = "sasonr_unsupported")

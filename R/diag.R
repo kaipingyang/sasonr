@@ -17,6 +17,7 @@ rt$ls <- 132L # log line size (OPTIONS LINESIZE=)
 
 rt_reset <- function() {
   rt$err <- FALSE
+  rt$stop_step <- FALSE
   rt$notes <- character()
   rt$mv <- integer()
   rt$mv_rerun <- FALSE
@@ -41,15 +42,24 @@ at_text <- function(.at) {
 
 arg_ord <- c("first", "second", "third", "fourth", "fifth")
 
+# A character argument in an invalid-argument NOTE: SAS shows at most 12
+# characters ("'abababababab'[12 of 200 characters shown]").
+note_chr <- function(v, trim = TRUE) {
+  t <- if (trim) sas_rtrim(v) else v
+  if (nchar(t) > 12) return(sprintf("'%s'[12 of %d characters shown]", substr(t, 1L, 12L), nchar(v)))
+  paste0("'", if (nzchar(t)) gsub("'", "''", t, fixed = TRUE) else " ", "'")
+}
+
 # `args`/`bad`: the argument values and the failing elements; SAS shows the
 # arguments of the failing call, e.g. "Invalid argument to function LOG(-1)".
-note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = NULL, numbered = FALSE, math = TRUE) {
+note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = NULL, numbered = FALSE, math = TRUE,
+                             trim = TRUE) {
   if (numbered) {
     # "NOTE: Argument 2 to function SCAN('a b c',0) at line 3 column 7 is invalid."
     i <- if (is.null(bad)) 1L else which(bad)[1]
     vals <- vapply(args, function(a) {
       v <- a[min(i, length(a))]
-      if (is.character(v)) paste0("'", if (nzchar(sas_rtrim(v))) sas_rtrim(v) else " ", "'") else trimws(sas_fmt_best(v, 12L))
+      if (is.character(v)) note_chr(v) else trimws(sas_fmt_best(v, 12L))
     }, "")
     if (math) rt_count("math", .at, sum(bad %||% TRUE))
     return(rt_error(sprintf("NOTE: Argument %d to function %s(%s)%s is invalid.", argn, toupper(fname),
@@ -61,12 +71,12 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
     i <- if (is.null(bad)) 1L else which(bad)[1]
     vals <- vapply(args, function(a) {
       v <- a[min(i, length(a))]
-      if (is.character(v)) paste0("'", if (nzchar(sas_rtrim(v))) sas_rtrim(v) else " ", "'") else trimws(sas_fmt_best(v, 12L))
+      if (is.null(v) || length(v) == 0) "" else if (is.character(v)) note_chr(v, trim) else trimws(sas_fmt_best(v, 12L))
     }, "")
     call <- paste0(call, "(", paste(vals, collapse = ","), ")")
     # the failed call also counts as a place where a mathematical operation
     # could not be performed (summary NOTE at the end of the step)
-    rt_count("math", .at, sum(bad %||% TRUE))
+    if (math) rt_count("math", .at, sum(bad %||% TRUE))
   }
   rt_error(sprintf("NOTE: Invalid %s to function %s%s.", what, call, at_text(.at)))
 }
@@ -110,7 +120,7 @@ sas_dump_spec <- function(vars, names, fmts = list()) {
 
 dump_value <- function(v, fmt) {
   if (is.character(v)) {
-    out <- sas_rtrim(if (is.null(fmt)) v else sas_format(v, fmt))
+    out <- strip_both(if (is.null(fmt)) v else sas_format(v, fmt))
     return(ifelse(nzchar(out), out, " "))
   }
   trimws(sas_format(v, fmt))
@@ -149,8 +159,13 @@ dump_wrap <- function(items, ls) {
       cur <- ""
     }
     if (nchar(it) > ls) {
+      # an item wider than the line continues on the next lines, cut every `ls` columns (SAS 9.4)
       if (nzchar(cur)) lines <- c(lines, cur)
-      return(c(lines, substr(it, 1L, ls)))
+      starts <- seq(1L, nchar(it), by = ls)
+      chunks <- substring(it, starts, pmin(starts + ls - 1L, nchar(it)))
+      lines <- c(lines, chunks[-length(chunks)])
+      cur <- chunks[length(chunks)]
+      next
     }
     cur <- if (nzchar(cur)) paste(cur, it) else it
   }

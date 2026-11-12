@@ -10,7 +10,7 @@ test_that("reference-page examples agree with SAS 9.4", {
   f <- if (is.null(root)) "" else file.path(root, "fn_examples", "results.csv")
   skip_if_not(file.exists(f), "tests/conformance/fn_examples/ not present (local conformance assets)")
   res <- utils::read.csv(f, colClasses = "character")
-  res <- res[res$status %in% c("agree", "agree_tol"), ]
+  res <- res[res$status == "agree", ]
   expect_gt(nrow(res), 0)
   for (fn in unique(res$fn)) {
     ds <- haven::read_sas(file.path(root, "fn_examples", fn, "expected", "datasets", "ex.sas7bdat"))

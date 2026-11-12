@@ -187,6 +187,13 @@ sql_duck_aggregate <- function(eng, gid, G, aggs) {
   res <- sql_duck_query(eng, list(sasonr_g = frame),
                         paste0("SELECT g, ", paste(exprs, collapse = ", "), " FROM sasonr_g GROUP BY g"))
   out <- lapply(seq_along(aggs), function(k) {
+    a <- aggs[[k]]
+    # moments in R with sequential double sums, bit-identical to SAS 9.4 (DuckDB
+    # accumulates differently: AVG/STD differed in the last bits)
+    if (a$fn %in% c("sum", "avg", "mean", "std", "var", "css", "cv", "stderr", "uss") && !isTRUE(a$distinct) &&
+        is.numeric(a$arg)) {
+      return(sql_r_moment(a$fn, as.numeric(a$arg), gid, G))
+    }
     v <- res[[paste0("v", k)]]
     full <- if (is.character(v)) rep(NA_character_, G) else rep(NA_real_, G)
     if (!is.character(v)) {
@@ -197,6 +204,33 @@ sql_duck_aggregate <- function(eng, gid, G, aggs) {
     if (aggs[[k]]$fn %in% c("count", "freq", "n", "nmiss")) full[is.na(full)] <- 0
     full
   })
+  out
+}
+
+sql_r_moment <- function(fn, v, gid, G) {
+  out <- rep(NA_real_, G)
+  for (g in seq_len(G)) {
+    x <- v[gid == g]
+    x <- x[!is.na(x)]
+    n <- length(x)
+    if (n == 0) next
+    s1 <- Reduce(`+`, x)
+    # provisional (updating) mean, then the corrected sum of squares about it (bit-identical to SAS 9.4)
+    m <- 0
+    for (k in seq_len(n)) m <- m + (x[k] - m) / k
+    css <- Reduce(`+`, (x - m)^2)
+    out[g] <- switch(fn,
+      sum = s1,
+      avg = , mean = m,
+      uss = Reduce(`+`, x * x),
+      css = css,
+      var = if (n > 1) css / (n - 1) else NA_real_,
+      std = if (n > 1) sqrt(css / (n - 1)) else NA_real_,
+      stderr = if (n > 1) sqrt(css / (n - 1) / n) else NA_real_,
+      cv = if (n > 1 && m != 0) sqrt(css / (n - 1)) / m * 100 else NA_real_
+    )
+  }
+  out[!is.finite(out)] <- NA_real_
   out
 }
 

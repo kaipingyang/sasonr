@@ -1,0 +1,1252 @@
+# Verification matrix of the sas_f_* functions (tools/gen_matrix.py functions).
+#
+# One section per function: "## NAME [key=k,...] [ret=N|C] [ctx] [env] [nogeneric] [base=<call>]".
+# The reference-page calls of tools/fn_examples.txt are always included; the
+# lines below add documented usages, modifier values and function-specific
+# edges.  Generated edge cases replace each argument of the base call (the call
+# with the most arguments unless base= is given) by edge values of its type;
+# argument types and counts come from the SAS 9.4 function inventory.
+#   key=k     argument k is a keyword/name (distribution, basis, format, regex):
+#             only a blank and an invalid value are generated for it
+#   ctx       also run %SYSFUNC and PROC SQL variants of the first calls
+#   env       value depends on the session clock: structural checks only
+#   <call> ;; <setup>   statements placed before the assignment
+#   sysfunc: / sql: / ce: / glob:   see gen_matrix.py
+# All data are made up.
+
+## ABS ctx
+abs(-0)
+abs(1e300)
+abs(-constant('big'))
+
+## ANYALNUM
+anyalnum('abc', 0)
+anyalnum('a b', -1)
+anyalnum('abc', 4)
+anyalnum('abc', -4)
+anyalnum('___', 1)
+anyalnum('a', .)
+
+## ANYALPHA
+anyalpha('12ab', 0)
+anyalpha('12ab', -1)
+anyalpha('12ab', 5)
+anyalpha('12ab', 2.7)
+anyalpha('_')
+anyalpha('A', .)
+
+## ANYDIGIT
+anydigit('ab12', 0)
+anydigit('ab12', 5)
+anydigit('ab12', -5)
+anydigit('1.5')
+
+## ANYLOWER
+anylower('ABc', 0)
+anylower('ABc', 4)
+anylower('Abc', -1)
+
+## ANYPUNCT
+anypunct('a_b')
+anypunct('a b')
+anypunct('a!b?', -4)
+anypunct('a!b?', 0)
+
+## ANYSPACE
+anyspace('abc   ')
+anyspace('a b c', -5)
+anyspace('a b c', 0)
+anyspace('abc', 4)
+
+## ANYUPPER
+anyupper('abC', 0)
+anyupper('abC', 4)
+anyupper('ABC', -1)
+
+## ARCOS
+arcos(-1)
+arcos(1.0000001)
+arcos(-0.5)
+
+## ARSIN
+arsin(1)
+arsin(0)
+arsin(-1.0000001)
+
+## ATAN
+atan(1e300)
+atan(-1)
+
+## ATAN2
+atan2(0, 0)
+atan2(0, -1)
+atan2(-0, -1)
+atan2(1, 0)
+atan2(1e300, 1e-300)
+
+## BAND
+band(4294967295, 1)
+band(4294967296, 1)
+band(-1, 1)
+band(1.5, 1)
+band(0, 0)
+
+## BLSHIFT
+blshift(1, 31)
+blshift(1, 32)
+blshift(4294967295, 1)
+blshift(1, -1)
+blshift(1, 0)
+
+## BNOT
+bnot(1)
+bnot(4294967296)
+bnot(-1)
+bnot(1.5)
+
+## BOR
+bor(4294967295, 0)
+bor(4294967296, 0)
+bor(-1, 0)
+
+## BRSHIFT
+brshift(4294967295, 31)
+brshift(1, 32)
+brshift(1, -1)
+brshift(1.5, 1)
+
+## BXOR
+bxor(4294967295, 1)
+bxor(4294967296, 1)
+bxor(1.5, 1)
+
+## BETA
+beta(0, 1)
+beta(-1, 1)
+beta(1000, 1000)
+beta(1e-300, 1)
+
+## BYTE
+byte(0)
+byte(32)
+byte(127)
+byte(255)
+byte(256)
+byte(-1)
+byte(65.7)
+
+## CAT ctx
+cat('a')
+cat(1.5, 2)
+cat(1/3)
+cat(-0)
+cat(1e15)
+cat(1e16)
+cat(.A, ._)
+cat('  a  ', '  b  ')
+cat(123456789012)
+cat(0.000001)
+
+## CATS ctx
+cats(1/3)
+cats(' ', ' ')
+cats(1e15, 'x')
+cats(.A)
+cats(-1.5, '  ')
+cats(123456789012)
+
+## CATT ctx
+catt(1/3)
+catt('  ', 'a  ')
+catt(.A, 'b')
+catt(1e15)
+
+## CDF key=1
+cdf('NORMAL', 0, 1, 2)
+cdf('NORMAL', -40)
+cdf('NORMAL', 40)
+cdf('T', 1.5, 3.5)
+cdf('CHISQ', 3.84, 1)
+cdf('CHISQ', 2, 3, 1)
+cdf('F', 4, 2, 10)
+cdf('EXPONENTIAL', 1, 2)
+cdf('UNIFORM', 0.25)
+cdf('UNIFORM', 2, 1, 3)
+cdf('GAMMA', 2, 3)
+cdf('BETA', 0.3, 2, 3)
+cdf('LOGNORMAL', 1.5)
+cdf('POISSON', 0, 2)
+cdf('BINOMIAL', 10, 0.5, 10)
+cdf('BERNOULLI', 0, 0.3)
+cdf('GEOMETRIC', 2, 0.3)
+cdf('NEGBINOMIAL', 2, 0.3, 2)
+cdf('NORMAL', 0, 0, 0)
+cdf('NORMAL', 0, 0, -1)
+cdf('BINOMIAL', 3, 1.5, 10)
+cdf('XYZ', 1)
+
+## CEIL ctx
+ceil(-0.5)
+ceil(1e15 + 0.5)
+ceil(-1e-13)
+ceil(1e-12)
+ceil(2 - 1e-12)
+
+## CEILZ
+ceilz(-0.5)
+ceilz(1 + 1e-15)
+ceilz(1e15 + 0.5)
+
+## CHAR
+char('abc', 0)
+char('abc', -1)
+char('abc', 2.9)
+char('abc', .)
+char(' ', 1)
+
+## CHOOSEC
+choosec(1, 'a')
+choosec(0, 'a', 'b')
+choosec(-3, 'a', 'b', 'c')
+choosec(-4, 'a', 'b', 'c')
+choosec(2.9, 'a', 'b', 'c')
+choosec(., 'a', 'b')
+choosec(1, '  x  ', 'b')
+
+## CHOOSEN
+choosen(1, 5)
+choosen(0, 1, 2)
+choosen(-2, 1, 2)
+choosen(2.9, 1, 2, 3)
+choosen(., 1, 2)
+choosen(2, 1, .A)
+
+## CINV
+cinv(0, 3)
+cinv(1, 3)
+cinv(0.5, 0)
+cinv(0.5, -1)
+cinv(0.95, 2.5)
+cinv(1e-10, 1)
+cinv(0.95, 3, 0)
+
+## CMISS ctx
+cmiss(' ', .)
+cmiss('a', 1)
+cmiss(.A, ._, .Z)
+cmiss('   ')
+
+## COALESCE ctx
+coalesce(.A, ._)
+coalesce(1)
+coalesce(-0, 1)
+
+## COALESCEC ctx
+coalescec('a')
+coalescec(' ', ' ', 'z')
+coalescec('  x', 'y')
+
+## COLLATE
+collate(65)
+collate(0, 3)
+collate(250, 300)
+collate(65, 64)
+collate(., 70)
+collate(65, , 0)
+collate(65, , 300)
+
+## COMB
+comb(5, 5)
+comb(5, 6)
+comb(5, -1)
+comb(5.5, 2)
+comb(1000, 500)
+comb(0, 0)
+
+## COMPARE key=3
+compare('abc', 'ABC')
+compare('abc', 'ABC', 'i')
+compare(' abc', 'abc', 'l')
+compare('abc', 'abcd', ':')
+compare('abc ', 'abc')
+compare('a', 'b')
+compare('b', 'a')
+compare('', 'a')
+compare('abc', 'aXc', 'il')
+compare('"a b"n', 'A B', 'n')
+
+## COMPBL ctx
+compbl('a  b')
+compbl('    ')
+compbl('a' || '09'x || '  b')
+
+## CONSTANT key=1
+constant('pi')
+constant('BIG')
+constant('LOGBIG')
+constant('SQRTBIG')
+constant('SMALL')
+constant('LOGSMALL')
+constant('SQRTSMALL')
+constant('MACEPS')
+constant('LOGMACEPS')
+constant('SQRTMACEPS')
+constant('EXACTINT')
+constant('EXACTINT', 4)
+constant('BIG', 8)
+constant('E')
+constant('GAMMA')
+
+## COS
+cos(1e10)
+cos(3.141592653589793)
+
+## COSH
+cosh(710)
+cosh(-710)
+
+## COUNT key=3
+count('aaaa', 'aa')
+count('a a a', 'a ')
+count('a a a', 'a ', 't')
+count('ABab', 'a', 'it')
+count('abc', '')
+count('', 'a')
+count('banana', 'AN', 'i')
+
+## COUNTC key=3
+countc('abc', 'ab', 'V')
+countc('abc  ', ' ')
+countc('abc  ', ' ', 't')
+countc('abc', 'B', 'iv')
+countc('a1b2', '', 'd')
+countc('a1b2', '', 'a')
+countc('a1b2', '', 'ad')
+countc('a1b2', '', 'dk')
+countc('a b', '', 's')
+countc('a,b', '', 'p')
+countc('aB', '', 'u')
+countc('aB', '', 'l')
+
+## COUNTW key=3
+countw('a b c', ' ')
+countw('a b c', ' ', 'm')
+countw('  a  ')
+countw('a,b', ',', 'q')
+countw('a "b,c" d', ', ', 'q')
+countw('a1b2c', '', 'd')
+countw('a1b2c', '', 'a')
+countw(',a,', ',', 'm')
+countw('a b', ' ', 'o')
+
+## CSS
+css(1, 2)
+css(1e300, -1e300)
+css(.A)
+
+## CV
+cv(0, 0)
+cv(-1, 1)
+cv(5)
+cv(1, 2, .A)
+
+## DATDIF key=3
+datdif('01JAN2024'd, '01JAN2024'd, 'ACT/ACT')
+datdif('28FEB2023'd, '01MAR2023'd, '30/360')
+datdif('31MAR2024'd, '30APR2024'd, '30/360')
+datdif('31JAN2024'd, '29FEB2024'd, '30/360')
+datdif('29FEB2024'd, '31MAR2024'd, '30/360')
+datdif('01JAN2024'd, '01MAR2024'd, 'act/act')
+datdif('01JAN2024'd, '01MAR2024'd, 'ACT/360')
+datdif('01JAN2024'd, '01MAR2024'd, 'ACT/365')
+datdif(1.5, 3.7, 'ACT/ACT')
+
+## DATE env
+date() - today()
+(date() > '01JAN2024'd)
+
+## DATEJUL
+datejul(60001)
+datejul(99365)
+datejul(2024366)
+datejul(2023366)
+datejul(2024000)
+datejul(1)
+datejul(40001)
+datejul(39001)
+datejul(-1)
+datejul(2024075.5)
+
+## DATEPART ctx
+datepart(86399.9)
+datepart(-86400)
+datepart(1e15)
+
+## DATETIME env
+datetime() >= 0
+datepart(datetime()) - today()
+
+## DAY ctx
+day(-1)
+day(1.9)
+day(-138061)
+day(6589335)
+day(6589336)
+day(-138062)
+
+## DEQUOTE
+dequote('''abc''')
+dequote('  "abc"')
+dequote('"abc')
+dequote('"a""b"')
+dequote('x"abc"')
+dequote('"abc" def')
+dequote('''')
+
+## DHMS ctx
+dhms(0, -1, 0, 0)
+dhms(1.5, 0, 0, 0)
+dhms(0, 0, 0, -0.5)
+dhms(0, ., 0, 0)
+dhms(0, 0, 0, .)
+
+## DIVIDE
+divide(1, -0)
+divide(0, -1)
+divide(1e300, 1e-300)
+divide(.A, 2)
+divide(1, .)
+divide(.A, 0)
+
+## EXP
+exp(709)
+exp(710)
+exp(-746)
+exp(-1000)
+
+## FACT
+fact(170)
+fact(171)
+fact(-1)
+fact(2.5)
+
+## FIND key=3 ctx
+find('abc', 'B', 'i', 1)
+find('abc', 'c', 't', 2)
+find('abc  ', '  ', 't')
+find('abc', 'b', 0)
+find('abc', 'b', 10)
+find('abc', 'b', -10)
+find('abc', '')
+find('abc', 'b', 'v')
+find('abcabc', 'bc', -6)
+
+## FINDC key=3
+findc('abc', 'b', 2)
+findc('abc', 'b', -1)
+findc('abc', 'b', 0)
+findc('abc', 'B', 'i', 2)
+findc('abc  ', ' ', 't')
+findc('abc', 'ab', 'k')
+findc('abc', 'ab', 'v')
+findc('a1b', '', 'd')
+findc('a1b', '', 'a')
+findc('a1b', '', 'b')
+findc('ABc', '', 'u', -3)
+findc('ab c', '', 's')
+findc('ab,c', '', 'p')
+findc('abc', 'x', 'o')
+
+## FINDW key=4
+findw('the cat', 'cat', ' ', 'e')
+findw('The Cat', 'cat', ' ', 'i')
+findw('a cat sat', 'at', ' ', 1)
+findw('cat cat', 'cat', ' ', 2)
+findw('cat cat', 'cat', ' ', -7)
+findw('a,b,c', 'c', ',', 'e')
+findw('a b', '')
+findw('a  b', 'b', ' ', 's')
+findw('abc', 'b', 'a', 'k')
+
+## FINV
+finv(0, 1, 1)
+finv(1, 1, 1)
+finv(0.5, 0, 1)
+finv(0.95, 5.5, 20)
+finv(0.95, 2, 10, 0)
+finv(0.5, 3, 7, 4)
+
+## FIRST
+first(' ')
+first('9')
+first(12)
+
+## FLOOR ctx
+floor(-0.5)
+floor(1e15 + 0.5)
+floor(-1e-13)
+floor(2 - 1e-12)
+floor(-2 + 1e-13)
+
+## FLOORZ
+floorz(-0.5)
+floorz(1 - 1e-15)
+floorz(-1e-300)
+
+## GAMMA
+gamma(1)
+gamma(171)
+gamma(172)
+gamma(-1)
+gamma(-0.5)
+gamma(1e-300)
+
+## GCD
+gcd(0, 5)
+gcd(0, 0)
+gcd(-12, 18)
+gcd(12.5, 5)
+gcd(2**40, 2**20)
+
+## GEOMEAN
+geomean(-1, 4)
+geomean(2)
+geomean(1e300, 1e300)
+geomean(.A, 4)
+
+## HARMEAN
+harmean(0, 4)
+harmean(-1, 2)
+harmean(2)
+
+## HMS ctx
+hms(25, 0, 0)
+hms(-1, 0, 0)
+hms(0, 0, -1)
+hms(1.5, 0, 0)
+
+## HOUR
+hour(86400)
+hour(-1)
+hour(1.5)
+hour(-3600)
+hour(1e10)
+
+## IFC ctx
+ifc(-1, 'y', 'n')
+ifc(0.5, 'y', 'n')
+ifc(.A, 'y', 'n', 'm')
+ifc(., 'y', 'n')
+ifc(1, '  y', 'n')
+
+## IFN ctx
+ifn(.A, 1, 2, 3)
+ifn(., 1, 2)
+ifn(0.5, 1, 2)
+ifn(1, ., 2)
+
+## INDEXC ctx
+indexc('abc', 'c', 'b')
+indexc('abc', 'xyz', 'zzz', 'a')
+indexc('abc', '')
+indexc('a c', ' ')
+indexc('abc  ', ' ')
+indexc('ABC', 'cb')
+
+## INDEXW
+indexw('cat cat', 'cat')
+indexw('a;b;c', 'c', ';')
+indexw('abc', '')
+indexw('a b', ' b')
+indexw('a b', 'b ')
+indexw('abc cat', 'cat', ' c')
+indexw('x', 'x')
+
+## INPUTC key=2
+inputc('abc', '$5.')
+inputc('  abc', '$5.')
+inputc('  abc', '$char5.')
+inputc('abc', '$upcase.')
+inputc('abc', '$5.', 2)
+inputc('abc', '$nosuch.')
+
+## INPUTN key=2 ctx
+inputn('123', '8.')
+inputn('12345', '8.', 4)
+inputn('12345', '8.', 5, 2)
+inputn('1,234', 'comma8.')
+inputn('abc', '8.')
+inputn('2024-03-15', 'yymmdd10.')
+inputn('15MAR2024', 'date9.')
+inputn('', '8.')
+inputn('12', 'nosuch.')
+
+## INT ctx
+int(-0.5)
+int(1e15 + 0.5)
+int(3 - 1e-12)
+int(-3 + 1e-13)
+
+## INTZ
+intz(-0.5)
+intz(3 - 1e-15)
+
+## JULDATE
+juldate('01JAN1940'd)
+juldate('31DEC2039'd)
+juldate('01JAN2040'd)
+juldate('31DEC1939'd)
+juldate('01JAN1582'd)
+juldate(0.5)
+juldate(-1)
+
+## JULDATE7
+juldate7('01JAN2040'd)
+juldate7('01JAN1582'd)
+juldate7(-1)
+juldate7(0.5)
+
+## KURTOSIS
+kurtosis(1, 2, 3)
+kurtosis(1, 2, 3, 4)
+kurtosis(1e300, 1, 2, 3)
+
+## LARGEST
+largest(0, 1, 2)
+largest(-1, 1, 2)
+largest(1.5, 1, 2)
+largest(4, 1, 2)
+largest(1, .A, ._)
+largest(., 1, 2)
+
+## LCM
+lcm(0, 5)
+lcm(-4, 6)
+lcm(4.5, 6)
+lcm(2**30, 3**19)
+
+## LEFT ctx
+left(' ')
+left('a  ')
+
+## LENGTH ctx
+length(' ')
+length('   ')
+length(s) ;; length s $10; s = 'ab';
+
+## LENGTHC
+lengthc(' ')
+lengthc(s) ;; length s $10; s = 'ab';
+
+## LENGTHM
+lengthm(' ')
+lengthm(s) ;; length s $10; s = 'ab';
+
+## LENGTHN ctx
+lengthn(' ')
+lengthn('   ')
+lengthn(s) ;; length s $10; s = ' ';
+
+## LGAMMA
+lgamma(0)
+lgamma(-1)
+lgamma(-0.5)
+lgamma(1e300)
+lgamma(1e-300)
+
+## LOG
+log(1e-300)
+log(1e300)
+log(-0)
+
+## LOG10
+log10(-1)
+log10(.)
+log10(1e-300)
+
+## LOG2
+log2(0)
+log2(.)
+log2(1024)
+
+## LOGBETA
+logbeta(0, 1)
+logbeta(-1, 1)
+logbeta(1e300, 1)
+
+## LOGCDF key=1
+logcdf('NORMAL', 40)
+logcdf('NORMAL', -40)
+logcdf('T', -50, 3)
+logcdf('BINOMIAL', 3, 0.5, 10)
+logcdf('EXPONENTIAL', 0)
+
+## LOGPDF key=1
+logpdf('NORMAL', 40)
+logpdf('POISSON', 2, 1.5)
+logpdf('UNIFORM', 2)
+logpdf('T', 1, 3)
+
+## LOGSDF key=1
+logsdf('NORMAL', 40)
+logsdf('NORMAL', -40)
+logsdf('POISSON', 2, 1.5)
+logsdf('EXPONENTIAL', 1)
+logsdf('CHISQ', 100, 3)
+
+## LOWCASE ctx
+lowcase('ÀB')
+lowcase(' A ')
+
+## MAX ctx
+max(.A, .B)
+max(._, .)
+max(-0, 0)
+max(1e300, -1e300)
+
+## MDY ctx
+mdy(13, 1, 2024)
+mdy(2, 29, 2023)
+mdy(2, 29, 2024)
+mdy(1, 1, 24)
+mdy(1, 1, 39)
+mdy(1, 1, 40)
+mdy(1, 1, 99)
+mdy(1, 1, 100)
+mdy(1, 1, 1581)
+mdy(10, 15, 1582)
+mdy(12, 31, 20000)
+mdy(1, 1, 20001)
+mdy(1.5, 1, 2024)
+mdy(1, 1.9, 2024)
+mdy(0, 1, 2024)
+
+## MEAN ctx
+mean(1e300, 1e300)
+mean(.A)
+mean(-0)
+
+## MEDIAN
+median(1, 2)
+median(.A, 1)
+median(3, 1, 2)
+median(1e300, 1e300)
+
+## MIN ctx
+min(.A, .B)
+min(._, 1)
+min(-0, 0)
+
+## MINUTE
+minute(-1)
+minute(86400)
+minute(59.9)
+minute(-60)
+
+## MISSING ctx
+missing(._)
+missing(.Z)
+missing('   ')
+missing(-0)
+
+## MOD ctx
+mod(10, 0.3)
+mod(-0.5, 1)
+mod(1e300, 3)
+mod(5, .)
+mod(.A, 2)
+mod(0, 5)
+mod(-10, -3)
+mod(10.5, 0.1)
+
+## MODZ
+modz(10, 0)
+modz(-10, -3)
+modz(0.3, 0.1)
+modz(1, 0.1)
+
+## MONTH ctx
+month(-1)
+month(6589335)
+month(6589336)
+
+## N ctx
+n(.A, ._)
+n(1, 2, 3)
+
+## NMISS ctx
+nmiss(.)
+nmiss(0)
+
+## NOTALNUM
+notalnum('abc', 0)
+notalnum('abc', 4)
+notalnum('_', 1)
+
+## NOTALPHA
+notalpha('abc', 0)
+notalpha('abc', -1)
+notalpha(' ', 1)
+
+## NOTDIGIT
+notdigit('123', 0)
+notdigit('12.5')
+notdigit('123', 4)
+
+## NOTLOWER
+notlower('abc', 0)
+notlower('ab ', 1)
+
+## NOTPUNCT
+notpunct('!?', 0)
+notpunct('!? ', 1)
+
+## NOTSPACE
+notspace('   ', 0)
+notspace('   ', -3)
+notspace('a  ', -3)
+
+## NOTUPPER
+notupper('ABC', 0)
+notupper('AB ', 1)
+
+## NVALID key=2
+nvalid('a b')
+nvalid('_')
+nvalid('a123456789012345678901234567890123')
+nvalid('abc', 'V7')
+nvalid('ABC', 'upcase')
+nvalid('abc', 'upcase')
+nvalid('"a b"n', 'nliteral')
+nvalid('a b', 'nliteral')
+nvalid('', 'any')
+nvalid('1abc', 'any')
+
+## ORDINAL
+ordinal(0, 1, 2)
+ordinal(3, 1, 2)
+ordinal(1, .A, 2)
+ordinal(2, ., ., 1)
+ordinal(1.5, 3, 1)
+
+## PCTL
+pctl(0, 1, 2, 3)
+pctl(-1, 1, 2)
+pctl(101, 1, 2)
+pctl(50, 1, 2)
+pctl(33.3, 1, 2, 3)
+pctl(50, ., .)
+pctl(75, 10, 20, 30, 40)
+
+## PDF key=1
+pdf('NORMAL', 1, 0, 2)
+pdf('T', 0, 5)
+pdf('CHISQ', 2, 3)
+pdf('F', 1, 2, 10)
+pdf('EXPONENTIAL', 1, 2)
+pdf('GAMMA', 2, 3)
+pdf('BETA', 0.3, 2, 3)
+pdf('BERNOULLI', 1, 0.3)
+pdf('GEOMETRIC', 2, 0.3)
+pdf('POISSON', 2.5, 1.5)
+pdf('BINOMIAL', 11, 0.5, 10)
+pdf('UNIFORM', 1.5, 1, 3)
+
+## PERM
+perm(5, 5)
+perm(5, 6)
+perm(0)
+perm(-1, 0)
+perm(171)
+perm(5.5, 2)
+
+## POISSON
+poisson(0, 0)
+poisson(-1, 2)
+poisson(1, -1)
+poisson(1, 2.5)
+
+## PROBBNML
+probbnml(0, 5, 2)
+probbnml(1, 5, 2)
+probbnml(0.5, 5, 6)
+probbnml(1.5, 5, 2)
+probbnml(0.5, 5.5, 2)
+
+## PROBCHI
+probchi(0, 1)
+probchi(-1, 1)
+probchi(1, 0)
+probchi(1e300, 1)
+probchi(3.84, 1, 0)
+
+## PROBF
+probf(0, 1, 1)
+probf(-1, 1, 1)
+probf(4, 0, 10)
+probf(4, 2, 10, 0)
+probf(2, 3, 7, 4)
+
+## PROBIT ctx
+probit(0)
+probit(1)
+probit(-0.5)
+probit(1e-300)
+probit(0.999999999)
+
+## PROBNORM ctx
+probnorm(-40)
+probnorm(40)
+probnorm(1e300)
+probnorm(-1e-300)
+
+## PROBT
+probt(0, 0)
+probt(2, 0.5)
+probt(-40, 3)
+probt(2, 1e10)
+probt(2, 10, 0)
+probt(-2, 7, 1.5)
+
+## PROPCASE ctx
+propcase('o''neil')
+propcase('ABC dEF', ' ')
+propcase('a.b-c', '.')
+propcase(' ')
+propcase('mc donald', '')
+
+## PRXCHANGE key=1
+prxchange('s/(a)/[$1]/', 2, 'banana')
+prxchange('s/a//', -1, 'banana')
+prxchange('s/a/b/', 0, 'aaa')
+prxchange('s/^\s+//', 1, '   x')
+prxchange('s/[/x/', 1, 'a')
+
+## PRXMATCH key=1
+prxmatch('/\d+/', 'ab12')
+prxmatch('/^$/', '')
+prxmatch('/a b/x', 'ab')
+prxmatch('/c$/', 'abc  ')
+prxmatch('/[/', 'abc')
+
+## PRXPARSE key=1
+prxparse('/x/') > 0
+
+## PUTC key=2
+putc('abc', '$char5.')
+putc('abc', '$quote7.')
+putc('abc', '$')
+putc('abc', '$5.', 2)
+putc('a', '$hex2.')
+putc('abc', '$nosuch.')
+lengthc(putc('abc', '$hex6.'))
+cats(putc('abc', '$hex6.'))
+
+## PUTN key=2 ctx
+putn(3.14159, '8.2')
+putn(1234567, 'comma10.')
+putn(-1, 'z5.')
+putn(0.5, 'percent8.')
+putn(., '8.')
+putn(.A, '8.')
+putn(3.14159, '8.', 6)
+putn(3.14159, '8.', 8, 3)
+putn('15MAR2024'd, 'date9.')
+putn(1, 'nosuch.')
+
+## QTR ctx
+qtr(-1)
+qtr('31DEC2024'd)
+
+## QUANTILE key=1
+quantile('NORMAL', 0.5, 1, 2)
+quantile('NORMAL', 0)
+quantile('NORMAL', 1)
+quantile('T', 0.5, 3)
+quantile('CHISQ', 0.5, 1)
+quantile('F', 0.95, 2, 10)
+quantile('EXPONENTIAL', 0.5, 2)
+quantile('POISSON', 0.5, 1.5)
+quantile('BINOMIAL', 1, 0.5, 10)
+quantile('UNIFORM', 0.25, 1, 3)
+quantile('GAMMA', 0.5, 2)
+quantile('BETA', 0.5, 2, 3)
+
+## QUOTE key=2
+quote('a''b')
+quote('a''b', "'")
+quote('abc  ')
+quote('  abc')
+quote('abc', 'x')
+quote('abc', '')
+quote('a"b', "'")
+
+## RANGE
+range(5)
+range(.A, 1)
+range(1e300, -1e300)
+
+## RANK
+rank('')
+rank('ab')
+rank('~')
+
+## REPEAT
+repeat('ab', -1)
+repeat('ab', 1.9)
+repeat('ab', .)
+repeat(' ', 2)
+repeat('ab ', 1)
+
+## REVERSE
+reverse(' a')
+reverse('a ')
+
+## RIGHT ctx
+right(' ')
+right('a')
+lengthc(right('ab  '))
+
+## ROUNDE
+rounde(0.5)
+rounde(1.5)
+rounde(-0.5)
+rounde(2.675, 0.01)
+rounde(5, 0)
+rounde(5, -1)
+rounde(.A)
+
+## ROUNDZ
+roundz(0.5)
+roundz(-0.5)
+roundz(0.15, 0.1)
+roundz(5, 0)
+roundz(.A, 0.1)
+
+## SDF key=1
+sdf('NORMAL', 0)
+sdf('NORMAL', 40)
+sdf('NORMAL', -40)
+sdf('T', 2, 10)
+sdf('CHISQ', 3.84, 1)
+sdf('F', 4, 2, 10)
+sdf('BINOMIAL', 3, 0.5, 10)
+sdf('UNIFORM', 0.25)
+
+## SECOND
+second(-1)
+second(86399.5)
+second(60)
+second(-0.5)
+
+## SIGN
+sign(-0)
+sign(.A)
+sign(-1e-300)
+sign(1e300)
+
+## SIN
+sin(3.141592653589793)
+sin(1e10)
+
+## SINH
+sinh(710)
+sinh(-710)
+
+## SKEWNESS
+skewness(1, 2)
+skewness(1, 2, 3)
+skewness(1e300, 1, 2)
+
+## SMALLEST
+smallest(0, 1, 2)
+smallest(3, 1, 2)
+smallest(1, .A, 2)
+smallest(1.5, 3, 1)
+
+## SQRT
+sqrt(0)
+sqrt(-0)
+sqrt(1e300)
+sqrt(-1e-300)
+
+## STD
+std(5)
+std(1e300, -1e300)
+std(1, 1)
+
+## STDERR
+stderr(5)
+stderr(1, 1, 1)
+
+## STRIP ctx
+strip(' ')
+strip('a')
+lengthc(strip(' a '))
+
+## SUBSTRN ctx
+substrn('abc', -1, 3)
+substrn('abc', 2, 0)
+substrn('abc', 2, -1)
+substrn('abc', ., 2)
+substrn('abc', 2, .)
+substrn('abc', 2.9, 1.9)
+substrn('abc', 10)
+lengthc(substrn('abc', 5))
+
+## SUM ctx
+sum(.A)
+sum(-0)
+sum(1e300, 1e300)
+sum(0.1, 0.2)
+
+## SYMGET
+glob: %let empty = ;
+symget('nosuch')
+symget('empty')
+symget('mv ')
+symget('')
+
+## TAN
+tan(1.5707963267948966)
+tan(1e10)
+
+## TANH
+tanh(-20)
+tanh(1e300)
+
+## TIME env
+time() < 86400
+(time() >= 0)
+
+## TIMEPART ctx
+timepart(86400.5)
+timepart(-86400.5)
+timepart(1e15)
+
+## TINV
+tinv(0, 5)
+tinv(1, 5)
+tinv(0.5, 0)
+tinv(0.975, 2.5)
+tinv(1e-10, 3)
+tinv(0.975, 10, 0)
+tinv(0.9, 5, -1)
+
+## TODAY env
+today() - date()
+
+## TRANSLATE
+translate('abc', 'x', 'abc')
+translate('abc', 'xyz', 'a')
+translate('aaa', '', 'a')
+translate('abc', 'A', 'a', 'B')
+translate(' a ', '_', ' ')
+
+## TRANSTRN
+transtrn('abc', '', 'x')
+transtrn('aaa', 'a', 'bb')
+transtrn('abc  ', ' ', 'x')
+transtrn('abc', 'b', '')
+transtrn('ABC', 'b', 'x')
+
+## TRANWRD ctx
+tranwrd('aaa', 'a', 'bb')
+tranwrd('abc', '', 'x')
+tranwrd('abc  ', 'c', 'x')
+tranwrd('abc', 'c ', 'x')
+lengthc(tranwrd('abc', 'b', 'xyz'))
+
+## TRIM ctx
+trim(' ')
+trim('a')
+lengthc(trim(' a '))
+
+## TRIMN
+trimn(' ')
+lengthc(trimn(' '))
+lengthc(trimn('a '))
+
+## UPCASE ctx
+upcase('àb')
+upcase(' a ')
+
+## USS
+uss(1e300)
+uss(.A)
+uss(-2)
+
+## VAR
+var(1, 1)
+var(1e300, -1e300)
+var(5)
+
+## VERIFY
+verify('abc', '')
+verify('', 'a')
+verify('abc  ', 'abc')
+verify('abc', 'a', 'b', 'c')
+verify('abc', 'ABC')
+
+## WEEK key=2
+week('01JAN2024'd)
+week('01JAN2024'd, 'u')
+week('01JAN2024'd, 'v')
+week('01JAN2024'd, 'w')
+week('31DEC2024'd, 'v')
+week('31DEC2024'd, 'u')
+week('31DEC2024'd, 'w')
+week('01JAN2021'd, 'v')
+week('01JAN2021'd, 'u')
+week('01JAN2021'd, 'w')
+week('03JAN2021'd, 'u')
+week('03JAN2021'd, 'w')
+week('15MAR2024'd, 'U')
+week(.)
+week(-1)
+
+## WEEKDAY ctx
+weekday(-1)
+weekday(1.5)
+weekday(-138061)
+
+## WHICHC
+whichc(' ', ' ', 'a')
+whichc('a', 'b', 'a', 'a')
+whichc('A', 'a')
+whichc('a', '  a')
+
+## WHICHN
+whichn(1, 1)
+whichn(.A, .A, 1)
+whichn(-0, 0)
+whichn(2, 1, ., 2)
+
+## YEAR ctx
+year(-138061)
+year(6589335)
+year(6589336)
+year(1.5)
+
+## YRDIF key=3 ctx
+yrdif('15MAR2000'd, '15MAR2024'd, 'AGE')
+yrdif('15MAR2000'd, '16MAR2024'd, 'AGE')
+yrdif('29FEB2000'd, '28FEB2024'd, 'AGE')
+yrdif('29FEB2000'd, '01MAR2024'd, 'AGE')
+yrdif('29FEB2000'd, '28FEB2023'd, 'AGE')
+yrdif('29FEB2000'd, '01MAR2023'd, 'AGE')
+yrdif('01JAN2000'd, '31DEC2000'd, 'AGE')
+yrdif('01JAN2001'd, '31DEC2001'd, 'AGE')
+yrdif('15MAR2000'd, '14MAR2023'd, 'AGE')
+yrdif('15JUN2000'd, '14JUN2024'd, 'AGE')
+yrdif('15JAN2000'd, '14JAN2024'd, 'AGE')
+yrdif('15MAR2024'd, '15MAR2000'd, 'AGE')
+yrdif('15MAR2000'd, '15MAR2000'd, 'AGE')
+yrdif('01JAN2020'd, '01JUL2024'd)
+yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/360')
+yrdif('31JAN2020'd, '29FEB2024'd, '30/360')
+yrdif('01JUL2024'd, '01JAN2020'd, 'ACT/ACT')
+yrdif('01JAN2020'd, '01JAN2020'd, 'ACT/ACT')
+yrdif('15MAR2023'd, '14MAR2024'd, 'AGE')
+yrdif('10OCT1975'd, '12MAR2024'd, 'AGE')
+yrdif('01JAN2020'd, '01JUL2024'd, 'act/365')

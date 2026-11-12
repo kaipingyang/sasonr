@@ -336,6 +336,12 @@ translate_proc_means <- function(step, meta, last) {
     abort_runtime("Neither the PRINT option nor a valid output statement has been given.", step$line)
   }
   if (length(stats) == 0) stats <- c("n", "mean", "std", "min", "max")
+  # a printed table with ten or more statistics is split into panels; SAS 9.4
+  # sometimes fits one more column per panel than sasonr (rounding/proc/means_*:
+  # rule not determined), so such listings fail loud
+  if (printing && length(stats) >= 10L) {
+    abort_unsupported("PROC MEANS listing with ten or more statistics (panel layout)", step$line)
+  }
   vardef <- o$vardef %||% "df"
   ci_stats <- intersect(stats, c("stderr", "t", "prt", "lclm", "uclm"))
 

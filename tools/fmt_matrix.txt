@@ -1,0 +1,468 @@
+# Verification matrix of formats and informats (tools/gen_matrix.py formats).
+#
+# "## NAME format|informat N|C [BASE]": BASE is the SAS name (default NAME;
+# "-" for the w.d format/informat without a name).  Each case is
+#   format:   r = put(<value>, <BASE><w>.<d>)
+#   informat: r = input('<value>', [?|??] <BASE><w>.<d>)
+#   values: v1 | v2 ...   (SAS expressions for formats, raw text for informats)
+#   widths: w ...         (_ = no width; w or w.d; ?? or ? prefix; -l/-c/-r suffix)
+#   cases: <value> @ <width spec>     one more case
+#   ce: <expression>                  a compile-time error (own session)
+# Every value is combined with every width.  All data are made up.
+
+## W format N -
+values: 0 | -0 | 123.456 | -123.456 | 2.675 | 1e10 | . | .A | ._
+widths: 1 6.2 32.4
+cases: 123456789 @ 5
+cases: -0.001 @ 6.2
+cases: 0.5 @ 1
+cases: -0.5 @ 2
+cases: 123.456 @ 8.2-l
+cases: 123.456 @ 8.2-c
+ce: put(1, 33.)
+ce: put(1, 5.5)
+
+## F format N
+values: 0 | -1.5 | 123.456 | 1e10 | .
+widths: _ 4 8.3
+ce: put(1, f33.)
+
+## BEST format N
+values: 0 | -0 | 1/3 | -1/3 | 123456789012 | 1e-10 | 1e300 | . | .A
+widths: _ 1 4 8 32
+ce: put(1, best33.)
+
+## Z format N
+values: 0 | 42 | -42 | 3.14159 | -0.5 | 123456 | . | .A
+widths: _ 1 6 8.2 32.5
+ce: put(1, z33.)
+
+## COMMA format N
+values: 0 | 1234567 | -1234567.891 | 0.5 | 1e15 | . | .A
+widths: _ 1 10 12.2 32.4
+ce: put(1, comma33.)
+
+## COMMAX format N
+values: 0 | 1234567 | -1234567.891 | 0.5 | .
+widths: _ 10 12.2
+
+## DOLLAR format N
+values: 0 | 1234567 | -1234.5 | 0.005 | 1e15 | . | .A
+widths: _ 2 10 12.2 32.4
+ce: put(1, dollar1.)
+
+## DOLLARX format N
+values: 0 | 1234567 | -1234.5 | .
+widths: _ 10 12.2
+
+## PERCENT format N
+values: 0 | 0.125 | -0.125 | 1 | 12.3456 | -0.0001 | . | .A
+widths: _ 4 8.1 10.2 32.4
+ce: put(1, percent3.)
+
+## NEGPAREN format N
+values: 0 | 1234 | -1234 | -1234.5 | 0.5 | . | .A
+widths: _ 1 8 10.2
+
+## E format N
+values: 0 | -0 | 123.456 | -123.456 | 1e-300 | 1e300 | . | .A
+widths: _ 7 10 32
+ce: put(1, e6.)
+
+## PVALUE format N
+values: 0.05 | 0.0001 | 0.00001 | 0.5 | 1 | 0 | -0.1 | . | .A
+widths: _ 3 6.4 8.3 10.6
+ce: put(1, pvalue2.)
+
+## HEX format N
+values: 1 | -1 | 255 | 65535 | 0.5 | -0 | . | .A
+widths: _ 4 8 16
+ce: put(1, hex17.)
+
+## DATE format N
+values: 0 | -1 | 23450 | -138061 | 2936547 | 6589335 | 23450.7 | -0.5 | . | .A
+widths: _ 5 7 9 11
+ce: put(1, date4.)
+ce: put(1, date12.)
+
+## YYMMDD format N
+values: 0 | 23450 | -138061 | 2936547 | 6589335 | . | .A
+widths: _ 2 4 6 10
+ce: put(1, yymmdd11.)
+
+## YYMMDDD format N
+values: 0 | 23450 | 2936547 | .
+widths: _ 6 10
+
+## YYMMDDN format N
+values: 0 | 23450 | .
+widths: _ 6 8
+
+## YYMMDDS format N
+values: 0 | 23450 | .
+widths: _ 8 10
+
+## YYMMDDP format N
+values: 23450 | .
+widths: 10
+
+## YYMMDDB format N
+values: 23450
+widths: 10
+
+## YYMMDDC format N
+values: 23450
+widths: 10
+
+## MMDDYY format N
+values: 0 | 23450 | 2936547 | . | .A
+widths: _ 2 6 8 10
+
+## MMDDYYS format N
+values: 23450 | .
+widths: _ 10
+
+## MMDDYYD format N
+values: 23450
+widths: 10
+
+## DDMMYY format N
+values: 0 | 23450 | 2936547 | . | .A
+widths: _ 2 6 8 10
+
+## DDMMYYS format N
+values: 23450 | .
+widths: _ 10
+
+## DDMMYYP format N
+values: 23450
+widths: 10
+
+## YYMM format N
+values: 23450 | . | -1
+widths: _ 5 7 10
+
+## YYMMD format N
+values: 23450
+widths: _ 7
+
+## MMYY format N
+values: 23450 | .
+widths: _ 5 7
+
+## MMYYS format N
+values: 23450
+widths: _ 7
+
+## E8601DA format N
+values: 0 | 23450 | -138061 | 2936547 | . | .A
+widths: _ 10
+ce: put(1, e8601da9.)
+
+## IS8601DA format N
+values: 23450 | .
+widths: _ 10
+
+## B8601DA format N
+values: 23450 | 0 | .
+widths: _ 8 10
+
+## E8601DT format N
+values: 0 | 2026123456 | 2026123456.789 | -1 | . | .A
+widths: _ 16 19 22.2 26.6
+
+## IS8601DT format N
+values: 2026123456 | 2026123456.5 | .
+widths: _ 19 26.6
+
+## E8601TM format N
+values: 0 | 37815 | 37815.25 | 90000 | -1 | .
+widths: _ 8 11.2 15.6
+
+## IS8601TM format N
+values: 37815 | 37815.25 | .
+widths: _ 8 11.2
+
+## E8601DN format N
+values: 2026123456 | 0 | .
+widths: _ 10
+
+## DATETIME format N
+values: 0 | 2026123456 | 2026123456.789 | -1 | 1e10 | 86399.5 | . | .A
+widths: _ 7 13 16 18 20.2 40
+ce: put(1, datetime6.)
+
+## DTDATE format N
+values: 2026123456 | 0 | .
+widths: _ 5 9
+
+## DTMONYY format N
+values: 2026123456 | .
+widths: _ 5 7
+
+## DTYEAR format N
+values: 2026123456 | .
+widths: _ 2 4
+
+## TIME format N
+values: 0 | 3661 | 86399.5 | -3661 | 90000 | 1e7 | 0.25 | . | .A
+widths: _ 2 5 8 10.2 20
+ce: put(1, time1.)
+
+## TOD format N
+values: 0 | 37815 | 90000 | 2026123456 | -1 | .
+widths: _ 2 5 8 11.2
+
+## HHMM format N
+values: 0 | 37815 | 37845 | -3661 | 90000 | .
+widths: _ 2 5 8.2
+
+## HOUR format N
+values: 0 | 37815 | 90000 | -3600 | .
+widths: _ 2 4.1
+
+## MMSS format N
+values: 0 | 3661 | 75.5 | -75 | .
+widths: _ 2 5 8.2
+
+## TIMEAMPM format N
+values: 0 | 37815 | 43200 | 86399 | .
+widths: _ 2 5 8 11
+
+## MONYY format N
+values: 0 | 23450 | 2936547 | . | .A
+widths: _ 5 7
+ce: put(1, monyy4.)
+
+## MONNAME format N
+values: 0 | 23450 | .
+widths: _ 1 3 9 32
+
+## DOWNAME format N
+values: 0 | 23450 | .
+widths: _ 1 3 9 32
+
+## WORDDATE format N
+values: 0 | 23450 | 2936547 | .
+widths: _ 3 10 12 18 32
+
+## WORDDATX format N
+values: 0 | 23450 | .
+widths: _ 3 12 18 32
+
+## WEEKDATE format N
+values: 0 | 23450 | .
+widths: _ 3 9 15 29 37
+
+## WEEKDATX format N
+values: 0 | 23450 | .
+widths: _ 3 15 29 37
+
+## YEAR format N
+values: 0 | 23450 | 2936547 | -138061 | . | .A
+widths: _ 2 4 32
+
+## QTR format N
+values: 0 | 23450 | 23650 | .
+widths: _ 1 3
+
+## MONTH format N
+values: 0 | 23450 | 23700 | .
+widths: _ 1 2 3
+
+## DAY format N
+values: 0 | 23450 | .
+widths: _ 2 3
+
+## WEEKDAY format N
+values: 0 | 23450 | 23452 | .
+widths: _ 1 3
+
+## YYQ format N
+values: 0 | 23450 | 23700 | . | .A
+widths: _ 4 6 10
+
+## JULIAN format N
+values: 0 | 23450 | 2936547 | -138061 | .
+widths: _ 5 7
+
+## YYMMN format N
+values: 0 | 23450 | .
+widths: _ 4 6 8
+
+## $ format C $
+values: 'abc' | '  abc ' | ' ' | 'abcdefgh'
+widths: _ 1 5 10
+cases: 'abc' @ 5-r
+cases: 'abc' @ 7-c
+
+## $CHAR format C
+values: 'abc' | '  abc ' | ' '
+widths: _ 2 6
+
+## $UPCASE format C
+values: 'abc' | ' aBc' | ' '
+widths: _ 2 6
+
+## $QUOTE format C
+values: 'abc' | 'a"b' | ' ' | '  ab '
+widths: _ 4 5 10
+
+## $HEX format C
+values: 'abc' | ' ' | 'a'
+widths: _ 1 2 6 10
+
+## W_IN informat N -
+values: 123 | 12.5 | 1234 | -0 | 1e3 | 12 | abc | . | A | 1,234 | +5 | 0.5e-2 | 1 2
+widths: 8 8.2 3
+cases: abc @ ??8
+cases: abc @ ?8
+cases: 12345 @ 2
+
+## BEST_IN informat N BEST
+values: 123 | 1.5e3 | -.5 | abc | .
+widths: _ 8 8.2
+cases: abc @ ??8
+
+## COMMA_IN informat N COMMA
+values: 1,234 | $1,234.5 | (12) | 12% | -1,2,3 | abc | 1.234,5
+widths: 10 10.2
+cases: abc @ ??10
+
+## COMMAX_IN informat N COMMAX
+values: 1.234,5 | 1,5 | (12) | abc
+widths: 10
+
+## DOLLAR_IN informat N DOLLAR
+values: $1,234 | (1.5) | 12
+widths: 10 10.2
+
+## DOLLARX_IN informat N DOLLARX
+values: $1.234,5 | 12
+widths: 10
+
+## PERCENT_IN informat N PERCENT
+values: 12% | 12.5% | (5%) | 12 | abc
+widths: 8 8.2
+
+## E_IN informat N E
+values: 1.5e3 | 1.5E-3 | 12 | abc
+widths: 10 10.2
+
+## BZ_IN informat N BZ
+values: 1 2 | 12 | abc
+widths: 4 4.1
+
+## TRAILSGN_IN informat N TRAILSGN
+values: 12- | 12+ | 12 | -12 | abc
+widths: 6
+
+## NLNUM_IN informat N NLNUM
+values: 1,234.5 | -12 | abc
+widths: 10
+
+## HEX_IN informat N HEX
+values: 3FF0000000000000 | 4059000000000000 | FF | XYZ
+widths: 16 2 8
+
+## DATE_IN informat N DATE
+values: 15MAR2024 | 15mar24 | 1MAR2024 | 32MAR2024 | 15MAR1959 | 15-MAR-2024 | 29FEB2023 | abc
+widths: _ 9 11
+cases: abc @ ??9
+
+## YYMMDD_IN informat N YYMMDD
+values: 2024-03-15 | 20240315 | 24-03-15 | 240315 | 2024/3/5 | 2024-02-30 | 39-01-01 | 40-01-01 | abc
+widths: _ 6 8 10
+cases: abc @ ??10
+
+## MMDDYY_IN informat N MMDDYY
+values: 03/15/2024 | 031524 | 3/15/24 | 13/01/2024 | abc
+widths: _ 6 10
+
+## DDMMYY_IN informat N DDMMYY
+values: 15/03/2024 | 150324 | 32/01/2024 | abc
+widths: _ 6 10
+
+## E8601DA_IN informat N E8601DA
+values: 2024-03-15 | 2024-3-15 | 20240315 | abc
+widths: _ 10
+
+## IS8601DA_IN informat N IS8601DA
+values: 2024-03-15 | abc
+widths: _ 10
+
+## B8601DA_IN informat N B8601DA
+values: 20240315 | 2024-03-15 | abc
+widths: _ 8
+
+## E8601DT_IN informat N E8601DT
+values: 2024-03-15T10:30:15 | 2024-03-15T10:30:15.5 | 2024-03-15 10:30:15 | 2024-03-15 | abc
+widths: _ 19 26
+
+## IS8601DT_IN informat N IS8601DT
+values: 2024-03-15T10:30:15 | abc
+widths: _ 19
+
+## E8601TM_IN informat N E8601TM
+values: 10:30:15 | 10:30:15.25 | 25:00:00 | abc
+widths: _ 8 11
+
+## IS8601TM_IN informat N IS8601TM
+values: 10:30:15 | abc
+widths: _ 8
+
+## DATETIME_IN informat N DATETIME
+values: 15MAR2024:10:30:15 | 15MAR24:10:30 | 15MAR2024 10:30:15 | 15MAR2024:25:00:00 | abc
+widths: _ 18 20
+
+## TIME_IN informat N TIME
+values: 10:30 | 10:30:15.5 | 25:00 | 1:2:3 | -1:00 | 10 | abc
+widths: _ 8 11
+
+## HHMMSS_IN informat N HHMMSS
+values: 103015 | 10:30 | 1030 | 10 | abc
+widths: _ 6 8
+
+## MONYY_IN informat N MONYY
+values: MAR2024 | MAR24 | mar2024 | XYZ2024
+widths: _ 5 7
+
+## JULIAN_IN informat N JULIAN
+values: 2024075 | 24075 | 2024366 | abc
+widths: _ 5 7
+
+## YYMMN_IN informat N YYMMN
+values: 202403 | 2403 | 202413 | abc
+widths: _ 4 6
+
+## YYQ_IN informat N YYQ
+values: 2024Q1 | 24Q4 | 2024Q5 | abc
+widths: _ 4 6
+
+## ANYDTDTE_IN informat N ANYDTDTE
+values: 2024-03-15 | 15MAR2024 | 03/15/2024 | 15/03/2024 | 20240315 | 2024075 | MAR2024 | 15MAR2024:10:30:00 | abc | 01/02/2024
+widths: _ 10 20
+
+## ANYDTDTM_IN informat N ANYDTDTM
+values: 2024-03-15T10:30:15 | 15MAR2024:10:30:15 | 2024-03-15 | 10:30 | abc
+widths: _ 19 20
+
+## ANYDTTME_IN informat N ANYDTTME
+values: 10:30:15 | 10:30 | 15MAR2024:10:30:15 | abc
+widths: _ 8 20
+
+## CHAR_IN informat C $
+values: \s\sabc | abc | . | \s
+widths: _ 3 5 8
+
+## CHARW_IN informat C $CHAR
+values: \s\sabc | abc | .
+widths: _ 5 8
+
+## UPCASE_IN informat C $UPCASE
+values: abc | \saBc
+widths: _ 5
+
+## QUOTE_IN informat C $QUOTE
+values: "abc" | 'a''b' | abc | "a""b"
+widths: _ 7 10

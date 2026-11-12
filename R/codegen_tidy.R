@@ -91,6 +91,13 @@ gen_expr <- function(e, cx) {
       # vectorised code evaluates guarded expressions for every row, so the
       # missing-value counts there are not exact (the engine re-runs as L3)
       if (arith && isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
+      # an operand that is itself an arithmetic result: its missing values were already
+      # counted, SAS does not count this operation again (a + b + c with b missing: 1 place)
+      is_arith <- function(x) x$node == "binary" && x$op %in% c("+", "-", "*", "/", "**")
+      if (is.na(fun) && nzchar(at)) {
+        if (is_arith(e$lhs)) at <- paste0(at, ", .gen_a = TRUE")
+        if (is_arith(e$rhs)) at <- paste0(at, ", .gen_b = TRUE")
+      }
       if (is.na(fun)) paste0("sas_arith(", a, ", ", b, ", ", r_str(e$op), at, ")") else paste0(fun, "(", a, ", ", b, at, ")")
     },
     compare = if (isTRUE(e$colon)) {
@@ -193,8 +200,15 @@ gen_call <- function(e, cx) {
     return(sprintf("(%s - sas_lag_vec(%s, %dL))", x, x, n))
   }
   if (e$name == "symget") args <- c(".symtab", args)
+  if (e$name %in% names(fn_policy) && !is.null(e$col)) {
+    # missing / invalid arguments: log NOTEs and _ERROR_ as in SAS (fn_policy.R)
+    return(sprintf("sas_fcall(\"%s\", sas_f_%s%s, .at = c(%dL, %dL)%s)", e$name, e$name,
+                   paste0(", ", args, collapse = ""), as.integer(e$line), as.integer(e$col),
+                   if (isTRUE(cx$inexact)) ", .exact = FALSE" else ""))
+  }
   at <- if (cx$mode == "row" && e$name %in% err_fns && !is.null(e$col)) at_code(e) else ""
   if (e$name == "catx") at <- paste0(at, sprintf(", .len = %dL", as.integer(e$buf_len %||% 200L)))
+  if (e$name %in% c("cat", "cats", "catt")) at <- paste0(at, sprintf(", .len = %dL", as.integer(e$buf_len %||% 200L)))
   if (e$name %in% mv_note_fns && !is.null(e$col) && length(args) > 0) {
     # count missing arguments once, then call with the evaluated arguments
     extra <- if (nzchar(at)) sprintf(", list(%s)", sub("^, ", "", at)) else ""
@@ -214,7 +228,7 @@ expr_may_error <- function(e) {
   if (is.null(e)) return(FALSE)
   hit <- FALSE
   walk_expr(e, function(x) {
-    if (x$node == "call" && x$name %in% err_fns) hit <<- TRUE
+    if (x$node == "call" && (x$name %in% err_fns || x$name %in% names(fn_policy))) hit <<- TRUE
     if (x$node == "binary" && x$op %in% c("/", "**", "*", "+", "-")) hit <<- TRUE
   })
   hit

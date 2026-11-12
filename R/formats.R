@@ -104,8 +104,12 @@ month_full <- c("January", "February", "March", "April", "May", "June", "July", 
 day_full <- c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
 civil <- function(day) {
-  lt <- as.POSIXlt(as.Date(floor(day), origin = "1960-01-01"))
-  list(y = lt$year + 1900, m = lt$mon + 1, d = lt$mday, wday = lt$wday + 1, yday = lt$yday + 1)
+  day <- floor(as.numeric(day))
+  p <- greg_civil(sas_day_to_greg(day))
+  # weekday: 1 = Sunday (1960-01-01, day 0, was a Friday)
+  p$wday <- (day + 5) %% 7 + 1
+  p$yday <- day - from_ymd(p$y, 1, 1) + 1
+  p
 }
 
 # Round |x| half away from zero to d decimals (display fuzz) and write it.
@@ -134,6 +138,16 @@ add_commas <- function(s) {
 # the dollar sign; then the E form (sci_fit); then asterisks.  A rounding at
 # the edge of the display fuzz only fails loud when the text would fit.
 fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, swap = FALSE, down_at = -2.6e-16) {
+  # an integer beyond 2^53 / 10^d: the decimals are zeros (SAS 9.4: COMMA32.4 of 1E15)
+  if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21) {
+    ip <- sprintf("%.0f", abs(v))
+    forms <- c(if (commas) paste0(add_commas(ip), ".", strrep("0", d)), paste0(ip, ".", strrep("0", d)))
+    for (s in forms) {
+      if (swap) s <- chartr(",.", ".,", s)
+      s <- paste0(if (dollar) "$", if (v < 0) "-", s)
+      if (nchar(s) <= w) return(if (zero) just_right(s, w) else just_right(s, w))
+    }
+  }
   build <- function(dd, cm, dl, lead0 = TRUE, edge = "abort") {
     b <- fixed_body(v, dd, cm, edge, down_at)
     if (identical(b, NA_character_)) return(NA_character_)
@@ -170,6 +184,8 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
     # a negative value that rounds to zero and has no room for its sign is "0"
     if (v < 0 && w >= 1L && identical(display_round_text(v, 0L, edge = "up"), "0")) return(pad("0"))
     s <- sci_fit(v, w)
+    # COMMAX/DOLLARX write the E form with a decimal comma (SAS 9.4: 1,23E6)
+    if (!is.na(s) && swap) s <- chartr(".", ",", s)
     if (!is.na(s)) return(pad(s))
   }
   stars(w)
@@ -232,7 +248,11 @@ fmt_negparen <- function(v, w, d) {
     for (cm in c(TRUE, FALSE)) {
       b <- fixed_body(v, dd, cm)
       if (identical(b, NA_character_)) return(stars(w))
+      # a positive value keeps a column for ")" only when the negative form would fit
       s <- if (b$neg) paste0("(", b$s, ")") else paste0(b$s, " ")
+      if (nchar(b$s) + 2L <= w) return(just_right(s, w))
+      # no room for the parentheses (or the trailing column): a minus sign (SAS 9.4: NEGPAREN6. of -1234 is -1,234)
+      s <- if (b$neg) paste0("-", b$s) else b$s
       if (nchar(s) <= w) return(just_right(s, w))
     }
   }
@@ -250,10 +270,21 @@ two <- function(x) formatC(x, width = 2, flag = "0")
 four <- function(x) formatC(x, width = 4, flag = "0")
 
 fmt_date_value <- function(v, base, w, sep = NULL, d = NA_integer_) {
-  dd <- if (base %in% c("datetime", "e8601dt", "is8601dt", "dtdate", "dtmonyy", "dtyear")) floor(v / 86400) else floor(v)
+  dt <- base %in% c("datetime", "e8601dt", "is8601dt", "e8601dn", "dtdate", "dtmonyy", "dtyear")
+  # datetime values are rounded to the decimals shown (SAS 9.4: 86399.5 is 02JAN60:00:00:00 with DATETIME16.)
+  if (base %in% c("datetime", "e8601dt", "is8601dt")) v <- round_half_away(v, if (is.na(d)) 0L else d)
+  dd <- if (dt) floor(v / 86400) else floor(v)
   if (base %in% c("time", "tod", "hhmm", "hour", "mmss", "e8601tm", "is8601tm", "timeampm")) return(fmt_time_value(v, base, w, d))
   if (abs(dd) > 7e6) return(stars(w))
   p <- civil(dd)
+  if (p$y > 9999 && base %in% c("date", "yymmdd", "mmddyy", "ddmmyy", "datetime", "e8601da", "is8601da", "b8601da",
+                                 "e8601dt", "is8601dt", "e8601dn")) {
+    abort_unsupported(sprintf("format %s for a year beyond 9999 (SAS 9.4 writes **** for the year)", toupper(base)))
+  }
+  if (base == "month" && w < 2 && p$m >= 10) abort_unsupported("MONTH1. for October to December")
+  if ((base %in% c("weekdate", "weekdatx") && w < 29) || (base == "worddatx" && w < 12)) {
+    abort_unsupported(sprintf("%s%d. (narrow widths not verified against SAS 9.4)", toupper(base), w))
+  }
   y2 <- two(p$y %% 100)
   body <- switch(base,
     date = , dtdate = {
@@ -287,7 +318,10 @@ fmt_date_value <- function(v, base, w, sep = NULL, d = NA_integer_) {
       h <- floor(sec / 3600)
       mi <- floor((sec - h * 3600) / 60)
       s <- sec - h * 3600 - mi * 60
-      fy <- w >= 18
+      # four-digit year only when the full value with a 4-digit year fits with one column to spare
+      nd0 <- if (is.na(d)) 0L else d
+      fy <- w >= 19L + if (nd0 > 0) nd0 + 1L else 0L
+      if (w < 16 && w > 7 && w != 10 && w != 13) abort_unsupported(sprintf("DATETIME%d.", w))
       out <- paste0(two(p$d), month_abb[p$m], if (fy) four(p$y) else y2)
       ww <- if (fy) w - 2L else w
       if (ww >= 10) out <- paste0(out, ":", two(h))
@@ -339,10 +373,17 @@ fmt_date_value <- function(v, base, w, sep = NULL, d = NA_integer_) {
 }
 
 sec_text <- function(s, nd) {
-  if (nd <= 0) return(two(floor(s)))
-  txt <- formatC(floor(s * 10^nd) / 10^nd, format = "f", digits = nd)
+  if (nd <= 0) return(two(floor(s + 1e-9)))
+  txt <- formatC(round_half_away(s, nd), format = "f", digits = nd)
   if (floor(s) < 10) txt <- paste0("0", txt)
   txt
+}
+
+# round half away from zero at nd decimals (on the decimal value of the binary number)
+round_half_away <- function(v, nd) {
+  if (is.na(v)) return(v)
+  m <- 10^nd
+  sign(v) * floor(abs(v) * m + 0.5 + 1e-9) / m
 }
 
 # YYMMDD / MMDDYY / DDMMYY width ladder.
@@ -367,13 +408,32 @@ date3_text <- function(base, p, w, sep, explicit) {
 
 fmt_time_value <- function(v, base, w, d) {
   nd <- if (is.na(d)) 0L else d
+  if (base %in% c("e8601tm", "is8601tm") && (v < 0 || v >= 86400)) return(stars(w))
+  if (base == "hour" && v < 0) abort_unsupported("HOUR format of a negative time")
+  if (base %in% c("time", "tod", "e8601tm", "is8601tm")) v <- round_half_away(v, nd)
   if (base %in% c("tod", "e8601tm", "is8601tm")) v <- v - floor(v / 86400) * 86400
   av <- abs(v)
   sg <- if (v < 0) "-" else ""
   if (base == "hhmm") {
+    if (nd > 0) {
+      # minutes with decimals: 10:30.25
+      mins <- round_half_away(av / 60, nd)
+      hh <- floor(mins / 60)
+      mm <- mins - hh * 60
+      txt <- formatC(mm, format = "f", digits = nd)
+      if (mm < 10) txt <- paste0("0", txt)
+      body <- paste0(sg, hh, ":", txt)
+      if (nchar(body) <= w) return(just_right(body, w))
+      abort_unsupported(sprintf("HHMM%d.%d for this value", w, nd))
+    }
     tot <- floor(av / 60 + 0.5)
     body <- paste0(sg, floor(tot / 60), ":", two(tot %% 60))
-    return(if (nchar(body) > w) stars(w) else just_right(body, w))
+    if (nchar(body) > w) {
+      # too narrow for the minutes: the hours only
+      hb <- paste0(sg, floor(av / 3600))
+      return(if (nchar(hb) > w) stars(w) else just_right(hb, w))
+    }
+    return(just_right(body, w))
   }
   if (base == "timeampm") {
     sec <- v - floor(v / 86400) * 86400
@@ -384,7 +444,9 @@ fmt_time_value <- function(v, base, w, d) {
     h12 <- h %% 12
     if (h12 == 0) h12 <- 12
     body <- if (w >= 11) paste0(h12, ":", two(m), ":", two(s), " ", ap) else if (w >= 8) paste0(h12, ":", two(m), " ", ap) else paste0(h12, " ", ap)
-    return(if (nchar(body) > w) stars(w) else just_right(body, w))
+    if (w == 2) return(ap)
+    if (nchar(body) > w) abort_unsupported(sprintf("TIMEAMPM%d.", w))
+    return(just_right(body, w))
   }
   if (base == "hour") {
     hv <- if (nd == 0) floor(av / 3600 + 0.5) else av / 3600
@@ -392,7 +454,17 @@ fmt_time_value <- function(v, base, w, d) {
     return(just_right(body, w))
   }
   if (base == "mmss") {
-    body <- paste0(sg, floor(av / 60), ":", two(floor(av %% 60)))
+    sv <- round_half_away(av, nd)
+    mm <- floor(sv / 60)
+    ss <- sv - mm * 60
+    stxt <- if (nd > 0) formatC(ss, format = "f", digits = nd) else formatC(ss, format = "d")
+    if (ss < 10) stxt <- paste0("0", stxt)
+    body <- paste0(sg, mm, ":", stxt)
+    if (nchar(body) > w) {
+      # too narrow for the seconds: the minutes only (truncated)
+      mb <- paste0(sg, floor(av / 60))
+      return(if (nchar(mb) > w) stars(w) else just_right(mb, w))
+    }
     return(just_right(body, w))
   }
   h <- floor(av / 3600)
@@ -461,6 +533,7 @@ sas_format <- function(x, fmt = NULL) {
   bn <- fmt_base_name(name)
   if (is.null(bn)) abort_unsupported(paste0("format ", fmt$text))
   w <- fmt$w
+  if (is.na(w)) w <- registry_defw("format", fmt)
   if (is.na(w)) w <- as.integer(num_fmt_defaults[[bn$base]])
   if (bn$base == "pvalue" && is.na(fmt$d)) fmt$d <- 4L
   d <- if (is.na(fmt$d)) 0L else fmt$d
@@ -470,6 +543,9 @@ sas_format <- function(x, fmt = NULL) {
       if (bn$base %in% c("w", "z", "comma", "commax", "dollar", "dollarx") && d > 0 && d < w) {
         return(paste0(just_right(miss_label(code[i]), w - d), strrep(" ", d)))
       }
+      # NEGPAREN keeps the column of the closing parenthesis; PVALUE puts the missing value in its units column
+      if (bn$base == "negparen" && w > d + 1L) return(paste0(just_right(miss_label(code[i]), w - d - 1L), strrep(" ", d + 1L)))
+      if (bn$base == "pvalue" && d < w) return(paste0(just_right(miss_label(code[i]), w - d), strrep(" ", d)))
       if (bn$base == "percent" && w - d - 2L > 0) {
         return(paste0(just_right(miss_label(code[i]), w - d - 2L), strrep(" ", d + 2L)))
       }
@@ -520,6 +596,8 @@ fmt_width <- function(fmt, x_char = fmt$char) {
   if (fmt$char || x_char) return(NA_integer_)
   bn <- fmt_base_name(if (fmt$name %in% c("", "f")) "w" else fmt$name)
   if (is.null(bn)) return(12L)
+  w <- registry_defw("format", fmt)
+  if (!is.na(w)) return(w)
   as.integer(num_fmt_defaults[[bn$base]])
 }
 
@@ -625,18 +703,20 @@ read_std_num <- function(s, d) {
   if (!grepl(std_num_re, t)) return(list(v = NA_real_, ok = FALSE))
   t2 <- chartr("dD", "ee", t)
   v <- as.numeric(t2)
-  if (!is.na(d) && d > 0 && !grepl(".", t, fixed = TRUE) && !grepl("[eE]", t2)) v <- v / 10^d
+  # implied decimals also apply to E notation without a decimal point (SAS 9.4: '1e3' with 8.2 is 10)
+  if (!is.na(d) && d > 0 && !grepl(".", t, fixed = TRUE)) v <- v / 10^d
   if (!is.finite(v)) return(list(v = NA_real_, ok = FALSE))
   list(v = v, ok = TRUE)
 }
 
-read_comma_num <- function(s, d, swap = FALSE) {
+read_comma_num <- function(s, d, swap = FALSE, pct_div = FALSE) {
   t <- strip_both(s)
   if (!nzchar(t) || t == ".") return(list(v = NA_real_, ok = TRUE))
   if (swap) t <- chartr(",.", ".,", t)
   neg <- startsWith(t, "(") && endsWith(t, ")")
   if (neg) t <- substr(t, 2L, nchar(t) - 1L)
-  pct <- grepl("%", t, fixed = TRUE)
+  # COMMA/DOLLAR ignore a percent sign (PERCENT divides by 100)
+  pct <- pct_div && grepl("%", t, fixed = TRUE)
   t <- gsub("[,$% ]", "", t)
   if (endsWith(t, "-") && !startsWith(t, "-")) t <- paste0("-", substr(t, 1L, nchar(t) - 1L))
   r <- read_std_num(t, d)
@@ -684,7 +764,8 @@ read_date3 <- function(t, order) {
   yi <- switch(order, ymd = 1L, 3L)
   mi <- switch(order, ymd = 2L, mdy = 1L, dmy = 2L)
   di <- switch(order, ymd = 3L, mdy = 2L, dmy = 1L)
-  if (!nchar(parts[yi]) %in% c(2L, 4L)) return(NA_real_)
+  # one- and two-digit years use the YEARCUTOFF window ('3/15/2' read with MMDDYY6. is 2002)
+  if (!nchar(parts[yi]) %in% c(1L, 2L, 4L)) return(NA_real_)
   valid_ymd(expand_year(as.numeric(parts[yi]), nchar(parts[yi])), num(parts[mi]), num(parts[di]))
 }
 
@@ -789,7 +870,12 @@ read_hex_num <- function(t, w) {
 }
 
 read_num_field <- function(s, fmt) {
-  nm <- if (fmt$name %in% c("", "f", "best", "bestd", "nlnum")) "w" else fmt$name
+  nm <- if (fmt$name %in% c("", "f", "best", "bestd")) "w" else fmt$name
+  # NLNUM in the English locale: thousands separators are ignored
+  if (nm == "nlnum") {
+    nm <- "w"
+    s <- gsub(",", "", s, fixed = TRUE)
+  }
   d <- fmt$d
   t <- strip_both(s)
   if (nm == "bz" && nzchar(s) && !nzchar(t)) return(list(v = 0, ok = TRUE))
@@ -797,10 +883,11 @@ read_num_field <- function(s, fmt) {
   if (nm == "w") return(read_std_num(s, d))
   if (nm == "bz") return(read_std_num(gsub(" ", "0", s), d))
   if (nm == "hex") return(read_hex_num(t, fmt$w))
+  if (nm == "trailsgn" && grepl("\\+$", t)) return(read_comma_num(sub("\\+\\s*$", "", s), d))
   if (nm %in% c("comma", "dollar", "trailsgn")) return(read_comma_num(s, d))
   if (nm %in% c("commax", "dollarx")) return(read_comma_num(s, d, swap = TRUE))
   if (nm == "percent") {
-    r <- read_comma_num(s, d)
+    r <- read_comma_num(s, d, pct_div = TRUE)
     if (r$ok && !is.na(r$v) && !grepl("%", t, fixed = TRUE)) r$v <- r$v
     return(r)
   }
@@ -813,10 +900,23 @@ read_num_field <- function(s, fmt) {
     mmddyy = read_date3(t, "mdy"),
     ddmmyy = read_date3(t, "dmy"),
     e8601da = , is8601da = if (grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", t)) read_date3(t, "ymd") else NA_real_,
-    b8601da = if (grepl("^[0-9]{8}$", t)) read_date3(t, "ymd") else NA_real_,
+    b8601da = if (grepl("^[0-9]{8}$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$", t)) read_date3(t, "ymd") else NA_real_,
     e8601dt = , is8601dt = read_iso_dt(t),
     datetime = read_datetime(t),
-    time = , e8601tm = , is8601tm = read_time(t),
+    time = {
+      # a leading minus sign is allowed; digits alone (no separator) are invalid (SAS 9.4)
+      neg <- startsWith(t, "-")
+      tt <- if (neg) substring(t, 2L) else t
+      if (grepl("^[0-9]+$", tt)) NA_real_ else {
+        v <- read_time(tt)
+        if (neg) -v else v
+      }
+    },
+    e8601tm = , is8601tm = {
+      v <- read_time(t)
+      if (!is.na(v) && v >= 86400) abort_unsupported("E8601TM informat with hours above 23")
+      v
+    },
     hhmmss = {
       if (grepl("^[0-9]+$", t)) {
         if (nchar(t) %% 2 == 1) t <- paste0("0", t)
@@ -852,6 +952,8 @@ read_num_field <- function(s, fmt) {
     },
     anydtdte = read_anydate(t),
     anydtdtm = {
+      # a time alone is a datetime on 1 January 1960
+      if (grepl("^[0-9]{1,2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]*)?)?$", t)) return(list(v = read_time(t), ok = TRUE))
       v <- read_iso_dt(t)
       if (is.na(v)) v <- read_datetime(t)
       if (is.na(v)) {
@@ -860,7 +962,15 @@ read_num_field <- function(s, fmt) {
       }
       v
     },
-    anydttme = read_time(t),
+    anydttme = {
+      v <- read_time(t)
+      if (is.na(v)) {
+        # a datetime: its time part
+        dtv <- read_datetime(t)
+        if (!is.na(dtv)) v <- dtv - floor(dtv / 86400) * 86400
+      }
+      v
+    },
     abort_unsupported(paste0("informat ", fmt$text))
   )
   list(v = v, ok = !is.na(v))
@@ -869,11 +979,13 @@ read_num_field <- function(s, fmt) {
 read_char_field <- function(s, fmt, keep_lead = FALSE) {
   out <- switch(fmt$name,
     char = s,
-    upcase = toupper(sub("^ +", "", s)),
+    upcase = toupper(s),
     quote = {
       t <- strip_both(s)
       if (nchar(t) >= 2 && substr(t, 1, 1) %in% c("'", "\"") && substring(t, nchar(t)) == substr(t, 1, 1)) {
-        t <- substr(t, 2L, nchar(t) - 1L)
+        q <- substr(t, 1, 1)
+        # doubled quotation marks inside become single ones
+        t <- gsub(paste0(q, q), q, substr(t, 2L, nchar(t) - 1L), fixed = TRUE)
       }
       t
     },
@@ -971,6 +1083,8 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
   if (is.numeric(s)) s <- sas_fmt_best(s, 12L)
   w <- fmt$w
   is_char <- fmt$char || isTRUE(user_fmt(fmt$name, TRUE, "invalue")$char)
+  # an informat without a width reads its default width (SAS 9.4: YYMMDD. reads 6 columns)
+  if (is.na(w) && is.null(user_fmt(fmt$name, fmt$char, "invalue"))) w <- registry_defw("informat", fmt)
   vals <- vector(if (is_char) "character" else "numeric", length(s))
   bad <- FALSE
   for (i in seq_along(s)) {
@@ -1000,16 +1114,24 @@ sas_f_putc <- function(x, fmt, w = NULL) sas_f_putn(x, fmt, w)
 
 putn_spec <- function(text, w, d) {
   f <- sas_fmt_text(text)
-  if (!is.null(w)) f$w <- as.integer(w)
-  if (!is.null(d)) f$d <- as.integer(d)
+  # the optional width/decimals override the format's only when valid (else see fn_policy)
+  if (!is.null(w) && !is.na(w) && w >= 1 && w < 1e300) f$w <- as.integer(w)
+  if (!is.null(d) && !is.na(d) && d >= 0 && d < 1e300) f$d <- as.integer(d)
+  # $ without a width is $1.
+  if (f$char && !nzchar(f$name) && is.na(f$w)) f$w <- 1L
   f
 }
 
 #' @export
 sas_f_inputn <- function(s, fmt, w = NULL, d = NULL, .at = NULL) {
+  # invalid data: missing result, only the mathematical-operations NOTE and _ERROR_ (SAS 9.4)
   out <- vapply(seq_along(s), function(i) {
     f <- putn_spec(rep_len(fmt, length(s))[i], w, d)
-    as.numeric(sas_f_input(s[i], f, .at = .at))
+    v <- as.numeric(sas_f_input(s[i], f, qq = "??"))
+    t <- if (is.numeric(s[i])) sas_fmt_best(s[i], 12L) else s[i]
+    if (!is.na(f$w) && nchar(t) > f$w) t <- substr(t, 1L, f$w)
+    if (!sas_informat_read(t, f)$ok) note_math(.at)
+    v
   }, 0)
   out
 }

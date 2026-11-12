@@ -77,7 +77,11 @@ mv_result_fns <- c("abs", "min", "max", "sum", "mean")
 #' @export
 #' @keywords internal
 sas_mv_res <- function(res, .at, .exact = TRUE) {
-  if (anyNA(res)) sas_mv_count(.at, res, .exact = .exact)
+  # a special missing result (SUM(.A) is .A) is not counted (SAS 9.4)
+  if (anyNA(res)) {
+    plain <- ifelse(sas_miss_code(res) %in% 1L, res, 0)
+    sas_mv_count(.at, plain, .exact = .exact)
+  }
   res
 }
 
@@ -104,9 +108,16 @@ sas_mv_count <- function(.at, ..., .exact = TRUE) {
 #' Arithmetic operators `+ - *` with SAS missing-value semantics and NOTEs
 #' @export
 #' @keywords internal
-sas_arith <- function(a, b, op, .at = NULL, .exact = TRUE) {
+sas_arith <- function(a, b, op, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
   r <- switch(op, "+" = a + b, "-" = a - b, "*" = a * b)
-  if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
+  if (anyNA(a) || anyNA(b)) {
+    n <- max(length(a), length(b))
+    ma <- rep_len(is.na(a), n)
+    mb <- rep_len(is.na(b), n)
+    # rows where a missing operand is the missing result of an earlier operation are not counted
+    cnt <- (ma | mb) & !(.gen_a & ma) & !(.gen_b & mb)
+    if (any(cnt)) sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
+  }
   sas_num(r, .at)
 }
 

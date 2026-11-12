@@ -126,7 +126,10 @@ round_family <- function(x, unit, mode, fname, .at = NULL, note = TRUE) {
   # missing arguments (special missing values included) give an ordinary missing
   out <- rep(NA_real_, n)
   bad <- !is.na(unit) & unit <= 0
-  if (any(bad) && note) note_invalid_arg(fname, 2L, .at, list(x, unit), bad, numbered = TRUE)
+  if (any(bad) && note) {
+    # ROUND writes "Argument 2 ... is invalid"; ROUNDE/ROUNDZ only count the place (SAS 9.4)
+    if (fname == "round") note_invalid_arg(fname, 2L, .at, list(x, unit), bad, numbered = TRUE) else note_math(.at, sum(bad))
+  }
   ok <- !is.na(x) & !is.na(unit) & !bad
   for (i in which(ok)) out[i] <- round_one(x[i], unit[i], mode, fname)
   out

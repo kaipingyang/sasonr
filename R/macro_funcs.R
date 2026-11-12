@@ -155,7 +155,26 @@ sysfunc_table <- list(
   intck = list(args = c("c", "n", "n", "c"), min = 3), intnx = list(args = c("c", "n", "n", "c"), min = 3)
 )
 
-sysfunc_ws_significant <- c("cats", "catx", "tranwrd")
+sysfunc_ws_significant <- c("cats", "catx")
+
+# Other DATA step functions: argument types from the SAS 9.4 inventory kept in
+# the feature registry (num -> n, char -> c; "any" arguments are not supported).
+sysfunc_spec_from_registry <- function(fname) {
+  spec <- fn_table[[fname]]
+  if (is.null(spec) || fname %in% c(var_info_fns, "put", "input", "symget") || startsWith(fname, "cvt_")) return(NULL)
+  reg <- sas_feature_registry("functions")
+  r <- reg[reg$name == toupper(fname), , drop = FALSE]
+  if (!nrow(r) || !nzchar(r$sas_arg_types[1] %||% "")) return(NULL)
+  ty <- strsplit(r$sas_arg_types[1], " ", fixed = TRUE)[[1]]
+  if (any(!ty %in% c("num", "char"))) return(NULL)
+  ty <- c(num = "n", char = "c")[ty]
+  if (is.infinite(spec$max)) {
+    if (length(unique(ty)) != 1L) return(NULL)
+    return(list(args = paste0(ty[1], "*"), min = spec$min))
+  }
+  n <- spec$max
+  list(args = unname(c(ty, rep(ty[length(ty)], max(0, n - length(ty))))[seq_len(n)]), min = spec$min)
+}
 
 mac_parse_format <- function(text, line = NULL) {
   p <- new_parser(sas_lex(text))
@@ -181,7 +200,7 @@ mac_sysfunc <- function(text, line = NULL) {
     if (!startsWith(rest, ",")) abort_syntax("invalid %SYSFUNC argument", line)
     fmt <- mac_parse_format(trimws(substring(rest, 2L)), line)
   }
-  spec <- sysfunc_table[[fname]]
+  spec <- sysfunc_table[[fname]] %||% sysfunc_spec_from_registry(fname)
   if (is.null(spec)) abort_unsupported(paste0("%SYSFUNC(", toupper(fname), ")"), line)
   args <- if (nzchar(trimws(inner))) mq_split_commas(inner) else character()
   args <- mq_unmask(args)
@@ -209,14 +228,32 @@ mac_sysfunc <- function(text, line = NULL) {
       args[k]
     )
   })
+  f <- get(paste0("sas_f_", fname), envir = asNamespace("sasonr"))
   res <- switch(fname,
     putn = sas_format(vals[[1]], vals[[2]]),
     putc = sas_format(vals[[1]], vals[[2]]),
-    do.call(get(paste0("sas_f_", fname), envir = asNamespace("sasonr")), vals)
+    if (fname %in% names(fn_policy)) {
+      # invalid arguments: one NOTE for the %SYSFUNC call (SAS 9.4), not the DATA step NOTEs
+      old <- list(err = rt$err, notes = rt$notes, math = rt$math, mv = rt$mv)
+      r <- do.call(sas_fcall, c(list(fname, f), vals))
+      bad <- isTRUE(rt$err) && !isTRUE(old$err)
+      rt$err <- old$err
+      rt$notes <- old$notes
+      rt$math <- old$math
+      rt$mv <- old$mv
+      if (bad && is.function(rt$on_note)) {
+        rt$on_note(c("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution. The result of the operations",
+                     "      have been set to a missing value."))
+      }
+      r
+    } else {
+      do.call(f, vals)
+    }
   )
   if (is.numeric(res)) {
     if (!is.null(fmt)) return(sas_format(res, fmt))
-    return(trimws(sas_fmt_best(res, 12L)))
+    # numeric results without a format: BEST32. without blanks (SAS 9.4: 15 significant digits)
+    return(trimws(sas_fmt_best(res, 32L)))
   }
   if (!is.null(fmt)) return(sas_format(res, fmt))
   res
