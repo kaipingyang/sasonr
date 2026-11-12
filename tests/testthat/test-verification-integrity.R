@@ -144,12 +144,16 @@ test_that("HIGH 6: when the variables cannot be derived from the parsed step, sa
 
 test_that("MEDIUM 1: PROC FREQ statistics use the common strict gate", {
   d <- "data d; input a $ b $ n; datalines;\nX Y 3\nX Z 4\nW Y 5\nW Z 2\n;\nrun;\n"
+  # CMH became verified (freq_stats c51-c57); CMH1 is still unverified and shows
+  # that the PROC FREQ statistics go through the common strict gate.
   withr::with_options(list(sasonr.strict = TRUE), {
-    expect_error(sas_run(paste(d, "proc freq data=d; tables a*b / cmh; weight n; run;")), class = "sasonr_not_verified")
+    e <- tryCatch(sas_run(paste(d, "proc freq data=d; tables a*b / cmh1; weight n; run;")), error = function(z) z)
+    expect_s3_class(e, "sasonr_not_verified")
+    expect_match(conditionMessage(e), "PROC FREQ statistic CMH1", fixed = TRUE)
   })
   withr::with_options(list(sasonr.strict = FALSE), {
     n <- 0L
-    withCallingHandlers(sas_run(paste(d, "proc freq data=d noprint; tables a*b / cmh; weight n; output out=o cmh; run;")),
+    withCallingHandlers(try(sas_run(paste(d, "proc freq data=d; tables a*b / cmh1; weight n; run;")), silent = TRUE),
                         sasonr_unverified = function(w) {
                           n <<- n + 1L
                           invokeRestart("muffleWarning")
