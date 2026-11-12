@@ -619,6 +619,10 @@ conf_key_messages_marked <- function(lines, version = 1L) {
   out
 }
 
+# One sas_run() of a program segment in a fresh directory.  On an error the
+# result is a "conf_fail" whose `partial` holds the result of the steps run
+# before the error (NULL after a time limit or when it cannot be built) and
+# keeps its run directory.
 conf_matrix_run_segment <- function(code, data_dir, limit) {
   d <- tempfile("sasonr_mx_")
   dir.create(d)
@@ -628,20 +632,22 @@ conf_matrix_run_segment <- function(code, data_dir, limit) {
   on.exit(setwd(old), add = TRUE)
   setTimeLimit(elapsed = limit, transient = TRUE)
   on.exit(setTimeLimit(elapsed = Inf), add = TRUE)
-  res <- tryCatch(
-    withCallingHandlers(sas_run(code, on_error = "abort"), warning = function(w) invokeRestart("muffleWarning")),
-    error = function(e) {
-      m <- conditionMessage(e)
-      structure(list(unsupported = inherits(e, "sasonr_unsupported"), line = suppressWarnings(as.integer(e$sas_line %||% NA)),
-                     msg = paste0("[", class(e)[1], "] ", m), timeout = grepl("time limit", m, fixed = TRUE)),
-                class = "conf_fail")
-    }
+  rp <- tryCatch(
+    withCallingHandlers(engine_run_partial(code), warning = function(w) invokeRestart("muffleWarning")),
+    error = function(e) list(result = NULL, error = e)
   )
   setTimeLimit(elapsed = Inf)
-  if (inherits(res, "conf_fail")) {
-    unlink(d, recursive = TRUE)
-    return(res)
+  if (!is.null(rp$error)) {
+    e <- rp$error
+    m <- conditionMessage(e)
+    timeout <- grepl("time limit", m, fixed = TRUE)
+    partial <- if (timeout) NULL else rp$result
+    if (is.null(partial)) unlink(d, recursive = TRUE) else partial$run_dir <- d
+    return(structure(list(unsupported = inherits(e, "sasonr_unsupported"), line = suppressWarnings(as.integer(e$sas_line %||% NA)),
+                          msg = paste0("[", class(e)[1], "] ", m), timeout = timeout, partial = partial),
+                     class = "conf_fail"))
   }
+  res <- rp$result
   res$run_dir <- d
   res
 }
@@ -658,14 +664,21 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
   if (!dir.exists(exp)) return(lapply(stats::setNames(bl$ids, bl$ids), function(id) modifyList(blank(id), list(status = "no_gold"))))
   data_dir <- file.path(case, "data")
   per <- as.numeric(meta$timeout %||% 30)
+  # the gold logs hold the step NOTEs (testthat turns them off, helper-options.R)
+  old_opt <- options(sasonr.step_notes = TRUE)
+  on.exit(options(old_opt), add = TRUE)
   segs <- list()
   owner <- rep(NA_integer_, n)
   fails <- vector("list", n)
+  partial_dirs <- character()
+  on.exit(unlink(partial_dirs, recursive = TRUE), add = TRUE)
   run <- function(idx) {
     r <- conf_matrix_run_segment(conf_matrix_segment(lines, bl, idx), data_dir, per + 5 * length(idx))
     if (!inherits(r, "conf_fail")) {
       segs[[length(segs) + 1L]] <<- r
       owner[idx] <<- length(segs)
+    } else if (!is.null(r$partial)) {
+      partial_dirs <<- c(partial_dirs, r$partial$run_dir)
     }
     r
   }
@@ -673,22 +686,39 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
     r <- run(j)
     if (inherits(r, "conf_fail")) fails[[j]] <<- r
   }
+  # the blocks to run: all, or only those of the selected cases (`only`; the
+  # blocks are independent steps)
+  sel <- if (is.null(only)) seq_len(n) else which(bl$ids %in% only)
   start <- 1L
-  while (start <= n) {
-    idx <- start:n
+  while (start <= length(sel)) {
+    idx <- sel[start:length(sel)]
     r <- run(idx)
     if (!inherits(r, "conf_fail")) break
     k <- if (is.na(r$line)) NA_integer_ else which(bl$begin <= r$line & bl$end >= r$line)[1]
-    if (is.na(k) || k < start) {
+    pos <- match(k, sel)
+    if (is.na(pos) || pos < start) {
       one_by_one(idx)
       break
     }
-    if (k > start) {
-      r2 <- run(start:(k - 1L))
-      if (inherits(r2, "conf_fail")) one_by_one(start:(k - 1L))
+    if (pos > start) {
+      before <- sel[start:(pos - 1L)]
+      if (!is.null(r$partial)) {
+        # the cases before the failing one ran to completion in this segment:
+        # keep their results (without the failing case's data set)
+        p <- r$partial
+        ds_k <- tolower(conf_matrix_ds_name(bl$ids[k]))
+        p$work[[ds_k]] <- NULL
+        p$meta[[ds_k]] <- NULL
+        partial_dirs <- setdiff(partial_dirs, p$run_dir)
+        segs[[length(segs) + 1L]] <- p
+        owner[before] <- length(segs)
+      } else {
+        r2 <- run(before)
+        if (inherits(r2, "conf_fail")) one_by_one(before)
+      }
     }
     fails[[k]] <- r
-    start <- k + 1L
+    start <- pos + 1L
   }
   on.exit(for (s in segs) unlink(s$run_dir, recursive = TRUE), add = TRUE)
 
@@ -815,4 +845,45 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
     out[[id]] <- o
   }
   out
+}
+
+# ---- test tiers ----------------------------------------------------------------------------
+#
+# none   R CMD check (NOT_CRAN unset) or SASONR_CONFORMANCE=none: unit tests only
+# smoke  local devtools::test() (NOT_CRAN=true), the default: unit tests and a
+#        deterministic sample of the conformance cases (conf_smoke_units())
+# full   SASONR_CONFORMANCE=full: every case.  The release check is
+#        tools/run_conformance.R; this tier mirrors it inside testthat.
+conf_tier <- function() {
+  v <- tolower(Sys.getenv("SASONR_CONFORMANCE"))
+  if (v %in% c("none", "smoke", "full")) return(v)
+  if (!identical(Sys.getenv("NOT_CRAN"), "true")) return("none")
+  "smoke"
+}
+
+# Test units of a conformance root: list(case, ids, subset).  `ids` is NULL for a
+# one-program case, the case ids of a matrix program otherwise (`subset`: run only
+# these blocks).  fn_examples/ is compared call by call in test-fn-examples.R.
+# Smoke rule (stable, no randomness): the first case (sorted path) of every
+# directory that holds cases - one per function directory (functions/<FN>/) and
+# per flat area (rounding/, semantics/, parse_stress/, freq_stats/, ...) - and
+# the first case (cases.csv order) of every function / format matrix.
+conf_units_for_tier <- function(root, tier = conf_tier()) {
+  cases <- conf_list_cases(root)
+  rel <- substring(cases, nchar(root) + 2L)
+  keep <- !startsWith(rel, "fn_examples/")
+  cases <- cases[keep]
+  rel <- rel[keep]
+  matrix <- vapply(cases, function(d) identical(conf_read_meta(file.path(d, "meta.yaml"))$layout, "matrix"), TRUE)
+  if (tier == "smoke") {
+    grp <- dirname(rel)
+    keep <- matrix | !duplicated(grp)
+    cases <- cases[keep]
+    matrix <- matrix[keep]
+  }
+  lapply(seq_along(cases), function(k) {
+    if (!matrix[k]) return(list(case = cases[k], ids = NULL, subset = FALSE))
+    ids <- utils::read.csv(file.path(cases[k], "cases.csv"), colClasses = "character")$case
+    if (tier == "smoke") list(case = cases[k], ids = ids[1], subset = TRUE) else list(case = cases[k], ids = ids, subset = FALSE)
+  })
 }

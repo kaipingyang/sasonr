@@ -49,6 +49,22 @@ since <- opt("--since", "", flag_value = "origin/main")
 roots <- if (length(args)) args else "tests/conformance"
 
 suppressMessages(devtools::load_all(".", quiet = TRUE, helpers = FALSE))
+# devtools::load_all() leaves the package functions uncompiled: R's JIT then
+# compiles every closure created at run time (the lexer's local helpers, the
+# macro sink, lapply() bodies ...) again in every sas_run().  Byte-compile the
+# namespace once, as an installed package is (about 20 s; the cases then run
+# about a third faster).
+local({
+  ns <- asNamespace("sasonr")
+  for (nm in ls(ns, all.names = TRUE)) {
+    f <- get(nm, envir = ns, inherits = FALSE)
+    if (is.function(f) && !is.primitive(f)) {
+      unlockBinding(nm, ns)
+      assign(nm, compiler::cmpfun(f), envir = ns)
+      lockBinding(nm, ns)
+    }
+  }
+})
 if (nzchar(strict)) options(sasonr.strict = as.logical(toupper(strict)))
 env <- new.env(parent = asNamespace("sasonr"))
 sys.source("tests/testthat/helper-conformance.R", envir = env)

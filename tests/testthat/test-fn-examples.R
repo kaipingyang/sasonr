@@ -4,7 +4,7 @@
 # (tests/conformance/fn_examples/<FN>/, local assets; skipped without them).
 
 test_that("reference-page examples agree with SAS 9.4", {
-  skip_on_cran()
+  skip_if(conf_tier() == "none", "conformance tier 'none' (R CMD check)")
   skip_if_not_installed("haven")
   root <- conf_root()
   f <- if (is.null(root)) "" else file.path(root, "fn_examples", "results.csv")

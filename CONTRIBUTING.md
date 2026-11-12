@@ -30,6 +30,27 @@ devtools::load_all()
 devtools::test()
 ```
 
+## Test tiers
+
+The conformance cases (real SAS 9.4 output) are local assets, kept out of
+git and of the package build. They run in three tiers:
+
+| Tier | Command | What runs | Time |
+|---|---|---|---|
+| CRAN | `R CMD check` | unit tests only | about 1 min |
+| Dev smoke | `devtools::test()` | unit tests + about 300 conformance cases | about 1.5 min |
+| Full | `Rscript tools/run_conformance.R` | every conformance case, report by area | about 7 min |
+
+* The smoke sample is fixed (no randomness): the first case of every
+  function and format verification matrix, of every function directory and
+  of every other area (rounding, semantics, parse stress, PROC statistics,
+  ...).
+* `tools/run_conformance.R` is the full check and the one run before a
+  release. `tools/run_conformance.R --since` runs only the cases affected by
+  the changes since a commit (incremental regression during development).
+* `SASONR_CONFORMANCE=full` makes `devtools::test()` run every case as well;
+  `SASONR_CONFORMANCE=none` turns the conformance tests off.
+
 ## Code conventions
 
 * tidyverse style, `|>` pipe, `snake_case`.

@@ -72,9 +72,21 @@ SAS runner is configured; without SAS, open an issue with the label
 ## Running cases offline
 
 ```r
-devtools::test()                       # includes the conformance cases if present
-source("tools/run_conformance.R")      # summary report by area
+devtools::test()                       # unit tests + a fixed sample of about 300 cases
 ```
+
+```bash
+Rscript tools/run_conformance.R          # every case: summary report by area
+Rscript tools/run_conformance.R --since  # only the cases affected by your changes
+```
+
+There are three test tiers. `R CMD check` runs the unit tests only (the
+cases are not part of the package build). `devtools::test()` adds a smoke
+sample: the first case of every function and format verification matrix, of
+every function directory and of every other area. `tools/run_conformance.R`
+runs every case and is the check before a release; set
+`SASONR_CONFORMANCE=full` to make `devtools::test()` run every case too, or
+`SASONR_CONFORMANCE=none` to skip the conformance tests.
 
 Each case is compared on several layers: data sets (values and order),
 variable attributes, `PUT` output, key log diagnostics and listing. When a
