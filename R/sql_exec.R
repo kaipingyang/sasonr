@@ -28,18 +28,26 @@ sql_empty_rel <- function(n = 1L) list(data = tibble::tibble(.rows = n), cols = 
 sql_table_rel <- function(src, eng, outer) {
   name <- src$name
   quals <- src$alias %||% name
-  if (!is.null(eng$views[[name]])) {
-    res <- sql_query(eng$views[[name]], eng)
-    res$cols <- lapply(res$cols, function(c) {
-      c$quals <- quals
-      c
-    })
-    return(res)
+  if (identical(src$libref, "sashelp")) {
+    # members exported from the local SAS installation (inst/sashelp, not
+    # committed); a missing member fails loud inside sashelp_member()
+    d <- sashelp_member(name, src$line)
+    m <- meta_from_df(d)
+    o <- src$options
+  } else {
+    if (!is.null(eng$views[[name]])) {
+      res <- sql_query(eng$views[[name]], eng)
+      res$cols <- lapply(res$cols, function(c) {
+        c$quals <- quals
+        c
+      })
+      return(res)
+    }
+    d <- get0(name, envir = eng$wenv, inherits = FALSE)
+    if (is.null(d)) abort_runtime(paste0("File WORK.", toupper(name), ".DATA does not exist."), src$line)
+    m <- eng$meta[[name]] %||% meta_from_df(d)
+    o <- src$options
   }
-  d <- get0(name, envir = eng$wenv, inherits = FALSE)
-  if (is.null(d)) abort_runtime(paste0("File WORK.", toupper(name), ".DATA does not exist."), src$line)
-  m <- eng$meta[[name]] %||% meta_from_df(d)
-  o <- src$options
   if (!is.null(o$in_var)) abort_unsupported("IN= in PROC SQL", src$line)
   vars <- names(d)
   if (!is.null(o$keep)) vars <- intersect(vars, resolve_ds_items(o$keep, vars, src$line))

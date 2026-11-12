@@ -119,15 +119,19 @@ parse_sql_table_name <- function(p) {
   name <- tk_low(p)
   text <- tk_val(p)
   advance(p)
+  libref <- NULL
   if (tk_type(p) == "dot" && tk_type(p, 1L) == "name") {
-    if (name == "dictionary" || name == "sashelp") abort_unsupported(paste0(toupper(name), " tables"), line)
-    if (name != "work") abort_unsupported(paste0("library ", toupper(name), " (only WORK is available)"), line)
+    if (name == "dictionary") abort_unsupported("DICTIONARY tables", line)
+    if (name != "work" && name != "sashelp") {
+      abort_unsupported(paste0("library ", toupper(name), " (only WORK and SASHELP are available)"), line)
+    }
+    libref <- name
     advance(p)
     name <- tk_low(p)
     text <- tk_val(p)
     advance(p)
   }
-  list(name = name, text = text, line = line)
+  list(name = name, text = text, line = line, libref = libref)
 }
 
 # Queries -------------------------------------------------------------------
@@ -410,7 +414,8 @@ parse_sql_source <- function(p) {
     }
   } else {
     tn <- parse_sql_table_name(p)
-    src <- list(kind = "table", name = tn$name, text = tn$text, alias = NULL, options = list(), line = line)
+    src <- list(kind = "table", name = tn$name, text = tn$text, alias = NULL, options = list(),
+                line = line, libref = tn$libref)
     if (tk_type(p) == "lparen") src$options <- parse_ds_options(p, "input")
   }
   if (is_kw(p, "as")) {
