@@ -226,3 +226,14 @@ test_that("unsupported SQL fails loud", {
   expect_error(run_sql(c(base_data, "proc sql; select id from a where sum(x) > 1; quit;")), class = "sasonr_syntax_error")
   expect_error(run_sql(c(base_data, "proc sql; select id from a, b; quit;")), class = "sasonr_syntax_error")
 })
+
+test_that("PROC SQL gives computed character columns the lengths SAS gives", {
+  res <- sas_run("proc sql;
+    create table w as select catx('-', 'a', 'b') as c, compress('a b') as p,
+      scan('a b', 2) as s, substr('abcdef', 2, 3) as t; quit;")
+  m <- res$meta$w
+  expect_equal(m$len$c, 200)  # CAT family keeps the DATA step 200
+  expect_equal(m$len$p, 2)    # constant arguments: the length of the value
+  expect_equal(m$len$s, 1)
+  expect_equal(m$len$t, 3)
+})
