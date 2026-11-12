@@ -786,7 +786,9 @@ mod_domain_check <- function(fname, a, b, exact_only, fuzz_zero = NULL) {
   rng <- function(x) x == 0 | (abs(x) >= 1e-140 & abs(x) <= 1e140)
   bad <- !(rng(aa) & rng(bb))
   qq <- aa / bb
-  r <- stats_fma(-bb, trunc(qq), aa)
+  # the remainder only inside the range (the emulated fma fails loud outside it)
+  r <- rep(NA_real_, length(aa))
+  r[!bad] <- stats_fma(-bb[!bad], trunc(qq[!bad]), aa[!bad])
   bad <- bad | (!bad & qq == trunc(qq) & r != 0)
   if (exact_only) {
     dy <- function(x) abs(x) < 2^53 & (x * 1024) == trunc(x * 1024)
@@ -808,19 +810,22 @@ sas_f_median <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ 
 # DATA step moment functions: the moment kernel (stats_exact.R) with the
 # DATA step derivation.  CSS and what follows from it (VAR, STD, STDERR, CV,
 #
-# for at most 10 non-missing arguments of magnitude 0 or 1E-140..1E140: other
-# rows fail loud.  USS (a plain sequential sum of squares) has no such limit.
+#
+#
+# off): other rows fail loud.  USS (a plain sequential sum of squares) has no
+# such limit.  Rows with an argument of magnitude 1E300 or more are invalid
+# (fn_policy.R sets them to missing) and are not computed.
 ds_moments <- function(fname, m, css_based = TRUE) {
   if (!nrow(m) || !ncol(m)) return(stats_moments(matrix(numeric(), 0, 1), "datastep"))
+  m[rowSums(abs(m) >= 1e300, na.rm = TRUE) > 0, ] <- NA_real_
   if (css_based) {
     n <- rowSums(!is.na(m))
-    big <- which(n > 10)
+    big <- which(n > 9)
     if (length(big)) {
-      abort_unsupported(sprintf("%s() of %d non-missing values: supported for at most 10", toupper(fname), n[big[1]]))
+      abort_unsupported(sprintf("%s() of %d non-missing values: supported for at most 9", toupper(fname), n[big[1]]))
     }
-    # magnitudes of 1E300 and more are invalid arguments (fn_policy.R): the row is set to missing
     ax <- abs(m[!is.na(m)])
-    if (any(ax != 0 & (ax < 1e-140 | ax > 1e140) & ax < 1e300)) {
+    if (any(ax != 0 & (ax < 1e-140 | ax > 1e140))) {
       abort_unsupported(sprintf("%s() of values beyond 1E140 or below 1E-140 in magnitude (not supported)", toupper(fname)))
     }
   }
@@ -860,7 +865,12 @@ sas_f_skewness <- function(...) {
   sk <- ds_moments("skewness", num_args(...))$skew
   #
   #
+  # (600 symmetric lists, shuffled or with one value perturbed; at most 9
   #
+  #
+  # the result separates them; every row with SAS's result non-zero agrees bit
+  #
+  # therefore fail loud.
   if (any(!is.na(sk) & sk != 0 & abs(sk) < 1e-12)) {
     abort_unsupported("SKEWNESS() with a result below 1E-12 in magnitude (possibly a rounding residue of 0; not supported)")
   }
