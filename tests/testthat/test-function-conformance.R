@@ -145,6 +145,10 @@ run;")
   res2 <- sas_run("data c; e = exist('sashelp.class'); f = exist('sashelp.nope'); run;")
   expect_equal(res2$work$c$e, 1)
   expect_equal(res2$work$c$f, 0)
+  # SAS: an explicit TYPE='ANY' is not a valid member type and returns 0
+  res3 <- sas_run("data c; e = exist('work.present', 'ANY'); f = exist('work.absent', 'ANY'); run;")
+  expect_equal(res3$work$c$e, 0)
+  expect_equal(res3$work$c$f, 0)
   # unverified shapes fail loud instead of guessing
   expect_error(sas_run("data c; e = exist('other.ds'); run;"), class = "sasonr_unsupported")
   expect_error(sas_run("data c; e = exist('work.x', 'VIEW'); run;"), class = "sasonr_unsupported")

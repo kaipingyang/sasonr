@@ -509,12 +509,14 @@ sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
 
 #' @export
 # EXIST(member <, type>): 1 when the member exists, 0 otherwise.  WORK and
-# SASHELP are the libraries sasonr knows (R/sashelp.R); any other library, and
-# TYPE values other than ANY/DATA, fail loud because they are not verified.
+# SASHELP are the libraries sasonr knows (R/sashelp.R).  The type argument is a
+# member type: 'DATA' is verified, an explicit 'ANY' is not a valid member type
+# in SAS and returns 0 (TS1M2 probe), and any other type fails loud because it
+# is not verified.
 sas_f_exist <- function(name, type = NULL, .work = NULL, .at = NULL) {
   n <- max(length(name), if (is.null(type)) 1L else length(type))
   nm <- rep_len(as_sas_chr(name), n)
-  ty <- if (is.null(type)) rep_len("ANY", n) else rep_len(toupper(trimws(as_sas_chr(type))), n)
+  ty <- if (is.null(type)) rep_len(NA_character_, n) else rep_len(toupper(trimws(as_sas_chr(type))), n)
   vapply(seq_len(n), function(i) sas_exist_one(nm[i], ty[i], .work, .at), 0)
 }
 
@@ -523,8 +525,10 @@ sas_exist_one <- function(nm, type, .work, .at) {
   if (is.na(nm) || !nzchar(nm)) {
     abort_unsupported("EXIST() of a missing or blank member name (not verified against SAS)")
   }
-  if (!type %in% c("ANY", "DATA")) {
-    abort_unsupported(paste0("EXIST() with TYPE='", type, "' (only ANY and DATA are verified)"))
+  # SAS: an explicit TYPE='ANY' is not a valid member type, EXIST returns 0
+  if (!is.na(type) && identical(type, "ANY")) return(0)
+  if (!is.na(type) && !identical(type, "DATA")) {
+    abort_unsupported(paste0("EXIST() with TYPE='", type, "' (only DATA is verified)"))
   }
   dot <- regexpr("\\.", nm)
   if (dot > 0) {
