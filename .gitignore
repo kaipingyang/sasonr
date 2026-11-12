@@ -21,3 +21,5 @@ tests/conformance/
 tools/sas/work/
 __pycache__/
 *.pyc
+# SAS programs in the conformance cases write results.txt into the CWD
+results.txt
