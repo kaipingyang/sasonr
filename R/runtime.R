@@ -708,8 +708,19 @@ sas_lag_vec <- function(x, n = 1L) {
 strip_zeros <- function(s) ifelse(grepl(".", s, fixed = TRUE), sub("\\.?0+$", "", s), s)
 
 # 15 digits of v (a leading "0" counts as a digit), truncated unless the
-# value is within the display fuzz of the next 15-digit decimal
-best_digits15 <- function(v) {
+# value is within the display fuzz of the next 15-digit decimal.
+#
+# The rule comes from the SAS 9.4 gold of the function matrices (every
+# BEST32. value written in fn_matrix/*/results.txt, 10 rows below): with
+# r = (distance to the next 15-digit decimal) / |v|, SAS rounds up every value
+# with r below 1.9588575719195922E-16 (the smallest r SAS truncates:
+# 4.56388888888888, hex 4012416C16C16C17) and truncates every value with r
+# above 2.7538013767845717E-16 (the largest r SAS rounds up: 3.0725874871931,
+# hex 400894A8BF9CBED5).  In between SAS does both (7 rounded up, 3
+# truncated): the rule is not settled and the value fails loud.
+best_fuzz_lo <- 1.9588575719195922e-16
+best_fuzz_hi <- 2.7538013767845717e-16
+best_digits15 <- function(v, w) {
   a <- abs(v)
   intd <- if (a < 1) 1L else nchar(sprintf("%.0f", floor(a)))
   dd <- max(15L - intd, 0L)
@@ -717,7 +728,13 @@ best_digits15 <- function(v) {
   dot <- regexpr(".", s, fixed = TRUE)
   keep <- paste0(substr(s, 1L, dot - 1L), substr(s, dot + 1L, dot + dd))
   f <- as.numeric(paste0("0.", substring(s, dot + dd + 1L)))
-  if ((1 - f) * 10^-dd / a <= 1.5e-16) keep <- incr_decimal(keep)
+  r <- (1 - f) * 10^-dd / a
+  if (r >= best_fuzz_lo && r <= best_fuzz_hi) {
+    abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), ": whether SAS 9.4 rounds up or truncates the ",
+                             "15th digit of this value at widths above 16 is not settled"))
+  }
+  fuzz <- r < best_fuzz_lo
+  if (fuzz) keep <- incr_decimal(keep)
   r <- as.numeric(paste0(substr(keep, 1L, nchar(keep) - dd), ".", substring(keep, nchar(keep) - dd + 1L)))
   if (v < 0) -r else r
 }
@@ -753,7 +770,7 @@ sas_fmt_best <- function(x, w = 12L) {
     if (w > 16 && v != trunc(v) && abs(v) >= 1e-5) {
       # SAS writes at most 15 digits (a leading 0 counts), truncating unless
       # the value lies within the display fuzz below the next digit
-      v <- best_digits15(v)
+      v <- best_digits15(v, w)
     }
     s <- NA_character_
     if (v == trunc(v) && abs(v) < 10^w) {

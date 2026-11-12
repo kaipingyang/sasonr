@@ -15,15 +15,19 @@ decides what happens when a program uses a feature that is not verified:
 \item \code{TRUE} (the default): the program stops with a condition of class
 \code{sasonr_not_verified} (a subclass of \code{sasonr_unsupported}) that names the
 SAS feature, its status and the SAS line. This applies to \code{approximate}
-features (some results differ from SAS in the last bits), \code{unverified}
-ones (no SAS case) and features missing from the registry.
+features (some results differ from SAS in the last bits), \code{mismatch}
+ones (some result, display or log line differs), \code{unverified} ones (no SAS
+case), features missing from the registry, and functions called in a
+context (DATA step, WHERE, PROC SQL, \verb{\%SYSFUNC}) in which they have not
+been verified.
 \item \code{FALSE}: the program runs; each such feature gives a warning of class
 \code{sasonr_unverified}.
 }
 
-\code{verified} features, \code{partial} ones (the inputs that are known to differ
-from SAS fail loud in both modes) and clock-dependent \code{not_comparable}
-functions (\code{TODAY()}, \code{DATE()}, \code{TIME()}, \code{DATETIME()}) always run.
+\code{verified} features, \code{partial} ones (they run only inside their verified
+input domain; other inputs fail loud in both modes) and clock-dependent
+\code{not_comparable} functions (\code{TODAY()}, \code{DATE()}, \code{TIME()}, \code{DATETIME()})
+run in the contexts in which they have been verified.
 }
 \examples{
 # PROBT() is approximate: some results differ from SAS in the last bits

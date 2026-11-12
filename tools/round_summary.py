@@ -43,8 +43,11 @@ def main(argv):
     ident = st["pass"] + st["both_error"]
     silent = [r for r in rows if r["status"] == "fail" and r["ds"] == "FALSE"]
     known = [r for r in rows if r.get("known_fail")]
-    out = ["bit-identical %d / %d (pass %d, both stop with an ERROR %d); fail loud %d, other differences %d, sasonr error %d"
-           % (ident, n, st["pass"], st["both_error"], st["unsupported"], st["fail"] - len(silent), st["error"]),
+    loud = st["unsupported"] + st["sas_error_unsupported"]
+    out = ["bit-identical %d / %d (pass %d, both stop with an ERROR %d); fail loud %d (of which where SAS stopped %d), "
+           "other-layer differences %d, sasonr R error %d (where SAS stopped %d)"
+           % (ident, n, st["pass"], st["both_error"], loud, st["sas_error_unsupported"], st["fail"] - len(silent),
+              st["error"] + st["sas_error_rerror"], st["sas_error_rerror"]),
            "silent mismatches (L-DS differs, no fail loud): %d%s" % (len(silent), (" - " + ", ".join(
                r["case"] for r in silent[:4])) if silent else ""),
            "SAS errored but sasonr ran (lenient): %d" % st["lenient"],
@@ -59,12 +62,13 @@ def main(argv):
         out.append("approximate (strict = FALSE): not measured (--approx)")
     if "--base" in opts:
         base = {r["case"]: r["status"] for r in read(opts["--base"])}
-        new = [r for r in rows if r["status"] == "unsupported" and base.get(r["case"]) != "unsupported"]
+        loud_st = ("unsupported", "sas_error_unsupported")
+        new = [r for r in rows if r["status"] in loud_st and base.get(r["case"]) not in loud_st]
         strict = sum("sasonr.strict = FALSE" in r["detail"] for r in new)
         top = collections.Counter(feature(r["case"]) for r in new).most_common(5)
         out.append("new fail-loud vs base: %d (strict mode %d, other %d)%s" % (
             len(new), strict, len(new) - strict, (" - " + ", ".join("%s %d" % t for t in top)) if new else ""))
-        gone = sum(1 for r in rows if base.get(r["case"]) == "unsupported" and r["status"] != "unsupported")
+        gone = sum(1 for r in rows if base.get(r["case"]) in loud_st and r["status"] not in loud_st)
         if gone:
             out.append("fail loud resolved vs base: %d" % gone)
     else:

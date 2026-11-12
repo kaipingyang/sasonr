@@ -17,7 +17,7 @@ Day of the week (1 = Sunday). See the \href{https://documentation.sas.com/doc/en
 }
 
 \section{Verification}{
- partial (22 of 23 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (22 of 23 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: WEEKDAY with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

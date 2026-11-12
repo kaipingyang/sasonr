@@ -594,7 +594,7 @@ sas_f_symget <- function(symtab, name, .at = NULL) {
       rt$stop_step <- TRUE
       rt_error(sprintf("ERROR: Symbolic variable name %s must be 32 or fewer characters long.", toupper(substr(nm, 1L, 33L))))
     }
-    v <- if (!grepl("^[A-Za-z_][A-Za-z0-9_]*$", nm)) NULL else if (inherits(symtab, "sasonr_macro_session")) {
+    v <- if (nchar(nm) > 32 || !grepl("^[A-Za-z_][A-Za-z0-9_]*$", nm)) NULL else if (inherits(symtab, "sasonr_macro_session")) {
       mv_get(symtab, tolower(nm))
     } else {
       get0(tolower(nm), envir = symtab, inherits = FALSE)
@@ -666,11 +666,12 @@ prx_compile <- function(re) {
   out
 }
 
-# An invalid regular expression: SAS writes the Perl diagnostic (not
-# reproduced), an ERROR naming the function and the invalid-argument NOTE.
+# An invalid regular expression: SAS writes the Perl compiler's diagnostic
+# ("ERROR: Unmatched [ before HERE mark in regex ...", gold fn_matrix PRXMATCH
+# and PRXCHANGE), which sasonr does not reproduce: fail loud.
 prx_invalid_note <- function(fname, args, .at) {
-  rt_error(sprintf("ERROR: The regular expression passed to the function %s contains a syntax error.", toupper(fname)))
-  note_invalid_arg(fname, 1L, .at, args = args, numbered = TRUE)
+  abort_unsupported(sprintf("%s() of an invalid regular expression (SAS writes the Perl diagnostic, not reproduced)",
+                            toupper(fname)), .at[1] %||% NULL)
 }
 
 #' @export
@@ -804,25 +805,42 @@ mod_domain_check <- function(fname, a, b, exact_only, fuzz_zero = NULL) {
 
 #' @export
 sas_f_median <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else stats::median(v), ...)
+# DATA step moment functions: the moment kernel (stats_exact.R) with the
+# DATA step derivation.  CSS and what follows from it (VAR, STD, STDERR, CV,
+# SKEWNESS, KURTOSIS) are verified on the SAS gold probe fn_probe/STD only
+# for at most 10 non-missing arguments of magnitude 0 or 1E-140..1E140: other
+# rows fail loud.  USS (a plain sequential sum of squares) has no such limit.
+ds_moments <- function(fname, m, css_based = TRUE) {
+  if (!nrow(m) || !ncol(m)) return(stats_moments(matrix(numeric(), 0, 1), "datastep"))
+  if (css_based) {
+    n <- rowSums(!is.na(m))
+    big <- which(n > 10)
+    if (length(big)) {
+      abort_unsupported(sprintf("%s() of %d non-missing values: verified against SAS 9.4 for at most 10", toupper(fname), n[big[1]]))
+    }
+    # magnitudes of 1E300 and more are invalid arguments (fn_policy.R): the row is set to missing
+    ax <- abs(m[!is.na(m)])
+    if (any(ax != 0 & (ax < 1e-140 | ax > 1e140) & ax < 1e300)) {
+      abort_unsupported(sprintf("%s() of values beyond 1E140 or below 1E-140 in magnitude (not verified)", toupper(fname)))
+    }
+  }
+  stats_moments(m, "datastep")
+}
+
 #' @export
-sas_f_std <- function(...) row_stat(function(v) if (length(v) < 2) NA_real_ else stats::sd(v), ...)
+sas_f_std <- function(...) ds_moments("std", num_args(...))$std
 #' @export
-sas_f_var <- function(...) row_stat(function(v) if (length(v) < 2) NA_real_ else stats::var(v), ...)
+sas_f_var <- function(...) ds_moments("var", num_args(...))$var
 #' @export
-sas_f_stderr <- function(...) row_stat(function(v) {
-  n <- length(v)
-  if (n < 2) return(NA_real_)
-  m <- sum(v) / n
-  sqrt(sum((v - m)^2) / (n - 1) / n) # bit-identical to SAS 9.4 (not sd / sqrt(n))
-}, ...)
+sas_f_stderr <- function(...) ds_moments("stderr", num_args(...))$stderr
 #' @export
-sas_f_cv <- function(...) row_stat(function(v) if (length(v) < 2 || mean(v) == 0) NA_real_ else stats::sd(v) / mean(v) * 100, ...)
+sas_f_cv <- function(...) ds_moments("cv", num_args(...))$cv
 #' @export
 sas_f_range <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else max(v) - min(v), ...)
 #' @export
-sas_f_css <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else sum((v - mean(v))^2), ...)
+sas_f_css <- function(...) ds_moments("css", num_args(...))$css
 #' @export
-sas_f_uss <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else sum(v^2), ...)
+sas_f_uss <- function(...) ds_moments("uss", num_args(...), css_based = FALSE)$uss
 #' @export
 sas_f_geomean <- function(...) row_stat(function(v) {
   if (length(v) == 0 || any(v < 0)) return(NA_real_)
@@ -838,21 +856,9 @@ sas_f_harmean <- function(...) row_stat(function(v) {
   length(v) / stats_seq_sum(1 / v)
 }, ...)
 #' @export
-sas_f_skewness <- function(...) row_stat(function(v) {
-  n <- length(v)
-  if (n < 3) return(NA_real_)
-  s <- stats::sd(v)
-  if (s == 0) return(NA_real_)
-  n / ((n - 1) * (n - 2)) * sum(((v - mean(v)) / s)^3)
-}, ...)
+sas_f_skewness <- function(...) ds_moments("skewness", num_args(...))$skew
 #' @export
-sas_f_kurtosis <- function(...) row_stat(function(v) {
-  n <- length(v)
-  if (n < 4) return(NA_real_)
-  s <- stats::sd(v)
-  if (s == 0) return(NA_real_)
-  n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)) * sum(((v - mean(v)) / s)^4) - 3 * (n - 1)^2 / ((n - 2) * (n - 3))
-}, ...)
+sas_f_kurtosis <- function(...) ds_moments("kurtosis", num_args(...))$kurt
 
 kth <- function(k, m, decreasing) {
   kk <- rep_len(k, nrow(m))

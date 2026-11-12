@@ -15,6 +15,18 @@
 # this way.  `sasonr_unsupported` (fail loud) and R errors always abort.  An
 # execution-time ERROR in a DATA step (data sets partly written) still aborts
 # with `sasonr_unsupported`: the partial data sets are not reproduced yet.
+#
+# The variables of the 0-observation data sets come from the parser and the
+# analyzer, never from scanning tokens: the step's AST (or, after a syntax
+# error, a statement-level recovery parse) is translated with the failing
+# statements replaced as SAS compiles them, and the output metadata of that
+# translation (names, types, lengths, formats) is used.  SAS gold
+# (datastep/errors) fixes what a failing statement contributes:
+#   assignment  its target and the variables named before the error (e01, e09, e10)
+#   SET / MERGE nothing; SAS ignores the statement (e05, e08, e11)
+#   PROC SORT   the OUT= data set, with 0 variables (e06)
+# Any other failing statement or PROC fails loud (sasonr_unsupported): what SAS
+# leaves in WORK has not been verified.
 
 err_message_lines <- function(e) {
   msg <- conditionMessage(e)
@@ -28,109 +40,139 @@ err_message_lines <- function(e) {
   paste0("ERROR: ", msg)
 }
 
-# Statements of a chunk of SAS text as token tables (NULL if it cannot be lexed).
-err_statements <- function(text) {
-  tk <- tryCatch(sas_lex(text), error = function(e) NULL)
-  if (is.null(tk) || nrow(tk) == 0) return(NULL)
-  id <- cumsum(c(0L, utils::head(tk$type == "semi", -1L)))
-  out <- split(tk, id)
-  lapply(out, function(s) s[s$type != "semi", , drop = FALSE])
-}
-
-# A [libref.]name at token i: list(name, i = next token) or NULL.
-err_ds_name <- function(s, i) {
-  if (i > nrow(s) || s$type[i] != "name") return(NULL)
-  nm <- tolower(s$value[i])
-  i <- i + 1L
-  if (i + 1L <= nrow(s) && s$type[i] == "dot" && s$type[i + 1L] == "name") {
-    if (nm != "work") return(list(name = NA_character_, i = i + 2L))
-    nm <- tolower(s$value[i + 1L])
-    i <- i + 2L
+# Statement-level recovery parse of the one step in `text` that has a syntax
+# error: the statements that parse are kept as AST, a failing statement becomes
+# list(stmt = "failed", kind, vars) with the variables the parser had read when
+# it failed (SAS skips to the end of the statement and goes on compiling).
+# NULL when the step cannot be recovered (DATA/PROC statement itself fails,
+# a failing block statement, more than one step in the text).
+err_parse_recover <- function(text) {
+  toks <- tryCatch(sas_lex(text), error = function(e) NULL)
+  if (is.null(toks) || nrow(toks) == 0L) return(NULL)
+  toks$type[toks$type == "str_macro"] <- "str"
+  p <- new_parser(toks)
+  while (!at_eof(p) && tk_type(p) == "semi") advance(p)
+  if (at_eof(p) || tk_type(p) != "name") return(NULL)
+  if (is_kw(p, "proc")) {
+    # the PROC statement alone (its options name the output data sets)
+    end <- p$pos
+    while (end <= p$n && p$type[end] != "semi") end <- end + 1L
+    if (end > p$n) return(NULL)
+    sub <- toks[c(p$pos:end, end, end), , drop = FALSE]
+    sub$type[nrow(sub) - 1L] <- "name"
+    sub$value[nrow(sub) - 1L] <- "run"
+    st <- tryCatch(sas_parse(sub, resolved = TRUE), error = function(e) NULL)
+    if (is.null(st) || length(st$steps) != 1L || st$steps[[1]]$type != "proc") return(NULL)
+    return(st$steps[[1]])
   }
-  if (i <= nrow(s) && s$type[i] == "lparen") {
-    depth <- 0L
-    while (i <= nrow(s)) {
-      if (s$type[i] == "lparen") depth <- depth + 1L
-      if (s$type[i] == "rparen") depth <- depth - 1L
-      i <- i + 1L
-      if (depth == 0L) break
+  if (!is_kw(p, "data") || is_op(p, "=", 1L)) return(list(type = "global"))
+  line <- tk_line(p)
+  advance(p)
+  outputs <- tryCatch({
+    out <- list()
+    while (tk_type(p) != "semi") {
+      if (tk_type(p) != "name") abort_syntax("data set name", tk_line(p))
+      out <- c(out, list(parse_ds_ref(p, "output")))
     }
-  }
-  list(name = nm, i = i)
-}
-
-err_kw <- c("if", "then", "else", "do", "end", "to", "by", "while", "until", "and", "or", "not", "in", "eq",
-            "ne", "lt", "le", "gt", "ge", "of")
-
-# Output data sets of the step in `text` and the variables SAS has compiled
-# when the step stops: list(kind, outputs = named list of variable names).
-err_recover_step <- function(text, eng) {
-  st <- err_statements(text)
-  if (is.null(st)) return(list(kind = "unknown", outputs = list()))
-  st <- Filter(function(s) nrow(s) > 0, st)
-  if (!length(st)) return(list(kind = "unknown", outputs = list()))
-  first <- st[[1]]
-  kw <- tolower(first$value[1])
-  if (kw == "proc") {
-    outs <- list()
-    i <- 3L
-    while (i < nrow(first)) {
-      if (first$type[i] == "name" && tolower(first$value[i]) == "out" && first$value[i + 1L] == "=") {
-        d <- err_ds_name(first, i + 2L)
-        if (!is.null(d) && !is.na(d$name)) outs[[d$name]] <- character()
-        i <- if (is.null(d)) i + 2L else d$i
-      } else {
-        i <- i + 1L
-      }
+    advance(p)
+    out
+  }, error = function(e) NULL)
+  if (is.null(outputs) || !length(outputs)) return(NULL)
+  is_null <- vapply(outputs, function(o) o$name == "_null_", logical(1))
+  p$arrays <- character()
+  stmts <- list()
+  repeat {
+    if (at_eof(p)) break
+    if (is_kw(p, "run") && tk_type(p, 1L) == "semi") {
+      advance(p, 2L)
+      if (!at_eof(p)) return(NULL)
+      break
     }
-    return(list(kind = "proc", name = tolower(first$value[2] %||% ""), outputs = outs))
-  }
-  if (kw != "data") return(list(kind = "unknown", outputs = list()))
-  outs <- character()
-  i <- 2L
-  while (i <= nrow(first)) {
-    d <- err_ds_name(first, i)
-    if (is.null(d)) break
-    if (!is.na(d$name) && d$name != "_null_") outs <- c(outs, d$name)
-    i <- d$i
-  }
-  vars <- character()
-  add <- function(v) vars <<- c(vars, setdiff(v, vars))
-  for (s in st[-1]) {
-    k <- tolower(s$value[1])
-    if (k %in% c("run", "datalines", "cards")) break
-    if (k %in% c("set", "merge")) {
-      j <- 2L
-      ds <- character()
-      ok <- TRUE
-      while (j <= nrow(s)) {
-        if (s$type[j] == "name" && j < nrow(s) && s$value[j + 1L] == "=") {
-          if (!tolower(s$value[j]) %in% c("end", "nobs", "point", "indsname", "curobs", "key")) ok <- FALSE
-          j <- j + 3L
-          next
-        }
-        d <- err_ds_name(s, j)
-        if (is.null(d)) {
-          ok <- FALSE
-          break
-        }
-        if (!is.na(d$name)) ds <- c(ds, d$name)
-        j <- d$i
-      }
-      if (ok) for (d in ds) if (!is.null(eng$meta[[d]])) add(eng$meta[[d]]$vars)
+    if (is_kw(p, c("data", "proc")) && !is_op(p, c("=", "+"), 1L)) return(NULL)
+    start <- p$pos
+    p$seen <- character()
+    s <- tryCatch(parse_statement(p), sasonr_syntax_error = function(e) e, error = function(e) NULL)
+    seen <- p$seen
+    p$seen <- NULL
+    if (is.null(s)) return(NULL)
+    if (inherits(s, "condition")) {
+      kind <- if (p$type[start] == "name" && start < p$n && p$type[start + 1L] == "op" && p$value[start + 1L] == "=") "assign" else p$low[start]
+      stmts <- c(stmts, list(list(stmt = "failed", kind = kind, vars = unique(seen), line = p$line[start])))
+      while (!at_eof(p) && tk_type(p) != "semi") advance(p)
+      advance(p)
       next
     }
-    if (nrow(s) >= 2L && s$type[1] == "name" && s$value[2] == "=" && !k %in% err_kw) {
-      add(tolower(s$value[1]))
-      if (nrow(s) > 2L) {
-        r <- s[-(1:2), , drop = FALSE]
-        nxt <- c(r$type[-1], "")
-        nm <- r$type == "name" & !nxt %in% c("lparen", "lbrace", "lbracket", "dot") & !tolower(r$value) %in% err_kw
-        add(tolower(r$value[nm]))
-      }
+    if (s$stmt == "end") return(NULL)
+    stmts <- c(stmts, list(s))
+    if (s$stmt == "datalines") break
+  }
+  list(type = "data", line = line, null = any(is_null), outputs = if (any(is_null)) list() else outputs, stmts = stmts)
+}
+
+# What a failing DATA step statement contributes as SAS compiles it: a list of
+# statements, or NULL when that is not verified against SAS (fail loud).
+err_failed_stmt <- function(kind, vars, target, line) {
+  if (kind %in% c("set", "merge")) return(list())
+  if (kind != "assign" || is.null(target)) return(NULL)
+  tv <- list(node = "var", name = target, text = target, line = line)
+  c(list(list(stmt = "assign", target = tv, value = list(node = "missing", code = ".", line = line), line = line)),
+    lapply(setdiff(vars, target), function(v) {
+      list(stmt = "subset_if", cond = list(node = "var", name = v, text = v, line = line), line = line)
+    }))
+}
+
+# Output metadata (eng$meta form) of a DATA step as SAS compiled it, or NULL.
+err_data_schema <- function(eng, step) {
+  stmts <- list()
+  for (s in step$stmts) {
+    if (identical(s$stmt, "failed")) {
+      r <- err_failed_stmt(s$kind, s$vars, if (s$kind == "assign") s$vars[1] else NULL, s$line)
+      if (is.null(r)) return(NULL)
+      stmts <- c(stmts, r)
+    } else {
+      stmts <- c(stmts, list(s))
     }
   }
-  list(kind = "data", outputs = stats::setNames(rep(list(vars), length(outs)), outs))
+  step$stmts <- stmts
+  for (attempt in seq_len(length(stmts) + 1L)) {
+    tr <- tryCatch(translate_step(step, eng$meta, eng$level),
+                   sasonr_syntax_error = function(e) e, sasonr_runtime_error = function(e) e, error = function(e) NULL)
+    if (is.null(tr)) return(NULL)
+    if (!inherits(tr, "condition")) return(tr$meta[vapply(step$outputs, `[[`, "", "name")])
+    # an ERROR of the analyzer at one statement: replace it as SAS compiles it
+    ln <- tr$sas_line
+    k <- which(vapply(step$stmts, function(s) identical(as.integer(s$line), as.integer(ln)), logical(1)))
+    if (length(k) != 1L) return(NULL)
+    s <- step$stmts[[k]]
+    kind <- if (s$stmt == "assign" && identical(s$target$node, "var")) "assign" else s$stmt
+    vars <- if (kind == "assign") c(s$target$name, expr_reads(s$value)) else character()
+    r <- err_failed_stmt(kind, vars, if (kind == "assign") s$target$name else NULL, s$line)
+    if (is.null(r)) return(NULL)
+    step$stmts <- append(step$stmts[-k], r, after = k - 1L)
+  }
+  NULL
+}
+
+# Output data sets of the failing step and their metadata (eng$meta form) as
+# SAS has compiled them when the step stops: list(kind, outputs), or NULL
+# when they cannot be derived from the parsed step.
+err_recover_step <- function(eng, text) {
+  step <- eng$cur_step %||% err_parse_recover(text)
+  if (is.null(step)) return(NULL)
+  if (step$type == "proc") {
+    outs <- list()
+    if (step$name == "sort" && !is.null(step$options$out)) {
+      outs[[step$options$out$name]] <- list(vars = character(), type = list(), len = list(), formats = list(), disp = list())
+    } else if (step$name != "print") {
+      return(NULL)
+    }
+    return(list(kind = "proc", outputs = outs))
+  }
+  if (step$type != "data") return(list(kind = "global", outputs = list()))
+  if (isTRUE(step$null) || !length(step$outputs)) return(list(kind = "data", outputs = list()))
+  meta <- err_data_schema(eng, step)
+  if (is.null(meta) || any(vapply(meta, is.null, logical(1)))) return(NULL)
+  list(kind = "data", outputs = meta)
 }
 
 err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
@@ -148,11 +190,17 @@ engine_step_error <- function(eng, e, text) {
     abort_unsupported(paste0("the data sets that an execution-time ERROR leaves in WORK (", conditionMessage(e), ")"),
                       e$sas_line %||% NULL)
   }
+  in_sql <- isTRUE(eng$sql_open) || identical(eng$phase, "sql")
+  rec <- if (in_sql) NULL else err_recover_step(eng, text)
+  if (!in_sql && is.null(rec)) {
+    abort_unsupported(paste0("the data sets that this ERROR leaves in WORK could not be derived from the parsed step (",
+                             conditionMessage(e), ")"), e$sas_line %||% NULL)
+  }
   eng$status <- "error"
   eng$errors <- c(eng$errors, conditionMessage(e))
   if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
   eng$log <- c(eng$log, err_message_lines(e))
-  if (isTRUE(eng$sql_open) || identical(eng$phase, "sql")) {
+  if (in_sql) {
     if (!isTRUE(eng$sql_noexec)) {
       eng$log <- c(eng$log, "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.")
     }
@@ -160,7 +208,6 @@ engine_step_error <- function(eng, e, text) {
     err_set_macro(eng, syscc = 1012)
     return(invisible())
   }
-  rec <- err_recover_step(text, eng)
   eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
   if (!isTRUE(eng$syntax_check) && !isTRUE(eng$nosyntaxcheck)) {
     eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
@@ -169,25 +216,27 @@ engine_step_error <- function(eng, e, text) {
   }
   for (nm in names(rec$outputs)) {
     old <- get0(nm, envir = eng$wenv, inherits = FALSE)
-    vars <- rec$outputs[[nm]]
+    m <- rec$outputs[[nm]]
     eng$log <- c(eng$log, sprintf(
       "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and %d variables.",
-      toupper(nm), length(vars)))
+      toupper(nm), length(m$vars)))
     if (!is.null(old)) {
       eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because this step was stopped.", toupper(nm)))
     } else {
-      engine_empty_dataset(eng, nm, vars)
+      engine_empty_dataset(eng, nm, m)
     }
   }
   err_set_macro(eng, syserr = 1012, syscc = if (identical(rec$kind, "proc")) 3000 else 1012)
   invisible()
 }
 
-# A data set with 0 observations and the given (numeric unless known) variables.
-engine_empty_dataset <- function(eng, nm, vars, types = NULL) {
-  cols <- lapply(vars, function(v) if (identical(types[[v]], "char")) character() else numeric())
+# A data set with 0 observations and the variables (types, lengths, formats)
+# of the output metadata `m` (eng$meta form).
+engine_empty_dataset <- function(eng, nm, m) {
+  vars <- m$vars %||% character()
+  cols <- lapply(vars, function(v) if (identical(m$type[[v]], "char")) character() else numeric())
   d <- tibble::as_tibble(stats::setNames(cols, vars), .rows = 0L)
   assign(nm, d, envir = eng$wenv)
-  eng$meta[[nm]] <- meta_from_df(d)
+  eng$meta[[nm]] <- utils::modifyList(meta_from_df(d), m)
   invisible()
 }

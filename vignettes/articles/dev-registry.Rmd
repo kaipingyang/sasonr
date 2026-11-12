@@ -17,7 +17,7 @@ offline conformance cases (gold standard: SAS 9.4).
 
 ```{r}
 reg <- utils::read.csv(system.file("registry", "semantics.csv", package = "sasonr"),
-                       stringsAsFactors = FALSE)
+                       stringsAsFactors = FALSE, colClasses = "character")
 cat(sprintf("Entries: %d (verified %d, partial %d, unsupported %d, not applicable %d)",
             nrow(reg), sum(reg$sasonr_status == "verified"),
             sum(reg$sasonr_status == "partial"),

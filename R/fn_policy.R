@@ -71,8 +71,11 @@ dom_datetime <- function(args) {
   ifelse(is.na(x) | sas_date_ok(x / 86400), "ok", ifelse(abs(x) >= 1e15, "inv", "?"))
 }
 
-# descriptive statistics: overflow of a 1e300 argument is invalid; fewer than
-# `need` non-missing values give a missing result with the missing-values NOTE
+# descriptive statistics: an argument of magnitude 1E300 is an invalid argument
+# (SAS 9.4 gold fn_matrix MEAN_00b9bb, CSS_8953d9 and the other "huge" cases);
+# no gold value lies between 1E150 and 1E300, so that range fails loud ("?";
+# below 1E150 the squares of CSS/USS/VAR cannot overflow); fewer than `need`
+# non-missing values give a missing result with the missing-values NOTE
 dom_stat <- function(need, zero_var = FALSE, zero_mean = FALSE) {
   force(need)
   function(args) {
@@ -122,8 +125,11 @@ fn_policy <- list(
   cos = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   sin = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   tan = fpol("mv", dom = function(a) {
+    # SAS 9.4 gold fn_matrix TAN_577ff2: TAN(1.5707963267948966), the double
+    # nearest pi/2, is an invalid argument.  Other arguments whose cosine is
+    # that close to 0 (below 1E-15 in magnitude) have no gold: fail loud.
     x <- dom_n(a, 1)
-    dom_or(dom_huge(x, 1e10), code_if(abs(cos(x)) < 1e-15, "inv"))
+    dom_or(dom_huge(x, 1e10), code_if(abs(x) == 1.5707963267948966, "inv"), code_if(abs(cos(x)) < 1e-15, "?"))
   }),
   cosh = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), log(.Machine$double.xmax), 710)),
   sinh = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), log(.Machine$double.xmax), 710)),
@@ -135,7 +141,10 @@ fn_policy <- list(
   sqrt = fpol("mv", dom = function(a) code_if(dom_n(a, 1) < 0, "inv")),
   gamma = fpol("mv", dom = function(a) {
     x <- dom_n(a, 1)
-    dom_or(code_if(x <= 0 & is_int(x), "inv"), code_if(x > 171.62, "inv"), code_if(x > 0 & x <= 1e-300, "inv"),
+    # SAS 9.4 gold fn_matrix GAMMA_84cec2 / GAMMA_bc82ce: GAMMA(171) is a number,
+    # GAMMA(172) an invalid argument; arguments in between have no gold (fail loud)
+    dom_or(code_if(x <= 0 & is_int(x), "inv"), code_if(x >= 172, "inv"), code_if(x > 171 & x < 172, "?"),
+           code_if(x > 0 & x <= 1e-300, "inv"),
            code_if(x > 1e-300 & x < 1e-15, "?"), code_if(x < -170, "?"))
   }),
   lgamma = fpol("mv", dom = function(a) code_if(dom_n(a, 1) <= 0, "inv")),
@@ -160,7 +169,6 @@ fn_policy <- list(
   month = fpol("mv", dom = dom_date),
   year = fpol("mv", dom = dom_date),
   qtr = fpol("mv", dom = dom_date_huge),
-  weekday = fpol("mv", dom = dom_date_huge),
   juldate = fpol("mv", dom = dom_date_huge),
   juldate7 = fpol("mv", dom = dom_date_huge),
   hour = fpol("mv", dom = dom_time),
@@ -340,8 +348,7 @@ fn_policy <- list(
   }, nan = "math"),
   # selection
   choosen = fpol("mv", pos = 1L, dom = function(a) choose_dom(a), nan = "none"),
-  choosec = fpol("mv", pos = 1L, dom = function(a) choose_dom(a), nan = "none", math = FALSE),
-  byte = fpol("mv", dom = function(a) code_if(dom_n(a, 1) < 0 | dom_n(a, 1) >= 256, "inv"), nan = "none", math = FALSE)
+  choosec = fpol("mv", pos = 1L, dom = function(a) choose_dom(a), nan = "none", math = FALSE)
 )
 
 # letters outside ASCII: case mapping depends on the session encoding (not verified)
@@ -475,7 +482,13 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   blank <- if (num) NA_real_ else ""
   # no valid row: the implementation is not called (arguments may be of the wrong type)
   fargs <- if (".at" %in% names(formals(.f))) c(args, list(.at = .at)) else args
-  res <- if (all(miss & p$miss != "none" | dom != "ok")) rep(blank, n) else suppressWarnings(do.call(.f, fargs))
+  # R warnings of the implementation (NaNs produced ...) are not SAS messages:
+  # the SAS NOTEs come from the policy above.  Only that warning class is
+  # muffled; any other warning reaches the caller.
+  res <- if (all(miss & p$miss != "none" | dom != "ok")) rep(blank, n) else withCallingHandlers(
+    do.call(.f, fargs),
+    warning = function(w) if (grepl("NaNs produced|value out of range", conditionMessage(w))) invokeRestart("muffleWarning")
+  )
   if (num && p$nan != "none") {
     bad_res <- !miss & dom == "ok" & (is.infinite(res) | is.na(res))
     dom[bad_res] <- p$nan

@@ -4,7 +4,7 @@
 # (tests/conformance/fn_examples/<FN>/, local assets; skipped without them).
 
 test_that("reference-page examples agree with SAS 9.4", {
-  skip_on_cran()
+  skip_if(conf_tier() == "none", "conformance tier 'none' (R CMD check)")
   skip_if_not_installed("haven")
   root <- conf_root()
   f <- if (is.null(root)) "" else file.path(root, "fn_examples", "results.csv")
@@ -17,7 +17,9 @@ test_that("reference-page examples agree with SAS 9.4", {
     rt$prx <- list()
     env <- new.env(parent = environment())
     for (i in which(res$fn == fn)) {
-      v <- suppressWarnings(eval(parse(text = res$r[i])[[1]], envir = env))
+      # an example outside a verified domain now fails loud (not a silent difference)
+      v <- tryCatch(suppressWarnings(eval(parse(text = res$r[i])[[1]], envir = env)), sasonr_unsupported = function(e) NULL)
+      if (is.null(v)) next
       if (is.logical(v)) v <- as.numeric(v)
       s <- ds[[paste0("r", res$k[i])]]
       label <- paste0(fn, ": ", res$sas[i])

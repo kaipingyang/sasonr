@@ -26,31 +26,38 @@ widths too small for the value and invalid input (with `?`/`??`).
 Each case is classified as
 
 * **pass** – every compared layer agrees with SAS (data set values bit for
-  bit, result length, `_ERROR_`, log NOTEs, PUT output);
+  bit, result length, `_ERROR_`, log NOTEs, PUT output, listing); when SAS
+  stops with an ERROR, sasonr must report a SAS ERROR at the same step;
 * **approximate** – only numbers differ, in the last bits (typically a
   probability function computed with a different algorithm); this is not a
   pass;
-* **log** – the values agree, only a log NOTE differs;
-* **unsupported** – sasonr stops with `sasonr_unsupported` (fail loud);
-* **mismatch** – any other difference (must be zero).
+* **unsupported** – sasonr stops with `sasonr_unsupported` (fail loud) where
+  SAS ran;
+* **mismatch** – any other difference: a value, the display of a value, a
+  log NOTE, or sasonr failing loud or stopping with an R error where SAS
+  stopped with an ERROR.
 
 Every comparison is exact: numbers bit for bit (IEEE 754 pattern),
 character values after removing trailing blanks; there is no tolerance.
-A feature is **verified** when all its cases pass, **approximate** when some
-of its results differ from SAS in the last bits (the algorithm differs; with
-`sasonr.strict = TRUE` it fails loud), **partial** when no case is a mismatch
-but some differ in a log NOTE only or fail loud,
-**not_comparable** when its value depends on the session clock (only the
-type and range are compared) and **unverified** when it has no case yet.
+A feature is **verified** when all its cases pass; **partial** when some
+cases pass and every other case fails loud (the feature runs only inside its
+verified domain: a run-time guard makes every other input fail loud in both
+modes); **not_comparable** when its value depends on the session clock (only
+the type and range are compared); **approximate** when some results differ
+from SAS in the last bits; **mismatch** when some case differs in any other
+way; **unsupported** when every case fails loud; **unverified** when it has
+no case yet. A function also records the contexts in which its cases agree
+(`contexts_verified`: DATA step, PROC SQL, `%SYSFUNC`).
 
 The option `sasonr.strict` (default `TRUE`) uses the status at run time:
-a program that uses an `approximate` or `unverified` function, format or
-informat (or one missing from the registry) stops with a condition of class
-`sasonr_not_verified`, a subclass of `sasonr_unsupported`, that names the
-feature, its status and the SAS line. With `options(sasonr.strict = FALSE)`
-the program runs and each such feature gives a warning of class
-`sasonr_unverified`. `verified`, `partial` (the inputs known to differ fail
-loud in both modes) and `not_comparable` features always run.
+a program that uses a function, format or informat that is not `verified`,
+`partial` or `not_comparable` (or one missing from the registry), or a
+function in a context in which it has not been verified (WHERE expressions
+have no cases yet), stops with a condition of class `sasonr_not_verified`, a
+subclass of `sasonr_unsupported`, that names the feature, its status or
+context and the SAS line. PUTN, PUTC, INPUTN and INPUTC check the format they
+name at run time. With `options(sasonr.strict = FALSE)` the program runs and
+each such feature gives a warning of class `sasonr_unverified`.
 
 The cases of a function or format are one SAS program (one step per case,
 inputs listed per case); each case is still compared on its own: the
@@ -62,17 +69,28 @@ value bit for bit, type and length, `_ERROR_`, the log NOTEs of its step
 ```{r}
 fn <- utils::read.csv(system.file("registry", "functions.csv", package = "sasonr"),
                       stringsAsFactors = FALSE)
-tab <- table(factor(fn$status, c("verified", "approximate", "partial", "not_comparable", "unverified", "mismatch")))
+tab <- table(factor(fn$status, c("verified", "partial", "not_comparable", "approximate", "mismatch", "unsupported", "unverified")))
 cat(sprintf("Functions: %d (%s); cases: %d, of which %d agree bit for bit.",
             nrow(fn), paste(sprintf("%s %d", names(tab), as.integer(tab)), collapse = ", "),
             sum(fn$cases), sum(fn$pass)))
 ```
 
 ```{r}
-knitr::kable(fn[, c("name", "status", "cases", "pass", "approximate", "log_only", "unsupported",
+knitr::kable(fn[, c("name", "status", "cases", "pass", "approximate", "mismatch", "unsupported",
                     "result_length", "contexts_verified", "note")],
-             col.names = c("Function", "Status", "Cases", "Exact", "Approximate", "Log", "Fail loud",
-                           "Result length", "Contexts (all pass)", "Note"))
+             col.names = c("Function", "Status", "Cases", "Exact", "Approximate", "Other differences", "Fail loud",
+                           "Result length", "Verified contexts", "Note"))
+```
+
+Besides the matrix, some functions have targeted probes (`fn_probe`: several
+hundred random arguments each, one SAS program per probe). A `partial`
+function whose differences from SAS are confined to identifiable inputs has
+a **verified domain**; a run-time check makes every input outside it fail
+loud (`sasonr_unsupported`), in strict mode and outside it:
+
+```{r}
+dom <- fn[nzchar(fn$domain %||% ""), c("name", "domain")]
+knitr::kable(dom, col.names = c("Function", "Verified domain (other inputs fail loud)"), row.names = FALSE)
 ```
 
 Besides the matrix, some functions have targeted probes (`fn_probe`: several
@@ -91,7 +109,7 @@ knitr::kable(dom, col.names = c("Function", "Verified domain (other inputs fail 
 ```{r}
 fm <- utils::read.csv(system.file("registry", "formats.csv", package = "sasonr"),
                       stringsAsFactors = FALSE)
-tab <- table(factor(fm$status, c("verified", "approximate", "partial", "unverified", "mismatch")))
+tab <- table(factor(fm$status, c("verified", "partial", "approximate", "mismatch", "unsupported", "unverified")))
 cat(sprintf("Formats and informats: %d (%s); cases: %d, of which %d agree bit for bit.",
             nrow(fm), paste(sprintf("%s %d", names(tab), as.integer(tab)), collapse = ", "),
             sum(fm$cases), sum(fm$pass)))
@@ -99,9 +117,9 @@ cat(sprintf("Formats and informats: %d (%s); cases: %d, of which %d agree bit fo
 
 ```{r}
 knitr::kable(fm[, c("name", "kind", "status", "sas_minw", "sas_defw", "sas_maxw", "cases", "pass",
-                    "approximate", "log_only", "unsupported", "note")],
+                    "approximate", "mismatch", "unsupported", "note")],
              col.names = c("Name", "Kind", "Status", "Min w", "Default w", "Max w", "Cases", "Exact",
-                           "Approximate", "Log", "Fail loud", "Note"))
+                           "Approximate", "Other differences", "Fail loud", "Note"))
 ```
 
 Width limits are those SAS 9.4 reports for the format (`dictionary.formats`).

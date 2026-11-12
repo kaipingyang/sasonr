@@ -19,7 +19,7 @@ Hyperbolic sine. See the \href{https://documentation.sas.com/doc/en/lefunctionsr
 }
 
 \section{Verification}{
- approximate (356 of 419 SAS 9.4 cases agree bit for bit; 63 case(s) differ in the last bits (largest relative difference 1.2e-16; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (356 of 419 SAS 9.4 cases agree bit for bit; 62 case(s) differ in the last bits; 1 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

@@ -19,7 +19,7 @@ Number of permutations. See the \href{https://documentation.sas.com/doc/en/lefun
 }
 
 \section{Verification}{
- approximate (232 of 331 SAS 9.4 cases agree bit for bit; 96 case(s) differ in the last bits (largest relative difference -Inf; different algorithm); 3 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (232 of 331 SAS 9.4 cases agree bit for bit; 96 case(s) differ in the last bits; 3 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

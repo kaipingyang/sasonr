@@ -18,7 +18,15 @@ new_parser <- function(tokens) {
   p$pos <- 1L
   p$arrays <- character()
   p$where_ctx <- FALSE
+  # variables named so far (recorded only during the statement-level error
+  # recovery of errors.R: the variables SAS has compiled when a statement fails)
+  p$seen <- NULL
   p
+}
+
+parser_saw <- function(p, name) {
+  if (!is.null(p$seen)) p$seen <- c(p$seen, name)
+  invisible()
 }
 
 tk_type <- function(p, k = 0L) {
@@ -276,6 +284,7 @@ parse_name_primary <- function(p) {
       tk_adjacent(p, 0L, 1L) && tk_adjacent(p, 1L, 2L)) {
     name <- paste0(low, ".", tk_low(p, 2L))
     advance(p, 3L)
+    parser_saw(p, name)
     return(list(node = "var", name = name, text = name, line = line))
   }
   if (tk_type(p, 1L) == "dot" && tk_adjacent(p, 0L, 1L)) {
@@ -286,6 +295,7 @@ parse_name_primary <- function(p) {
   }
   if (tk_type(p, 1L) == "lparen") return(parse_call(p))
   advance(p)
+  parser_saw(p, low)
   list(node = "var", name = low, text = tk_val(p, -1L), line = line, col = col)
 }
 

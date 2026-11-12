@@ -19,7 +19,7 @@ Hyperbolic tangent. See the \href{https://documentation.sas.com/doc/en/lefunctio
 }
 
 \section{Verification}{
- approximate (408 of 418 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits (largest relative difference -Inf; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (408 of 418 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

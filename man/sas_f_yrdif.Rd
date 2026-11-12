@@ -21,7 +21,7 @@ Years between two dates under a day-count basis. See the \href{https://documenta
 }
 
 \section{Verification}{
- partial (928 of 1551 SAS 9.4 cases agree bit for bit; 623 case(s) fail loud (sasonr_unsupported)). Verified domain: bases 30/360, ACT/365 and ACT/360; AGE only for dates a whole number of years apart; ACT/ACT only within one calendar year or between two 1 January dates; other inputs fail loud (\code{sasonr_unsupported}). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (927 of 1551 SAS 9.4 cases agree bit for bit; 624 case(s) fail loud (sasonr_unsupported)). Verified domain: bases 30/360, ACT/365 and ACT/360; AGE only for dates a whole number of years apart; ACT/ACT only within one calendar year or between two 1 January dates; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

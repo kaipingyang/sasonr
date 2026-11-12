@@ -1,5 +1,51 @@
 # sasonr (development version)
 
+## Round 11 (2026-11-12): verification integrity
+
+An independent review of round 10 found ways in which results that do not
+match SAS 9.4 could still be counted as verified or run silently. All of
+them are closed; the bit-identical counts went down because cases that had
+been counted as a pass now fail loud or count as differences.
+
+* **A case is a pass only when every layer agrees**: data set values,
+  attributes, log NOTEs, PUT text, written files and listing. The same value
+  written differently (a BEST32. display difference) and a difference in a
+  log NOTE alone are differences, not passes. When SAS stops with an ERROR,
+  sasonr must report a SAS ERROR at the same step; failing loud or stopping
+  with an R error there is counted separately and is not a pass.
+* **Feature statuses**: `partial` now means that some cases pass and every
+  other case fails loud (the feature runs only inside its verified domain;
+  a run-time guard refuses everything else); new statuses `mismatch` and
+  `unsupported` are gated like `approximate` and `unverified`.
+* **Context-aware strict mode**: functions are checked against the contexts
+  in which their cases agree with SAS (DATA step, PROC SQL, `%SYSFUNC`);
+  a function used in another context -- including any WHERE expression, which
+  has no cases yet -- stops with `sasonr_not_verified` in strict mode. PUTN,
+  PUTC, INPUTN and INPUTC check the format they name at run time. Language
+  constructs are recognised by their AST node, not by the name of a function.
+* **BESTw. above 16**: the rounding of the 15th digit is derived from the SAS
+  gold; values in the window where SAS both rounds up and truncates fail loud.
+* **SAS error model**: the empty data sets left by a failing step are now
+  derived from the parsed step and the analyzer (types, lengths, LENGTH,
+  RETAIN, ARRAY); when they cannot be derived, sasonr fails loud.
+* **One moment kernel** for the DATA step functions, PROC MEANS and the PROC
+  SQL summary functions. A new random SAS probe (900 rows, 1 to 12
+  arguments) fixed the DATA step algorithm: STD, VAR, CSS, STDERR and CV are
+  bit-identical for up to 10 non-missing arguments (they fail loud beyond
+  that and are now `partial`), USS is verified, SKEWNESS and KURTOSIS stay
+  approximate.
+* PROC FREQ statistics go through the common PROC statistics registry and
+  `sasonr.strict` (the separate development switch is gone).
+* Fixes found on the way: `SYMGET()` of a name longer than 32 characters,
+  unknown format names (SAS's ERROR 48-59), `HEXw.` wider than 16, `MISSING()`
+  in `%SYSFUNC`, a zero CV of negative values; invalid PRX patterns now fail
+  loud (SAS writes a Perl diagnostic that is not reproduced).
+* Conformance (strict mode): 7,452 of 9,969 cases bit-identical (round 10:
+  7,891 of 9,968), 2,455 fail loud (2,015); no data set value differs
+  silently and no program on which SAS stops runs without an ERROR in
+  sasonr. Functions: 110 verified, 43 partial, 29 approximate, 2 mismatch
+  (CONSTANT, MDY), 4 clock-dependent.
+
 ## Round 10 (2026-11-12): exact procedure statistics, verified domains, SAS error model
 
 * **PROC statistics registry** (`inst/registry/proc_stats.csv`,

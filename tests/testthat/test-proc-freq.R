@@ -93,11 +93,12 @@ proc freq data=z; weight w / zeros; tables a*b / chisq; run;")
 })
 
 test_that("CHISQ, FISHER, CMH and BINOMIAL agree with reference computations", {
-  old <- options(sasonr.freq_unverified_stats = TRUE)
-  on.exit(options(old), add = TRUE)
-  res <- sas_run(paste(freq_data, "proc freq data=d noprint; tables trt*resp / chisq; weight n;
+  # CMH and BINOMIAL are unverified against SAS: strict off, their warnings expected
+  withr::local_options(sasonr.strict = FALSE)
+  res <- withCallingHandlers(sas_run(paste(freq_data, "proc freq data=d noprint; tables trt*resp / chisq; weight n;
     output out=c chisq; run;
-    proc freq data=d noprint; tables s*trt*resp / cmh; weight n; output out=m cmh; run;"))
+    proc freq data=d noprint; tables s*trt*resp / cmh; weight n; output out=m cmh; run;")),
+    sasonr_unverified = function(w) invokeRestart("muffleWarning"))
   tb <- matrix(c(13, 20, 19, 9), 2, dimnames = list(c("A", "B"), c("N", "Y")))
   ref <- suppressWarnings(stats::chisq.test(tb, correct = FALSE))
   ref_aj <- stats::chisq.test(tb, correct = TRUE)
@@ -125,8 +126,6 @@ test_that("CHISQ, FISHER, CMH and BINOMIAL agree with reference computations", {
 })
 
 test_that("listing of statistics and fail-loud surfaces", {
-  old <- options(sasonr.freq_unverified_stats = TRUE)
-  on.exit(options(old), add = TRUE)
   res <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq; weight n; run;"))
   l <- squish(res$listing)
   expect_true("Statistics for Table of trt by resp" %in% l)

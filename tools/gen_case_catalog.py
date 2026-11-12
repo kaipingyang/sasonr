@@ -21,6 +21,7 @@ ROOT = os.path.join(os.path.dirname(HERE), "tests", "conformance")
 
 
 def classify(r):
+    # the rules of conf_case_class() (tests/testthat/helper-conformance.R)
     st = r["status"]
     if st in ("pass", "both_error"):
         return "pass"
@@ -28,16 +29,14 @@ def classify(r):
         return "unsupported"
     if st == "fail":
         fl = r["failed_layers"]
-        if fl == "log":
-            return "log"
         tol = r.get("tol", "")
-        if tol not in ("", "NA") and not re.search("attr|log", fl):
+        if tol not in ("", "NA") and float(tol) <= 1e-9 and not re.search("attr|log|lst", fl):
             return "approximate"
     return "mismatch"
 
 
-MARK = {"pass": "✅", "approximate": "≈ last bits differ (not a pass)", "log": "value ✅ / log NOTE differs",
-        "unsupported": "unsupported (fails loud)", "mismatch": "❌"}
+MARK = {"pass": "✅", "approximate": "≈ last bits differ (not a pass)",
+        "unsupported": "unsupported (fails loud)", "mismatch": "❌ differs (value, display, log or error)"}
 
 
 class Matrix:

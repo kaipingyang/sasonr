@@ -161,7 +161,7 @@ sysfunc_ws_significant <- c("cats", "catx")
 # the feature registry (num -> n, char -> c; "any" arguments are not supported).
 sysfunc_spec_from_registry <- function(fname) {
   spec <- fn_table[[fname]]
-  if (is.null(spec) || fname %in% c(var_info_fns, "put", "input", "symget") || startsWith(fname, "cvt_")) return(NULL)
+  if (is.null(spec) || fname %in% c(var_info_fns, "put", "input", "symget", construct_fns)) return(NULL)
   reg <- sas_feature_registry("functions")
   r <- reg[reg$name == toupper(fname), , drop = FALSE]
   if (!nrow(r) || !nzchar(r$sas_arg_types[1] %||% "")) return(NULL)
@@ -200,9 +200,14 @@ mac_sysfunc <- function(text, line = NULL) {
     if (!startsWith(rest, ",")) abort_syntax("invalid %SYSFUNC argument", line)
     fmt <- mac_parse_format(trimws(substring(rest, 2L)), line)
   }
+  # functions SAS 9.4 refuses in %SYSFUNC (gold fn_matrix MISSING_ed990f)
+  if (fname %in% c("missing")) {
+    abort_runtime(paste0("The function ", toupper(fname), " referenced by %SYSFUNC, %QSYSFUNC, or %SYSCALL cannot be used ",
+                         "within the MACRO function/call-routine interfaces."), line)
+  }
   spec <- sysfunc_table[[fname]] %||% sysfunc_spec_from_registry(fname)
   if (is.null(spec)) abort_unsupported(paste0("%SYSFUNC(", toupper(fname), ")"), line)
-  feature_check("function", fname, line)
+  feature_check("function", fname, line, "sysfunc")
   args <- if (nzchar(trimws(inner))) mq_split_commas(inner) else character()
   args <- mq_unmask(args)
   if (!fname %in% sysfunc_ws_significant) args <- trimws(args)

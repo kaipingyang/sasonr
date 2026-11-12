@@ -2,7 +2,7 @@
 title: "To do and future plan"
 ---
 
-*Updated after every development round. Last update: 2026-11-12 (after round 9: strict by default, compact verification matrices).*
+*Updated after every development round. Last update: 2026-11-12 (after round 11: verification integrity).*
 
 ## Three ways to use sasonr
 
@@ -25,6 +25,7 @@ come later.
 
 | # | Task |
 |---|---|
+| 00 | Verification integrity follow-ups (round 11): WHERE-context cases for the functions (every function in a WHERE expression fails loud until then); `%SYSFUNC` / PROC SQL cases for the functions verified in the DATA step only; the BESTw. (w > 16) window in which SAS both rounds up and truncates the 15th digit; DATA step CSS family beyond 10 arguments and SKEWNESS / KURTOSIS (random probe fn_probe/STD); SAS ERRORs that sasonr still answers with fail loud (CONSTANT, HEX17., format errors) and log texts that differ (MDY in `%SYSFUNC` / PROC SQL) |
 | 0 | PROC MEANS CSS family (STD, VAR, STDERR, CV, USS, SKEWNESS, KURTOSIS): SAS's accumulation is not yet reproduced (88 % of random groups agree bit for bit); until then these statistics stop programs in strict mode |
 | 0a | Remaining `approximate` functions (probability functions, EXP, LOG10, hyperbolic functions, COMB, PERM, GEOMEAN, SKEWNESS, KURTOSIS): last-bit differences from SAS's math library |
 | 0b | Partial data sets after an execution-time ERROR (on_error = "sas"); OPTIONS ERRORS= other than 20; PROC SQL STDERR / CV |

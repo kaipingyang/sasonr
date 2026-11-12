@@ -21,7 +21,7 @@ Writes a character value with a format given at run time. See the \href{https://
 }
 
 \section{Verification}{
- partial (35 of 37 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (35 of 37 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: format $nosuch.; format xyz.; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

@@ -199,8 +199,7 @@ sql_duck_aggregate <- function(eng, gid, G, aggs, order_known = TRUE, line = NUL
     v <- res[[paste0("v", k)]]
     full <- if (is.character(v)) rep(NA_character_, G) else rep(NA_real_, G)
     if (!is.character(v)) {
-      v <- as.numeric(v)
-      v[!is.finite(v)] <- NA_real_ # overflow: missing, as in SAS
+      v <- stats_overflow_missing(as.numeric(v))
     }
     full[res$g] <- v
     if (aggs[[k]]$fn %in% c("count", "freq", "n", "nmiss")) full[is.na(full)] <- 0
@@ -240,8 +239,7 @@ sql_r_moment <- function(fn, v, gid, G, order_known = TRUE, distinct = FALSE, li
     }
     out[g] <- stats_sql_moment(fn, x)
   }
-  out[!is.finite(out)] <- NA_real_
-  out
+  stats_overflow_missing(out)
 }
 
 # Listing -------------------------------------------------------------------------

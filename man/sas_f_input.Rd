@@ -23,7 +23,7 @@ Reads a value with an informat. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- partial (40 of 43 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (40 of 43 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: informat $hex4.; SASHELP tables; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

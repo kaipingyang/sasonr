@@ -25,7 +25,7 @@ Date advanced by a number of intervals. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- partial (35 of 38 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (35 of 38 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: INTNX interval 'weekday'; INTNX interval 'tenday'; SASHELP tables; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

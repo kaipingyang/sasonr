@@ -65,6 +65,7 @@ new_engine <- function(work, level, execute) {
 engine_exec <- function(eng, text, line) {
   if (!identical(eng$on_error, "sas")) return(engine_exec_steps(eng, text, line))
   eng$phase <- "compile"
+  eng$cur_step <- NULL
   tryCatch(engine_exec_steps(eng, text, line),
            sasonr_syntax_error = function(e) engine_step_error(eng, e, text),
            sasonr_runtime_error = function(e) engine_step_error(eng, e, text))
@@ -76,6 +77,8 @@ engine_exec_steps <- function(eng, text, line) {
   eng$sql_open <- isTRUE(attr(prog, "sql_open"))
   for (step in prog$steps) {
     eng$phase <- "compile"
+    # the AST of the step being compiled / run (errors.R derives from it what an ERROR leaves in WORK)
+    eng$cur_step <- step
     if (step$type == "global") {
       engine_global(eng, step)
       next
@@ -190,8 +193,7 @@ engine_check_step <- function(eng, step) {
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
     vars <- m$vars %||% character()
-    engine_empty_dataset(eng, nm, vars, m$type)
-    eng$meta[[nm]] <- utils::modifyList(eng$meta[[nm]], m)
+    engine_empty_dataset(eng, nm, m)
     if (isTRUE(rt$notes_on) && eng$step_notes) {
       eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and %d variables.", toupper(nm), length(vars)))
     }
@@ -355,6 +357,29 @@ sas_run <- function(code, work = list(), level = c("auto", "L3"),
   eng$status <- "ok"
   on.exit(sql_duck_close(eng), add = TRUE)
   engine_program(eng, code)
+  engine_result(eng)
+}
+
+# sas_run(code, on_error = "abort") that keeps what ran before an error:
+# list(result, error).  `result` is the sasonr_result of the steps run before
+# the error (NULL when it cannot be built), `error` the condition (NULL on
+# success).  Used by the conformance runner (matrix programs: the cases before
+# a failing case need no second run).
+engine_run_partial <- function(code) {
+  eng <- new_engine(list(), "auto", execute = TRUE)
+  eng$on_error <- "abort"
+  eng$status <- "ok"
+  on.exit(sql_duck_close(eng), add = TRUE)
+  err <- tryCatch({
+    engine_program(eng, code)
+    NULL
+  }, error = function(e) e)
+  res <- if (is.null(err)) engine_result(eng) else tryCatch(engine_result(eng), error = function(e) NULL)
+  list(result = res, error = err)
+}
+
+# The sasonr_result of an engine.
+engine_result <- function(eng) {
   out <- lapply(as.list(eng$wenv), function(d) {
     dplyr::mutate(d, dplyr::across(dplyr::where(is.character), sas_rtrim))
   })
