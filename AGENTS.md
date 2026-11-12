@@ -83,6 +83,51 @@ so a stray threaded BLAS cannot perturb last-bit results.
 | `vignettes/articles/` | developer articles, including the semantics and feature registries |
 | `.local/` | local-only SAS helpers and scratch runs (git-ignored) |
 
+## The conformance repository and its specs
+
+`E:\dsh\sasonr-conformance` (private) is part of this project, not an
+optional extra. It holds the gold output, the case corpus, the design specs and
+the verification reports. Clone/pull it before starting work on a feature.
+
+| Path | Contents |
+|---|---|
+| `specs/01_datastep.md` | DATA step, DSIR, `SasSession`, error model, in-memory librefs |
+| `specs/02_macro.md` | macro language |
+| `specs/03_proc_sql.md` | PROC SQL |
+| `specs/04_functions_formats_rounding.md` | **the value runtime shared by every layer**: functions, formats/informats, rounding, the display engine |
+| `specs/05_clinical_procs.md` | PROC framework and the clinical procedures |
+| `docs/conformance/` | reports: `case_format.md`, `function_verification.md`, `rounding_gold.md`, `semantics_registry.md`, `sasonr_corpus.md` |
+| `harness/`, `tools/` | case generators and probe generators |
+| `cases/` | `own/` (TS1M7 gold) and `ts1m2/` (local TS1M2 gold) |
+
+**Read the owning spec before implementing.** Each spec states the SAS
+semantics with sources, the current state with numbers, the design, the
+acceptance criteria and a prioritised backlog; §7 records the decisions taken
+with the project owner. Spec 04 owns anything about values, formats or
+rounding, and its decisions bind the other specs.
+
+Decisions that shape everyday work: strict mode is on by default (D1); there is
+no numeric tolerance — features that differ in the last bits are `approximate`
+and fail loud (D2); every number that becomes text goes through one display
+engine (§4.3); the gold environment's session encoding is **utf-8** and gold is
+produced for utf-8 and latin1 (§4.8); `sas_put()`/`sas_input()` are the exported
+format API (D5).
+
+The local SAS here is TS1M2 and runs **WLATIN1 / latin1**, so local gold is
+`encoding: latin1` while the gold environment of the spec is utf-8. Do not mix
+the two: a behaviour verified under one encoding is not verified under the
+other.
+
+`docs/conformance/case_format.md` defines `gold_version: 2` (2026-11-12):
+`log_notes` now also records SAS error-handling messages, the epilogue leaves
+syntax-check mode before copying WORK, and a `both_error` case must match on
+ds, log (normalised ERROR lines) and put. New cases should be v2.
+
+The spec can lag the code. When an implementation overtakes a spec statement
+(for example PROC MEANS panels are implemented and passing although spec 04
+still lists them as fail-loud), update the spec in the same piece of work and
+say so in the commit.
+
 ## Strict mode and the registries
 
 `sasonr.strict` (default `TRUE`) makes a program stop when it uses a function,
