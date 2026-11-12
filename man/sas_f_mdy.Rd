@@ -23,7 +23,7 @@ SAS date from month, day and year. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- partial (50 of 52 SAS 9.4 cases agree bit for bit; 2 case(s) differ in a log NOTE only). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ mismatch (2 case(s) differ (values, display, log or errors)). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

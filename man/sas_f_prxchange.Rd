@@ -23,7 +23,7 @@ Substitutes with a Perl regular expression. See the \href{https://documentation.
 }
 
 \section{Verification}{
- partial (30 of 33 SAS 9.4 cases agree bit for bit; 1 case(s) differ in a log NOTE only; 2 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (30 of 33 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: PRXCHANGE() of an invalid regular expression (SAS writes the Perl diagnostic, not reproduced); regular expression without delimiters: ; regular expression without delimiters: xyz; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

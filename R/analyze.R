@@ -72,7 +72,19 @@ new_state <- function(meta) {
   st$informats <- list()
   st$numlen <- list()
   st$dl <- NULL
+  # context of function calls for the feature registry (registry.R): "data",
+  # "where" (an_where()), "sql" (sql_expr.R)
+  st$context <- "data"
   st
+}
+
+# A WHERE expression (WHERE statement, WHERE= option, WHERE of a PROC):
+# functions in it are checked against the registry in the "where" context.
+an_where <- function(e, st) {
+  old <- st$context
+  st$context <- "where"
+  on.exit(st$context <- old)
+  an_expr(e, st)
 }
 
 reg_var <- function(st, name, type = NA_character_, len = NA_integer_, kind = "data",
@@ -261,7 +273,7 @@ an_expr <- function(e, st) {
       e$rhs <- an_expr(e$rhs, st)
       if (e$node == "like") {
         if (!is.null(e$escape)) abort_unsupported("LIKE ... ESCAPE in a WHERE statement", e$line)
-        call <- list(node = "call", name = "sqllike", args = list(e$lhs, e$rhs), line = e$line)
+        call <- list(node = "call", name = "sqllike", args = list(e$lhs, e$rhs), line = e$line, construct = TRUE)
         e <- if (isTRUE(e$negate)) list(node = "unary", op = "not", arg = call, line = e$line) else call
       }
     },
@@ -273,7 +285,14 @@ an_expr <- function(e, st) {
   e
 }
 
+# Runtime functions behind language constructs (registry.R): only the nodes
+# marked `construct = TRUE` by the code that builds them may call them.
+construct_fns <- c("sqllike", "sqlinlist", "sqlcase", "sqlmonotonic", "sqlquant", "cvt_n2c", "cvt_c2n")
+
 an_call <- function(e, st) {
+  if (!isTRUE(e$construct) && e$name %in% construct_fns) {
+    abort_syntax(paste0("The function ", toupper(e$name), " is unknown, or cannot be accessed. (ERROR 68-185)"), e$line)
+  }
   lk <- lag_kind(e$name)
   if (e$name %in% c("dim", "lbound", "hbound")) {
     if (length(e$args) < 1 || e$args[[1]]$node != "var" || is.null(st$arrays[[e$args[[1]]$name]])) {
@@ -286,11 +305,17 @@ an_call <- function(e, st) {
     f <- e$fmt
     known <- if (e$name == "put") fmt_known(f) else infmt_known(f)
     if (!known) {
+      k <- if (e$name == "put") "format" else "informat"
+      if (is.null(user_fmt(f$name, f$char, if (k == "informat") "invalue" else "value")) && nzchar(f$name) &&
+          !sas_known_format(f, k)) {
+        abort_syntax(sprintf("The %s %s was not found or could not be loaded. (ERROR 48-59)", k,
+                             toupper(paste0(if (f$char) "$", f$name))), e$line)
+      }
       if (f$char || e$name == "input") abort_unsupported(paste0(if (e$name == "put") "format " else "informat ", f$text), e$line)
       abort_unsupported(paste0("format ", f$text), e$line)
     }
     if (e$name == "put") check_format_width(f, e$line)
-    feature_check("function", e$name, e$line)
+    feature_check("function", e$name, e$line, st$context)
     if (is.null(if (e$name == "put") user_fmt(f$name, f$char) else user_fmt(f$name, f$char, "invalue"))) {
       feature_check(if (e$name == "put") "format" else "informat", fmt_registry_name(f), e$line)
     }
@@ -328,7 +353,7 @@ an_call <- function(e, st) {
       }
       abort_unsupported(paste0("function ", toupper(e$name), "()"), e$line)
     }
-    feature_check("function", e$name, e$line)
+    if (!isTRUE(e$construct)) feature_check("function", e$name, e$line, st$context)
     nargs <- sum(vapply(e$args, function(a) if (a$node == "of") 2L else 1L, integer(1)))
     # argument counts SAS 9.4 accepts (feature registry, from the SAS inventory): more or fewer is a compile-time ERROR
     sas_n <- registry_arg_counts(e$name)
@@ -382,7 +407,7 @@ convert_fn_args <- function(e, st) {
     if (have == want) return(a)
     ct_conversion(if (want == "char") "n2c" else "c2n", a$line %||% e$line, a$col %||% e$col)
     list(node = "call", name = if (want == "char") "cvt_n2c" else "cvt_c2n", args = list(a),
-         line = a$line %||% e$line, col = a$col %||% e$col)
+         line = a$line %||% e$line, col = a$col %||% e$col, construct = TRUE)
   })
 }
 
@@ -501,7 +526,7 @@ an_stmt <- function(s, st) {
     },
     subset_if = s$cond <- an_expr(s$cond, st),
     where = {
-      s$cond <- an_expr(s$cond, st)
+      s$cond <- an_where(s$cond, st)
       st$wheres <- list(s$cond) # a later WHERE statement replaces an earlier one
     },
     do = {
@@ -830,7 +855,7 @@ an_reader <- function(s, st) {
   # WHERE= is evaluated against the renamed input variables.
   for (k in seq_along(s$datasets)) {
     w <- s$datasets[[k]]$options$where
-    if (!is.null(w)) s$datasets[[k]]$options$where <- an_expr(w, st)
+    if (!is.null(w)) s$datasets[[k]]$options$where <- an_where(w, st)
   }
   for (a in c(s$end, s$nobs)) {
     reg_var(st, a, "num", kind = "auto", retained = TRUE)

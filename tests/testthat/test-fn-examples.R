@@ -17,7 +17,9 @@ test_that("reference-page examples agree with SAS 9.4", {
     rt$prx <- list()
     env <- new.env(parent = environment())
     for (i in which(res$fn == fn)) {
-      v <- suppressWarnings(eval(parse(text = res$r[i])[[1]], envir = env))
+      # an example outside a verified domain now fails loud (not a silent difference)
+      v <- tryCatch(suppressWarnings(eval(parse(text = res$r[i])[[1]], envir = env)), sasonr_unsupported = function(e) NULL)
+      if (is.null(v)) next
       if (is.logical(v)) v <- as.numeric(v)
       s <- ds[[paste0("r", res$k[i])]]
       label <- paste0(fn, ": ", res$sas[i])

@@ -27,12 +27,11 @@ run_prog <- function(case) {
   dir <- file.path(root, case)
   old <- setwd(tempdir())
   on.exit(setwd(old))
-  op <- options(sasonr.strict = FALSE, sasonr.step_notes = TRUE, sasonr.freq_unverified_stats = TRUE)
+  op <- options(sasonr.strict = FALSE, sasonr.step_notes = TRUE)
   on.exit(options(op), add = TRUE)
   code <- readLines(file.path(dir, "program.sas"), warn = FALSE, encoding = "latin1")
   tryCatch(suppressWarnings(sas_run(code)), error = function(e) e)
 }
-options(sasonr.freq_unverified_stats = TRUE)
 results <- list()
 whole <- list()
 for (cs in cases) {

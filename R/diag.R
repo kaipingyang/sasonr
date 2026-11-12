@@ -6,6 +6,19 @@
 # one (sas_err_sync) and writes the SAS-style PDV dump at the end of the
 # iteration (sas_iter_dump). Vectorised (L1/L2) code only needs to know that
 # an error happened at all: the engine then re-runs the step as L3.
+#
+# Package-global mutable state (inventory for the SasSession R6 refactor,
+# CLAUDE.md §3; no new fields are added until then -- new per-run state goes
+# into the engine `eng`):
+#   rt (this file)  per run: catalog (PROC FORMAT), filerefs, prx, prx_cache,
+#                   ls (LINESIZE), notes_on (NOTES/NONOTES), on_warn, on_error,
+#                   on_note (log callbacks of the engine); per step evaluation
+#                   (rt_reset()): err, stop_step, notes, mv, math, mv_rerun,
+#                   reads, proc_notes, flow_note
+#   ct (notes.R)    per step translation (ct_reset()): notes, mv, conv
+#   registry_cache (registry.R)  read-once cache of inst/registry/*.csv and
+#                   the SAS function inventory (not run state)
+#   options()       sasonr.strict, sasonr.on_error, sasonr.step_notes
 
 rt <- new.env(parent = emptyenv())
 rt$err <- FALSE

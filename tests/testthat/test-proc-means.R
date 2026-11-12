@@ -1,7 +1,14 @@
-# These tests check the PROC MEANS computations and layouts; several use
-# statistics that are `approximate` in the PROC statistics registry (STD, VAR,
-# CSS ...), so strict mode is off here (the gate is tested in test-stats-exact.R).
-withr::local_options(sasonr.strict = FALSE) # restored at the end of this file
+# These tests check the PROC MEANS computations and layouts.  Strict mode
+# stays on; the tests that request statistics which are `approximate` in the
+# PROC statistics registry (STD, VAR, CSS ...) run them through run_approx():
+# strict off for that one program, only its `sasonr_unverified` warnings
+# muffled (the gate itself is tested in test-stats-exact.R).
+run_approx <- function(code, ...) {
+  withr::with_options(list(sasonr.strict = FALSE), withCallingHandlers(
+    sas_run(code, ...),
+    sasonr_unverified = function(w) invokeRestart("muffleWarning")
+  ))
+}
 
 squish <- function(x) {
   x <- gsub("[[:space:]]+", " ", trimws(x))
@@ -20,7 +27,7 @@ run;
 "
 
 test_that("default statistics and the listing of one analysis variable", {
-  res <- sas_run(paste(means_data, "proc means data=d; var x; run;"))
+  res <- run_approx(paste(means_data, "proc means data=d; var x; run;"))
   expect_equal(squish(res$listing), c(
     "The MEANS Procedure", "Analysis Variable : x",
     "N Mean Std Dev Minimum Maximum", strrep("-", 65),
@@ -52,7 +59,7 @@ test_that("CLASS / MISSING, NWAY, TYPES and WAYS select the combinations", {
 })
 
 test_that("FREQ and WEIGHT: weighted SUM / MEAN / VAR, frequencies count in N", {
-  res <- sas_run(paste(means_data, "proc means data=d noprint; var x; freq f;
+  res <- run_approx(paste(means_data, "proc means data=d noprint; var x; freq f;
     output out=a n=n sum=s mean=m; run;
     proc means data=d noprint; var x; weight w; output out=b n=n sum=s mean=m var=v sumwgt=sw stderr=se; run;"))
   expect_equal(unlist(res$work$a[c("_freq_", "n", "s", "m")]), c(`_freq_` = 8, n = 8, s = 240, m = 30))
@@ -66,7 +73,7 @@ test_that("FREQ and WEIGHT: weighted SUM / MEAN / VAR, frequencies count in N", 
 })
 
 test_that("quantiles follow QNTLDEF (default 5) and weighted percentiles", {
-  res <- sas_run("data q; do x = 1 to 10; output; end; run;
+  res <- run_approx("data q; do x = 1 to 10; output; end; run;
     proc means data=q noprint; var x; output out=a median=md q1=q1 q3=q3 p20=p20 p90=p90; run;
     proc means data=q noprint qntldef=1; var x; output out=b q1=q1; run;
     proc means data=q noprint qntldef=4; var x; output out=c q1=q1; run;")
@@ -76,7 +83,7 @@ test_that("quantiles follow QNTLDEF (default 5) and weighted percentiles", {
 })
 
 test_that("default OUT= is the _STAT_ long form; AUTONAME and empty names", {
-  res <- sas_run(paste(means_data, "proc means data=d noprint; var x w; output out=o; run;
+  res <- run_approx(paste(means_data, "proc means data=d noprint; var x w; output out=o; run;
     proc means data=d noprint; var x; output out=a mean= max= / autoname; run;
     proc means data=d noprint; var x w; output out=b mean=; run;"))
   expect_equal(res$work$o$`_stat_`, c("N", "MIN", "MAX", "MEAN", "STD"))
@@ -86,9 +93,9 @@ test_that("default OUT= is the _STAT_ long form; AUTONAME and empty names", {
 })
 
 test_that("BY groups must be sorted; ID keeps the group maximum", {
-  expect_error(sas_run(paste(means_data, "proc means data=d noprint; by g; var x; output out=o; run;")),
+  expect_error(run_approx(paste(means_data, "proc means data=d noprint; by g; var x; output out=o; run;")),
                class = "sasonr_runtime_error")
-  res <- sas_run("data d; input id g $ x; datalines;
+  res <- run_approx("data d; input id g $ x; datalines;
 1 A 10
 2 A 20
 4 B 40
@@ -100,7 +107,7 @@ proc means data=d noprint; class g; id id; var x; output out=o mean=m; run;")
 })
 
 test_that("confidence limits, t and p values; MAXDEC in the listing", {
-  res <- sas_run("data d; do x = 2 to 10; output; end; run;
+  res <- run_approx("data d; do x = 2 to 10; output; end; run;
     proc means data=d n mean stderr clm t probt maxdec=3; var x; run;")
   expect_equal(squish(res$listing)[6], "9 6.000 0.913 3.895 8.105 6.57 0.0002")
   expect_equal(squish(res$listing)[3], "Lower 95% Upper 95%")
@@ -108,9 +115,9 @@ test_that("confidence limits, t and p values; MAXDEC in the listing", {
 
 test_that("PROC SUMMARY needs PRINT or OUTPUT; unsupported options fail loud", {
   d <- "data a; x = 1; run;"
-  expect_error(sas_run(paste(d, "proc summary data=a; var x; run;")), class = "sasonr_runtime_error")
-  expect_equal(squish(sas_run(paste(d, "proc summary data=a print; var x; run;"))$listing)[1], "The SUMMARY Procedure")
-  expect_error(sas_run(paste(d, "proc means data=a completetypes; var x; run;")), class = "sasonr_unsupported")
-  expect_error(sas_run(paste(d, "proc means data=a; var x; output out=o mean=m / levels; run;")), class = "sasonr_unsupported")
-  expect_error(sas_run(paste(d, "proc means data=a; zzz x; run;")), class = "sasonr_syntax_error")
+  expect_error(run_approx(paste(d, "proc summary data=a; var x; run;")), class = "sasonr_runtime_error")
+  expect_equal(squish(run_approx(paste(d, "proc summary data=a print; var x; run;"))$listing)[1], "The SUMMARY Procedure")
+  expect_error(run_approx(paste(d, "proc means data=a completetypes; var x; run;")), class = "sasonr_unsupported")
+  expect_error(run_approx(paste(d, "proc means data=a; var x; output out=o mean=m / levels; run;")), class = "sasonr_unsupported")
+  expect_error(run_approx(paste(d, "proc means data=a; zzz x; run;")), class = "sasonr_syntax_error")
 })

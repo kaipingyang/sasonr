@@ -68,11 +68,9 @@ test_that("INPUT() with invalid data is listed in the mathematical-operations NO
   expect_match(paste(log[k:(k + 3)], collapse = " "), "1 at 2:7")
 })
 
-test_that("an invalid PRX pattern is an ERROR, as in SAS", {
+test_that("an invalid PRX pattern fails loud (SAS writes the Perl diagnostic, not reproduced)", {
   notes_on()
-  log <- sas_run("data _null_;\n  rx = prxparse('/(abc/');\nrun;")$log
-  expect_true("ERROR: The regular expression passed to the function PRXPARSE contains a syntax error." %in% log)
-  expect_true(any(startsWith(log, "NOTE: Argument 1 to function PRXPARSE('/(abc/') at line 2 column 8 is invalid.")))
+  expect_error(sas_run("data _null_;\n  rx = prxparse('/(abc/');\nrun;"), class = "sasonr_unsupported")
 })
 
 test_that("%SYSFUNC(CATX) with an empty argument reports the %SYSEVALF ERROR and continues", {

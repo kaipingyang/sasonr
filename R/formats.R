@@ -70,7 +70,7 @@ num_fmt_width_range <- list(
   date = c(5, 11), yymmdd = c(2, 10), mmddyy = c(2, 10), ddmmyy = c(2, 10), e8601da = c(10, 10),
   is8601da = c(10, 10), e8601dt = c(16, 26), is8601dt = c(16, 26), time = c(2, 20),
   datetime = c(7, 40), monyy = c(5, 7), worddate = c(3, 32), weekdate = c(3, 37), year = c(2, 32),
-  tod = c(2, 20)
+  tod = c(2, 20), hex = c(1, 16)
 )
 
 #' Is a (numeric or character) format known (built-in or user-defined)?
@@ -1116,9 +1116,20 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
   vals
 }
 
+# PUTN/PUTC/INPUTN/INPUTC name their format at run time: the analyzer cannot
+# check it, so every distinct format is checked against the feature registry
+# here (strict mode: an unverified format fails loud; registry.R).
+putn_check <- function(f, kind) {
+  if (is.null(user_fmt(f$name, f$char, if (kind == "informat") "invalue" else "value"))) {
+    feature_check(kind, fmt_registry_name(f), context = "runtime")
+  }
+  invisible(f)
+}
+
 #' @export
 sas_f_putn <- function(x, fmt, w = NULL, d = NULL) {
   specs <- unique(fmt)
+  for (sp in specs[!is.na(specs) & nzchar(trimws(specs))]) putn_check(putn_spec(sp, w, d), "format")
   if (length(specs) == 1) return(sas_format(x, putn_spec(specs, w, d)))
   vapply(seq_along(x), function(i) sas_format(x[i], putn_spec(rep_len(fmt, length(x))[i], w, d)), "")
 }
@@ -1137,6 +1148,7 @@ putn_spec <- function(text, w, d) {
 
 #' @export
 sas_f_inputn <- function(s, fmt, w = NULL, d = NULL, .at = NULL) {
+  for (sp in Filter(function(t) !is.na(t) && nzchar(trimws(t)), unique(fmt))) putn_check(putn_spec(sp, w, d), "informat")
   # invalid data: missing result, only the mathematical-operations NOTE and _ERROR_ (SAS 9.4)
   out <- vapply(seq_along(s), function(i) {
     f <- putn_spec(rep_len(fmt, length(s))[i], w, d)
@@ -1150,6 +1162,11 @@ sas_f_inputn <- function(s, fmt, w = NULL, d = NULL, .at = NULL) {
 }
 #' @export
 sas_f_inputc <- function(s, fmt, w = NULL) {
+  for (sp in Filter(function(t) !is.na(t) && nzchar(trimws(t)), unique(fmt))) {
+    f <- putn_spec(sp, w, NULL)
+    f$char <- TRUE
+    putn_check(f, "informat")
+  }
   vapply(seq_along(s), function(i) {
     f <- putn_spec(rep_len(fmt, length(s))[i], w, NULL)
     f$char <- TRUE

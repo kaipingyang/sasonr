@@ -509,18 +509,19 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
   if (n > 0) {
     plain <- is.null(w) && all(fv == 1)
     # SUM: sequential double additions in observation order; MEAN = SUM / n
-    # (bit-identical to SAS 9.4).  CSS: shifted sums with a fused multiply-add,
-    # the closest form found (approximate, gated by the PROC statistics
-    # registry); USS = fma(SUM, MEAN, CSS) as SAS derives it.
+    # (bit-identical to SAS 9.4).  CSS, USS, SKEWNESS, KURTOSIS of unweighted
+    # data: the moment kernel (stats_exact.R, method "means"; CSS is
+    # approximate, gated by the PROC statistics registry).  WEIGHT / FREQ:
+    # weighted sums (gated by the registry's weight condition).
     val$sum <- if (plain) stats_seq_sum(xv) else sum(wf * xv)
     val$min <- min(xv)
     val$max <- max(xv)
     val$range <- val$max - val$min
     val$mean <- if (sw > 0) val$sum / sw else NA_real_
-    if (plain && stats_fma_range_ok(xv)) {
-      sh <- stats_shift_sums(xv)
-      val$css <- stats_fma(-sh$sd, sh$sd / n, sh$sdd)
-      val$uss <- stats_fma(val$sum, val$mean, val$css)
+    kern <- if (plain && stats_fma_range_ok(xv)) stats_moments(xv, "means") else NULL
+    if (!is.null(kern)) {
+      val$css <- kern$css
+      val$uss <- kern$uss
     } else {
       val$uss <- sum(wf * xv^2)
       val$css <- if (!is.na(val$mean)) sum(wf * (xv - val$mean)^2) else NA_real_
@@ -546,7 +547,10 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     }
     if (any(stats %in% c("skew", "kurt")) && !is.na(val$std) && val$std > 0) {
       z <- (xv - val$mean) / val$std
-      if (sp$vardef == "df") {
+      if (sp$vardef == "df" && !is.null(kern)) {
+        if (n > 2) val$skew <- kern$skew
+        if (n > 3) val$kurt <- kern$kurt
+      } else if (sp$vardef == "df") {
         if (n > 2) val$skew <- n / ((n - 1) * (n - 2)) * sum(fv * wv^1.5 * z^3)
         if (n > 3) val$kurt <- n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)) * sum(fv * wv^2 * z^4) - 3 * (n - 1)^2 / ((n - 2) * (n - 3))
       } else if (sp$vardef == "n") {

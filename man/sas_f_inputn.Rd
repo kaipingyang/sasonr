@@ -25,7 +25,7 @@ Reads a numeric value with an informat given at run time. See the \href{https://
 }
 
 \section{Verification}{
- partial (41 of 45 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (41 of 45 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: informat nosuch.; informat xyz.; INPUTN with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

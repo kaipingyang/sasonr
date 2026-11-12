@@ -23,7 +23,7 @@ Writes a numeric value with a format given at run time. See the \href{https://do
 }
 
 \section{Verification}{
- partial (42 of 45 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (42 of 45 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: format nosuch.; format xyz.; PUTN with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

@@ -5,17 +5,25 @@ test_that("the feature registries have no silent mismatch", {
   fn <- sas_feature_registry("functions")
   fm <- sas_feature_registry("formats")
   skip_if(nrow(fn) == 0, "registry not built")
-  expect_true(all(fn$status %in% c("verified", "approximate", "partial", "not_comparable", "unverified", "unsupported")))
-  expect_true(all(fm$status %in% c("verified", "approximate", "partial", "not_comparable", "unverified", "unsupported")))
-  expect_equal(sum(as.integer(fn$mismatch), na.rm = TRUE), 0)
-  expect_equal(sum(as.integer(fm$mismatch), na.rm = TRUE), 0)
+  all_st <- c("verified", "partial", "not_comparable", "approximate", "mismatch", "unsupported", "unverified")
+  expect_true(all(fn$status %in% all_st))
+  expect_true(all(fm$status %in% all_st))
+  # a feature with a differing case never runs unchecked: it is gated (fails loud under strict)
+  for (reg in list(fn, fm)) {
+    runs <- !vapply(reg$status, sasonr:::feature_gated, logical(1))
+    expect_true(all(as.integer(reg$mismatch[runs]) == 0))
+    expect_true(all(as.integer(reg$approximate[runs]) == 0))
+  }
   v <- fn[fn$status == "verified", ]
   expect_identical(v$cases, v$pass)
-  # every exported sas_f_* function except internal helpers has a registry entry
+  # every exported sas_f_* function except the runtime of language constructs has a registry entry
   ns <- getNamespaceExports("sasonr")
   f <- sub("^sas_f_", "", grep("^sas_f_", ns, value = TRUE))
-  f <- f[!startsWith(f, "cvt_") & !startsWith(f, "sql") & f != "monotonic"]
+  f <- setdiff(f, c(sasonr:::construct_fns, "monotonic"))
   expect_setequal(toupper(f), fn$name)
+  sem <- sas_feature_registry("semantics")
+  expect_true(nrow(sem) > 0)
+  expect_true(all(sem$sasonr_status %in% c("verified", "partial", "unsupported", "n/a", "not_applicable", "na")))
 })
 
 test_that("sasonr.strict: approximate and unverified features fail loud by default", {
@@ -67,8 +75,9 @@ test_that("sasonr.strict applies to the DATA step, PROC SQL and %SYSFUNC", {
     expect_error(sas_run("%put %sysfunc(exp(1));"), class = "sasonr_not_verified")
   })
   withr::with_options(list(sasonr.strict = FALSE), {
-    res <- suppressWarnings(sas_run("data a; y = exp(1); run;"))
-    expect_equal(res$work$a$y, exp(1))
+    res <- withCallingHandlers(sas_run("data a; y = exp(1); run;"),
+                               sasonr_unverified = function(w) invokeRestart("muffleWarning"))
+    expect_identical(res$work$a$y, exp(1))
     expect_warning(sas_run("data a; y = exp(1); run;"), class = "sasonr_unverified")
   })
 })

@@ -19,7 +19,7 @@ Poisson cumulative probability. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- approximate (21 of 29 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 1.1e-14; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (21 of 29 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 3.9e-16; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

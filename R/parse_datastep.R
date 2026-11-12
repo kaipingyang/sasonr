@@ -326,6 +326,7 @@ parse_assign <- function(p) {
     target <- parse_array_ref(p)
   } else {
     target <- list(node = "var", name = tk_low(p), text = tk_val(p), line = line)
+    parser_saw(p, target$name)
     advance(p)
   }
   if (is_op(p, "+") && target$node == "array_ref") abort_unsupported("sum statement on an array element", line)

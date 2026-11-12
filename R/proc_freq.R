@@ -7,23 +7,16 @@ freq_table_opts <- c("list", "missing", "missprint", "nocum", "nopercent", "noro
 freq_output_kw <- c("n", "nmiss", "pchi", "lrchi", "ajchi", "mhchi", "chisq", "phi", "contgy", "cramv", "cmh",
                     "cmh1", "cmh2", "cmhcor", "cmhrms", "cmhga", "binomial", "bin")
 
-# Statistics that have been checked against real SAS output.  Every other
-# statistic request (TABLES options, EXACT, OUTPUT keywords) fails loud until
-# it is verified; the computations below stay in place for that work.  The
-# option `sasonr.freq_unverified_stats = TRUE` opens the gate for development
-# and for the package's own reference-computation tests only.
-# Verified (2026-11-11, freq_stats gold c01-c33): two-way and one-way CHISQ,
-# FISHER (2x2 and RxC) and EXACT FISHER -- values within 1e-12 of SAS and the
-# listing line for line.  BINOMIAL and CMH values agree too, but their
-# listings (and CMH's common odds ratio / Breslow-Day tables) do not yet.
-# The verified statistics are read from the PROC statistics registry
-# (inst/registry/proc_stats.csv, rows with proc FREQ).
+# Every statistic request (TABLES options, EXACT, OUTPUT keywords) goes
+# through the PROC statistics registry (inst/registry/proc_stats.csv, rows with
+# proc FREQ; proc_stat_check(), the same strict gate as every other PROC
+# statistic and function): CHISQ, FISHER and EXACT FISHER are verified (whole
+# SAS gold cases freq_stats/ agree in every layer, the listing line for line);
+# the others are unverified and fail loud with sasonr.strict = TRUE.
 freq_stat_gate <- function(k, line) {
   k <- tolower(k)
   if (k == "bin") k <- "binomial"
-  if (!identical(proc_stat_status("FREQ", k), "verified") && !isTRUE(getOption("sasonr.freq_unverified_stats"))) {
-    abort_unsupported(paste0("PROC FREQ statistic ", toupper(k), " (not yet verified against SAS)"), line)
-  }
+  proc_stat_check("FREQ", k, line)
   invisible(k)
 }
 

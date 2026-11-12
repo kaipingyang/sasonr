@@ -23,7 +23,7 @@ Position of a substring. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- partial (41 of 43 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (41 of 43 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: \%SYSFUNC(FIND); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

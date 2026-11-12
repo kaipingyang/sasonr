@@ -42,12 +42,13 @@ stopped with an error on 285.
 | | Programs |
 |---|---|
 | SAS ran normally | 1,680 |
-| sasonr ran to completion | **1,110** |
-| sasonr stopped: feature not supported yet | 548 |
-| sasonr stopped: error | 22 |
-| **All layers identical to SAS** | **1,070** (96.4% of completed) |
+| sasonr ran to completion | **1,015** |
+| sasonr stopped: feature not supported yet | 648 |
+| sasonr stopped: error | 17 |
+| **All layers identical to SAS** | **988** (97.3% of completed) |
 | L-DS mismatches | **0** |
 | SAS stopped with an error but sasonr kept running | **0** of 285 |
+| SAS stopped with an error: sasonr reports a SAS ERROR at the same step / fails loud / R error | 43 / 225 / 17 |
 
 ### Progress by development round
 
@@ -62,6 +63,7 @@ stopped with an error on 285.
 | 7a | Offline conformance cases (gold as sas7bdat), SAS rounding and formats, semantics registry, function reference pages | 1,110 | 1,070 | 0 |
 | 8 | Function and format verification matrices, feature registry | — | — | — |
 | 9 | Strict mode on by default (approximate and unverified functions fail loud); compact matrices | 1,091 | 1,057 | 1 *** |
+| 11 | Verification integrity: every layer must agree, context-aware strict mode (WHERE has no function cases yet), BEST32. undecided window fails loud | 1,015 | 988 | 0 |
 
 \* Rounds 2–3 used an earlier, weaker comparison (printed output only).
 \*\*\* A last-bit difference in a PROC MEANS standard deviation (open question, see Known gaps); the fall in completed programs comes from strict mode (26 programs call MOD, YRDIF or other approximate functions).
@@ -114,7 +116,7 @@ boundaries, argument counts and types, result length and `_ERROR_`.
 | Stage | Status |
 |---|---|
 | Pilot: SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT, INTNX, INTCK | **343 / 370 identical to SAS**, 27 fail loud |
-| Verification matrix: 188 functions, 5,322 cases | 120 verified, 36 partial, 28 approximate, 4 clock-dependent |
+| Verification matrix and random probes: 188 functions, 5,322 matrix cases | 110 verified, 43 partial, 29 approximate, 2 differ (CONSTANT, MDY; fail loud), 4 clock-dependent |
 | Verification matrix: 144 formats and informats, 1,746 cases | 94 verified, 13 partial, 37 without cases yet |
 
 Every case is compared exactly: value bit for bit, type, length,
@@ -165,6 +167,15 @@ SAS:
 | Our own cases (parser, functions, FREQ statistics, rounding, semantics, function and format matrices, function probes, procedure statistic probes, error handling) | 7,849 |
 | Single-feature corpus and book programs | 2,119 |
 
+Round 11 (verification integrity): 7,452 of 9,969 cases bit-identical,
+2,455 fail loud, no data set value differs silently and no program on which
+SAS stops with an ERROR runs in sasonr. The count is lower than in round 10
+because the rules are stricter: a case passes only when every layer agrees
+(a display or log difference alone is a difference), a fail loud or R error
+where SAS stops with an ERROR is no longer counted as agreement, functions
+are gated by the context of the call (WHERE expressions have no cases yet),
+and BEST32. values whose rounding SAS does not decide consistently fail loud.
+
 Round 10: 7,891 of 9,968 cases bit-identical (including programs on which
 SAS and sasonr both stop with an ERROR; for the new error-handling cases the
 data sets SAS leaves behind and the log are compared too), 2,015 fail loud,
@@ -192,9 +203,9 @@ program in strict mode.
   and 2 are rejected (INDEXC with several excerpts). They are excluded from
   the examples and are the first items to fix.
 
-- PROC FREQ statistics were checked against 57 SAS-generated cases: all 265
-  compared values agree (relative tolerance 1e-12). CHISQ, FISHER and EXACT
-  FISHER are enabled; BINOMIAL and CMH values agree but their listings do not
-  yet, so they still stop with `sasonr_unsupported`.
+- PROC FREQ: CHISQ, FISHER and EXACT FISHER are verified (whole SAS cases
+  agree in every layer, the listing line for line); BINOMIAL, CMH and the
+  other statistics are not verified and stop the program in strict mode,
+  through the same PROC statistics registry as every other procedure.
 - ODS output (HTML/RTF) is not compared yet.
 - No statistical procedures beyond MEANS/FREQ yet.

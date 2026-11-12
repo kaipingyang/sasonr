@@ -19,7 +19,7 @@ Exponential function. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- approximate (620 of 621 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference -Inf; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (620 of 621 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

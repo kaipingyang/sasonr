@@ -65,6 +65,7 @@ new_engine <- function(work, level, execute) {
 engine_exec <- function(eng, text, line) {
   if (!identical(eng$on_error, "sas")) return(engine_exec_steps(eng, text, line))
   eng$phase <- "compile"
+  eng$cur_step <- NULL
   tryCatch(engine_exec_steps(eng, text, line),
            sasonr_syntax_error = function(e) engine_step_error(eng, e, text),
            sasonr_runtime_error = function(e) engine_step_error(eng, e, text))
@@ -76,6 +77,8 @@ engine_exec_steps <- function(eng, text, line) {
   eng$sql_open <- isTRUE(attr(prog, "sql_open"))
   for (step in prog$steps) {
     eng$phase <- "compile"
+    # the AST of the step being compiled / run (errors.R derives from it what an ERROR leaves in WORK)
+    eng$cur_step <- step
     if (step$type == "global") {
       engine_global(eng, step)
       next
@@ -190,8 +193,7 @@ engine_check_step <- function(eng, step) {
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
     vars <- m$vars %||% character()
-    engine_empty_dataset(eng, nm, vars, m$type)
-    eng$meta[[nm]] <- utils::modifyList(eng$meta[[nm]], m)
+    engine_empty_dataset(eng, nm, m)
     if (isTRUE(rt$notes_on) && eng$step_notes) {
       eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and %d variables.", toupper(nm), length(vars)))
     }

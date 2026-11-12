@@ -103,33 +103,22 @@ stats_seq_sum <- function(x) {
   as.numeric(stats::filter(x, 1, method = "recursive"))[n]
 }
 
-# Shifted sums of the non-missing values `x` (in observation order).
-stats_shift_sums <- function(x) {
-  n <- length(x)
-  c0 <- x[1]
-  d <- x - c0
-  list(n = n, c0 = c0, sum = stats_seq_sum(x), sd = stats_seq_sum(d), sdd = stats_seq_sum(d * d))
-}
-
-# PROC SQL moment statistics of one group (non-missing values in order).
+# PROC SQL moment statistics of one group (non-missing values in order):
+# the moment kernel with the PROC SQL derivation.
 stats_sql_moment <- function(fn, x) {
-  n <- length(x)
-  if (n == 0L) return(NA_real_)
+  if (length(x) == 0L) return(NA_real_)
   if (fn == "sum") return(stats_seq_sum(x))
-  s <- stats_shift_sums(x)
-  css <- stats_fma(-s$sd, s$sd / n, s$sdd)
-  mean <- stats_fma(n, s$c0, s$sd) / n
-  var <- if (n > 1) css / (n - 1) else NA_real_
+  k <- stats_moments(x, "sql")
   switch(fn,
-    avg = , mean = mean,
-    css = css,
-    uss = stats_fma(s$c0, stats_fma(n, s$c0, 2 * s$sd), s$sdd),
-    var = var,
-    std = sqrt(var),
+    avg = , mean = k$mean,
+    css = k$css,
+    uss = k$uss,
+    var = k$var,
+    std = k$std,
     # not reproduced exactly (SAS uses a different, cancellation-prone formula):
     # `approximate` in the PROC statistics registry
-    stderr = sqrt(var) / sqrt(n),
-    cv = if (n > 1 && mean != 0) 100 * sqrt(var) / mean else NA_real_,
+    stderr = k$stderr,
+    cv = k$cv,
     abort_unsupported(paste0("summary function ", toupper(fn), "()"))
   )
 }
@@ -143,4 +132,105 @@ stats_order_free <- function(fn, x) {
   if (sum(abs(x)) >= 2^53) return(FALSE)
   if (fn == "uss" && sum(x * x) >= 2^53) return(FALSE)
   TRUE
+}
+
+# ---- the moment kernel -------------------------------------------------------------
+#
+# One kernel for N, SUM, MEAN, CSS, USS, VAR, STD, STDERR, CV, SKEWNESS and
+# KURTOSIS, shared by the DATA step functions, PROC MEANS (no WEIGHT / FREQ)
+# and the PROC SQL summary functions.  `m` is a matrix with one group per row
+# (the values in observation / argument order, NA = missing); every
+# accumulation is a sequential double operation over the non-missing values
+# of a row, vectorised over the rows.  The three callers differ only in how
+# SAS 9.4 derives the moments (`method`), each fitted on SAS gold probes:
+#   datastep  MEAN = SUM / N; CSS = sum of fma(d, d, .) over d = x - MEAN;
+#             USS = sequential sum of x * x; STDERR = sqrt(CSS / (N (N - 1)));
+#             CV = STD / MEAN * 100 (fn_probe/STD: 750 of 750 rows with at most
+#             10 non-missing arguments; with 11 or 12 some CSS differ, so the
+#             DATA step functions run only up to 10 arguments)
+#   sql       shifted sums: MEAN = fma(N, c0, Sd) / N, CSS = fma(-Sd, Sd / N, Sdd),
+#             USS = fma(c0, fma(N, c0, 2 Sd), Sdd) (proc_stats/ probes)
+#   means     MEAN = SUM / N, CSS from the shifted sums as for sql,
+#             USS = fma(SUM, MEAN, CSS) (proc_stats/ probes; CSS approximate)
+# VAR = CSS / div (div = N - 1 unless the caller passes its VARDEF divisor),
+# STD = sqrt(VAR).  SKEWNESS and KURTOSIS (VARDEF=DF form) are approximate in
+# every caller (the registries say so).  The emulated fma is exact only for
+# magnitudes 0 or 1E-140..1E140 (stats_fma_range_ok()); callers check it.
+
+# Sequential double sum of the non-missing values of every row (NA: none).
+stats_row_seq_sum <- function(m) {
+  if (nrow(m) == 1L) {
+    v <- m[1L, !is.na(m[1L, ])]
+    return(if (length(v)) stats_seq_sum(v) else NA_real_)
+  }
+  s <- rep(NA_real_, nrow(m))
+  for (j in seq_len(ncol(m))) {
+    x <- m[, j]
+    ok <- !is.na(x)
+    s[ok] <- ifelse(is.na(s[ok]), x[ok], s[ok] + x[ok])
+  }
+  s
+}
+
+# Sum of fma(d, d, .) over the non-missing values of every row (from 0).
+stats_row_fma_sq <- function(d) {
+  acc <- rep(0, nrow(d))
+  for (j in seq_len(ncol(d))) {
+    x <- d[, j]
+    ok <- !is.na(x)
+    if (any(ok)) acc[ok] <- stats_fma(x[ok], x[ok], acc[ok])
+  }
+  acc
+}
+
+stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL) {
+  method <- match.arg(method)
+  if (!is.matrix(m)) m <- matrix(as.numeric(m), nrow = 1L)
+  n <- rowSums(!is.na(m))
+  none <- n == 0
+  sum <- stats_row_seq_sum(m)
+  if (method == "datastep") {
+    mean <- sum / n
+    d <- m - mean
+    css <- stats_row_fma_sq(d)
+    uss <- stats_row_seq_sum(m * m)
+  } else {
+    c0 <- apply(m, 1L, function(r) r[!is.na(r)][1L])
+    d <- m - c0
+    sd <- stats_row_seq_sum(d)
+    sdd <- stats_row_seq_sum(d * d)
+    css <- stats_fma(-sd, sd / n, sdd)
+    if (method == "sql") {
+      mean <- stats_fma(n, c0, sd) / n
+      uss <- stats_fma(c0, stats_fma(n, c0, 2 * sd), sdd)
+    } else {
+      mean <- sum / n
+      uss <- stats_fma(sum, mean, css)
+    }
+  }
+  div <- div %||% (n - 1)
+  var <- ifelse(div > 0, css / div, NA_real_)
+  std <- sqrt(var)
+  stderr <- if (method == "datastep") ifelse(n > 1, sqrt(css / (n * (n - 1))), NA_real_) else ifelse(n > 1, std / sqrt(n), NA_real_)
+  cv <- ifelse(!is.na(std) & mean != 0, if (method == "datastep") std / mean * 100 else 100 * std / mean, NA_real_)
+  # a zero CV of negative values is +0 in the DATA step (fn_probe/STD row 603)
+  if (method == "datastep") cv[!is.na(cv) & cv == 0] <- 0
+  # skewness and kurtosis (VARDEF=DF) from the standardised deviations
+  z <- (m - mean) / std
+  sz3 <- rowSums(z^3, na.rm = TRUE)
+  sz4 <- rowSums(z^4, na.rm = TRUE)
+  ok <- !is.na(std) & std > 0
+  skew <- ifelse(ok & n > 2, n / ((n - 1) * (n - 2)) * sz3, NA_real_)
+  kurt <- ifelse(ok & n > 3, n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)) * sz4 - 3 * (n - 1)^2 / ((n - 2) * (n - 3)), NA_real_)
+  out <- list(n = n, sum = sum, mean = mean, css = css, uss = uss, var = var, std = std, stderr = stderr, cv = cv,
+              skew = skew, kurt = kurt)
+  for (k in setdiff(names(out), "n")) out[[k]][none] <- NA_real_
+  lapply(out, stats_overflow_missing)
+}
+
+# An overflow (non-finite result) is a missing value in SAS: the one place
+# that maps it (moment kernel, PROC SQL summary functions).
+stats_overflow_missing <- function(v) {
+  v[!is.finite(v)] <- NA_real_
+  v
 }

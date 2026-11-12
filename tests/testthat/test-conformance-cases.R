@@ -17,22 +17,16 @@ conf_units <- if (is.null(conf_dir) || conf_tier() == "none") list() else conf_u
 conf_expect_case <- function(r) {
   # known differences are not allowed: a difference is fixed or the input fails loud
   expect_length(r$meta$known_fail %||% character(), 0L)
-  if (r$status %in% c("no_program", "no_gold")) skip(r$status)
-  if (r$status == "unsupported") skip(paste("unsupported:", r$msg))
+  v <- conf_case_verdict(r)
+  # no gold, or fail loud (also where SAS stopped with an ERROR): not a silent error
+  if (v == "skip") skip(paste(r$status, r$msg, sep = ": "))
   expect_false(r$status == "lenient", info = "SAS reported an error but sasonr ran without one")
-  expect_false(r$status == "error", info = r$msg)
-  if (r$status == "both_error") {
+  expect_false(r$status %in% c("error", "sas_error_rerror"), info = paste(r$status, r$msg, sep = ": "))
+  if (v == "pass") {
     succeed()
     return(invisible())
   }
   bad <- names(r$layers)[!r$layers]
-  # numbers that differ only in the last bits (a different algorithm): not a pass,
-  # reported as "approximate" (feature registry; fails loud with sasonr.strict = TRUE)
-  tl <- c(if ("files" %in% bad) r$tol_files, if ("put" %in% bad) r$tol_put)
-  if (length(bad) && all(bad %in% c("ds", "files", "put"))) {
-    if (!any(c("files", "put") %in% bad)) tl <- conf_ds_rel_diff(r)
-    if (length(tl) && all(!is.na(tl)) && max(tl) <= 1e-9) skip(paste0("approximate (last bits differ): ", r$diffs[[bad[1]]]))
-  }
   for (L in bad) expect_true(FALSE, label = paste0("L-", toupper(L), ": ", r$diffs[[L]]))
   succeed()
 }

@@ -13,43 +13,45 @@
 # exported from SAS (../sasonr-conformance/data/inventory/: argument counts and
 # types, width limits).  Without the local cases the registries are kept.
 #
-# Per case:   pass         every layer agrees bit for bit (or SAS and sasonr both stop with an error)
-#             approximate  only numbers differ (last bits; at most 1e-9 relative): NOT a pass
-#             log          only the log NOTEs differ
-#             unsupported  sasonr fails loud (sasonr_unsupported)
-#             mismatch     anything else (values, lengths, _ERROR_, sasonr error, lenient)
+# Per case:   pass         every layer agrees bit for bit: values, attributes, log
+#                          NOTEs, PUT text, files, listing (both_error: SAS and
+#                          sasonr stop with a SAS ERROR at the same step and the
+#                          layers compared after it agree)
+#             approximate  only numbers differ, in their last bits (at most 1e-9
+#                          relative; the same value written differently is a
+#                          display difference, not approximate): NOT a pass
+#             unsupported  sasonr fails loud (sasonr_unsupported) where SAS ran
+#             mismatch     anything else: values, lengths, display, a log NOTE,
+#                          an R error, lenient, or sasonr failing loud / stopping
+#                          with an R error where SAS stopped with an ERROR
+#                          (sas_error_unsupported, sas_error_rerror)
 # Per feature: verified (all cases pass), approximate (some numbers differ in the
-# last bits because the algorithm differs; fails loud with sasonr.strict = TRUE),
-# partial (no mismatch; some cases differ in a log NOTE only or fail loud),
-# mismatch (some case is a silent difference),
-# not_comparable (depends on the session clock), unverified (no case).
+# last bits because the algorithm differs), mismatch (some case differs in any
+# other way), partial (some cases pass, every other case fails loud: the
+# feature runs only inside its verified domain, its runtime guard fails loud
+# outside it), unsupported (every case fails loud), not_comparable (depends on
+# the session clock), unverified (no case).  Everything except verified,
+# partial and not_comparable fails loud with sasonr.strict = TRUE.
+# contexts_verified: the contexts (data, sql, sysfunc; where has no cases yet)
+# in which the feature's cases pass (partial: pass or fail loud); a function
+# used in any other context fails loud with sasonr.strict = TRUE.
 
 args <- commandArgs(trailingOnly = TRUE)
 if (!length(args)) stop("usage: Rscript tools/update_registry.R results.csv [...]")
 suppressMessages(devtools::load_all(".", quiet = TRUE, helpers = FALSE))
 ns <- asNamespace("sasonr")
+# the verdict rules shared with the tests (conf_case_class, conf_feature_status)
+conf <- new.env(parent = ns)
+sys.source("tests/testthat/helper-conformance.R", envir = conf)
 today <- format(Sys.Date())
 
 res <- do.call(rbind, lapply(args, utils::read.csv, stringsAsFactors = FALSE))
 res <- res[!duplicated(res$case, fromLast = TRUE), ]
 res$fails <- ifelse(is.na(res$failed_layers), "", res$failed_layers)
-res$class <- with(res, ifelse(status %in% c("pass", "both_error"), "pass",
-                       ifelse(status == "unsupported", "unsupported",
-                       ifelse(status == "fail" & fails == "log", "log",
-                       ifelse(status == "fail" & !is.na(tol) & tol <= 1e-9 & !grepl("attr|log", fails), "approximate",
-                              "mismatch")))))
-# A function case whose value is bit-identical (same hex=) and whose only
-# difference is the BEST32. display in results.txt is a BESTw. (w > 16) edge,
-# not a difference of the function (BEST widths above 16 are partly undetermined).
-hex_of <- function(d, who) sub("^.*?hex=([0-9A-F]+).*$", "\\1", regmatches(d, regexpr(paste0(who, "='[^']*'"), d)))
-disp_only <- vapply(seq_len(nrow(res)), function(i) {
-  if (!identical(res$status[i], "fail") || !identical(res$fails[i], "files") || !grepl("^fn_matrix/", res$case[i])) return(FALSE)
-  d <- res$detail[i]
-  a <- hex_of(d, "SAS")
-  b <- hex_of(d, "sasonr")
-  length(a) == 1 && length(b) == 1 && grepl("^[0-9A-F]{16}$", a) && a == b
-}, logical(1))
-res$class[disp_only] <- "pass"
+known_status <- c("pass", "both_error", "unsupported", "fail", "error", "lenient", "sas_error_unsupported",
+                  "sas_error_rerror", "no_gold", "no_program")
+if (any(!res$status %in% known_status)) stop("unknown case status: ", paste(setdiff(res$status, known_status), collapse = ", "))
+res$class <- conf$conf_case_class(res$status, res$fails, res$tol)
 res$feature <- sub("^(fn_matrix|fmt_matrix|functions)/([^/]+)/.*$", "\\2", res$case)
 res$area <- sub("/.*$", "", res$case)
 
@@ -66,7 +68,13 @@ probe_calls <- list(
   YRDIF = list(age = quote(sas_f_yrdif(d1, d2, "AGE")), aa = quote(sas_f_yrdif(d1, d2, "ACT/ACT")),
                t3 = quote(sas_f_yrdif(d1, d2, "30/360")), a365 = quote(sas_f_yrdif(d1, d2, "ACT/365")),
                a360 = quote(sas_f_yrdif(d1, d2, "ACT/360"))),
-  GEOMEAN = list(g = quote(sas_f_geomean(a, b, c, d)), g2 = quote(sas_f_geomean(a, b)), h = quote(sas_f_harmean(a, b, c, d)))
+  GEOMEAN = list(g = quote(sas_f_geomean(a, b, c, d)), g2 = quote(sas_f_geomean(a, b)), h = quote(sas_f_harmean(a, b, c, d))),
+  STD = local({
+    a <- lapply(paste0("a", 1:12), as.name)
+    list(s = as.call(c(quote(sas_f_std), a)), v = as.call(c(quote(sas_f_var), a)), c = as.call(c(quote(sas_f_css), a)),
+         u = as.call(c(quote(sas_f_uss), a)), se = as.call(c(quote(sas_f_stderr), a)), cv = as.call(c(quote(sas_f_cv), a)),
+         sk = as.call(c(quote(sas_f_skewness), a)), ku = as.call(c(quote(sas_f_kurtosis), a)))
+  })
 )
 probe_rows <- list()
 for (pr in names(probe_calls)) {
@@ -77,8 +85,7 @@ for (pr in names(probe_calls)) {
     call <- probe_calls[[pr]][[col]]
     fname <- toupper(sub("^sas_f_", "", as.character(call[[1]])))
     cls <- vapply(seq_len(nrow(P)), function(i) {
-      got <- tryCatch(suppressWarnings(eval(call, as.list(P[i, ]), ns)), sasonr_unsupported = function(e) "u",
-                      error = function(e) "e")
+      got <- tryCatch(eval(call, as.list(P[i, ]), ns), sasonr_unsupported = function(e) "u", error = function(e) "e")
       if (identical(got, "u")) return("unsupported")
       if (identical(got, "e")) return("mismatch")
       want <- as.numeric(P[[col]][i])
@@ -110,20 +117,28 @@ case_context <- function(area, feature) {
   stats::setNames(x$context, x$case)
 }
 
+# The verified domain of a partial feature without a hand-written description:
+# what its runtime guard refuses (the fail-loud messages of its cases).
+guard_text <- function(rows) {
+  m <- rows$detail[rows$class == "unsupported" & !is.na(rows$detail)]
+  m <- unique(sub("^(\\[[a-z_]+\\] )?Unsupported: ", "", sub(" \\(SAS line [0-9]+\\)$", "", m)))
+  if (!length(m)) return("")
+  paste0("fails loud for: ", paste(utils::head(m, 3), collapse = "; "), if (length(m) > 3) sprintf("; and %d more", length(m) - 3) else "")
+}
+
 summarise <- function(rows) {
   cl <- rows$class
   n <- length(cl)
   cnt <- function(k) sum(cl == k)
-  status <- if (n == 0) "unverified" else if (cnt("pass") == n) "verified" else if (cnt("mismatch") > 0) "mismatch" else
-    if (cnt("approximate") > 0) "approximate" else "partial"
+  status <- conf$conf_feature_status(cl)
+  tl <- rows$tol[rows$class == "approximate"]
   why <- c(
-    if (cnt("approximate")) sprintf("%d case(s) differ in the last bits (largest relative difference %.1e; different algorithm)",
-                                    cnt("approximate"), max(rows$tol[rows$class == "approximate"], na.rm = TRUE)),
-    if (cnt("log")) sprintf("%d case(s) differ in a log NOTE only", cnt("log")),
+    if (cnt("approximate")) sprintf("%d case(s) differ in the last bits%s", cnt("approximate"),
+                                    if (any(!is.na(tl))) sprintf(" (largest relative difference %.1e; different algorithm)", max(tl, na.rm = TRUE)) else ""),
     if (cnt("unsupported")) sprintf("%d case(s) fail loud (sasonr_unsupported)", cnt("unsupported")),
-    if (cnt("mismatch")) sprintf("%d case(s) differ", cnt("mismatch"))
+    if (cnt("mismatch")) sprintf("%d case(s) differ (values, display, log or errors)", cnt("mismatch"))
   )
-  list(status = status, cases = n, pass = cnt("pass"), approximate = cnt("approximate"), log = cnt("log"),
+  list(status = status, cases = n, pass = cnt("pass"), approximate = cnt("approximate"),
        unsupported = cnt("unsupported"), mismatch = cnt("mismatch"), note = paste(why, collapse = "; "))
 }
 
@@ -153,7 +168,8 @@ env_fns <- toupper(sub("^## (\\S+).*$", "\\1", hdr[grepl("\\benv\\b", hdr)]))
 docs <- utils::read.delim("tools/fn_docs.tsv", quote = "", colClasses = "character")
 # verified input domain of `partial` functions (the runtime guard fails loud outside it)
 fn_domains <- utils::read.delim("tools/fn_domains.tsv", quote = "", colClasses = "character", comment.char = "#")
-docs <- docs[!startsWith(docs$name, "cvt_") & !startsWith(docs$name, "sql") & docs$name != "monotonic", ]
+# runtime functions of language constructs are not SAS functions (analyze.R construct_fns)
+docs <- docs[!docs$name %in% c(get("construct_fns", ns), "monotonic"), ]
 ft <- get("fn_table", ns)
 fn_rows <- lapply(docs$name, function(nm) {
   NM <- toupper(nm)
@@ -180,9 +196,12 @@ fn_rows <- lapply(docs$name, function(nm) {
     s$status <- "not_comparable"
     s$note <- "the value depends on the session clock; only its type and range are compared"
   }
+  # a context is verified when its cases pass (partial: pass or fail loud at the
+  # runtime guard); clock-dependent functions: the contexts that have cases
   ok_ctx <- vapply(c("data", "sysfunc", "sql"), function(k) {
     r <- rows[rows$context == k, , drop = FALSE]
-    nrow(r) > 0 && all(r$class == "pass")
+    if (s$status == "not_comparable") return(nrow(r) > 0)
+    nrow(r) > 0 && any(r$class == "pass") && all(r$class %in% c("pass", "unsupported"))
   }, logical(1))
   len <- if (is.null(spec)) NA else if (spec$type == "num") "8 (numeric)" else if (identical(spec$len, "arg")) "length of argument 1" else
     if (identical(spec$len, "fmt")) "format width" else as.character(spec$len)
@@ -196,8 +215,9 @@ fn_rows <- lapply(docs$name, function(nm) {
     sasonr_args = if (is.null(spec)) NA else sprintf("%s-%s", spec$min, if (is.infinite(spec$max)) "any" else spec$max),
     contexts_verified = paste(c(data = "data", sysfunc = "sysfunc", sql = "sql")[ok_ctx], collapse = " "),
     impl = paste0("sas_f_", nm), status = s$status, cases = s$cases, pass = s$pass, approximate = s$approximate,
-    log_only = s$log, unsupported = s$unsupported, mismatch = s$mismatch, note = s$note,
-    domain = if (s$status == "partial" && NM %in% fn_domains$name) fn_domains$domain[fn_domains$name == NM][1] else "",
+    unsupported = s$unsupported, mismatch = s$mismatch, note = s$note,
+    domain = if (s$status != "partial") "" else if (NM %in% fn_domains$name) fn_domains$domain[fn_domains$name == NM][1] else
+      guard_text(rows),
     updated = today, stringsAsFactors = FALSE
   )
 })
@@ -214,6 +234,10 @@ fm$sas <- toupper(ifelse(fm$base == "-", "w.d", ifelse(fm$type == "C" & !startsW
 fm$sas[fm$sas == "W.D"] <- "w.d"
 
 fmt_inv <- read_inv("sas_formats.csv")
+# names of every SAS 9.4 format and informat (unknown names: ERROR 48-59)
+if (!is.null(fmt_inv)) {
+  writeLines(sort(unique(paste(fmt_inv$fmttype, toupper(fmt_inv$fmtname)))), file.path("inst", "registry", "sas_format_names.txt"))
+}
 implemented <- local({
   nd <- names(get("num_fmt_defaults", ns))
   sv <- names(get("sep_variants", ns))
@@ -243,7 +267,7 @@ fmt_rows <- lapply(seq_len(nrow(implemented)), function(i) {
   data.frame(name = nm, kind = kind, type = if (startsWith(nm, "$")) "char" else "num",
              sas_minw = g("minw"), sas_maxw = g("maxw"), sas_defw = g("defw"), sas_mind = g("mind"),
              sas_maxd = g("maxd"), sas_defd = g("defd"), status = s$status, cases = s$cases, pass = s$pass,
-             approximate = s$approximate, log_only = s$log, unsupported = s$unsupported, mismatch = s$mismatch,
+             approximate = s$approximate, unsupported = s$unsupported, mismatch = s$mismatch,
              note = s$note, updated = today, stringsAsFactors = FALSE)
 })
 fmts <- do.call(rbind, fmt_rows)

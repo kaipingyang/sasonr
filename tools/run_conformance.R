@@ -22,7 +22,11 @@
 #   fail         sasonr ran, some layer differs (columns ds/attr/log/lst/put/files)
 #   unsupported  sasonr_unsupported (SAS ran normally)
 #   error        sasonr stopped with an error (SAS ran normally)
-#   both_error   SAS ended with errors (rc >= 2) and sasonr stopped too
+#   both_error   SAS stopped with an ERROR and sasonr reported a SAS ERROR at the
+#                same step (the layers compared after it agree)
+#   sas_error_unsupported  SAS stopped with an ERROR, sasonr failed loud instead
+#   sas_error_rerror       SAS stopped with an ERROR, sasonr stopped with an R error
+#                (both are failures for the feature registry)
 #   lenient      SAS reported an error but sasonr ran without one  (must be 0)
 # Matrix programs (fn_matrix/, fmt_matrix/: meta.yaml `layout: matrix`) are
 # reported per case (`<area>/<NAME>/<case>`).  The program text of cases with
@@ -177,19 +181,28 @@ for (root in roots) {
 res <- if (length(rows)) do.call(rbind, rows) else data.frame(area = character(), status = character(), ds = logical())
 if (nzchar(out_csv)) utils::write.csv(res, out_csv, row.names = FALSE)
 
-st <- c("pass", "fail", "unsupported", "error", "both_error", "lenient", "no_gold", "no_program")
+st <- c("pass", "fail", "unsupported", "error", "both_error", "sas_error_unsupported", "sas_error_rerror", "lenient",
+        "no_gold", "no_program")
 cat(sprintf("\nstrict = %s\n", format(getOption("sasonr.strict", TRUE))))
 cat("== by area ==\n")
-cat(sprintf("%-14s %6s %s\n", "area", "cases", paste(sprintf("%11s", st), collapse = "")))
+lab <- c(sas_error_unsupported = "serr_unsup", sas_error_rerror = "serr_rerr")
+hd <- ifelse(st %in% names(lab), lab[st], st)
+cat(sprintf("%-14s %6s %s\n", "area", "cases", paste(sprintf("%11s", hd), collapse = "")))
 for (a in unique(res$area)) {
   x <- res[res$area == a, ]
   cat(sprintf("%-14s %6d %s\n", a, nrow(x), paste(sprintf("%11d", vapply(st, function(s) sum(x$status == s), 1L)), collapse = "")))
 }
 cat(sprintf("%-14s %6d %s\n", "TOTAL", nrow(res), paste(sprintf("%11d", vapply(st, function(s) sum(res$status == s), 1L)), collapse = "")))
+cat(sprintf("\nbit-identical (pass + both_error): %d / %d; fail loud: %d; other-layer mismatches (ds ok): %d\n",
+            sum(res$status %in% c("pass", "both_error")), sum(!res$status %in% c("no_gold", "no_program")),
+            sum(res$status %in% c("unsupported", "sas_error_unsupported")),
+            sum(res$status == "fail" & !(res$ds %in% FALSE))))
 ran <- res[res$status %in% c("pass", "fail"), ]
 cat("\n== layers (cases sasonr ran) ==\n")
 for (L in c("ds", "attr", "log", "lst", "put", "files")) {
   v <- ran[[L]]
   cat(sprintf("L-%-6s compared %5d  pass %5d  fail %4d\n", toupper(L), sum(!is.na(v)), sum(v %in% TRUE), sum(v %in% FALSE)))
 }
-cat(sprintf("\nsilent errors: L-DS fail = %d, lenient = %d\n", sum(ran$ds %in% FALSE), sum(res$status == "lenient")))
+cat(sprintf("\nsilent errors: L-DS fail = %d, lenient = %d; R errors = %d (where SAS ran: %d, where SAS stopped: %d)\n",
+            sum(ran$ds %in% FALSE), sum(res$status == "lenient"), sum(res$status %in% c("error", "sas_error_rerror")),
+            sum(res$status == "error"), sum(res$status == "sas_error_rerror")))

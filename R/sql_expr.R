@@ -88,6 +88,7 @@ sql_ctx <- function(eng, rel, outer = NULL, items = NULL, allow_alias = FALSE) {
   ctx$calc_stack <- character()
   ctx$env <- new.env(parent = asNamespace("sasonr"))
   ctx$st <- new_state(list())
+  ctx$st$context <- "sql"
   for (c in rel$cols) reg_var(ctx$st, c$id, c$type, if (c$type == "char") c$len else NA_integer_, disp = c$disp)
   for (c in rel$cols) if (!is.null(c$format)) ctx$st$formats[[c$id]] <- c$format
   ctx
@@ -199,7 +200,7 @@ sql_lower <- function(e, ctx) {
     like = {
       args <- list(L(e$lhs), L(e$rhs))
       if (!is.null(e$escape)) args <- c(args, list(L(e$escape)))
-      out <- list(node = "call", name = "sqllike", args = args, line = e$line)
+      out <- list(node = "call", name = "sqllike", args = args, line = e$line, construct = TRUE)
       if (isTRUE(e$negate)) out <- list(node = "unary", op = "not", arg = out, line = e$line)
       out
     },
@@ -209,7 +210,7 @@ sql_lower <- function(e, ctx) {
       if (all(vapply(items, function(i) i$node %in% c("num", "str", "missing"), logical(1)))) {
         return(list(node = "in", lhs = lhs, items = items, negate = isTRUE(e$negate), line = e$line))
       }
-      out <- list(node = "call", name = "sqlinlist", args = c(list(lhs), items), line = e$line)
+      out <- list(node = "call", name = "sqlinlist", args = c(list(lhs), items), line = e$line, construct = TRUE)
       if (isTRUE(e$negate)) out <- list(node = "unary", op = "not", arg = out, line = e$line)
       out
     },
@@ -244,7 +245,7 @@ sql_lower_case <- function(e, ctx) {
   if (length(tt) > 1) abort_syntax("Result of WHEN clause is not the same data type as the preceding results.", e$line)
   len <- max(vapply(types, function(t) as.integer(t$len), 1L))
   if (is.null(els)) els <- if (tt == "char") list(node = "str", value = "", line = e$line) else list(node = "missing", code = ".", line = e$line)
-  list(node = "call", name = "sqlcase", args = c(args, list(els)), line = e$line,
+  list(node = "call", name = "sqlcase", args = c(args, list(els)), line = e$line, construct = TRUE,
        sql_type = list(type = tt, len = if (tt == "char") len else 8L))
 }
 
@@ -265,7 +266,7 @@ sql_lower_call <- function(e, ctx) {
     abort_syntax(paste0("The ", toupper(e$name), " function is not supported in PROC SQL, it is only valid within the DATA step."), e$line)
   }
   if (e$name == "monotonic") {
-    return(list(node = "call", name = "sqlmonotonic", args = list(), line = e$line, col = e$col))
+    return(list(node = "call", name = "sqlmonotonic", args = list(), line = e$line, col = e$col, construct = TRUE))
   }
   if (isTRUE(e$distinct)) abort_syntax(paste0("DISTINCT is only valid in a summary function, not in ", toupper(e$name), "()"), e$line)
   name <- if (e$name %in% names(sql_fn_alias)) sql_fn_alias[[e$name]] else e$name

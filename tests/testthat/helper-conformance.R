@@ -364,6 +364,10 @@ conf_tol_diff <- function(s, o) {
     ts <- strsplit(trimws(s[k]), "\\s+")[[1]]
     to <- strsplit(trimws(o[k]), "\\s+")[[1]]
     if (length(ts) != length(to)) return(NA_real_)
+    # the same value (hex=) written differently: a display difference, not a
+    # difference in the last bits of the value
+    hx <- startsWith(ts, "hex=")
+    if (any(hx) && identical(ts[hx], to[hx])) return(NA_real_)
     for (j in seq_along(ts)) {
       if (identical(ts[j], to[j])) next
       ps <- sub("^([A-Za-z_][A-Za-z0-9_]*=)?(.*)$", "\\1", ts[j])
@@ -387,17 +391,64 @@ conf_tol_diff <- function(s, o) {
   worst
 }
 
-# Largest relative difference in an L-DS message "SAS=<num> sasonr=<num>" (NA otherwise).
-conf_ds_rel_diff <- function(r) {
-  m <- regmatches(r$diffs[["ds"]], regexec("SAS=([-0-9.eE+]+) sasonr=([-0-9.eE+]+)$", r$diffs[["ds"]]))[[1]]
-  if (length(m) < 3) return(NA_real_)
-  a <- as.numeric(m[2])
-  b <- as.numeric(m[3])
-  if (is.na(a) || is.na(b) || a == b || sign(a) != sign(b)) return(NA_real_)
-  abs(a - b) / max(abs(a), abs(b))
+# ---- verdicts -------------------------------------------------------------------------------
+#
+# Used by the tests (test-conformance-cases.R) and by the feature registry
+# (tools/update_registry.R), so that both apply the same rules.
+
+# Registry class of one case result: "pass" only when every layer agrees
+# (values, attributes, log NOTEs, PUT text, files, listing; both_error: the
+# layers compared after a SAS ERROR at the same step agree); "approximate"
+# when the only differences are numbers in their last bits (at most 1e-9
+# relative, `tol`; a display difference of the same value has no `tol`);
+# "unsupported" when sasonr failed loud where SAS ran; "mismatch" otherwise,
+# also for a log-only or display-only difference and for a SAS ERROR answered
+# by fail loud or an R error.
+conf_case_class <- function(status, failed_layers = "", tol = NA_real_) {
+  failed_layers[is.na(failed_layers)] <- ""
+  ifelse(status %in% c("pass", "both_error"), "pass",
+  ifelse(status == "unsupported", "unsupported",
+  ifelse(status == "fail" & !is.na(tol) & tol <= 1e-9 & !grepl("attr|log|lst", failed_layers), "approximate",
+         "mismatch")))
+}
+
+# Registry status of a feature from the classes of its cases.  `partial`:
+# some cases pass and every other one fails loud (the feature runs only inside
+# its verified domain); `unsupported`: every case fails loud.
+conf_feature_status <- function(cl) {
+  stopifnot(all(cl %in% c("pass", "approximate", "unsupported", "mismatch")))
+  n <- length(cl)
+  if (n == 0) return("unverified")
+  if (all(cl == "pass")) return("verified")
+  if (any(cl == "mismatch")) return("mismatch")
+  if (any(cl == "approximate")) return("approximate")
+  if (any(cl == "pass")) "partial" else "unsupported"
+}
+
+# Test verdict of one case result: "skip" (no gold, or fail loud: not a silent
+# error), "pass" or "fail" (any difference, also in the last bits of a number:
+# strict mode makes the approximate features fail loud, so a numeric
+# difference is a feature that runs although it differs from SAS).
+conf_case_verdict <- function(r) {
+  if (r$status %in% c("no_program", "no_gold", "unsupported", "sas_error_unsupported")) return("skip")
+  if (r$status %in% c("lenient", "error", "sas_error_rerror")) return("fail")
+  if (r$status == "both_error") return("pass")
+  if (length(r$layers) && all(r$layers)) "pass" else "fail"
 }
 
 # ---- one case ----------------------------------------------------------------------------
+
+# Status of a case in which sasonr stopped (fail loud or an error condition).
+# `both_error` only when SAS stopped with an ERROR too and sasonr raised a SAS
+# ERROR (syntax or run-time error of the SAS error model) at the same step;
+# when SAS errored and sasonr failed loud or stopped with an R error the case
+# is `sas_error_unsupported` / `sas_error_rerror`: not a pass (the feature
+# registry counts both as mismatches).
+conf_fail_status <- function(sas_err, unsupported, sas_style) {
+  if (!sas_err) return(if (unsupported) "unsupported" else "error")
+  if (sas_style && !unsupported) return("both_error")
+  if (unsupported) "sas_error_unsupported" else "sas_error_rerror"
+}
 
 conf_layers_all <- c("ds", "attr", "log", "lst", "put", "files")
 
@@ -435,7 +486,7 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
   limit <- as.numeric(timeout %||% meta$timeout %||% 30)
   setTimeLimit(elapsed = limit, transient = TRUE)
   res <- tryCatch(
-    withCallingHandlers(sas_run(code), warning = function(w) invokeRestart("muffleWarning")),
+    withCallingHandlers(sas_run(code, on_error = "sas"), warning = function(w) invokeRestart("muffleWarning")),
     sasonr_unsupported = function(e) structure(list(rc = 2L, msg = conditionMessage(e)), class = "conf_fail"),
     error = function(e) {
       m <- conditionMessage(e)
@@ -446,8 +497,10 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
   setTimeLimit(elapsed = Inf)
   sas_rc <- as.integer(meta$sas_rc %||% 0L)
   if (inherits(res, "conf_fail")) {
+    # SAS stopped with an ERROR but sasonr did not report one the SAS way (an
+    # ERROR in its result): fail loud or an R error is not a both_error
     out$msg <- res$msg
-    out$status <- if (sas_rc >= 2L) "both_error" else if (res$rc == 2L) "unsupported" else "error"
+    out$status <- conf_fail_status(sas_rc >= 2L, res$rc == 2L, FALSE)
     return(out)
   }
   # sas_run(on_error = "sas"): a SAS ERROR gives a result with status "error"
@@ -643,7 +696,9 @@ conf_matrix_run_segment <- function(code, data_dir, limit) {
     timeout <- grepl("time limit", m, fixed = TRUE)
     partial <- if (timeout) NULL else rp$result
     if (is.null(partial)) unlink(d, recursive = TRUE) else partial$run_dir <- d
-    return(structure(list(unsupported = inherits(e, "sasonr_unsupported"), line = suppressWarnings(as.integer(e$sas_line %||% NA)),
+    return(structure(list(unsupported = inherits(e, "sasonr_unsupported"),
+                          sas_style = inherits(e, c("sasonr_syntax_error", "sasonr_runtime_error")),
+                          line = suppressWarnings(as.integer(e$sas_line %||% NA)),
                           msg = paste0("[", class(e)[1], "] ", m), timeout = timeout, partial = partial),
                      class = "conf_fail"))
   }
@@ -767,7 +822,7 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
     sas_err <- any(startsWith(s_log, "ERROR")) && !any(startsWith(s_log, done_note[1]) | startsWith(s_log, done_note[2]))
     if (!is.null(fails[[k]])) {
       o$msg <- fails[[k]]$msg
-      o$status <- if (sas_err) "both_error" else if (isTRUE(fails[[k]]$unsupported)) "unsupported" else "error"
+      o$status <- conf_fail_status(sas_err, isTRUE(fails[[k]]$unsupported), isTRUE(fails[[k]]$sas_style))
       out[[id]] <- o
       next
     }

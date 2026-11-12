@@ -2,18 +2,21 @@
 % Please edit documentation in R/registry.R
 \name{sas_feature_registry}
 \alias{sas_feature_registry}
-\title{Feature registry (functions or formats/informats) with the verification status}
+\title{Feature registry (functions, formats/informats, SAS semantics) with the verification status}
 \usage{
-sas_feature_registry(kind = c("functions", "formats"))
+sas_feature_registry(kind = c("functions", "formats", "semantics"))
 }
 \arguments{
-\item{kind}{\code{"functions"} or \code{"formats"}.}
+\item{kind}{\code{"functions"}, \code{"formats"} or \code{"semantics"} (SAS behaviours that
+differ from R defaults -- missing values, fixed-length strings, PROC SQL
+remerge ... -- each with the SAS cases that cover it).}
 }
 \value{
-A data frame, one row per function or per format/informat, as
-generated from the offline conformance results against SAS 9.4.
+A data frame, one row per function, per format/informat or per
+semantic entry, as generated from the offline conformance results against
+SAS 9.4.
 }
 \description{
-Feature registry (functions or formats/informats) with the verification status
+Feature registry (functions, formats/informats, SAS semantics) with the verification status
 }
 \keyword{internal}

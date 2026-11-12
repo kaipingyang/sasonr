@@ -2,10 +2,14 @@
 # small programs reproduce each one).
 
 test_that("PROC SQL: chained comparisons, INPUT() of a column, COUNT(UNIQUE x)", {
-  res <- sas_run("data t; x = -2; s = '2003-09-05'; output; x = 3; s = '2003-09-06'; output; run;
+  code <- "data t; x = -2; s = '2003-09-05'; output; x = 3; s = '2003-09-06'; output; run;
     proc sql; create table a as select x, (-5 <= x <= -1) as c,
       case when -5 <= x <= -1 then 'YES' else 'NO' end as w, input(s, yymmdd10.) as d from t;
-      create table n as select count(unique x) as k from t; quit;")
+      create table n as select count(unique x) as k from t; quit;"
+  # INPUT() has no passing PROC SQL verification case yet: gated in strict mode
+  expect_error(sas_run(code), class = "sasonr_not_verified")
+  res <- withr::with_options(list(sasonr.strict = FALSE), withCallingHandlers(
+    sas_run(code), sasonr_unverified = function(w) invokeRestart("muffleWarning")))
   expect_equal(res$work$a$c, c(1, 0))
   expect_equal(res$work$a$w, c("YES", "NO"))
   expect_equal(res$work$a$d, c(15953, 15954))
