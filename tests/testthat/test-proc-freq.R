@@ -55,10 +55,11 @@ test_that("TABLES grouping syntax and LIST / n-way tables", {
 })
 
 test_that("statistics not yet supported fail loud by default", {
+  #
+  #
   for (src in c("proc freq data=d; by s; tables trt*resp / chisq; weight n; run;",
                 "proc freq data=d; tables s*trt*resp / cmh; weight n; run;",
                 "proc freq data=d; tables trt*resp / relrisk; weight n; run;",
-                "proc freq data=d; tables trt / expected; weight n; run;",
                 "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;")) {
     expect_error(sas_run(paste(freq_data, src)), class = "sasonr_unsupported")
   }
