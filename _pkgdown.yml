@@ -31,6 +31,8 @@ navbar:
         href: articles/dev-registry.html
       - text: Feature registry
         href: articles/dev-feature-registry.html
+      - text: Base R and the tidyverse
+        href: articles/dev-base-vs-tidyverse.html
     progress:
       text: Progress
       menu:
@@ -56,6 +58,7 @@ articles:
   - articles/dev-conformance-cases
   - articles/dev-registry
   - articles/dev-feature-registry
+  - articles/dev-base-vs-tidyverse
 - title: Progress
   contents:
   - articles/conformance

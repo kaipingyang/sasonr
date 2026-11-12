@@ -1,0 +1,88 @@
+---
+title: "Base R and the tidyverse inside sasonr"
+---
+
+This note records which parts of sasonr are written in base R and which parts
+use the tidyverse, why the split falls where it does, and which questions are
+still open. It is a design note for review, not a user guide.
+
+## Layering
+
+| Layer | Language | Evidence (calls in `R/`) |
+|---|---|---|
+| Value runtime: functions, formats, rounding | base R + `stats::` | `functions.R`: 0 tidyverse, 66 base; `stats::` 97 across the package |
+| Exact statistics (moments, CSS) | base R, bit-level | `stats_exact.R`: 0 tidyverse |
+| PROC engines (MEANS, FREQ, ...) | base R for the arithmetic, tibble only at the result boundary | `proc_means.R`: 84 base / 2 tidyverse; `proc_freq.R`: 172 base / 8 tidyverse |
+| DATA step execution | two code generators: a vectorised path emits `dplyr` pipelines, the row-wise path emits base R | `codegen_tidy.R`: 16 `dplyr`/`tibble` calls |
+| PROC SQL | own parser and R evaluation; DuckDB is a candidate executor for joins/aggregations, never a passthrough | `sql_exec.R`: DBI/duckdb 4 each |
+| Translation output (`sas_translate()`) | `idiomatic` mode emits tidyverse, `faithful` mode emits `sas_rt_*` calls | spec `04` §4.11 |
+
+## What the tidyverse is used for, and why those uses are safe
+
+These are structural, not numeric, operations, where dplyr's semantics are
+either exact or irrelevant to the conformance comparison:
+
+* `dplyr::if_else()` for conditional assignment in vectorised code — stricter
+  than `ifelse()`, which drops attributes;
+* `dplyr::lag()` for LAG, whose semantics is exactly "previous row";
+* `dplyr::coalesce()` for COALESCEC — first non-missing argument;
+* `dplyr::bind_rows()` and `tibble::as_tibble()` for SET, `OUT=` data sets and
+  the result container.
+
+## Why the value layer cannot use the tidyverse
+
+### lubridate: a different calendar
+
+SAS does **not** treat years divisible by 4000 as leap years. The runtime
+implements that calendar explicitly (`runtime.R`, `skip4000_g`/`sas_day_to_greg`),
+while lubridate follows the proleptic Gregorian calendar, so dates beyond 4000
+differ. Beyond that: SAS dates are days and datetimes are seconds since
+1960-01-01, `Date`/`POSIXct` add a timezone and a second conversion layer, the
+valid range is 1582-01-01..20000-12-31, and the SAS informats parse with their
+own rules (MDY-before-DMY preference, `YEARCUTOFF`, invalid input sets
+`_ERROR_` and returns missing). None of that maps onto lubridate's parsers.
+
+### stringr: fixed width, bytes and missing values
+
+SAS character values are fixed-length and blank padded, a missing character is
+a blank string (not `NA`), and `LENGTH`/`SUBSTR`/$w. widths count **bytes** in
+the session encoding. stringr returns variable-length strings, propagates `NA`,
+counts Unicode code points and delegates case mapping to ICU/locale. Base
+`substr`/`toupper` is not perfect either, but its behaviour is deterministic and
+can be pinned to the SAS gold.
+
+### dplyr aggregations and ordering
+
+The moments must be accumulated in observation order with plain double
+arithmetic: R's `sum()` accumulates in long double and differs in the last
+bits, which is exactly why the CSS formula had to be reproduced by hand
+(`stats_exact.R`). `dplyr::summarise()` would reintroduce `sum()`.
+`arrange()` places `NA` last where SAS sorts missing values first, and
+`group_by()` does not promise SAS's group order. The PROC listings also need
+control over the column layout to the character, which a `summarise()` result
+does not give.
+
+### tidyr
+
+PROC output is a fixed-width text listing; reshaping only changes the data
+frame shape, while the order, names and labels still have to be produced
+exactly. Adding tidyr would buy little and cost a dependency.
+
+## Where tidyverse is fine
+
+* The `idiomatic` output of `sas_translate()`: readable dplyr code for people
+  who keep the translation. It is not part of the conformance comparison; the
+  numerical results still come from `sas_f_*`/`sas_put()`/`sas_input()`.
+* User-facing examples and vignettes.
+
+## Open questions for review
+
+1. `DESCRIPTION` imports `purrr`, but `R/` has no `purrr::` call. Remove it?
+2. Is `duckdb` worth keeping as a hard `Imports` for PROC SQL, or should it be
+   a `Suggests` with a pure-R fallback (spec `03` §7 Q3 keeps it for now)?
+3. The vectorised DATA step generator depends on dplyr. Would emitting base R
+   for the common cases (mutate-only steps) be worth the maintenance cost? It
+   would shrink the dependency surface of generated code, not of the engine.
+4. Nothing in the value layer prevents using base R alternatives; the rule to
+   review is: a tidyverse function may be used where its semantics are either
+   identical to SAS's or irrelevant to the comparison, and nowhere else.
