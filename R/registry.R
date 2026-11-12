@@ -3,14 +3,17 @@
 #
 #
 #
-# asks feature_check() about every function, format and informat it accepts.
+# asks feature_check() about every function, format and informat it accepts
+# (DATA step, PROC SQL and %SYSFUNC).  A feature whose status is `approximate`
 #
+# `mismatch` or that is missing from the registry is gated by the option
 # `sasonr.strict`:
-#   NULL (default)  nothing (current behaviour; the policy is not decided yet)
-#   TRUE            fail loud (sasonr_unsupported)
 #
-# Runtime guards for combinations that are known to differ fail loud in every
-# mode.
+#                   `sasonr_unsupported`) naming the feature, its status and the
+#                   opt-out
+#
+#
+# in every mode) and `not_comparable` (clock-dependent) features always run.
 
 registry_cache <- new.env(parent = emptyenv())
 
@@ -49,13 +52,63 @@ fmt_registry_name <- function(fmt) {
   paste0(if (fmt$char) "$", toupper(fmt$name))
 }
 
+# Registry statuses that are gated by `sasonr.strict` (NA: not in the registry).
+feature_gated <- function(status) is.na(status) || status %in% c("approximate", "unsupported", "mismatch")
+
+feature_status_text <- function(status) {
+  if (is.na(status)) return("is not in the feature registry (not supported)")
+  switch(status,
+    approximate = "is approximate (some results differ in the last bits)",
+    unsupported = "is not supported (no test cases)",
+    mismatch = "has results that differ",
+    paste("has status", status)
+  )
+}
+
+#'
+#'
+#' Every function, format and informat that sasonr implements has a
+#'
+#'
+#'
+#'
+#' * `TRUE` (the default): the program stops with a condition of class
+#'
+#'   SAS feature, its status and the SAS line. This applies to `approximate`
+#'
+#'   ones (no SAS case) and features missing from the registry.
+#' * `FALSE`: the program runs; each such feature gives a warning of class
+#'
+#'
+#'
+#' from SAS fail loud in both modes) and clock-dependent `not_comparable`
+#' functions (`TODAY()`, `DATE()`, `TIME()`, `DATETIME()`) always run.
+#'
+#' @name sasonr_strict
+#' @aliases sasonr.strict
+#' @examples
+#'
+#' try(sas_run("data a; y = log(10); run;"))
+#' old <- options(sasonr.strict = FALSE)
+#' res <- suppressWarnings(sas_run("data a; y = log(10); run;"))
+#' res$work$a$y
+#' options(old)
+NULL
+
 feature_check <- function(kind, name, line = NULL) {
-  strict <- getOption("sasonr.strict")
-  if (is.null(strict)) return(invisible())
+  # internal call nodes for language constructs (PROC SQL CASE / IN / LIKE /
+  # quantified comparisons, MONOTONIC, type conversion) are not SAS functions
+  if (kind == "function" && (startsWith(tolower(name), "sql") || startsWith(tolower(name), "cvt_") ||
+                             tolower(name) == "monotonic")) return(invisible())
   st <- feature_status(kind, name)
-  if (identical(st, "supported")) return(invisible())
-  what <- sprintf("%s %s (%s)", kind, toupper(name), if (is.na(st)) "not in the feature registry" else st)
-  if (isTRUE(strict)) abort_unsupported(paste0("unsupported ", what), line)
+  if (!feature_gated(st)) return(invisible())
+  what <- sprintf("%s %s %s", kind, toupper(name), feature_status_text(st))
+  if (!isFALSE(getOption("sasonr.strict", TRUE))) {
+    msg <- paste0("Unsupported: ", what, "; set options(sasonr.strict = FALSE) to run it anyway")
+    if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
+    rlang::abort(msg, class = c("sasonr_strict_error", "sasonr_unsupported", "sasonr_error"), sas_line = line,
+                 kind = kind, name = toupper(name), status = st)
+  }
   warning(structure(class = c("sasonr_strict_warning", "warning", "condition"),
                     list(message = paste0("sasonr: ", what, if (!is.null(line)) sprintf(" at line %s", line) else ""),
                          call = NULL, kind = kind, name = toupper(name), status = st)))
