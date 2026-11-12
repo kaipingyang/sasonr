@@ -57,26 +57,162 @@ test_that("TABLES grouping syntax and LIST / n-way tables", {
 test_that("statistics not yet verified against SAS fail loud by default", {
   # EXPECTED on a one-way table is accepted and ignored by SAS (case
   # ts1m2/freq_stats/oneway_expected), so it is not in this list
-  for (src in c("proc freq data=d; by s; tables trt*resp / chisq; weight n; run;",
+  for (src in c("proc freq data=d; by s; tables trt*resp / relrisk; weight n; run;",
                 "proc freq data=d; tables trt*resp; exact relrisk; weight n; run;",
                 "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;",
                 "proc freq data=d; tables s*trt*resp / cmh1; weight n; run;")) {
     expect_error(sas_run(paste(freq_data, src)), class = "sasonr_unsupported")
   }
   # plain frequency tables are unaffected; CHISQ / FISHER / BINOMIAL, the
-  # RELRISK / RISKDIFF tables and the multiway CMH summary are verified
+  # RELRISK / RISKDIFF tables, the multiway CMH summary, EXACT CHISQ for a 2x2
+  # table and CHISQ / FISHER with BY groups are verified
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / out=o outpct; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq fisher; exact fisher; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt / binomial; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk riskdiff; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / riskdiff(cl=(wald newcombe ac ha)); exact riskdiff; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / cmh; weight n; run;")))
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq; exact chisq; weight n; run;")))
+  expect_silent(sas_run(paste(freq_data, "proc freq data=d; by s; tables trt*resp / chisq fisher; weight n; run;")))
   # CMH is verified only for the multiway summary: a two-way table request,
   # SCORES= on a two-way table and exact statistics on a multiway table fail loud
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / cmh; weight n; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq scores=rank; weight n; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq; exact fisher; weight n; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq scores=ridit; weight n; run;")), class = "sasonr_unsupported")
+  # EXACT CHISQ is verified only for the 2x2 exact enumeration
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq; exact chisq; weight n; run;")), class = "sasonr_unsupported")
+})
+
+test_that("PROC FREQ fractional weights: CHISQ runs, FISHER is not computed", {
+  code <- "data d; input trt $ resp $ cnt; datalines;
+A Yes 10.5
+A No 4.25
+B Yes 6.75
+B No 12.5
+;
+run;
+proc freq data=d; weight cnt; tables trt*resp / chisq; run;"
+  l <- squish(sas_run(code)$listing)
+  expect_true(any(grepl("^A \\| 4\\.25 \\| 10\\.5 \\| 14\\.75$", l)))
+  expect_true("Chi-Square 1 4.3594 0.0368" %in% l)
+  expect_false("Fisher's Exact Test" %in% l)
+  l <- squish(sas_run(sub("chisq", "fisher", code))$listing)
+  expect_true("Chi-Square 1 4.3594 0.0368" %in% l)
+  expect_false("Fisher's Exact Test" %in% l)
+  expect_identical(utils::tail(l, 1), "Sample Size = 34")
+})
+
+test_that("PROC FREQ degenerate table, BY groups, EXACT CHISQ and TESTP/TESTF", {
+  # a single-row table prints no statistics block at all (c32)
+  res <- sas_run("data d; input trt $ cat $ cnt; datalines;
+A X 4
+A Y 7
+A Z 2
+;
+run;
+proc freq data=d; weight cnt; tables trt*cat / chisq; run;")
+  l <- squish(res$listing)
+  expect_identical(utils::tail(l, 1), "30.77 53.85 15.38 100.00")
+  expect_false(any(startsWith(l, "Statistics for Table")))
+  # BY groups repeat the procedure title and print the statistics per group (c34)
+  res <- sas_run("data d; input site $ trt $ resp $ cnt; datalines;
+S1 A Yes 8
+S1 A No 3
+S1 B Yes 4
+S1 B No 9
+S2 A Yes 2
+S2 A No 6
+S2 B Yes 1
+S2 B No 7
+;
+run;
+proc sort data=d; by site; run;
+proc freq data=d; weight cnt; by site; tables trt*resp / chisq fisher; run;")
+  l <- squish(res$listing)
+  expect_true(sum(l == "The FREQ Procedure") >= 2L)
+  expect_true("site=S1" %in% l)
+  expect_true("site=S2" %in% l)
+  expect_true("Chi-Square 1 4.1958 0.0405" %in% l)
+  expect_true("Chi-Square 1 0.4103 0.5218" %in% l)
+  # EXACT CHISQ adds the three exact-test blocks (c08)
+  res <- sas_run("data d; input trt $ resp $ cnt; datalines;
+A Yes 12
+A No 5
+B Yes 7
+B No 15
+;
+run;
+proc freq data=d; weight cnt; tables trt*resp / chisq; exact chisq; run;")
+  l <- squish(res$listing)
+  expect_true("Pearson Chi-Square Test" %in% l)
+  expect_true("Likelihood Ratio Chi-Square Test" %in% l)
+  expect_true("Mantel-Haenszel Chi-Square Test" %in% l)
+  expect_true("Exact Pr >= ChiSq 0.0248" %in% l)
+  expect_true("Fisher's Exact Test" %in% l)
+  # one-way CHISQ(TESTP=) / CHISQ(TESTF=) (c48, c49)
+  res <- sas_run("data d; input cat $ cnt; datalines;
+A 18
+B 27
+C 35
+;
+run;
+proc freq data=d; weight cnt; tables cat / chisq testp=(0.2 0.3 0.5); run;")
+  l <- squish(res$listing)
+  expect_true("Test Cumulative Cumulative" %in% l)
+  expect_true(any(grepl("^A 18 22\\.50 20\\.00 18 22\\.50$", l)))
+  expect_true("for Specified Proportions" %in% l)
+  expect_true("Chi-Square 1.2500" %in% l)
+  l <- squish(sas_run("data d; input cat $ cnt; datalines;
+A 18
+B 27
+C 35
+;
+run;
+proc freq data=d; weight cnt; tables cat / chisq testf=(10 30 40); run;")$listing)
+  expect_true(any(grepl("^A 18 10 22\\.50 18 22\\.50$", l)))
+  expect_true("for Specified Frequencies" %in% l)
+  expect_true("Chi-Square 7.3250" %in% l)
+})
+
+test_that("PROC FREQ MISSPRINT lists the missing level but excludes it (c18)", {
+  res <- sas_run("data d; input trt $ resp $; datalines;
+A Yes
+A Yes
+A No
+A Yes
+A .
+A No
+A Yes
+B No
+B No
+B Yes
+. Yes
+B No
+B .
+B No
+A Yes
+. No
+B Yes
+B No
+A Yes
+B No
+A No
+B No
+. .
+A Yes
+B Yes
+;
+run;
+proc freq data=d; tables trt*resp / chisq missprint; run;")
+  l <- squish(res$listing)
+  expect_true("Col Pct | |No |Yes | Total" %in% l)
+  expect_true("| 1 | 1 | 1 | ." %in% l)
+  expect_true(any(grepl("^A \\| 1 \\| 3 \\| 7 \\| 10$", l)))
+  expect_true(any(grepl("^Total \\. 10 10 20$", l)))
+  expect_true("Chi-Square 1 3.2000 0.0736" %in% l)
+  expect_true("Sample Size = 20" %in% l)
+  expect_true("WARNING: 20% of the data are missing." %in% l)
 })
 
 test_that("PROC FREQ CMH summary: statistics, common OR/RR, Breslow-Day, scores", {
