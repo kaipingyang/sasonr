@@ -233,10 +233,12 @@ args_matrix <- function(args) {
 #' @export
 sas_f_sum <- function(...) {
   m <- args_matrix(list(...))
-  # sequential double sum (rowSums accumulates in long double; SAS 9.4: SUM(-0) is -0)
+  # sequential double sum in argument order; a missing argument counts as +0
+  # for the sign of a zero result (cases/ts1m2/proc/zero_sign: SUM(., -0) is +0)
   out <- as.numeric(apply(m, 1, function(r) {
-    v <- r[!is.na(r)]
-    if (length(v) == 0) 0 else Reduce(`+`, v)
+    if (all(is.na(r))) return(0)
+    r[is.na(r)] <- 0
+    Reduce(`+`, r)
   }))
   none <- rowSums(!is.na(m)) == 0
   out[none] <- NA_real_
@@ -259,8 +261,9 @@ sas_f_mean <- function(...) {
   out <- apply(m, 1, function(r) {
     v <- r[!is.na(r)]
     if (length(v) == 0) return(NA_real_)
-    # zeros of both signs: SAS 9.4 gives -0 for MEAN(-0, 0) (rule not determined)
-    if (all(v == 0) && length(unique(1 / v)) > 1) abort_unsupported("MEAN of zeros with different signs")
+    # all values are zero: SAS returns the first non-missing argument's sign
+    # (gold cases/ts1m2/proc/zero_sign: MEAN(-0, 0) is -0, MEAN(0, -0) is +0)
+    if (all(v == 0)) return(v[1])
     Reduce(`+`, v) / length(v)
   })
   as.numeric(out)
@@ -268,16 +271,25 @@ sas_f_mean <- function(...) {
 #' @export
 sas_f_min <- function(...) {
   m <- args_matrix(list(...))
-  out <- suppressWarnings(apply(m, 1, min, na.rm = TRUE))
-  out[is.infinite(out)] <- NA_real_
-  out
+  # ties keep the first non-missing argument (its zero sign), as SAS does
+  out <- apply(m, 1, function(r) {
+    v <- r[!is.na(r)]
+    if (length(v) == 0) return(NA_real_)
+    k <- min(v)
+    v[which(v == k)[1L]]
+  })
+  as.numeric(out)
 }
 #' @export
 sas_f_max <- function(...) {
   m <- args_matrix(list(...))
-  out <- suppressWarnings(apply(m, 1, max, na.rm = TRUE))
-  out[is.infinite(out)] <- NA_real_
-  out
+  out <- apply(m, 1, function(r) {
+    v <- r[!is.na(r)]
+    if (length(v) == 0) return(NA_real_)
+    k <- max(v)
+    v[which(v == k)[1L]]
+  })
+  as.numeric(out)
 }
 
 fuzz_int <- function(x) {

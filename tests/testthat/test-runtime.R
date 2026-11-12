@@ -183,3 +183,36 @@ test_that("SUBSTR assignment to an undeclared variable creates it with length 8"
   res3 <- sas_run("data d; substr(t,2,2)='XYZ'; l=lengthn(t); run;")
   expect_equal(res3$work$d$l, 3)
 })
+test_that("the sign of zero in SUM / MEAN / MIN / MAX and PROC MEANS", {
+  hex <- function(x) paste(rev(as.character(writeBin(x, raw()))), collapse = "")
+  res <- sas_run("data f;
+    p = input('0000000000000000', hex16.);
+    n = input('8000000000000000', hex16.);
+    m = .;
+    sm_mn = sum(m,n); sm_nm = sum(n,m); sm_nn = sum(n,n);
+    me_pn = mean(p,n); me_np = mean(n,p); me_npm = mean(n,p,m);
+    mn_pn = min(p,n); mn_np = min(n,p);
+  run;")
+  f <- res$work$f
+  # a missing argument counts as +0 for the sign (gold cases/ts1m2/proc/zero_sign)
+  expect_identical(hex(f$sm_mn), "0000000000000000")
+  expect_identical(hex(f$sm_nm), "0000000000000000")
+  expect_identical(hex(f$sm_nn), "8000000000000000")
+  # MEAN returns the first non-missing argument's sign when every value is zero
+  expect_identical(hex(f$me_pn), "0000000000000000")
+  expect_identical(hex(f$me_np), "8000000000000000")
+  expect_identical(hex(f$me_npm), "8000000000000000")
+  # MIN / MAX keep the first non-missing argument's sign on ties
+  expect_identical(hex(f$mn_pn), "0000000000000000")
+  expect_identical(hex(f$mn_np), "8000000000000000")
+  # PROC MEANS: SUM and MEAN are always +0, MIN / MAX keep the first value's sign
+  r2 <- sas_run("data d; length hx $16; input hx $; x = input(hx, hex16.); datalines;
+8000000000000000
+0000000000000000
+;
+proc means data=d noprint; var x; output out=o sum=s mean=mn min=mi max=ma; run;")
+  expect_identical(hex(r2$work$o$s), "0000000000000000")
+  expect_identical(hex(r2$work$o$mn), "0000000000000000")
+  expect_identical(hex(r2$work$o$mi), "8000000000000000")  # first value is -0
+  expect_identical(hex(r2$work$o$ma), "8000000000000000")
+})

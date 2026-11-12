@@ -516,10 +516,15 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     # USS = CSS + SUM * MEAN; VAR = CSS / (n - 1); STD = sqrt(VAR) with SAS's
     # constant-data fuzz; STDERR = sqrt(VAR / n).  All bit-identical to SAS.
     val$sum <- if (plain) stats_seq_sum(xv) else sum(wf * xv)
-    val$min <- min(xv)
-    val$max <- max(xv)
+    # SAS 9.4: PROC MEANS SUM and MEAN are always +0, whatever the signs of the
+    # zeros in the data (cases/ts1m2/proc/zero_sign)
+    if (!is.na(val$sum[1]) && val$sum[1] == 0) val$sum <- 0
+    # MIN / MAX keep the sign of the first value of the group on ties
+    val$min <- xv[which(xv == min(xv))[1L]]
+    val$max <- xv[which(xv == max(xv))[1L]]
     val$range <- val$max - val$min
     val$mean <- if (sw > 0) val$sum / sw else NA_real_
+    if (!is.na(val$mean[1]) && val$mean[1] == 0) val$mean <- 0
     if (plain) {
       val$css <- stats_means_css(xv)
       val$uss <- val$css + val$sum * val$mean
@@ -930,7 +935,11 @@ means_stat_text <- function(s, v, sp) {
 means_stat_col <- function(s, cells, sp) {
   parts <- means_stat_heading(s, sp$alpha)
   minw <- max(nchar(parts))
-  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else max(c(1L, nchar(cells)))) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
+  # N / N Miss: as wide as the printed counts, but SAS never prints that field
+  # narrower than two columns (cases/ts1m2/proc/zero_sign has single-digit
+  # counts and a 2-column N field); the 2-digit cases of rounding/proc cannot
+  # tell the two rules apart.
+  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else max(c(2L, nchar(cells)))) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
   list(parts = parts, width = max(vw, minw), right = TRUE, cells = cells)
 }
 

@@ -23,10 +23,12 @@ run;
 
 test_that("default statistics and the listing of one analysis variable", {
   res <- sas_run(paste(means_data, "proc means data=d; var x; run;"))
+  # the N field is never narrower than two columns (cases/ts1m2/proc/zero_sign),
+  # so a single-digit count still gives a 66-column table
   expect_equal(squish(res$listing), c(
     "The MEANS Procedure", "Analysis Variable : x",
-    "N Mean Std Dev Minimum Maximum", strrep("-", 65),
-    "5 30.0000000 15.8113883 10.0000000 50.0000000", strrep("-", 65)
+    "N Mean Std Dev Minimum Maximum", strrep("-", 66),
+    "5 30.0000000 15.8113883 10.0000000 50.0000000", strrep("-", 66)
   ))
 })
 
