@@ -8,7 +8,9 @@ options_ignorable <- c(
   "ps", "pagesize", "notes", "nonotes", "nosource", "nosource2",
   "nomprint", "nomlogic", "nosymbolgen", "nomprintnest", "nomlogicnest",
   "formdlim", "pageno", "stimer", "nostimer",
-  "fullstimer", "nofullstimer", "msglevel", "errors"
+  "fullstimer", "nofullstimer", "msglevel", "errors",
+  # sasonr stops at the first ERROR, so syntax-check mode never starts
+  "nosyntaxcheck"
 )
 
 parse_global_stmt <- function(p) {

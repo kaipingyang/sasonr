@@ -103,3 +103,23 @@ the program with a classed condition that carries the SAS line number.
 ```{r, error = TRUE}
 sas_run("data a; x = 1; run; proc report data=a; run;")
 ```
+
+The same applies to functions, formats and informats whose results are not
+bit-identical to SAS 9.4 in every verified case (status `approximate` in the
+feature registry, for example the probability functions) or that have no
+SAS verification cases yet: by default (`sasonr.strict = TRUE`) they stop
+with a `sasonr_not_verified` condition.
+
+```{r, error = TRUE}
+sas_run("data a; p = probnorm(1.96); run;")
+```
+
+To run them anyway, with a warning of class `sasonr_unverified`, turn strict
+mode off:
+
+```{r}
+old <- options(sasonr.strict = FALSE)
+res <- suppressWarnings(sas_run("data a; p = probnorm(1.96); run;"))
+res$work$a$p
+options(old)
+```

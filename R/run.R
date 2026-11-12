@@ -117,9 +117,14 @@ engine_exec <- function(eng, text, line) {
       # NOTEs that are not data errors (e.g. INPUT going to a new line)
       if (length(rt$notes) > 0 && isTRUE(rt$notes_on)) env$.log <- c(env$.log, rt$notes)
     }
-    if (step$type == "data" && isTRUE(rt$stop_step)) {
-      # an execution-time ERROR that stops the step (SYMGET): no output data set
-      for (nm in tr$outputs) if (exists(nm, envir = eng$wenv, inherits = FALSE)) rm(list = nm, envir = eng$wenv)
+    stopped <- step$type == "data" && isTRUE(rt$stop_step)
+    if (stopped) {
+      # An execution-time ERROR that stops the step (SYMGET): SAS ends the step
+      # after the current observation and keeps what was written ("WARNING: The
+      # data set ... may be incomplete").  Only a one-observation step is known
+      # to match SAS; a longer step would have to stop part-way through.
+      big <- vapply(tr$outputs, function(nm) NROW(get0(nm, envir = eng$wenv, inherits = FALSE)) > 1L, logical(1))
+      if (any(big)) abort_unsupported("an execution-time ERROR that stops a DATA step with more than one observation", step$line)
       env$.log <- c(env$.log, "NOTE: The SAS System stopped processing this step because of errors.")
     }
     if (step$type == "data") engine_store_numlen(eng, tr$outputs)
@@ -128,7 +133,10 @@ engine_exec <- function(eng, text, line) {
     if (notes_on) {
       ds_notes <- unlist(lapply(tr$outputs, function(nm) {
         d <- get0(nm, envir = eng$wenv, inherits = FALSE)
-        if (is.null(d)) NULL else dataset_note(nm, d)
+        if (is.null(d)) NULL else if (stopped) {
+          sprintf("WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were %d observations and %d variables.",
+                  toupper(nm), nrow(d), ncol(d))
+        } else dataset_note(nm, d)
       }))
       # PROC SORT of an empty data set reports no observations read
       if (identical(tr$reasons, "PROC SORT")) rt$reads <- Filter(function(r) r$n > 0, rt$reads)

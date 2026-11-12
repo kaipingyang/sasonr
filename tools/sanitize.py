@@ -174,11 +174,22 @@ def norm_msg(parts):
     return " | ".join([head] + [r for r in rest if r])
 
 
-def key_messages(lines):
-    """Key NOTE/WARNING/ERROR messages, normalised (identical to compare4.py)."""
+MATRIX_MARK_RE = re.compile(r"^@@(BEGIN|END|COLLECT)\b")
+
+
+def key_messages(lines, markers=False):
+    """Key NOTE/WARNING/ERROR messages, normalised (identical to compare4.py).
+
+    markers=True (matrix layout) also keeps the %PUT case markers
+    `@@BEGIN <case> <context>`, `@@END <case>` and `@@COLLECT` in their
+    place, so that every message can be attributed to its case."""
     out, i = [], 0
     while i < len(lines):
         l = lines[i]
+        if markers and MATRIX_MARK_RE.match(l):
+            out.append(l.rstrip())
+            i += 1
+            continue
         if KEY_RE.match(l) and not ENV_NOISE.search(l):
             parts = [l]
             j = i + 1
@@ -383,8 +394,11 @@ def sas_version(log_lines):
     return ""
 
 
-def written_files(run_dir, inputs=()):
-    """Text files the program wrote in its working directory (relative paths)."""
+def written_files(run_dir, inputs=(), text=()):
+    """Text files the program wrote in its working directory (relative paths).
+
+    Files named in `text` are kept even when they hold NUL bytes (results.txt of
+    the matrix layout records any character value)."""
     out = []
     for root, dirs, files in os.walk(run_dir):
         rel_root = os.path.relpath(root, run_dir)
@@ -397,6 +411,9 @@ def written_files(run_dir, inputs=()):
             if rel in inputs or fn.lower().endswith(TEXT_EXT_SKIP):
                 continue
             p = os.path.join(root, fn)
+            if rel in text:
+                out.append(rel)
+                continue
             if os.path.getsize(p) > 5_000_000:
                 continue
             with open(p, "rb") as f:
@@ -406,7 +423,7 @@ def written_files(run_dir, inputs=()):
     return sorted(out)
 
 
-def build_expected(run_dir, case_dir, encoding="latin-1", extra_roots=(), inputs=()):
+def build_expected(run_dir, case_dir, encoding="latin-1", extra_roots=(), inputs=(), markers=False):
     """Write case_dir/expected/ from a SAS run directory; return (rc, sas_version)."""
     red = redactor([run_dir] + list(extra_roots))
     exp = os.path.join(case_dir, "expected")
@@ -415,7 +432,7 @@ def build_expected(run_dir, case_dir, encoding="latin-1", extra_roots=(), inputs
     os.makedirs(exp)
     log = read_lines(os.path.join(run_dir, "program.log"))
     body = sas_log_body(log)
-    write_lines(os.path.join(exp, "log_notes.txt"), [red(x) for x in key_messages(body)])
+    write_lines(os.path.join(exp, "log_notes.txt"), [red(x) for x in key_messages(body, markers)])
     puts = put_lines(body)
     if puts:
         write_lines(os.path.join(exp, "put.txt"), [red(x) for x in puts])
@@ -432,7 +449,7 @@ def build_expected(run_dir, case_dir, encoding="latin-1", extra_roots=(), inputs
                 # the data sets stay in SAS's own format: exact values and attributes
                 os.makedirs(os.path.join(exp, "datasets"), exist_ok=True)
                 shutil.copyfile(os.path.join(ds, fn), os.path.join(exp, "datasets", fn.lower()))
-    for rel in written_files(run_dir, inputs):
+    for rel in written_files(run_dir, inputs, ("results.txt",) if markers else ()):
         lines = [red(x.rstrip()) for x in read_lines(os.path.join(run_dir, rel), encoding)]
         write_lines(os.path.join(exp, "files", rel), lines)
     try:

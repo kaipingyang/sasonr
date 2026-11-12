@@ -6,7 +6,7 @@ title: "Conformance status"
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-*Last updated: 2026-11-12 (development round 7a).*
+*Last updated: 2026-11-12 (development round 9).*
 
 sasonr only accepts a feature once its test cases reproduce the output of
 **real SAS 9.4** (TS1M7, Linux). Expected results are never taken from
@@ -20,12 +20,13 @@ are compared:
 
 | Layer | What is compared |
 |---|---|
-| **L-DS** | Every WORK data set at the end of the program: data set names, row count, column names and order, every cell (numeric relative tolerance 1e-9, character values without trailing blanks) |
+| **L-DS** | Every WORK data set at the end of the program: data set names, row count, column names and order, every cell (numbers bit for bit, no tolerance; character values without trailing blanks) |
 | **L-ATTR** | Variable type, length, format, informat and label |
 | **L-LOG** | Key log diagnostics in order (`NOTE: The data set ... has N observations`, missing-value notes, uninitialized variables, unresolved macro references, ...) |
 | **L-LST** | Listing output, line by line in order (whitespace normalised) |
 
-Two kinds of failure are tracked first in every round because they are
+Own test programs also compare the PUT output and the files a program
+writes. Two kinds of failure are tracked first in every round because they are
 *silent*: an L-DS mismatch (wrong result) and a program on which SAS stops
 with an ERROR but sasonr keeps running (too lenient). Unsupported features
 are not failures: sasonr stops with a `sasonr_unsupported` condition.
@@ -59,8 +60,11 @@ stopped with an error on 285.
 | 5 | PROC MEANS/SUMMARY, FREQ, TRANSPOSE, CONTENTS, DATASETS, APPEND, DELETE | 1,104 | 1,031 | 0 ** |
 | 6 | Verification round: function pilot, book programs, FREQ statistics against SAS; environment fields of PROC CONTENTS masked | 1,110 | 1,066 | 0 |
 | 7a | Offline conformance cases (gold as sas7bdat), SAS rounding and formats, semantics registry, function reference pages | 1,110 | 1,070 | 0 |
+| 8 | Function and format verification matrices, feature registry | — | — | — |
+| 9 | Strict mode on by default (approximate and unverified functions fail loud); compact matrices | 1,091 | 1,057 | 1 *** |
 
 \* Rounds 2–3 used an earlier, weaker comparison (printed output only).
+\*\*\* A last-bit difference in a PROC MEANS standard deviation (open question, see Known gaps); the fall in completed programs comes from strict mode (26 programs call MOD, YRDIF or other approximate functions).
 \*\* Excluding environment fields (time stamps, file paths) in `PROC CONTENTS`; masked in the comparison from round 6 on.
 
 ### By area (programs SAS ran normally)
@@ -109,9 +113,16 @@ boundaries, argument counts and types, result length and `_ERROR_`.
 
 | Stage | Status |
 |---|---|
-| Pilot: SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT, INTNX, INTCK | **340 / 370 identical to SAS**, 0 different, 30 not supported yet (mostly need SASHELP data sets) |
-| ~120 functions frequently used in clinical programming | planned |
-| 207 Base formats and informats | planned |
+| Pilot: SUBSTR, SCAN, COMPRESS, INDEX, CATX, ROUND, INPUT, PUT, INTNX, INTCK | **343 / 370 identical to SAS**, 27 fail loud |
+| Verification matrix: 188 functions, 5,322 cases | 120 verified, 36 partial, 28 approximate, 4 clock-dependent |
+| Verification matrix: 144 formats and informats, 1,746 cases | 94 verified, 13 partial, 37 without cases yet |
+
+Every case is compared exactly: value bit for bit, type, length,
+`_ERROR_`, the log NOTEs of its step and its PUT output. Each function or
+format is one SAS program with one step per case. With strict mode (the
+default) the 28 approximate functions stop with `sasonr_not_verified`;
+measured with `sasonr.strict = FALSE`, 718 of their 1,077 cases are
+bit-identical and 266 differ in the last bits.
 
 ## Test suite 3: end-to-end programs from books
 
@@ -151,13 +162,20 @@ SAS:
 
 | Layer | Cases |
 |---|---|
-| Our own cases (parser, functions, FREQ statistics, rounding, semantics) | 574 |
+| Our own cases (parser, functions, FREQ statistics, rounding, semantics, function and format matrices) | 7,826 |
 | Single-feature corpus and book programs | 2,119 |
 
-Silent wrong results (data set mismatches, or SAS errors that sasonr
-accepts) remain **0** in both layers.
+Round 9: 7,910 of 9,945 cases bit-identical (including programs on which
+SAS and sasonr both stop with an ERROR), 1,970 fail loud, no program on
+which SAS stops with an ERROR runs in sasonr. Five data set values differ
+from SAS in the last bits, all in procedure statistics (PROC SQL `MEAN`,
+PROC MEANS `STD`/`SKEWNESS`); they are listed under Known gaps.
 
 ## Known gaps
+
+- Five procedure statistics differ from SAS in the last bits (PROC SQL
+  `MEAN` of three rounding cases, PROC MEANS `STD` and `SKEWNESS`); they are
+  not yet gated by strict mode.
 
 - Function examples: 698 SAS-verified calls were generated for the reference
   pages; **15 calls return a different value from SAS** (CAT, CATT, COUNTC,
