@@ -856,7 +856,16 @@ sas_f_harmean <- function(...) row_stat(function(v) {
   length(v) / stats_seq_sum(1 / v)
 }, ...)
 #' @export
-sas_f_skewness <- function(...) ds_moments("skewness", num_args(...))$skew
+sas_f_skewness <- function(...) {
+  sk <- ds_moments("skewness", num_args(...))$skew
+  #
+  #
+  #
+  if (any(!is.na(sk) & sk != 0 & abs(sk) < 1e-12)) {
+    abort_unsupported("SKEWNESS() with a result below 1E-12 in magnitude (possibly a rounding residue of 0; not supported)")
+  }
+  sk
+}
 #' @export
 sas_f_kurtosis <- function(...) ds_moments("kurtosis", num_args(...))$kurt
 
