@@ -21,7 +21,9 @@ open rules.
 * **STD cut-off measured**: SAS reports STD and CV 0 up to VAR / MEAN\*\*2 =
   1.1966E-26 and keeps them from 1.4312E-26 on (the undetermined band shrank
   from 5.6E-31..4E-18); in the cut-off region the statistics derived from
-  STD are run only under the conditions a probe covers, others fail loud.
+  STD are run only under the conditions a probe covers, others fail loud;
+  ratios below the smallest one probed (2.27E-33) fail loud instead of being
+  extrapolated to STD 0.
 * **A negative CSS is missing**, now confirmed by SAS (86 of 86 groups,
   together with USS, VAR, STD, STDERR and CV).
 * **One moment kernel**: `stats_moments()` holds the DATA step, PROC SQL and

@@ -401,6 +401,12 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
   cut <- FALSE
   if (!is.na(var) && var > 0 && mean != 0) {
     ratio <- var / stats_mul(mean, mean)
+    if (ratio < STD_CUT_MIN) {
+      if (any(need %in% c("std", "cv", "stderr", "t", "prt", "lclm", "uclm", "skew", "kurt"))) {
+        abort_unsupported(sprintf("PROC MEANS STD of a variance below %s times the squared mean (smaller than any SAS probe; not verified)",
+                                  format(STD_CUT_MIN, digits = 4)))
+      }
+    }
     if (ratio <= STD_CUT_ZERO) {
       std <- 0
       cut <- TRUE
@@ -467,9 +473,9 @@ stats_means_checked <- function(out) {
 # negligible against the squared mean: proc_stats/means_css_neg_probe and
 # means_css_dec_probe: STD 0 up to VAR/MEAN**2 =
 # 1.1965683145884955E-26 and STD kept from 1.4312245245430491E-26 on (the
-# smallest ratios seen are 2.7E-33; below them the cut-off is extrapolated).
-# Between the two the rule is not determined: STD, CV, SKEWNESS and KURTOSIS
-# fail loud.
+# smallest ratio seen with STD 0 is 2.2713562904522125E-33). Below it the
+# statistics that depend on STD fail loud, as they do between the two limits.
+STD_CUT_MIN <- 2.2713562904522125e-33
 STD_CUT_ZERO <- 1.1965683145884955e-26
 STD_CUT_KEEP <- 1.4312245245430491e-26
 

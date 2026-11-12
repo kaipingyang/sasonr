@@ -102,6 +102,11 @@ test_that("PROC MEANS: the STD cut-off region fails loud where SAS is not verifi
   # VAR / MEAN**2 = 1.28E-26: between the gold-derived limits
   expect_error(means_out(hex_data(c("3FF0000000000000", toupper(hex(1 + 1.6e-13)))), "", "std=sd"),
                class = "sasonr_unsupported")
+  # VAR / MEAN**2 = 4.9E-34, below the smallest ratio SAS was probed with
+  # (2.27E-33): no longer extrapolated to STD 0
+  tiny <- paste0("data a; do i = 1 to 99; x = 1; output; end; x = 1 + 2**-52; output; run;\n")
+  expect_error(means_out(tiny, "", "std=sd"), class = "sasonr_unsupported")
+  expect_identical(means_out(tiny, "", "var=v")$v, 2^-104 / 99)
   # cut-off region with FREQ (no SAS gold): STD fails loud, VAR still runs
   fd <- "data a; input x f; datalines;\n1 1\n1.0000000000000002 1\n;\nrun;\n"
   expect_error(means_out(fd, "freq f;", "std=sd"), class = "sasonr_unsupported")
