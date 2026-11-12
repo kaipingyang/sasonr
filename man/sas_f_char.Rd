@@ -4,9 +4,9 @@
 \alias{sas_f_char}
 \title{SAS \code{CHAR(string, position)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 
-\item{pos}{Position.}
+\item{pos}{Numeric position of the character to return. A position below 1, beyond the end of the string, or missing gives a blank result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,20 @@ Single character at a position. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CHAR: each call is followed by the result of the same call in SAS 9.4
-sas_f_char("abcdef", 3)  # SAS: char('abcdef', 3) -> "c"
-sas_f_char("abc", 5)  # SAS: char('abc', 5) -> ""
-sas_f_char("abc", 1)  # SAS: char('abc', 1) -> "a"
+# CHAR: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CHAR returns the single character at position 3, 'c'.
+sas_f_char("abcdef", 3)  # SAS 9.4: char('abcdef', 3) = "c"
+
+# Position 5 is past the end of the string, so the result is blank.
+sas_f_char("abc", 5)  # SAS 9.4: char('abc', 5) = ""
+
+# Position 1 returns the first character, 'a'.
+sas_f_char("abc", 1)  # SAS 9.4: char('abc', 1) = "a"
 }
 \seealso{
 Other character functions:

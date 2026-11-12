@@ -4,9 +4,9 @@
 \alias{sas_f_propcase}
 \title{SAS \verb{PROPCASE(argument <, delimiters>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The first letter of each word is uppercased and all other letters lowercased.}
 
-\item{dlm}{Delimiters.}
+\item{dlm}{Optional characters that start a new word, replacing the default set: blank, slash, hyphen, open parenthesis, period and tab.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,26 @@ Converts to proper case. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PROPCASE: each call is followed by the result of the same call in SAS 9.4
-sas_f_propcase("hello WORLD")  # SAS: propcase('hello WORLD') -> "Hello World"
-sas_f_propcase("a-b c", "-")  # SAS: propcase('a-b c', '-') -> "A-B c"
-sas_f_propcase("jean-luc")  # SAS: propcase('jean-luc') -> "Jean-Luc"
-sas_f_propcase("")  # SAS: propcase('') -> ""
+# PROPCASE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# PROPCASE capitalizes the first letter of each word and lowercases the other
+# letters.
+sas_f_propcase("hello WORLD")  # SAS 9.4: propcase('hello WORLD') = "Hello World"
+
+# The second argument replaces the default delimiters: with only '-' the blank
+# no longer starts a word, so 'c' stays lowercase.
+sas_f_propcase("a-b c", "-")  # SAS 9.4: propcase('a-b c', '-') = "A-B c"
+
+# With the default delimiters (blank, slash, hyphen, open parenthesis, period,
+# tab) the letter after '-' is capitalized.
+sas_f_propcase("jean-luc")  # SAS 9.4: propcase('jean-luc') = "Jean-Luc"
+
+# A blank string stays blank.
+sas_f_propcase(" ")  # SAS 9.4: propcase('') = ""
 }
 \seealso{
 Other character functions:

@@ -4,7 +4,11 @@
 \alias{sas_f_cat}
 \title{SAS \verb{CAT(item-1 <, ..., item-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes \code{.}. Character items are used as is, with all leading and trailing blanks kept.}
+
+\item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
+
+\item{.len}{Internal: length of the result buffer (CATX).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,12 +21,26 @@ Concatenates without removing blanks. See the \href{https://documentation.sas.co
 }
 
 \section{Verification}{
- Partial: 1 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ partial (38 of 40 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CAT: each call is followed by the result of the same call in SAS 9.4
-sas_f_cat("a", " b ", "c ")  # SAS: cat('a', ' b ', 'c ') -> "a b c"
+# CAT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CAT concatenates without removing blanks, so the blanks around ' b ' are kept
+# (trailing blanks of the result are not shown).
+sas_f_cat("a", " b ", "c ")  # SAS 9.4: cat('a', ' b ', 'c ') = "a b c"
+
+# A numeric argument is converted with the BEST12. format and its leading
+# blanks are removed, giving 'x1'.
+sas_f_cat("x", 1)  # SAS 9.4: cat('x', 1) = "x1"
+
+# The literal '' is one blank character in SAS, and CAT keeps it, so the result
+# is 'a b'.
+sas_f_cat("a", " ", "b")  # SAS 9.4: cat('a', '', 'b') = "a b"
+
+# A missing numeric argument is converted to the character '.', giving 'a.b'.
+sas_f_cat("a", NA_real_, "b")  # SAS 9.4: cat('a', ., 'b') = "a.b"
 }
 \seealso{
 Other character functions:

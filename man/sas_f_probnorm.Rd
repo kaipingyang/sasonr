@@ -4,7 +4,7 @@
 \alias{sas_f_probnorm}
 \title{SAS \code{PROBNORM(x)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the standard normal CDF is evaluated. Missing gives missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,20 @@ Standard normal cumulative probability. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (20 of 24 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 7.1e-15; different algorithm)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PROBNORM: each call is followed by the result of the same call in SAS 9.4
-sas_f_probnorm(1.96)  # SAS: probnorm(1.96) -> 0.97500210485178
-sas_f_probnorm(0)  # SAS: probnorm(0) -> 0.5
-sas_f_probnorm(-10)  # SAS: probnorm(-10) -> 7.619853024161e-24
-sas_f_probnorm(NA_real_)  # SAS: probnorm(.) -> .
+# PROBNORM: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The standard normal CDF at 1.96 is about 0.975.
+sas_f_probnorm(1.96)  # SAS 9.4: probnorm(1.96) = 0.97500210485178
+
+# The standard normal CDF at 0 is 0.5.
+sas_f_probnorm(0)  # SAS 9.4: probnorm(0) = 0.5
+
+# A missing argument gives a missing result.
+sas_f_probnorm(NA_real_)  # SAS 9.4: probnorm(.) = .
 }
 \seealso{
 Other probability functions:

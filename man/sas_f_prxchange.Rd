@@ -4,11 +4,11 @@
 \alias{sas_f_prxchange}
 \title{SAS \code{PRXCHANGE(perl-regular-expression, times, source)}}
 \arguments{
-\item{re}{Perl regular expression or its id.}
+\item{re}{Pattern identifier from PRXPARSE or a Perl substitution string 's/pattern/replacement/' (capture groups referenced as $1, $2).}
 
-\item{times}{Number of replacements (-1 for all).}
+\item{times}{Number of matches to replace; -1 replaces all matches.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character source string.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -23,15 +23,23 @@ Substitutes with a Perl regular expression. See the \href{https://documentation.
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (30 of 33 SAS 9.4 cases agree bit for bit; 1 case(s) differ in a log NOTE only; 2 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PRXCHANGE: each call is followed by the result of the same call in SAS 9.4
-sas_f_prxchange("s/a/X/", -1, "banana")  # SAS: prxchange('s/a/X/', -1, 'banana') -> "bXnXnX"
-sas_f_prxchange("s/a/X/", 1, "banana")  # SAS: prxchange('s/a/X/', 1, 'banana') -> "bXnana"
-sas_f_prxchange("s/(\\\\w+) (\\\\w+)/$2 $1/", -1, "hello world")  # SAS: prxchange('s/(\w+) (\w+)/$2 $1/', -1, 'hello world') -> "world hello"
-sas_f_prxchange("s/x/y/i", -1, "XxX")  # SAS: prxchange('s/x/y/i', -1, 'XxX') -> "yyy"
+# PRXCHANGE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Times -1 applies the Perl substitution s/a/X/ to every match.
+sas_f_prxchange("s/a/X/", -1, "banana")  # SAS 9.4: prxchange('s/a/X/', -1, 'banana') = "bXnXnX"
+
+# Times 1 replaces only the first match.
+sas_f_prxchange("s/a/X/", 1, "banana")  # SAS 9.4: prxchange('s/a/X/', 1, 'banana') = "bXnana"
+
+# The capture groups $1 and $2 swap the two words.
+sas_f_prxchange("s/(\\\\w+) (\\\\w+)/$2 $1/", -1, "hello world")  # SAS 9.4: prxchange('s/(\w+) (\w+)/$2 $1/', -1, 'hello world') = "world hello"
+
+# The i option after the pattern makes matching case-insensitive.
+sas_f_prxchange("s/x/y/i", -1, "XxX")  # SAS 9.4: prxchange('s/x/y/i', -1, 'XxX') = "yyy"
 }
 \seealso{
 Other special functions:

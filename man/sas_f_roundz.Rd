@@ -4,9 +4,9 @@
 \alias{sas_f_roundz}
 \title{SAS \verb{ROUNDZ(argument <, rounding-unit>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result.}
 
-\item{unit}{Rounding unit (default 1).}
+\item{unit}{Optional positive rounding unit, default 1; the result is the multiple of the unit nearest to \code{x}. No fuzzing is applied, and exact ties are rounded to the even multiple.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,16 +21,28 @@ Rounds to a multiple of the unit, ties to even, without fuzz. See the \href{http
 }
 
 \section{Verification}{
- Partial: 5 of 5 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ROUNDZ: each call is followed by the result of the same call in SAS 9.4
-sas_f_roundz(2.5)  # SAS: roundz(2.5) -> 2
-sas_f_roundz(2.45, 0.1)  # SAS: roundz(2.45, 0.1) -> 2.4
-sas_f_roundz(1.005, 0.01)  # SAS: roundz(1.005, 0.01) -> 1
-sas_f_roundz(-3.5)  # SAS: roundz(-3.5) -> -4
-sas_f_roundz(NA_real_)  # SAS: roundz(.) -> .
+# ROUNDZ: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# ROUNDZ rounds an exact tie to the even integer: 2.5 gives 2.
+sas_f_roundz(2.5)  # SAS 9.4: roundz(2.5) = 2
+
+# The second argument is the rounding unit; 2.45 rounded to a multiple of 0.1
+# gives 2.4.
+sas_f_roundz(2.45, 0.1)  # SAS 9.4: roundz(2.45, 0.1) = 2.4
+
+# ROUNDZ uses no fuzzing, and 1.005 is stored slightly below 1.005 in binary,
+# so it rounds down to 1.
+sas_f_roundz(1.005, 0.01)  # SAS 9.4: roundz(1.005, 0.01) = 1
+
+# -3.5 is halfway between -4 and -3, so the even integer -4 is chosen.
+sas_f_roundz(-3.5)  # SAS 9.4: roundz(-3.5) = -4
+
+# A missing argument gives a missing result.
+sas_f_roundz(NA_real_)  # SAS 9.4: roundz(.) = .
 }
 \seealso{
 Other numeric functions:

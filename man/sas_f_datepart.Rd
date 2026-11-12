@@ -4,7 +4,7 @@
 \alias{sas_f_datepart}
 \title{SAS \code{DATEPART(datetime)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS datetime value (seconds since midnight, 1 January 1960). A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,25 @@ Date part of a datetime value. See the \href{https://documentation.sas.com/doc/e
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (23 of 23 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# DATEPART: each call is followed by the result of the same call in SAS 9.4
+# DATEPART: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_datepart(2026117800)  # SAS: datepart('15MAR2024:10:30:00'dt) -> 23450
-sas_f_datepart(0)  # SAS: datepart(0) -> 0
-sas_f_datepart(-1)  # SAS: datepart(-1) -> -1
-sas_f_datepart(NA_real_)  # SAS: datepart(.) -> .
+
+# DATEPART extracts the date (days since 1960) from a datetime value (seconds
+# since 1960).
+sas_f_datepart(2026117800)  # SAS 9.4: datepart('15MAR2024:10:30:00'dt) = 23450
+
+# Datetime 0 is midnight on 1 January 1960, which is date 0.
+sas_f_datepart(0)  # SAS 9.4: datepart(0) = 0
+
+# One second before 1960 falls on 31 December 1959, date -1.
+sas_f_datepart(-1)  # SAS 9.4: datepart(-1) = -1
+
+# A missing argument gives a missing result.
+sas_f_datepart(NA_real_)  # SAS 9.4: datepart(.) = .
 }
 \seealso{
 Other datetime functions:

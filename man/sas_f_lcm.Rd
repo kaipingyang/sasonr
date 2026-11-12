@@ -4,7 +4,7 @@
 \alias{sas_f_lcm}
 \title{SAS \verb{LCM(x-1 <, ..., x-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Integer values. Any missing argument gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Least common multiple. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ partial (31 of 35 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LCM: each call is followed by the result of the same call in SAS 9.4
-sas_f_lcm(4, 6)  # SAS: lcm(4, 6) -> 12
-sas_f_lcm(3, 5, 7)  # SAS: lcm(3, 5, 7) -> 105
-sas_f_lcm(4, NA_real_)  # SAS: lcm(4, .) -> .
+# LCM: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The least common multiple of 4 and 6 is 12.
+sas_f_lcm(4, 6)  # SAS 9.4: lcm(4, 6) = 12
+
+# The least common multiple of 3, 5 and 7 is 105.
+sas_f_lcm(3, 5, 7)  # SAS 9.4: lcm(3, 5, 7) = 105
+
+# A missing argument gives a missing result.
+sas_f_lcm(4, NA_real_)  # SAS 9.4: lcm(4, .) = .
 }
 \seealso{
 Other numeric functions:

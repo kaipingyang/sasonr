@@ -4,7 +4,7 @@
 \alias{sas_f_rank}
 \title{SAS \code{RANK(x)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character value; the ASCII code (0 to 255) of its first character is returned.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Position of a character in the collating sequence. See the \href{https://documen
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# RANK: each call is followed by the result of the same call in SAS 9.4
-sas_f_rank("A")  # SAS: rank('A') -> 65
-sas_f_rank("a")  # SAS: rank('a') -> 97
-sas_f_rank(" ")  # SAS: rank(' ') -> 32
-sas_f_rank("0")  # SAS: rank('0') -> 48
+# RANK: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# RANK returns the position of a character in the ASCII collating sequence: 'A'
+# is 65.
+sas_f_rank("A")  # SAS 9.4: rank('A') = 65
+
+# The lowercase letter 'a' is 97.
+sas_f_rank("a")  # SAS 9.4: rank('a') = 97
+
+# The blank is 32.
+sas_f_rank(" ")  # SAS 9.4: rank(' ') = 32
+
+# The digit character '0' is 48.
+sas_f_rank("0")  # SAS 9.4: rank('0') = 48
 }
 \seealso{
 Other character functions:

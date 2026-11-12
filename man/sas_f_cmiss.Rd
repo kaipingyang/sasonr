@@ -4,7 +4,7 @@
 \alias{sas_f_cmiss}
 \title{SAS \verb{CMISS(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Numeric or character values. A numeric value counts as missing if it is \code{.} or a special missing value; a character value counts if it is blank.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,21 @@ Number of missing arguments (numeric or character). See the \href{https://docume
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ partial (37 of 39 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CMISS: each call is followed by the result of the same call in SAS 9.4
-sas_f_cmiss(1, NA_real_, "a", "")  # SAS: cmiss(1, ., 'a', '') -> 2
-sas_f_cmiss(sas_missing(".A"))  # SAS: cmiss(.A) -> 1
-sas_f_cmiss("x", 2)  # SAS: cmiss('x', 2) -> 0
+# CMISS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CMISS counts missing numeric or character arguments: . and the blank string
+# '' are both missing, giving 2.
+sas_f_cmiss(1, NA_real_, "a", " ")  # SAS 9.4: cmiss(1, ., 'a', '') = 2
+
+# A special missing value such as .A counts as missing.
+sas_f_cmiss(sas_missing(".A"))  # SAS 9.4: cmiss(.A) = 1
+
+# Neither 'x' nor 2 is missing, so the count is 0.
+sas_f_cmiss("x", 2)  # SAS 9.4: cmiss('x', 2) = 0
 }
 \seealso{
 Other descriptive functions:

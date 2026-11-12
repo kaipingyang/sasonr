@@ -4,7 +4,7 @@
 \alias{sas_f_sin}
 \title{SAS \code{SIN(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value in radians. A missing value gives a missing result.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,23 @@ Sine. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titl
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SIN: each call is followed by the result of the same call in SAS 9.4
-sas_f_sin(0)  # SAS: sin(0) -> 0
-sas_f_sin(1)  # SAS: sin(1) -> 0.841470984807897
-sas_f_sin(-3.5)  # SAS: sin(-3.5) -> 0.35078322768962
-sas_f_sin(NA_real_)  # SAS: sin(.) -> .
+# SIN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The sine of 0 is 0.
+sas_f_sin(0)  # SAS 9.4: sin(0) = 0
+
+# The sine of 1 radian.
+sas_f_sin(1)  # SAS 9.4: sin(1) = 0.841470984807897
+
+# -3.5 radians lies in the second quadrant, so the sine is positive.
+sas_f_sin(-3.5)  # SAS 9.4: sin(-3.5) = 0.35078322768962
+
+# A missing argument gives a missing result.
+sas_f_sin(NA_real_)  # SAS 9.4: sin(.) = .
 }
 \seealso{
 Other numeric functions:

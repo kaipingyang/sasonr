@@ -4,11 +4,11 @@
 \alias{sas_f_indexw}
 \title{SAS \verb{INDEXW(source, excerpt <, delimiters>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the source searched.}
 
-\item{word}{Word to find.}
+\item{word}{Character word to find; leading and trailing blanks are ignored. It must be delimited on both sides by delimiters or the string ends.}
 
-\item{dlm}{Delimiters.}
+\item{dlm}{Optional delimiter characters, default blank.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,16 +21,25 @@ Position of a word. See the \href{https://documentation.sas.com/doc/en/lefunctio
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (25 of 27 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INDEXW: each call is followed by the result of the same call in SAS 9.4
+# INDEXW: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_indexw("the cat sat", "cat")  # SAS: indexw('the cat sat', 'cat') -> 5
-sas_f_indexw("the cat sat", "at")  # SAS: indexw('the cat sat', 'at') -> 0
-sas_f_indexw("a;b;c", "b", ";")  # SAS: indexw('a;b;c', 'b', ';') -> 3
-sas_f_indexw("cat", "cat")  # SAS: indexw('cat', 'cat') -> 1
+
+# INDEXW returns the position of 'cat' as a whole word delimited by blanks.
+sas_f_indexw("the cat sat", "cat")  # SAS 9.4: indexw('the cat sat', 'cat') = 5
+
+# 'at' occurs only inside other words, so the result is 0.
+sas_f_indexw("the cat sat", "at")  # SAS 9.4: indexw('the cat sat', 'at') = 0
+
+# The third argument sets the word delimiters; with ';' the word 'b' starts at
+# position 3.
+sas_f_indexw("a;b;c", "b", ";")  # SAS 9.4: indexw('a;b;c', 'b', ';') = 3
+
+# A word may be the entire string.
+sas_f_indexw("cat", "cat")  # SAS 9.4: indexw('cat', 'cat') = 1
 }
 \seealso{
 Other character functions:

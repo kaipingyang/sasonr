@@ -4,13 +4,13 @@
 \alias{sas_f_find}
 \title{SAS \verb{FIND(string, substring <, modifiers> <, start>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.}
 
-\item{sub}{Substring.}
+\item{sub}{Character substring to find. A zero-length substring gives 0.}
 
-\item{a3}{Modifiers or start position (as in SAS).}
+\item{a3}{Either the modifiers (if character) or the start position (if numeric); the two may be given in either order. Modifiers: i ignores case; t trims trailing blanks from \code{string} and \code{substring}. Start: a positive value searches rightwards from that position, a negative value searches leftwards from position |start|, 0 gives 0; default 1.}
 
-\item{a4}{Start position or modifiers (as in SAS).}
+\item{a4}{Either the modifiers (if character) or the start position (if numeric); the two may be given in either order. Modifiers: i ignores case; t trims trailing blanks from \code{string} and \code{substring}. Start: a positive value searches rightwards from that position, a negative value searches leftwards from position |start|, 0 gives 0; default 1.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -23,16 +23,29 @@ Position of a substring. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) agree with SAS.
+ partial (41 of 43 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# FIND: each call is followed by the result of the same call in SAS 9.4
-sas_f_find("abcabc", "bc")  # SAS: find('abcabc', 'bc') -> 2
-sas_f_find("abcabc", "BC", "i")  # SAS: find('abcabc', 'BC', 'i') -> 2
-sas_f_find("abcabc", "bc", 3)  # SAS: find('abcabc', 'bc', 3) -> 5
-sas_f_find("abcabc", "bc", -4)  # SAS: find('abcabc', 'bc', -4) -> 2
-sas_f_find("abc", "x")  # SAS: find('abc', 'x') -> 0
+# FIND: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# FIND returns the position of the first occurrence of 'bc', which is 2.
+sas_f_find("abcabc", "bc")  # SAS 9.4: find('abcabc', 'bc') = 2
+
+# A character third argument is a modifier: i ignores case, so 'BC' matches at
+# position 2.
+sas_f_find("abcabc", "BC", "i")  # SAS 9.4: find('abcabc', 'BC', 'i') = 2
+
+# A numeric third argument is the start position: searching rightwards from
+# position 3 finds 'bc' at 5.
+sas_f_find("abcabc", "bc", 3)  # SAS 9.4: find('abcabc', 'bc', 3) = 5
+
+# Negative start -4 searches leftwards from position 4 and finds the occurrence
+# that begins at position 2.
+sas_f_find("abcabc", "bc", -4)  # SAS 9.4: find('abcabc', 'bc', -4) = 2
+
+# The substring does not occur, so the result is 0.
+sas_f_find("abc", "x")  # SAS 9.4: find('abc', 'x') = 0
 }
 \seealso{
 Other character functions:

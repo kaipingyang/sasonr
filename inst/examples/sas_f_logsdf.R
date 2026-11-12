@@ -1,5 +1,11 @@
-# LOGSDF: each call is followed by the result of the same call in SAS 9.4
-# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_logsdf("NORMAL", 0)  # SAS: logsdf('NORMAL', 0) -> -0.693147180559945
-sas_f_logsdf("T", 1, 3)  # SAS: logsdf('T', 1, 3) -> -1.6321892244941
-sas_f_logsdf("NORMAL", NA_real_)  # SAS: logsdf('NORMAL', .) -> .
+# LOGSDF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The log of the normal survival function P(X > 0) is log(0.5).
+sas_f_logsdf("NORMAL", 0)  # SAS 9.4: logsdf('NORMAL', 0) = -0.693147180559945
+
+# Far in the upper tail LOGSDF stays accurate although P(X > 10) is only about
+# 7.6E-24.
+sas_f_logsdf("NORMAL", 10)  # SAS 9.4: logsdf('NORMAL', 10) = -53.2312851505125
+
+# A missing quantile gives a missing result.
+sas_f_logsdf("NORMAL", NA_real_)  # SAS 9.4: logsdf('NORMAL', .) = .

@@ -4,9 +4,9 @@
 \alias{sas_f_constant}
 \title{SAS \verb{CONSTANT(constant <, parameter>)}}
 \arguments{
-\item{name}{Name.}
+\item{name}{Character name of the constant, not case sensitive: 'PI', 'E', 'EULER', 'BIG', 'LOGBIG', 'SQRTBIG', 'SMALL', 'LOGSMALL', 'SQRTSMALL', 'MACEPS', 'LOGMACEPS', 'SQRTMACEPS' or 'EXACTINT'.}
 
-\item{p}{Probability.}
+\item{p}{Optional numeric parameter, used only by 'EXACTINT': the number of bytes (integer from 3 to 8); without it 'EXACTINT' refers to 8 bytes.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,16 +19,27 @@ Mathematical and machine constants. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) agree with SAS.
+ verified (34 of 34 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CONSTANT: each call is followed by the result of the same call in SAS 9.4
-sas_f_constant("PI")  # SAS: constant('PI') -> 3.14159265358979
-sas_f_constant("E")  # SAS: constant('E') -> 2.71828182845905
-sas_f_constant("EULER")  # SAS: constant('EULER') -> 0.577215664901533
-sas_f_constant("MACEPS")  # SAS: constant('MACEPS') -> 2.22044604925031e-16
-sas_f_constant("BIG")  # SAS: constant('BIG') -> 1.79769313486232e+308
+# CONSTANT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CONSTANT('PI') returns the mathematical constant pi.
+sas_f_constant("PI")  # SAS 9.4: constant('PI') = 3.14159265358979
+
+# 'E' returns the base of the natural logarithm.
+sas_f_constant("E")  # SAS 9.4: constant('E') = 2.71828182845905
+
+# 'EULER' returns Euler's constant, about 0.5772.
+sas_f_constant("EULER")  # SAS 9.4: constant('EULER') = 0.577215664901533
+
+# 'MACEPS' returns the machine precision of double-precision numbers, 2 to the
+# power -52.
+sas_f_constant("MACEPS")  # SAS 9.4: constant('MACEPS') = 2.22044604925031e-16
+
+# 'BIG' returns the largest double-precision number.
+sas_f_constant("BIG")  # SAS 9.4: constant('BIG') = 1.79769313486232e+308
 }
 \seealso{
 Other numeric functions:

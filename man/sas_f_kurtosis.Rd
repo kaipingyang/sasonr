@@ -4,7 +4,7 @@
 \alias{sas_f_kurtosis}
 \title{SAS \code{KURTOSIS(argument-1, ..., argument-n)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Four or more numeric values. Missing values are ignored; with fewer than 4 nonmissing values or zero variance the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,14 @@ Kurtosis. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS.
+ approximate (13 of 70 SAS 9.4 cases agree bit for bit; 57 case(s) differ in the last bits (largest relative difference 2.3e-14; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# KURTOSIS: each call is followed by the result of the same call in SAS 9.4
-sas_f_kurtosis(1, 2, 3, 4, 10)  # SAS: kurtosis(1, 2, 3, 4, 10) -> 3.152
-sas_f_kurtosis(2, 4, 4, 4, 5, 5, 7, 9)  # SAS: kurtosis(2, 4, 4, 4, 5, 5, 7, 9) -> 0.940625
-sas_f_kurtosis(1, 2, NA_real_, 3, 4, 8)  # SAS: kurtosis(1, 2, ., 3, 4, 8) -> 2.021017076375
-sas_f_kurtosis(1, 1, 1, 1)  # SAS: kurtosis(1, 1, 1, 1) -> .
+# KURTOSIS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Values with zero variance have no defined kurtosis, so the result is missing.
+sas_f_kurtosis(1, 1, 1, 1)  # SAS 9.4: kurtosis(1, 1, 1, 1) = .
 }
 \seealso{
 Other descriptive functions:

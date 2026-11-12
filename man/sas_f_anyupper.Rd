@@ -4,9 +4,9 @@
 \alias{sas_f_anyupper}
 \title{SAS \verb{ANYUPPER(string <, start>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string to search. A numeric value is first converted to character with the BEST12. format.}
 
-\item{start}{Starting position.}
+\item{start}{Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,21 @@ Position of the first uppercase letter. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ANYUPPER: each call is followed by the result of the same call in SAS 9.4
-sas_f_anyupper("abC")  # SAS: anyupper('abC') -> 3
-sas_f_anyupper("abc")  # SAS: anyupper('abc') -> 0
-sas_f_anyupper("AbC", -2)  # SAS: anyupper('AbC', -2) -> 1
+# ANYUPPER: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The first uppercase letter is 'C' at position 3.
+sas_f_anyupper("abC")  # SAS 9.4: anyupper('abC') = 3
+
+# No uppercase letter occurs, so the result is 0.
+sas_f_anyupper("abc")  # SAS 9.4: anyupper('abc') = 0
+
+# Negative start -2 searches leftwards from position 2 ('b') and finds the
+# uppercase 'A' at position 1.
+sas_f_anyupper("AbC", -2)  # SAS 9.4: anyupper('AbC', -2) = 1
 }
 \seealso{
 Other character functions:

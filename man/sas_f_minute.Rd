@@ -4,7 +4,7 @@
 \alias{sas_f_minute}
 \title{SAS \code{MINUTE(time | datetime)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS time value (seconds since midnight) or datetime value (seconds since 1 January 1960); only the time of day is used. A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,24 @@ Minute. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/ti
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (20 of 20 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MINUTE: each call is followed by the result of the same call in SAS 9.4
+# MINUTE: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_minute(37815)  # SAS: minute('10:30:15't) -> 30
-sas_f_minute(2026166399)  # SAS: minute('15MAR2024:23:59:59'dt) -> 59
-sas_f_minute(0)  # SAS: minute(0) -> 0
-sas_f_minute(NA_real_)  # SAS: minute(.) -> .
+
+# MINUTE extracts the minute from a SAS time value.
+sas_f_minute(37815)  # SAS 9.4: minute('10:30:15't) = 30
+
+# MINUTE also accepts a datetime value.
+sas_f_minute(2026166399)  # SAS 9.4: minute('15MAR2024:23:59:59'dt) = 59
+
+# Time 0 is midnight, minute 0.
+sas_f_minute(0)  # SAS 9.4: minute(0) = 0
+
+# A missing argument gives a missing result.
+sas_f_minute(NA_real_)  # SAS 9.4: minute(.) = .
 }
 \seealso{
 Other datetime functions:

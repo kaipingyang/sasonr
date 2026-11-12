@@ -4,9 +4,9 @@
 \alias{sas_f_blshift}
 \title{SAS \code{BLSHIFT(argument-1, argument-2)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.}
 
-\item{n}{Count or position.}
+\item{n}{Number of bit positions to shift left, an integer from 0 to 31; bits shifted beyond bit 32 are lost.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,14 +21,20 @@ Bitwise left shift. See the \href{https://documentation.sas.com/doc/en/lefunctio
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# BLSHIFT: each call is followed by the result of the same call in SAS 9.4
-sas_f_blshift(1, 4)  # SAS: blshift(1, 4) -> 16
-sas_f_blshift(3, 1)  # SAS: blshift(3, 1) -> 6
-sas_f_blshift(NA_real_, 1)  # SAS: blshift(., 1) -> .
+# BLSHIFT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Shifting 1 left by 4 bits multiplies it by 2 to the power 4, giving 16.
+sas_f_blshift(1, 4)  # SAS 9.4: blshift(1, 4) = 16
+
+# Shifting 3 (binary 11) left by one bit gives 6 (binary 110).
+sas_f_blshift(3, 1)  # SAS 9.4: blshift(3, 1) = 6
+
+# A missing argument gives a missing result.
+sas_f_blshift(NA_real_, 1)  # SAS 9.4: blshift(., 1) = .
 }
 \seealso{
 Other special functions:

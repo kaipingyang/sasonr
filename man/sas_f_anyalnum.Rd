@@ -4,9 +4,9 @@
 \alias{sas_f_anyalnum}
 \title{SAS \verb{ANYALNUM(string <, start>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string to search. A numeric value is first converted to character with the BEST12. format.}
 
-\item{start}{Starting position.}
+\item{start}{Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,26 @@ Position of the first alphanumeric character (0 if none). See the \href{https://
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (33 of 33 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ANYALNUM: each call is followed by the result of the same call in SAS 9.4
-sas_f_anyalnum("  ab1")  # SAS: anyalnum('  ab1') -> 3
-sas_f_anyalnum("!!!")  # SAS: anyalnum('!!!') -> 0
-sas_f_anyalnum("a1!", -3)  # SAS: anyalnum('a1!', -3) -> 2
-sas_f_anyalnum("!a!", 3)  # SAS: anyalnum('!a!', 3) -> 0
+# ANYALNUM: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The search starts at position 1; the first letter or digit is 'a' at position
+# 3, after two blanks.
+sas_f_anyalnum("  ab1")  # SAS 9.4: anyalnum('  ab1') = 3
+
+# No letter or digit occurs in the string, so the result is 0.
+sas_f_anyalnum("!!!")  # SAS 9.4: anyalnum('!!!') = 0
+
+# Negative start -3 searches leftwards from position 3: the first alphanumeric
+# character found is '1' at position 2.
+sas_f_anyalnum("a1!", -3)  # SAS 9.4: anyalnum('a1!', -3) = 2
+
+# Start 3 searches rightwards from position 3, which holds only '!', so nothing
+# is found and the result is 0.
+sas_f_anyalnum("!a!", 3)  # SAS 9.4: anyalnum('!a!', 3) = 0
 }
 \seealso{
 Other character functions:

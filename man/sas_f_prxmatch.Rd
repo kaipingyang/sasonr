@@ -4,9 +4,9 @@
 \alias{sas_f_prxmatch}
 \title{SAS \code{PRXMATCH(regular-expression-id | perl-regular-expression, source)}}
 \arguments{
-\item{re}{Perl regular expression or its id.}
+\item{re}{Pattern identifier returned by PRXPARSE, or a Perl regular expression string in delimiters (e.g. '/b+/').}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character source string to search; the result is the position of the first match, or 0.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,15 +21,26 @@ Position of the first match of a Perl regular expression. See the \href{https://
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (18 of 21 SAS 9.4 cases agree bit for bit; 1 case(s) differ in a log NOTE only; 2 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PRXMATCH: each call is followed by the result of the same call in SAS 9.4
-sas_f_prxmatch("/b+/", "abbc")  # SAS: prxmatch('/b+/', 'abbc') -> 2
-sas_f_prxmatch("/z/", "abc")  # SAS: prxmatch('/z/', 'abc') -> 0
-sas_f_prxmatch("/B/i", "abc")  # SAS: prxmatch('/B/i', 'abc') -> 2
-sas_f_prxmatch("/^a/", " abc")  # SAS: prxmatch('/^a/', ' abc') -> 0
+# PRXMATCH: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# PRXMATCH returns the position of the first match of the Perl regular
+# expression /b+/: 2.
+sas_f_prxmatch("/b+/", "abbc")  # SAS 9.4: prxmatch('/b+/', 'abbc') = 2
+
+# There is no match, so the result is 0.
+sas_f_prxmatch("/z/", "abc")  # SAS 9.4: prxmatch('/z/', 'abc') = 0
+
+# The i option makes matching case-insensitive, so /B/i matches 'b' at position
+# 2.
+sas_f_prxmatch("/B/i", "abc")  # SAS 9.4: prxmatch('/B/i', 'abc') = 2
+
+# ^ anchors the match at the start, and the string starts with a blank, so
+# there is no match.
+sas_f_prxmatch("/^a/", " abc")  # SAS 9.4: prxmatch('/^a/', ' abc') = 0
 }
 \seealso{
 Other special functions:

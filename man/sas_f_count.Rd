@@ -4,11 +4,11 @@
 \alias{sas_f_count}
 \title{SAS \verb{COUNT(string, substring <, modifiers>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.}
 
-\item{sub}{Substring.}
+\item{sub}{Character substring to count; occurrences do not overlap. A blank substring gives 0.}
 
-\item{mods}{Modifiers, as in SAS.}
+\item{mods}{Optional modifier string, default none. i ignores case; t trims trailing blanks from \code{x} and \code{sub}.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,24 @@ Number of occurrences of a substring. See the \href{https://documentation.sas.co
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COUNT: each call is followed by the result of the same call in SAS 9.4
-sas_f_count("banana", "an")  # SAS: count('banana', 'an') -> 2
-sas_f_count("Banana", "b", "i")  # SAS: count('Banana', 'b', 'i') -> 1
-sas_f_count("aaa", "aa")  # SAS: count('aaa', 'aa') -> 1
-sas_f_count("abc", "x")  # SAS: count('abc', 'x') -> 0
+# COUNT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# COUNT counts the occurrences of the substring 'an' in 'banana': 2.
+sas_f_count("banana", "an")  # SAS 9.4: count('banana', 'an') = 2
+
+# Modifier i ignores case, so 'b' matches the 'B' once.
+sas_f_count("Banana", "b", "i")  # SAS 9.4: count('Banana', 'b', 'i') = 1
+
+# Occurrences do not overlap: after 'aa' at position 1 the search resumes at
+# position 3, so the count is 1.
+sas_f_count("aaa", "aa")  # SAS 9.4: count('aaa', 'aa') = 1
+
+# The substring does not occur, so the result is 0.
+sas_f_count("abc", "x")  # SAS 9.4: count('abc', 'x') = 0
 }
 \seealso{
 Other character functions:

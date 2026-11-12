@@ -4,11 +4,11 @@
 \alias{sas_f_put}
 \title{SAS \code{PUT(source, format.)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Value to format; numeric for numeric formats, character for character ($) formats.}
 
-\item{fmt}{Format or informat (text such as \code{"8.2"} or a parsed specification).}
+\item{fmt}{Parsed format specification: a list with elements \code{name}, \code{w}, \code{d}, \code{char} and \code{text}, as produced by the translator from a format written as \verb{name w.d} (e.g. \code{8.3}, \code{z5.}, \verb{$5.}). In SAS code this is the format name itself, not a string.}
 
-\item{align}{Alignment (\code{"-l"}, \code{"-r"}, \code{"-c"}).}
+\item{align}{Optional alignment written after the format: 'l' left-aligns (-L), 'r' right-aligns (-R), 'c' centers (-C) the formatted value within the width. Default none.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,16 +21,30 @@ Writes a value with a format. See the \href{https://documentation.sas.com/doc/en
 }
 
 \section{Verification}{
- Partial: 5 of 5 example call(s) and 44 of 46 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+ partial (43 of 45 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PUT: each call is followed by the result of the same call in SAS 9.4
-sas_f_put(3.14159, list(name = "", w = 8L, d = 3L, char = FALSE, text = "8.3"))  # SAS: put(3.14159, 8.3) -> "   3.142"
-sas_f_put(42, list(name = "z", w = 5L, d = NA_integer_, char = FALSE, text = "z5."))  # SAS: put(42, z5.) -> "00042"
-sas_f_put(1234567, list(name = "comma", w = 10L, d = NA_integer_, char = FALSE, text = "comma10."))  # SAS: put(1234567, comma10.) -> " 1,234,567"
-sas_f_put(NA_real_, list(name = "", w = 8L, d = 2L, char = FALSE, text = "8.2"))  # SAS: put(., 8.2) -> "     ."
-sas_f_put("ab", list(name = "", w = 5L, d = NA_integer_, char = TRUE, text = "$5."))  # SAS: put('ab', $5.) -> "ab"
+# PUT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# PUT formats 3.14159 with the w.d format 8.3: rounded to 3 decimals,
+# right-aligned in 8 columns.
+sas_f_put(3.14159, list(name = "", w = 8L, d = 3L, char = FALSE, text = "8.3"))  # SAS 9.4: put(3.14159, 8.3) = "   3.142"
+
+# The Z5. format pads the number with leading zeros to width 5.
+sas_f_put(42, list(name = "z", w = 5L, d = NA_integer_, char = FALSE, text = "z5."))  # SAS 9.4: put(42, z5.) = "00042"
+
+# The COMMA10. format inserts thousands separators, right-aligned in 10
+# columns.
+sas_f_put(1234567, list(name = "comma", w = 10L, d = NA_integer_, char = FALSE, text = "comma10."))  # SAS 9.4: put(1234567, comma10.) = " 1,234,567"
+
+# A missing value is written as a period; for a w.d format it sits where the
+# decimal point would be.
+sas_f_put(NA_real_, list(name = "", w = 8L, d = 2L, char = FALSE, text = "8.2"))  # SAS 9.4: put(., 8.2) = "     ."
+
+# The character format $5. writes 'ab' in a 5-character field, padded with
+# trailing blanks.
+sas_f_put("ab", list(name = "", w = 5L, d = NA_integer_, char = TRUE, text = "$5."))  # SAS 9.4: put('ab', $5.) = "ab"
 }
 \seealso{
 Other special functions:

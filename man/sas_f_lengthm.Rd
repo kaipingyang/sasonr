@@ -4,7 +4,7 @@
 \alias{sas_f_lengthm}
 \title{SAS \code{LENGTHM(string)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The result is the number of bytes allocated, including trailing blanks.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,21 @@ Bytes allocated for the string. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (14 of 14 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LENGTHM: each call is followed by the result of the same call in SAS 9.4
-sas_f_lengthm("abc  ")  # SAS: lengthm('abc  ') -> 5
-sas_f_lengthm("")  # SAS: lengthm('') -> 1
-sas_f_lengthm("abcdef")  # SAS: lengthm('abcdef') -> 6
+# LENGTHM: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LENGTHM returns the memory in bytes allocated for the string, including
+# trailing blanks: 5.
+sas_f_lengthm("abc  ")  # SAS 9.4: lengthm('abc  ') = 5
+
+# The blank literal '' occupies 1 byte.
+sas_f_lengthm(" ")  # SAS 9.4: lengthm('') = 1
+
+# A 6-character literal occupies 6 bytes.
+sas_f_lengthm("abcdef")  # SAS 9.4: lengthm('abcdef') = 6
 }
 \seealso{
 Other character functions:

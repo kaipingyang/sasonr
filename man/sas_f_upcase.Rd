@@ -4,7 +4,7 @@
 \alias{sas_f_upcase}
 \title{SAS \code{UPCASE(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Converts to uppercase. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) and 1 offline conformance case(s) agree with SAS.
+ partial (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# UPCASE: each call is followed by the result of the same call in SAS 9.4
-sas_f_upcase("abc Def")  # SAS: upcase('abc Def') -> "ABC DEF"
-sas_f_upcase("")  # SAS: upcase('') -> ""
-sas_f_upcase("a1!")  # SAS: upcase('a1!') -> "A1!"
+# UPCASE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# UPCASE converts all letters to upper case.
+sas_f_upcase("abc Def")  # SAS 9.4: upcase('abc Def') = "ABC DEF"
+
+# A blank string stays blank.
+sas_f_upcase(" ")  # SAS 9.4: upcase('') = ""
+
+# Digits and punctuation are not changed.
+sas_f_upcase("a1!")  # SAS 9.4: upcase('a1!') = "A1!"
 }
 \seealso{
 Other character functions:

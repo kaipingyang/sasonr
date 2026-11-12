@@ -4,7 +4,7 @@
 \alias{sas_f_cos}
 \title{SAS \code{COS(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value in radians. A missing value gives a missing result.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,23 @@ Cosine. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/ti
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COS: each call is followed by the result of the same call in SAS 9.4
-sas_f_cos(0)  # SAS: cos(0) -> 1
-sas_f_cos(1)  # SAS: cos(1) -> 0.54030230586814
-sas_f_cos(-3.5)  # SAS: cos(-3.5) -> -0.936456687290796
-sas_f_cos(NA_real_)  # SAS: cos(.) -> .
+# COS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The cosine of 0 is 1.
+sas_f_cos(0)  # SAS 9.4: cos(0) = 1
+
+# The cosine of 1 radian.
+sas_f_cos(1)  # SAS 9.4: cos(1) = 0.54030230586814
+
+# Cosine is an even function, so cos(-3.5) equals cos(3.5).
+sas_f_cos(-3.5)  # SAS 9.4: cos(-3.5) = -0.936456687290796
+
+# A missing argument gives a missing result.
+sas_f_cos(NA_real_)  # SAS 9.4: cos(.) = .
 }
 \seealso{
 Other numeric functions:

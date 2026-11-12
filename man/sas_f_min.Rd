@@ -4,7 +4,7 @@
 \alias{sas_f_min}
 \title{SAS \verb{MIN(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{One or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Smallest non-missing value. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+ verified (39 of 39 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MIN: each call is followed by the result of the same call in SAS 9.4
-sas_f_min(1, 5, 3)  # SAS: min(1, 5, 3) -> 1
-sas_f_min(NA_real_, 2)  # SAS: min(., 2) -> 2
-sas_f_min(NA_real_, NA_real_)  # SAS: min(., .) -> .
-sas_f_min(sas_missing(".A"), 1)  # SAS: min(.A, 1) -> 1
+# MIN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# MIN returns the smallest argument, 1.
+sas_f_min(1, 5, 3)  # SAS 9.4: min(1, 5, 3) = 1
+
+# Missing values are ignored, so the result is 2.
+sas_f_min(NA_real_, 2)  # SAS 9.4: min(., 2) = 2
+
+# All arguments are missing, so the result is missing.
+sas_f_min(NA_real_, NA_real_)  # SAS 9.4: min(., .) = .
+
+# Special missing values such as .A are ignored as well.
+sas_f_min(sas_missing(".A"), 1)  # SAS 9.4: min(.A, 1) = 1
 }
 \seealso{
 Other descriptive functions:

@@ -4,11 +4,11 @@
 \alias{sas_f_logsdf}
 \title{SAS \verb{LOGSDF(distribution, quantile <, parameters>)}}
 \arguments{
-\item{dist}{Distribution name, as in SAS (\code{"NORMAL"}, \code{"T"}, ...).}
+\item{dist}{Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,21 @@ Logarithm of the survival function. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ approximate (22 of 32 SAS 9.4 cases agree bit for bit; 6 case(s) differ in the last bits (largest relative difference 1.4e-15; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOGSDF: each call is followed by the result of the same call in SAS 9.4
-# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_logsdf("NORMAL", 0)  # SAS: logsdf('NORMAL', 0) -> -0.693147180559945
-sas_f_logsdf("T", 1, 3)  # SAS: logsdf('T', 1, 3) -> -1.6321892244941
-sas_f_logsdf("NORMAL", NA_real_)  # SAS: logsdf('NORMAL', .) -> .
+# LOGSDF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The log of the normal survival function P(X > 0) is log(0.5).
+sas_f_logsdf("NORMAL", 0)  # SAS 9.4: logsdf('NORMAL', 0) = -0.693147180559945
+
+# Far in the upper tail LOGSDF stays accurate although P(X > 10) is only about
+# 7.6E-24.
+sas_f_logsdf("NORMAL", 10)  # SAS 9.4: logsdf('NORMAL', 10) = -53.2312851505125
+
+# A missing quantile gives a missing result.
+sas_f_logsdf("NORMAL", NA_real_)  # SAS 9.4: logsdf('NORMAL', .) = .
 }
 \seealso{
 Other probability functions:

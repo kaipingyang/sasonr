@@ -4,9 +4,9 @@
 \alias{sas_f_repeat}
 \title{SAS \code{REPEAT(argument, n)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 
-\item{n}{Count or position.}
+\item{n}{Number of additional copies, a nonnegative integer; the result has n + 1 copies of \code{x}.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,20 @@ Repeats a string n + 1 times. See the \href{https://documentation.sas.com/doc/en
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# REPEAT: each call is followed by the result of the same call in SAS 9.4
-sas_f_repeat("ab", 2)  # SAS: repeat('ab', 2) -> "ababab"
-sas_f_repeat("x", 0)  # SAS: repeat('x', 0) -> "x"
-sas_f_repeat("-", 4)  # SAS: repeat('-', 4) -> "-----"
+# REPEAT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# REPEAT(s, n) returns s followed by n further copies, so 'ab' appears 3 times.
+sas_f_repeat("ab", 2)  # SAS 9.4: repeat('ab', 2) = "ababab"
+
+# With n = 0 the string is returned once.
+sas_f_repeat("x", 0)  # SAS 9.4: repeat('x', 0) = "x"
+
+# '-' followed by 4 further copies gives 5 dashes.
+sas_f_repeat("-", 4)  # SAS 9.4: repeat('-', 4) = "-----"
 }
 \seealso{
 Other character functions:

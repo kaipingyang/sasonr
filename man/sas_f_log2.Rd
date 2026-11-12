@@ -4,7 +4,7 @@
 \alias{sas_f_log2}
 \title{SAS \code{LOG2(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,24 @@ Base-2 logarithm. See the \href{https://documentation.sas.com/doc/en/lefunctions
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOG2: each call is followed by the result of the same call in SAS 9.4
-sas_f_log2(8)  # SAS: log2(8) -> 3
-sas_f_log2(10)  # SAS: log2(10) -> 3.3219280948874
-sas_f_log2(0.5)  # SAS: log2(0.5) -> -1
-sas_f_log2(-1)  # SAS: log2(-1) -> .
+# LOG2: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The base-2 logarithm of 8 is 3.
+sas_f_log2(8)  # SAS 9.4: log2(8) = 3
+
+# The base-2 logarithm of 10.
+sas_f_log2(10)  # SAS 9.4: log2(10) = 3.32192809488736
+
+# The base-2 logarithm of 0.5 is -1.
+sas_f_log2(0.5)  # SAS 9.4: log2(0.5) = -1
+
+# The logarithm of a negative number is undefined, so the result is missing
+# (with a note in the log).
+sas_f_log2(-1)  # SAS 9.4: log2(-1) = .
 }
 \seealso{
 Other numeric functions:

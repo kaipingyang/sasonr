@@ -4,9 +4,9 @@
 \alias{sas_f_whichc}
 \title{SAS \verb{WHICHC(string, value-1 <, ..., value-n>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character value to look up; trailing blanks are ignored. A blank value is looked up like any other.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Character values; the result is the index of the first one equal to \code{x}, or 0.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,21 @@ Index of the first matching character value. See the \href{https://documentation
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (25 of 25 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# WHICHC: each call is followed by the result of the same call in SAS 9.4
-sas_f_whichc("b", "a", "b", "c")  # SAS: whichc('b', 'a', 'b', 'c') -> 2
-sas_f_whichc("x", "a", "b")  # SAS: whichc('x', 'a', 'b') -> 0
-sas_f_whichc("a ", "a")  # SAS: whichc('a ', 'a') -> 1
+# WHICHC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# WHICHC returns the index of the first value equal to the first argument: 'b'
+# is the 2nd value.
+sas_f_whichc("b", "a", "b", "c")  # SAS 9.4: whichc('b', 'a', 'b', 'c') = 2
+
+# No value matches, so the result is 0.
+sas_f_whichc("x", "a", "b")  # SAS 9.4: whichc('x', 'a', 'b') = 0
+
+# Trailing blanks are ignored in the comparison, so 'a ' equals 'a'.
+sas_f_whichc("a ", "a")  # SAS 9.4: whichc('a ', 'a') = 1
 }
 \seealso{
 Other character functions:

@@ -4,9 +4,9 @@
 \alias{sas_f_perm}
 \title{SAS \verb{PERM(n <, r>)}}
 \arguments{
-\item{n}{Count or position.}
+\item{n}{Total number of elements, a nonnegative integer. Missing gives missing.}
 
-\item{r}{Count.}
+\item{r}{Optional number of elements arranged, an integer from 0 to \code{n}; when omitted the result is n!.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,23 @@ Number of permutations. See the \href{https://documentation.sas.com/doc/en/lefun
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (28 of 31 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PERM: each call is followed by the result of the same call in SAS 9.4
-sas_f_perm(5, 2)  # SAS: perm(5, 2) -> 20
-sas_f_perm(5)  # SAS: perm(5) -> 120
-sas_f_perm(10, 0)  # SAS: perm(10, 0) -> 1
-sas_f_perm(NA_real_, 2)  # SAS: perm(., 2) -> .
+# PERM: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The number of ordered arrangements of 2 items out of 5 is 5 * 4 = 20.
+sas_f_perm(5, 2)  # SAS 9.4: perm(5, 2) = 20
+
+# With r omitted, PERM(n) is n! = 120.
+sas_f_perm(5)  # SAS 9.4: perm(5) = 120
+
+# There is exactly one way to arrange 0 items.
+sas_f_perm(10, 0)  # SAS 9.4: perm(10, 0) = 1
+
+# A missing argument gives a missing result.
+sas_f_perm(NA_real_, 2)  # SAS 9.4: perm(., 2) = .
 }
 \seealso{
 Other numeric functions:

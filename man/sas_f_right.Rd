@@ -4,7 +4,7 @@
 \alias{sas_f_right}
 \title{SAS \code{RIGHT(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are moved to the front; the length is unchanged.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Right-aligns a string. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# RIGHT: each call is followed by the result of the same call in SAS 9.4
-sas_f_right("abc  ")  # SAS: right('abc  ') -> "  abc"
-sas_f_right("  abc")  # SAS: right('  abc') -> "  abc"
-sas_f_right("")  # SAS: right('') -> ""
+# RIGHT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# RIGHT moves trailing blanks to the front, right-aligning the text.
+sas_f_right("abc  ")  # SAS 9.4: right('abc  ') = "  abc"
+
+# A string without trailing blanks is unchanged.
+sas_f_right("  abc")  # SAS 9.4: right('  abc') = "  abc"
+
+# A blank string stays blank.
+sas_f_right(" ")  # SAS 9.4: right('') = ""
 }
 \seealso{
 Other character functions:

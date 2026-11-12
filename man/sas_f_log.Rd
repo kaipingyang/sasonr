@@ -4,7 +4,7 @@
 \alias{sas_f_log}
 \title{SAS \code{LOG(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,16 +19,28 @@ Natural logarithm. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) agree with SAS.
+ approximate (16 of 17 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 9.1e-15; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOG: each call is followed by the result of the same call in SAS 9.4
-sas_f_log(10)  # SAS: log(10) -> 2.30258509299405
-sas_f_log(1)  # SAS: log(1) -> 0
-sas_f_log(0)  # SAS: log(0) -> .
-sas_f_log(-1)  # SAS: log(-1) -> .
-sas_f_log(NA_real_)  # SAS: log(.) -> .
+# LOG: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The natural logarithm of 10.
+sas_f_log(10)  # SAS 9.4: log(10) = 2.30258509299405
+
+# The logarithm of 1 is 0.
+sas_f_log(1)  # SAS 9.4: log(1) = 0
+
+# The logarithm of 0 is undefined, so the result is missing (with a note in the
+# log).
+sas_f_log(0)  # SAS 9.4: log(0) = .
+
+# The logarithm of a negative number is undefined, so the result is missing
+# (with a note in the log).
+sas_f_log(-1)  # SAS 9.4: log(-1) = .
+
+# A missing argument gives a missing result.
+sas_f_log(NA_real_)  # SAS 9.4: log(.) = .
 }
 \seealso{
 Other numeric functions:

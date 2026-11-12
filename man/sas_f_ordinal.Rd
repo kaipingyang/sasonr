@@ -4,9 +4,9 @@
 \alias{sas_f_ordinal}
 \title{SAS \verb{ORDINAL(k, argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{k}{Index.}
+\item{k}{Positive integer rank from 1 to the number of values; 1 returns the smallest.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Numeric values; missing values are kept and sort lowest, so they can be returned.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,21 @@ k-th smallest value (missing values first). See the \href{https://documentation.
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (43 of 43 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ORDINAL: each call is followed by the result of the same call in SAS 9.4
-sas_f_ordinal(2, 5, 1, 3)  # SAS: ordinal(2, 5, 1, 3) -> 3
-sas_f_ordinal(1, NA_real_, 2)  # SAS: ordinal(1, ., 2) -> .
-sas_f_ordinal(3, 3, 1, 2)  # SAS: ordinal(3, 3, 1, 2) -> 3
+# ORDINAL: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# ORDINAL(k, ...) returns the k-th smallest argument, counting missing values
+# as smallest: the 2nd of 5, 1, 3 is 3.
+sas_f_ordinal(2, 5, 1, 3)  # SAS 9.4: ordinal(2, 5, 1, 3) = 3
+
+# Missing values sort lowest, so the smallest of ., 2 is the missing value.
+sas_f_ordinal(1, NA_real_, 2)  # SAS 9.4: ordinal(1, ., 2) = .
+
+# The 3rd smallest of 3, 1, 2 is 3.
+sas_f_ordinal(3, 3, 1, 2)  # SAS 9.4: ordinal(3, 3, 1, 2) = 3
 }
 \seealso{
 Other descriptive functions:

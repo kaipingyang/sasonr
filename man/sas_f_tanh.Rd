@@ -4,7 +4,7 @@
 \alias{sas_f_tanh}
 \title{SAS \code{TANH(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value (any real number). A missing value gives a missing result.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,24 @@ Hyperbolic tangent. See the \href{https://documentation.sas.com/doc/en/lefunctio
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TANH: each call is followed by the result of the same call in SAS 9.4
-sas_f_tanh(0)  # SAS: tanh(0) -> 0
-sas_f_tanh(1)  # SAS: tanh(1) -> 0.761594155955765
-sas_f_tanh(20)  # SAS: tanh(20) -> 1
-sas_f_tanh(NA_real_)  # SAS: tanh(.) -> .
+# TANH: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The hyperbolic tangent of 0 is 0.
+sas_f_tanh(0)  # SAS 9.4: tanh(0) = 0
+
+# The hyperbolic tangent of 1.
+sas_f_tanh(1)  # SAS 9.4: tanh(1) = 0.761594155955765
+
+# The hyperbolic tangent approaches 1 for large arguments; at 20 it equals 1 in
+# double precision.
+sas_f_tanh(20)  # SAS 9.4: tanh(20) = 1
+
+# A missing argument gives a missing result.
+sas_f_tanh(NA_real_)  # SAS 9.4: tanh(.) = .
 }
 \seealso{
 Other numeric functions:

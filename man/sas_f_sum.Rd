@@ -4,7 +4,7 @@
 \alias{sas_f_sum}
 \title{SAS \verb{SUM(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{One or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Sum of the non-missing values. See the \href{https://documentation.sas.com/doc/e
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+ verified (39 of 39 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SUM: each call is followed by the result of the same call in SAS 9.4
-sas_f_sum(1, 2, 3)  # SAS: sum(1, 2, 3) -> 6
-sas_f_sum(1, NA_real_, 3)  # SAS: sum(1, ., 3) -> 4
-sas_f_sum(NA_real_, NA_real_)  # SAS: sum(., .) -> .
-sas_f_sum(sas_missing(".A"), 1)  # SAS: sum(.A, 1) -> 1
+# SUM: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# SUM adds its arguments: 6.
+sas_f_sum(1, 2, 3)  # SAS 9.4: sum(1, 2, 3) = 6
+
+# Missing values are ignored: 1 + 3 = 4.
+sas_f_sum(1, NA_real_, 3)  # SAS 9.4: sum(1, ., 3) = 4
+
+# All arguments are missing, so the result is missing.
+sas_f_sum(NA_real_, NA_real_)  # SAS 9.4: sum(., .) = .
+
+# The special missing value .A is ignored, so the sum is 1.
+sas_f_sum(sas_missing(".A"), 1)  # SAS 9.4: sum(.A, 1) = 1
 }
 \seealso{
 Other descriptive functions:

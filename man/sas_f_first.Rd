@@ -4,7 +4,7 @@
 \alias{sas_f_first}
 \title{SAS \code{FIRST(string)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Its first character is returned, even if it is a blank.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,21 @@ First character. See the \href{https://documentation.sas.com/doc/en/lefunctionsr
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# FIRST: each call is followed by the result of the same call in SAS 9.4
-sas_f_first("abc")  # SAS: first('abc') -> "a"
-sas_f_first("  x")  # SAS: first('  x') -> ""
-sas_f_first("")  # SAS: first('') -> ""
+# FIRST: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# FIRST returns the first character of the string.
+sas_f_first("abc")  # SAS 9.4: first('abc') = "a"
+
+# Leading blanks are not skipped: the first character is a blank, so the result
+# is blank.
+sas_f_first("  x")  # SAS 9.4: first('  x') = ""
+
+# A blank string gives a blank result.
+sas_f_first(" ")  # SAS 9.4: first('') = ""
 }
 \seealso{
 Other character functions:

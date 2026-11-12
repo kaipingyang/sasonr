@@ -4,11 +4,11 @@
 \alias{sas_f_substrn}
 \title{SAS \verb{SUBSTRN(string, position <, length>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 
-\item{pos}{Position.}
+\item{pos}{Starting position; may be 0, negative or beyond the end, in which case only the part of the requested range inside the string is returned (no note).}
 
-\item{len}{Length.}
+\item{len}{Optional number of characters; when omitted the rest of the string is returned. Lengths running past the end are cut without a note.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,25 @@ Extracts a substring (zero-length results allowed). See the \href{https://docume
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (45 of 47 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SUBSTRN: each call is followed by the result of the same call in SAS 9.4
-sas_f_substrn("abcdef", 2, 3)  # SAS: substrn('abcdef', 2, 3) -> "bcd"
-sas_f_substrn("abcdef", 0, 3)  # SAS: substrn('abcdef', 0, 3) -> "ab"
-sas_f_substrn("abcdef", 5, 10)  # SAS: substrn('abcdef', 5, 10) -> "ef"
-sas_f_substrn("abc", 4)  # SAS: substrn('abc', 4) -> ""
+# SUBSTRN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# SUBSTRN extracts 3 characters starting at position 2.
+sas_f_substrn("abcdef", 2, 3)  # SAS 9.4: substrn('abcdef', 2, 3) = "bcd"
+
+# Position 0 lies before the string; of positions 0 to 2 only 1 and 2 are
+# inside it, giving 'ab'.
+sas_f_substrn("abcdef", 0, 3)  # SAS 9.4: substrn('abcdef', 0, 3) = "ab"
+
+# A length that runs past the end is cut at the end of the string: 'ef'.
+sas_f_substrn("abcdef", 5, 10)  # SAS 9.4: substrn('abcdef', 5, 10) = "ef"
+
+# A start position beyond the end gives an empty result, without the note that
+# SUBSTR would write.
+sas_f_substrn("abc", 4)  # SAS 9.4: substrn('abc', 4) = ""
 }
 \seealso{
 Other character functions:

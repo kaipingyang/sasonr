@@ -4,11 +4,11 @@
 \alias{sas_f_yrdif}
 \title{SAS \verb{YRDIF(sdate, edate <, basis>)}}
 \arguments{
-\item{start}{Starting position.}
+\item{start}{Starting SAS date value (SAS sdate). Missing gives missing.}
 
-\item{end}{End position.}
+\item{end}{Ending SAS date value (SAS edate). Missing gives missing.}
 
-\item{basis}{Day-count basis, as in SAS.}
+\item{basis}{Optional basis: 'AGE' (default) gives the age in completed years plus a fraction; 'ACT/ACT' divides actual days in each calendar year by 365 or 366; '30/360' uses 30-day months and 360-day years; 'ACT/360' and 'ACT/365' divide actual days by 360 or 365.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,26 @@ Years between two dates under a day-count basis. See the \href{https://documenta
 }
 
 \section{Verification}{
- Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ approximate (48 of 51 SAS 9.4 cases agree bit for bit; 3 case(s) differ in the last bits (largest relative difference 4.3e-15; different algorithm)). Contexts where every case agrees: sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# YRDIF: each call is followed by the result of the same call in SAS 9.4
+# YRDIF: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_yrdif(21915, 23558, "ACT/ACT")  # SAS: yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/ACT') -> 4.49726775956284
-sas_f_yrdif(21915, 23558, "30/360")  # SAS: yrdif('01JAN2020'd, '01JUL2024'd, '30/360') -> 4.5
-sas_f_yrdif(21915, 23558, "ACT/365")  # SAS: yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/365') -> 4.5013698630137
+
+# 'ACT/ACT' splits the period by calendar year and divides the days in each
+# year by 365 or 366.
+sas_f_yrdif(21915, 23558, "ACT/ACT")  # SAS 9.4: yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/ACT') = 4.49726775956284
+
+# 'AGE' computes an age in years: one day before the 24th anniversary gives
+# just under 24.
+sas_f_yrdif(14684, 23449, "AGE")  # SAS 9.4: yrdif('15MAR2000'd, '14MAR2024'd, 'AGE') = 23.9972602739726
+
+# '30/360' counts 30-day months and 360-day years: 54 months are 4.5 years.
+sas_f_yrdif(21915, 23558, "30/360")  # SAS 9.4: yrdif('01JAN2020'd, '01JUL2024'd, '30/360') = 4.5
+
+# 'ACT/365' divides the actual number of days by 365.
+sas_f_yrdif(21915, 23558, "ACT/365")  # SAS 9.4: yrdif('01JAN2020'd, '01JUL2024'd, 'ACT/365') = 4.5013698630137
 }
 \seealso{
 Other datetime functions:

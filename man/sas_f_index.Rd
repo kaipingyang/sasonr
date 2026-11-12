@@ -4,9 +4,9 @@
 \alias{sas_f_index}
 \title{SAS \code{INDEX(source, excerpt)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the source searched.}
 
-\item{s}{Source text.}
+\item{s}{Character excerpt to find, including its trailing blanks. The result is the start position of the first occurrence, or 0.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,16 +19,24 @@ Position of a substring. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- Partial: 23 of 25 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ partial (23 of 25 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INDEX: each call with the result of the same INDEX call in SAS 9.4
-# (offline conformance cases; dates are SAS day counts from 1960-01-01)
-sas_f_index("abcabc", "bc")  # SAS index('abcabc','bc') = 2
-sas_f_index("abc", "d")  # SAS index('abc','d') = 0
-sas_f_index("ABC", "b")  # SAS index('ABC','b') = 0
-sas_f_index("a bc", " ")  # SAS index('a bc',' ') = 2
+# INDEX: each call is explained above it and followed by the result of the same call in SAS 9.4
+# (dates are SAS day counts from 1960-01-01)
+
+# Position of the first occurrence of 'bc'.
+sas_f_index("abcabc", "bc")  # SAS 9.4: index('abcabc','bc') = 2
+
+# 0 when the excerpt does not occur.
+sas_f_index("abc", "d")  # SAS 9.4: index('abc','d') = 0
+
+# The search is case-sensitive: 'b' does not match 'B'.
+sas_f_index("ABC", "b")  # SAS 9.4: index('ABC','b') = 0
+
+# A blank excerpt finds the first blank.
+sas_f_index("a bc", " ")  # SAS 9.4: index('a bc',' ') = 2
 }
 \seealso{
 Other character functions:

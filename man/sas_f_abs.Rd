@@ -4,7 +4,7 @@
 \alias{sas_f_abs}
 \title{SAS \code{ABS(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Absolute value. See the \href{https://documentation.sas.com/doc/en/lefunctionsre
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+ verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ABS: each call is followed by the result of the same call in SAS 9.4
-sas_f_abs(-3.5)  # SAS: abs(-3.5) -> 3.5
-sas_f_abs(0)  # SAS: abs(0) -> 0
-sas_f_abs(NA_real_)  # SAS: abs(.) -> .
-sas_f_abs(sas_missing(".A"))  # SAS: abs(.A) -> .
+# ABS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The absolute value of a negative number drops the sign.
+sas_f_abs(-3.5)  # SAS 9.4: abs(-3.5) = 3.5
+
+# The absolute value of zero is zero.
+sas_f_abs(0)  # SAS 9.4: abs(0) = 0
+
+# A missing argument (.) gives a missing result.
+sas_f_abs(NA_real_)  # SAS 9.4: abs(.) = .
+
+# A special missing value such as .A also gives the ordinary missing value (.).
+sas_f_abs(sas_missing(".A"))  # SAS 9.4: abs(.A) = .
 }
 \seealso{
 Other numeric functions:

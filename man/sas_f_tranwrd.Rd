@@ -4,11 +4,11 @@
 \alias{sas_f_tranwrd}
 \title{SAS \code{TRANWRD(source, target, replacement)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the source.}
 
-\item{from}{Start value.}
+\item{from}{Character target substring; every occurrence is replaced.}
 
-\item{to}{End value.}
+\item{to}{Replacement string. A blank literal is one blank, so the target cannot be deleted; use TRANSTRN with TRIMN for that.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,13 +21,21 @@ Replaces substrings. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TRANWRD: each call is followed by the result of the same call in SAS 9.4
-sas_f_tranwrd("banana", "an", "AN")  # SAS: tranwrd('banana', 'an', 'AN') -> "bANANa"
-sas_f_tranwrd("a b c", " ", "-")  # SAS: tranwrd('a b c', ' ', '-') -> "a-b-c"
+# TRANWRD: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# TRANWRD replaces every occurrence of the substring 'an' by 'AN'.
+sas_f_tranwrd("banana", "an", "AN")  # SAS 9.4: tranwrd('banana', 'an', 'AN') = "bANANa"
+
+# Every blank is replaced by '-'.
+sas_f_tranwrd("a b c", " ", "-")  # SAS 9.4: tranwrd('a b c', ' ', '-') = "a-b-c"
+
+# The replacement '' is one blank in SAS, so 'b' becomes a blank (use TRANSTRN
+# with TRIMN to delete it).
+sas_f_tranwrd("abc", "b", " ")  # SAS 9.4: tranwrd('abc', 'b', '') = "a c"
 }
 \seealso{
 Other character functions:

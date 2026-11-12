@@ -4,11 +4,11 @@
 \alias{sas_f_countc}
 \title{SAS \verb{COUNTC(string, characters <, modifiers>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.}
 
-\item{chars}{Characters to remove or find.}
+\item{chars}{Character string; each character is a separate item of the list (order does not matter). Characters of \code{x} that appear in it are counted.}
 
-\item{mods}{Modifiers, as in SAS.}
+\item{mods}{Optional modifier string. i ignores case; k or v counts characters NOT in the list; t trims trailing blanks; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the list.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,14 +21,25 @@ Number of occurrences of the listed characters. See the \href{https://documentat
 }
 
 \section{Verification}{
- Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COUNTC: each call is followed by the result of the same call in SAS 9.4
-sas_f_countc("banana", "an")  # SAS: countc('banana', 'an') -> 5
-sas_f_countc("abc", "x")  # SAS: countc('abc', 'x') -> 0
-sas_f_countc("aBc", "b", "i")  # SAS: countc('aBc', 'b', 'i') -> 1
+# COUNTC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# COUNTC counts the characters that appear in the list 'an': three a's and two
+# n's make 5.
+sas_f_countc("banana", "an")  # SAS 9.4: countc('banana', 'an') = 5
+
+# 'x' does not occur, so the result is 0.
+sas_f_countc("abc", "x")  # SAS 9.4: countc('abc', 'x') = 0
+
+# Modifier i ignores case, so 'b' matches the 'B'.
+sas_f_countc("aBc", "b", "i")  # SAS 9.4: countc('aBc', 'b', 'i') = 1
+
+# Modifier v counts the characters NOT in the list; only 'c' is neither 'a' nor
+# 'b', so the result is 1.
+sas_f_countc("abc", "ab", "v")  # SAS 9.4: countc('abc', 'ab', 'v') = 1
 }
 \seealso{
 Other character functions:

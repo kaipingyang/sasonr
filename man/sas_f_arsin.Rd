@@ -4,7 +4,7 @@
 \alias{sas_f_arsin}
 \title{SAS \code{ARSIN(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value in from -1 to 1. Values outside the domain give a missing result with a note in the log; missing gives missing.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,24 @@ Arcsine. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/t
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ARSIN: each call is followed by the result of the same call in SAS 9.4
-sas_f_arsin(0.5)  # SAS: arsin(0.5) -> 0.523598775598299
-sas_f_arsin(-1)  # SAS: arsin(-1) -> -1.5707963267949
-sas_f_arsin(NA_real_)  # SAS: arsin(.) -> .
-sas_f_arsin(1.5)  # SAS: arsin(1.5) -> .
+# ARSIN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The arcsine of 0.5 is pi/6 radians.
+sas_f_arsin(0.5)  # SAS 9.4: arsin(0.5) = 0.523598775598299
+
+# The arcsine of -1 is -pi/2 radians.
+sas_f_arsin(-1)  # SAS 9.4: arsin(-1) = -1.5707963267949
+
+# A missing argument gives a missing result.
+sas_f_arsin(NA_real_)  # SAS 9.4: arsin(.) = .
+
+# 1.5 is outside the domain from -1 to 1, so the result is missing (with a note
+# in the log).
+sas_f_arsin(1.5)  # SAS 9.4: arsin(1.5) = .
 }
 \seealso{
 Other numeric functions:

@@ -4,7 +4,7 @@
 \alias{sas_f_lengthc}
 \title{SAS \code{LENGTHC(string)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The result includes trailing blanks.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Length including trailing blanks. See the \href{https://documentation.sas.com/do
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (13 of 13 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LENGTHC: each call is followed by the result of the same call in SAS 9.4
-sas_f_lengthc("abc  ")  # SAS: lengthc('abc  ') -> 5
-sas_f_lengthc("")  # SAS: lengthc('') -> 1
-sas_f_lengthc("a")  # SAS: lengthc('a') -> 1
+# LENGTHC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LENGTHC counts trailing blanks too: 5.
+sas_f_lengthc("abc  ")  # SAS 9.4: lengthc('abc  ') = 5
+
+# The literal '' is one blank character, so LENGTHC is 1.
+sas_f_lengthc(" ")  # SAS 9.4: lengthc('') = 1
+
+# A single character has length 1.
+sas_f_lengthc("a")  # SAS 9.4: lengthc('a') = 1
 }
 \seealso{
 Other character functions:

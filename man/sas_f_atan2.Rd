@@ -4,9 +4,9 @@
 \alias{sas_f_atan2}
 \title{SAS \code{ATAN2(argument-1, argument-2)}}
 \arguments{
-\item{y}{Numeric argument.}
+\item{y}{Numeric y coordinate (SAS argument-1). A missing value gives a missing result.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric x coordinate (SAS argument-2); the signs of \code{y} and \code{x} select the quadrant of the angle in (-pi, pi]. A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,24 @@ Arctangent of the quotient of two arguments. See the \href{https://documentation
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ATAN2: each call is followed by the result of the same call in SAS 9.4
-sas_f_atan2(1, 1)  # SAS: atan2(1, 1) -> 0.785398163397448
-sas_f_atan2(1, -1)  # SAS: atan2(1, -1) -> 2.35619449019234
-sas_f_atan2(-1, -1)  # SAS: atan2(-1, -1) -> -2.35619449019234
-sas_f_atan2(NA_real_, 1)  # SAS: atan2(., 1) -> .
+# ATAN2: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# ATAN2(y, x) is the angle of the point (x, y); for (1, 1) it is pi/4 radians.
+sas_f_atan2(1, 1)  # SAS 9.4: atan2(1, 1) = 0.785398163397448
+
+# The point x = -1, y = 1 lies in the second quadrant, so the angle is 3*pi/4.
+sas_f_atan2(1, -1)  # SAS 9.4: atan2(1, -1) = 2.35619449019234
+
+# With both coordinates negative the point lies in the third quadrant, so the
+# angle is -3*pi/4.
+sas_f_atan2(-1, -1)  # SAS 9.4: atan2(-1, -1) = -2.35619449019234
+
+# A missing argument gives a missing result.
+sas_f_atan2(NA_real_, 1)  # SAS 9.4: atan2(., 1) = .
 }
 \seealso{
 Other numeric functions:

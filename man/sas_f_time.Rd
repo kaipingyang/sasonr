@@ -14,15 +14,20 @@ Current time of day. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 2 example call(s) agree with SAS. The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only.
+ not comparable (3 SAS 9.4 cases check type and range only; the value depends on the session clock). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TIME: each call is followed by the result of the same call in SAS 9.4
+# TIME: each call is explained above it and followed by the result of the same call in SAS 9.4
 # TIME() returns the current time of day (the clock of the session), so its
 # value cannot be reproduced; the examples check its type and range only.
-as.numeric(sas_f_time() >= 0)  # SAS: time() >= 0 -> 1
-as.numeric(sas_f_time() < 86400)  # SAS: time() < 86400 -> 1
+
+# TIME() returns the current time of day in seconds since midnight, which is
+# never negative.
+as.numeric(sas_f_time() >= 0)  # SAS 9.4: time() >= 0 = 1
+
+# The time of day is always less than 86400 seconds (24 hours).
+as.numeric(sas_f_time() < 86400)  # SAS 9.4: time() < 86400 = 1
 }
 \seealso{
 Other datetime functions:

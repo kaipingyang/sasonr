@@ -4,13 +4,13 @@
 \alias{sas_f_inputn}
 \title{SAS \verb{INPUTN(source, informat <, w <, d>>)}}
 \arguments{
-\item{s}{Source text.}
+\item{s}{Character source value to read.}
 
-\item{fmt}{Format or informat (text such as \code{"8.2"} or a parsed specification).}
+\item{fmt}{Numeric informat name given as a string, e.g. 'comma8.'.}
 
-\item{w}{Width override.}
+\item{w}{Optional numeric width that overrides the informat width.}
 
-\item{d}{Decimals override.}
+\item{d}{Optional number of decimal places that overrides the informat's.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -25,17 +25,28 @@ Reads a numeric value with an informat given at run time. See the \href{https://
 }
 
 \section{Verification}{
- Partial: 40 of 44 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ partial (41 of 45 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INPUT: each call with the result of the same INPUT call in SAS 9.4
-# (offline conformance cases; dates are SAS day counts from 1960-01-01)
-sas_f_inputn("123", "8.")  # SAS input('123',8.) = 123
-sas_f_inputn("1234", "4.2")  # SAS input('1234',4.2) = 12.34
-sas_f_inputn("12.34", "5.1")  # SAS input('12.34',5.1) = 12.34
-sas_f_inputn("1,234", "comma8.")  # SAS input('1,234',comma8.) = 1234
-sas_f_inputn("(12)", "comma5.")  # SAS input('(12)',comma5.) = -12
+# INPUT: each call is explained above it and followed by the result of the same call in SAS 9.4
+# (dates are SAS day counts from 1960-01-01)
+
+# Read the text '123' with the 8. informat.
+sas_f_inputn("123", "8.")  # SAS 9.4: input('123',8.) = 123
+
+# Without a decimal point in the text, the informat 4.2 places two implied
+# decimals: 12.34.
+sas_f_inputn("1234", "4.2")  # SAS 9.4: input('1234',4.2) = 12.34
+
+# A decimal point in the text overrides the informat's decimals.
+sas_f_inputn("12.34", "5.1")  # SAS 9.4: input('12.34',5.1) = 12.34
+
+# COMMA8. ignores the thousands separator.
+sas_f_inputn("1,234", "comma8.")  # SAS 9.4: input('1,234',comma8.) = 1234
+
+# COMMA5. reads a value in parentheses as negative.
+sas_f_inputn("(12)", "comma5.")  # SAS 9.4: input('(12)',comma5.) = -12
 }
 \seealso{
 Other special functions:

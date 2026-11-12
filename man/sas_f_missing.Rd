@@ -4,7 +4,7 @@
 \alias{sas_f_missing}
 \title{SAS \code{MISSING(numeric-expression | character-expression)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric or character value. A number is missing if it is \code{.} or a special missing value (\code{.A} to \code{.Z}, \code{._}); a character value is missing if it is blank.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,26 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) and 5 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+ verified (22 of 22 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MISSING: each call is followed by the result of the same call in SAS 9.4
-sas_f_missing(NA_real_)  # SAS: missing(.) -> 1
-sas_f_missing(sas_missing(".A"))  # SAS: missing(.A) -> 1
-sas_f_missing(0)  # SAS: missing(0) -> 0
-sas_f_missing("")  # SAS: missing('') -> 1
-sas_f_missing(" a")  # SAS: missing(' a') -> 0
+# MISSING: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# MISSING returns 1 for the missing value (.).
+sas_f_missing(NA_real_)  # SAS 9.4: missing(.) = 1
+
+# Special missing values such as .A also count as missing.
+sas_f_missing(sas_missing(".A"))  # SAS 9.4: missing(.A) = 1
+
+# 0 is a valid number, so the result is 0.
+sas_f_missing(0)  # SAS 9.4: missing(0) = 0
+
+# For a character argument a blank string counts as missing.
+sas_f_missing(" ")  # SAS 9.4: missing('') = 1
+
+# A string with any nonblank character is not missing.
+sas_f_missing(" a")  # SAS 9.4: missing(' a') = 0
 }
 \seealso{
 Other special functions:

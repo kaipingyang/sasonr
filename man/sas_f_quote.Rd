@@ -4,9 +4,9 @@
 \alias{sas_f_quote}
 \title{SAS \verb{QUOTE(argument <, character>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Embedded quotation marks of the chosen kind are doubled.}
 
-\item{q}{Quotation character.}
+\item{q}{Optional quotation mark character, a double quote (default) or a single quote.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,24 @@ Adds quotation marks (trailing blanks kept). See the \href{https://documentation
 }
 
 \section{Verification}{
- Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (23 of 23 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# QUOTE: each call is followed by the result of the same call in SAS 9.4
-sas_f_quote("abc")  # SAS: quote('abc') -> "\"abc\""
-sas_f_quote("a\"b")  # SAS: quote('a"b') -> "\"a\"\"b\""
-sas_f_quote("abc", "'")  # SAS: quote('abc', "'") -> "'abc'"
+# QUOTE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# QUOTE encloses the value in double quotation marks.
+sas_f_quote("abc")  # SAS 9.4: quote('abc') = "\"abc\""
+
+# An embedded double quotation mark is doubled.
+sas_f_quote("a\"b")  # SAS 9.4: quote('a"b') = "\"a\"\"b\""
+
+# The optional second argument chooses the quotation mark, here a single quote.
+sas_f_quote("abc", "'")  # SAS 9.4: quote('abc', "'") = "'abc'"
+
+# The literal '' is one blank, so the result is a blank enclosed in quotation
+# marks.
+sas_f_quote(" ")  # SAS 9.4: quote('') = "\" \""
 }
 \seealso{
 Other character functions:

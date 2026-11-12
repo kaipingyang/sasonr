@@ -4,7 +4,7 @@
 \alias{sas_f_geomean}
 \title{SAS \verb{GEOMEAN(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{One or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Geometric mean. See the \href{https://documentation.sas.com/doc/en/lefunctionsre
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (30 of 36 SAS 9.4 cases agree bit for bit; 2 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# GEOMEAN: each call is followed by the result of the same call in SAS 9.4
-sas_f_geomean(1, 2, 4)  # SAS: geomean(1, 2, 4) -> 2
-sas_f_geomean(1, NA_real_, 9)  # SAS: geomean(1, ., 9) -> 3
-sas_f_geomean(0, 4)  # SAS: geomean(0, 4) -> 0
-sas_f_geomean(NA_real_, NA_real_)  # SAS: geomean(., .) -> .
+# GEOMEAN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The geometric mean of 1, 2 and 4 is the cube root of 8, which is 2.
+sas_f_geomean(1, 2, 4)  # SAS 9.4: geomean(1, 2, 4) = 2
+
+# Missing values are ignored: the geometric mean of 1 and 9 is 3.
+sas_f_geomean(1, NA_real_, 9)  # SAS 9.4: geomean(1, ., 9) = 3
+
+# If any value is zero, the geometric mean is 0.
+sas_f_geomean(0, 4)  # SAS 9.4: geomean(0, 4) = 0
+
+# All arguments are missing, so the result is missing.
+sas_f_geomean(NA_real_, NA_real_)  # SAS 9.4: geomean(., .) = .
 }
 \seealso{
 Other descriptive functions:

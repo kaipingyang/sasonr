@@ -4,7 +4,7 @@
 \alias{sas_f_stderr}
 \title{SAS \verb{STDERR(argument-1, argument-2 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Two or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,21 @@ Standard error of the mean. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (40 of 40 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# STDERR: each call is followed by the result of the same call in SAS 9.4
-sas_f_stderr(1, 2, 3, 4)  # SAS: stderr(1, 2, 3, 4) -> 0.645497224367903
-sas_f_stderr(2, 4)  # SAS: stderr(2, 4) -> 1
-sas_f_stderr(5, NA_real_)  # SAS: stderr(5, .) -> .
+# STDERR: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# STDERR returns the standard error of the mean, the standard deviation divided
+# by sqrt(n).
+sas_f_stderr(1, 2, 3, 4)  # SAS 9.4: stderr(1, 2, 3, 4) = 0.645497224367903
+
+# The standard deviation of 2 and 4 is sqrt(2), divided by sqrt(2) gives 1.
+sas_f_stderr(2, 4)  # SAS 9.4: stderr(2, 4) = 1
+
+# At least two nonmissing values are needed, so the result is missing.
+sas_f_stderr(5, NA_real_)  # SAS 9.4: stderr(5, .) = .
 }
 \seealso{
 Other descriptive functions:

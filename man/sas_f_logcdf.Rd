@@ -4,11 +4,11 @@
 \alias{sas_f_logcdf}
 \title{SAS \verb{LOGCDF(distribution, quantile <, parameters>)}}
 \arguments{
-\item{dist}{Distribution name, as in SAS (\code{"NORMAL"}, \code{"T"}, ...).}
+\item{dist}{Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,21 @@ Logarithm of the CDF. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (24 of 39 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOGCDF: each call is followed by the result of the same call in SAS 9.4
-sas_f_logcdf("NORMAL", 0)  # SAS: logcdf('NORMAL', 0) -> -0.693147180559945
-sas_f_logcdf("NORMAL", -10)  # SAS: logcdf('NORMAL', -10) -> -53.2312851505125
-sas_f_logcdf("POISSON", 2, 1)  # SAS: logcdf('POISSON', 2, 1) -> -0.083709268125845
-sas_f_logcdf("NORMAL", NA_real_)  # SAS: logcdf('NORMAL', .) -> .
+# LOGCDF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The log of the standard normal CDF at 0 is log(0.5).
+sas_f_logcdf("NORMAL", 0)  # SAS 9.4: logcdf('NORMAL', 0) = -0.693147180559945
+
+# Far in the lower tail LOGCDF stays accurate although the CDF itself is only
+# about 7.6E-24.
+sas_f_logcdf("NORMAL", -10)  # SAS 9.4: logcdf('NORMAL', -10) = -53.2312851505125
+
+# A missing quantile gives a missing result.
+sas_f_logcdf("NORMAL", NA_real_)  # SAS 9.4: logcdf('NORMAL', .) = .
 }
 \seealso{
 Other probability functions:

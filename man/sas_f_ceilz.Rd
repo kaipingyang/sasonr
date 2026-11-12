@@ -4,7 +4,7 @@
 \alias{sas_f_ceilz}
 \title{SAS \code{CEILZ(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result. No fuzzing is applied.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Smallest integer >= the argument, without fuzz. See the \href{https://documentat
 }
 
 \section{Verification}{
- Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (20 of 20 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CEILZ: each call is followed by the result of the same call in SAS 9.4
-sas_f_ceilz(2.1)  # SAS: ceilz(2.1) -> 3
-sas_f_ceilz(1 + 1e-13)  # SAS: ceilz(1 + 1e-13) -> 2
-sas_f_ceilz(-2.5)  # SAS: ceilz(-2.5) -> -2
-sas_f_ceilz(NA_real_)  # SAS: ceilz(.) -> .
+# CEILZ: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The smallest integer greater than or equal to 2.1 is 3.
+sas_f_ceilz(2.1)  # SAS 9.4: ceilz(2.1) = 3
+
+# CEILZ uses zero fuzzing, so a value only slightly above 1 is still rounded up
+# to 2.
+sas_f_ceilz(1 + 1e-13)  # SAS 9.4: ceilz(1 + 1e-13) = 2
+
+# The ceiling of -2.5 is -2.
+sas_f_ceilz(-2.5)  # SAS 9.4: ceilz(-2.5) = -2
+
+# A missing argument gives a missing result.
+sas_f_ceilz(NA_real_)  # SAS 9.4: ceilz(.) = .
 }
 \seealso{
 Other numeric functions:

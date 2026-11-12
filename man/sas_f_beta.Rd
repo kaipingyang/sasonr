@@ -4,9 +4,9 @@
 \alias{sas_f_beta}
 \title{SAS \code{BETA(a, b)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{First shape parameter, a positive number. Missing gives missing.}
 
-\item{b}{Numeric argument.}
+\item{b}{Second shape parameter, a positive number. Missing gives missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,20 @@ Beta function. See the \href{https://documentation.sas.com/doc/en/lefunctionsref
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (25 of 30 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# BETA: each call is followed by the result of the same call in SAS 9.4
-sas_f_beta(2, 3)  # SAS: beta(2, 3) -> 0.0833333333333333
-sas_f_beta(0.5, 0.5)  # SAS: beta(0.5, 0.5) -> 3.1415926535898
-sas_f_beta(1, 1)  # SAS: beta(1, 1) -> 1
-sas_f_beta(NA_real_, 1)  # SAS: beta(., 1) -> .
+# BETA: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The beta function B(2, 3) = Gamma(2) * Gamma(3) / Gamma(5) = 1/12.
+sas_f_beta(2, 3)  # SAS 9.4: beta(2, 3) = 0.0833333333333333
+
+# B(1, 1) equals 1.
+sas_f_beta(1, 1)  # SAS 9.4: beta(1, 1) = 1
+
+# A missing argument gives a missing result.
+sas_f_beta(NA_real_, 1)  # SAS 9.4: beta(., 1) = .
 }
 \seealso{
 Other numeric functions:

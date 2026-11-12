@@ -4,7 +4,7 @@
 \alias{sas_f_cvt_n2c}
 \title{Runtime helper: Implicit numeric-to-character conversion of a function argument.}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value used where a character value is expected; it is written with the BEST12. format, right-aligned in 12 columns, and a missing value becomes \code{.}.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,11 +21,20 @@ Implicit numeric-to-character conversion of a function argument.
 }
 
 \examples{
-# CVT_N2C: each call is followed by the result of the same call in SAS 9.4
-sas_f_cvt_n2c(3.5)  # SAS: 3.5 -> "         3.5"
-sas_f_cvt_n2c(-12)  # SAS: -12 -> "         -12"
-sas_f_cvt_n2c(1e15)  # SAS: 1e15 -> "        1E15"
-sas_f_cvt_n2c(1/3)  # SAS: 1/3 -> "0.3333333333"
+# CVT_N2C: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Assigning a number to a character variable converts it with the BEST12.
+# format, right-aligned in 12 columns.
+sas_f_cvt_n2c(3.5)  # SAS 9.4: 3.5 = "         3.5"
+
+# Negative numbers are also right-aligned in 12 columns.
+sas_f_cvt_n2c(-12)  # SAS 9.4: -12 = "         -12"
+
+# BEST12. writes a large number such as 10 to the power 15 in E notation, 1E15.
+sas_f_cvt_n2c(1e15)  # SAS 9.4: 1e15 = "        1E15"
+
+# BEST12. shows as many decimal digits as fit in 12 columns.
+sas_f_cvt_n2c(1/3)  # SAS 9.4: 1/3 = "0.3333333333"
 }
 \seealso{
 Other internal functions:

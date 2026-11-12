@@ -4,7 +4,7 @@
 \alias{sas_f_month}
 \title{SAS \code{MONTH(date)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,24 @@ Month. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/tit
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (23 of 23 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MONTH: each call is followed by the result of the same call in SAS 9.4
+# MONTH: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_month(23450)  # SAS: month('15MAR2024'd) -> 3
-sas_f_month(0)  # SAS: month(0) -> 1
-sas_f_month(23741)  # SAS: month('31DEC2024'd) -> 12
-sas_f_month(NA_real_)  # SAS: month(.) -> .
+
+# MONTH returns the month (1 to 12) of a SAS date value: March is 3.
+sas_f_month(23450)  # SAS 9.4: month('15MAR2024'd) = 3
+
+# Date 0 is 1 January 1960, month 1.
+sas_f_month(0)  # SAS 9.4: month(0) = 1
+
+# 31 December is in month 12.
+sas_f_month(23741)  # SAS 9.4: month('31DEC2024'd) = 12
+
+# A missing argument gives a missing result.
+sas_f_month(NA_real_)  # SAS 9.4: month(.) = .
 }
 \seealso{
 Other datetime functions:

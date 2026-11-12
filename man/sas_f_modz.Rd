@@ -4,9 +4,9 @@
 \alias{sas_f_modz}
 \title{SAS \code{MODZ(dividend, divisor)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{Numeric dividend; the remainder has its sign. Missing gives missing.}
 
-\item{b}{Numeric argument.}
+\item{b}{Numeric divisor. 0 gives missing with a note in the log. No fuzzing is applied.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,15 +21,24 @@ Remainder without fuzz. See the \href{https://documentation.sas.com/doc/en/lefun
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (27 of 28 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.0e-13; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MODZ: each call is followed by the result of the same call in SAS 9.4
-sas_f_modz(10, 3)  # SAS: modz(10, 3) -> 1
-sas_f_modz(-10, 3)  # SAS: modz(-10, 3) -> -1
-sas_f_modz(5.5, 2)  # SAS: modz(5.5, 2) -> 1.5
-sas_f_modz(0.3, 0.1)  # SAS: modz(0.3, 0.1) -> 0.1
+# MODZ: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The remainder of 10 divided by 3 is 1.
+sas_f_modz(10, 3)  # SAS 9.4: modz(10, 3) = 1
+
+# The remainder has the sign of the dividend: -1.
+sas_f_modz(-10, 3)  # SAS 9.4: modz(-10, 3) = -1
+
+# MODZ also works with non-integers: 5.5 - 2*2 = 1.5.
+sas_f_modz(5.5, 2)  # SAS 9.4: modz(5.5, 2) = 1.5
+
+# MODZ uses zero fuzzing: in binary 0.3 is slightly less than 3 * 0.1, so the
+# remainder is (almost) 0.1.
+sas_f_modz(0.3, 0.1)  # SAS 9.4: modz(0.3, 0.1) = 0.1
 }
 \seealso{
 Other numeric functions:

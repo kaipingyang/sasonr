@@ -4,11 +4,11 @@
 \alias{sas_f_pdf}
 \title{SAS \verb{PDF(distribution, quantile <, parameters>)}}
 \arguments{
-\item{dist}{Distribution name, as in SAS (\code{"NORMAL"}, \code{"T"}, ...).}
+\item{dist}{Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,16 +21,17 @@ Probability density (mass) function. See the \href{https://documentation.sas.com
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) agree with SAS.
+ approximate (30 of 47 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits (largest relative difference 1.3e-15; different algorithm); 7 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PDF: each call is followed by the result of the same call in SAS 9.4
-sas_f_pdf("NORMAL", 0)  # SAS: pdf('NORMAL', 0) -> 0.39894228040143
-sas_f_pdf("BINOMIAL", 3, 0.5, 10)  # SAS: pdf('BINOMIAL', 3, 0.5, 10) -> 0.1171875
-sas_f_pdf("POISSON", 2, 1.5)  # SAS: pdf('POISSON', 2, 1.5) -> 0.25102143016698
-sas_f_pdf("UNIFORM", 0.5)  # SAS: pdf('UNIFORM', 0.5) -> 1
-sas_f_pdf("NORMAL", NA_real_)  # SAS: pdf('NORMAL', .) -> .
+# PDF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The standard uniform density is 1 everywhere inside from 0 to 1.
+sas_f_pdf("UNIFORM", 0.5)  # SAS 9.4: pdf('UNIFORM', 0.5) = 1
+
+# A missing quantile gives a missing result.
+sas_f_pdf("NORMAL", NA_real_)  # SAS 9.4: pdf('NORMAL', .) = .
 }
 \seealso{
 Other probability functions:

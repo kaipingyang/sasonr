@@ -1,0 +1,354 @@
+name	param	description
+abs	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result.
+anyalnum	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+anyalnum	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+anyalpha	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+anyalpha	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+anydigit	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+anydigit	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+anylower	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+anylower	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+anypunct	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+anypunct	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+anyspace	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+anyspace	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+anyupper	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+anyupper	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+arcos	x	Numeric value in from -1 to 1. Values outside the domain give a missing result with a note in the log; missing gives missing.
+arsin	x	Numeric value in from -1 to 1. Values outside the domain give a missing result with a note in the log; missing gives missing.
+atan	x	Numeric value (any real number). A missing value gives a missing result.
+atan2	y	Numeric y coordinate (SAS argument-1). A missing value gives a missing result.
+atan2	x	Numeric x coordinate (SAS argument-2); the signs of `y` and `x` select the quadrant of the angle in (-pi, pi]. A missing value gives a missing result.
+band	a	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+band	b	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+beta	a	First shape parameter, a positive number. Missing gives missing.
+beta	b	Second shape parameter, a positive number. Missing gives missing.
+blshift	a	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+blshift	n	Number of bit positions to shift left, an integer from 0 to 31; bits shifted beyond bit 32 are lost.
+bnot	a	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing. All 32 bits are inverted.
+bor	a	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+bor	b	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+brshift	a	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+brshift	n	Number of bit positions to shift right, an integer from 0 to 31; zeros are shifted in from the left.
+bxor	a	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+bxor	b	Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.
+byte	n	Integer code from 0 to 255 in the ASCII (Latin-1) collating sequence. A missing value gives a blank result.
+cat	...	Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes `.`. Character items are used as is, with all leading and trailing blanks kept.
+cats	...	Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes `.`. Leading and trailing blanks are removed from every item.
+catt	...	Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes `.`. Trailing blanks are removed from every item; leading blanks are kept.
+catx	sep	Delimiter string inserted between consecutive nonblank items, used as given (its blanks are kept).
+catx	...	Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes `.`. Leading and trailing blanks are removed from every item, and blank or missing items are skipped together with their delimiter.
+cdf	dist	Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.
+cdf	x	Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.
+cdf	...	Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
+ceil	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. Fuzzed: a value within about 1E-12 of an integer is treated as that integer.
+ceilz	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. No fuzzing is applied.
+char	x	Character string. A numeric value is first converted to character with the BEST12. format.
+char	pos	Numeric position of the character to return. A position below 1, beyond the end of the string, or missing gives a blank result.
+choosec	k	Numeric index of the value to return. A negative index counts from the end of the list (-1 is the last); 0, missing, or an index beyond the list gives a blank result with a note in the log.
+choosec	...	Character values to choose from.
+choosen	k	Numeric index of the value to return. A negative index counts from the end of the list (-1 is the last); 0, missing, or an index beyond the list gives a missing result with a note in the log.
+choosen	...	Numeric values to choose from.
+cinv	p	Numeric probability strictly between 0 and 1. A missing value gives a missing result.
+cinv	df	Degrees of freedom, a positive number (need not be an integer).
+cinv	nc	Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
+cmiss	...	Numeric or character values. A numeric value counts as missing if it is `.` or a special missing value; a character value counts if it is blank.
+coalesce	...	Numeric values; the first one that is not `.` or a special missing value is returned. If all are missing the result is missing.
+coalescec	...	Character values; the first one that is not blank is returned. If all are blank the result is blank.
+collate	start	Numeric code of the first character (0 to 255) in the ASCII collating sequence. Missing gives a blank result.
+collate	end	Optional numeric code of the last character; when omitted the string runs to code 255 or for `len` characters.
+collate	len	Optional length of the result, used only when `end` is omitted (written in SAS as the third argument after an empty second one). Default 200 characters at most.
+comb	n	Total number of elements, a nonnegative integer. Missing gives missing.
+comb	r	Number of chosen elements, an integer from 0 to `n`. Missing gives missing.
+compare	a	First character string (SAS string-1).
+compare	b	Second character string (SAS string-2); the shorter string is padded with blanks.
+compare	mods	Optional modifier string, default none. i ignores case; l removes leading blanks before comparing; n treats both strings as SAS name literals (quotes and n removed, case ignored); : truncates the longer string to the length of the shorter one.
+compbl	x	Character string. A numeric value is first converted to character with the BEST12. format. Each run of two or more blanks is replaced by one blank.
+compress	x	Character string. A numeric value is first converted to character with the BEST12. format.
+compress	chars	Optional character list; each character is removed (or kept with modifier k). When both `chars` and `mods` are omitted, blanks are removed.
+compress	mods	Optional modifier string. k keeps the listed characters instead of removing them; i ignores case; t trims trailing blanks first; a adds letters, d digits, l lowercase letters, u uppercase letters, s whitespace, p punctuation, n letters, digits and underscore, f letters and underscore, x hexadecimal digits, c control characters, h horizontal tab to the list.
+constant	name	Character name of the constant, not case sensitive: 'PI', 'E', 'EULER', 'BIG', 'LOGBIG', 'SQRTBIG', 'SMALL', 'LOGSMALL', 'SQRTSMALL', 'MACEPS', 'LOGMACEPS', 'SQRTMACEPS' or 'EXACTINT'.
+constant	p	Optional numeric parameter, used only by 'EXACTINT': the number of bytes (integer from 3 to 8); without it 'EXACTINT' refers to 8 bytes.
+cos	x	Numeric value in radians. A missing value gives a missing result.
+cosh	x	Numeric value (any real number). A missing value gives a missing result.
+count	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.
+count	sub	Character substring to count; occurrences do not overlap. A blank substring gives 0.
+count	mods	Optional modifier string, default none. i ignores case; t trims trailing blanks from `x` and `sub`.
+countc	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.
+countc	chars	Character string; each character is a separate item of the list (order does not matter). Characters of `x` that appear in it are counted.
+countc	mods	Optional modifier string. i ignores case; k or v counts characters NOT in the list; t trims trailing blanks; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the list.
+countw	x	Character string. A numeric value is first converted to character with the BEST12. format. Words are counted in it.
+countw	dlm	Optional character list of delimiters, each character a separate delimiter. Default: blank ! $ percent-sign & ( ) * + , - . / ; < ^ |.
+countw	mods	Optional modifier string. m makes every delimiter separate words, so adjacent delimiters enclose an empty word; q ignores delimiters inside quoted substrings; b counts words from the end; i ignores case; k makes the delimiters all characters NOT listed; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the delimiters.
+css	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+cv	...	Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
+cvt_c2n	x	Character value used where a number is expected. Leading and trailing blanks are ignored; a value that is not a valid number gives a missing result with a note in the log.
+cvt_n2c	x	Numeric value used where a character value is expected; it is written with the BEST12. format, right-aligned in 12 columns, and a missing value becomes `.`.
+datdif	start	Starting SAS date value (SAS sdate). Missing gives missing.
+datdif	end	Ending SAS date value (SAS edate); before `start` gives a negative result. Missing gives missing.
+datdif	basis	Day-count basis: 'ACT/ACT' (or 'ACTUAL') counts actual days; '30/360' (or '360') counts 30-day months, treating the 31st as the 30th. Default 'ACT/ACT'.
+datejul	j	Julian date as a number yyddd or yyyyddd (year followed by the 3-digit day of the year); a 2-digit year is resolved with the YEARCUTOFF option. Missing gives missing.
+datepart	x	Numeric SAS datetime value (seconds since midnight, 1 January 1960). A missing value gives a missing result.
+day	x	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+dequote	x	Character string. A numeric value is first converted to character with the BEST12. format. If it starts with a quotation mark, the quoted part is returned with doubled quotes undoubled and the rest discarded; otherwise it is returned unchanged.
+dhms	d	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+dhms	h	Numeric hours; values above 23 carry over into later days. Missing gives missing.
+dhms	m	Numeric minutes; values above 59 carry over. Missing gives missing.
+dhms	s	Numeric seconds, fractions allowed. Missing gives missing.
+divide	a	Numeric dividend (SAS x). Missing gives missing.
+divide	b	Numeric divisor (SAS y). Division by 0 gives the special missing value .I for a positive dividend, .M for a negative one, and . for 0/0, without a log note.
+exp	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. Results that overflow give missing with a note in the log.
+fact	n	Nonnegative integer. Missing gives missing; a result too large to represent gives missing with a note in the log.
+find	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.
+find	sub	Character substring to find. A zero-length substring gives 0.
+find	a3	Either the modifiers (if character) or the start position (if numeric); the two may be given in either order. Modifiers: i ignores case; t trims trailing blanks from `string` and `substring`. Start: a positive value searches rightwards from that position, a negative value searches leftwards from position |start|, 0 gives 0; default 1.
+find	a4	Either the modifiers (if character) or the start position (if numeric); the two may be given in either order. Modifiers: i ignores case; t trims trailing blanks from `string` and `substring`. Start: a positive value searches rightwards from that position, a negative value searches leftwards from position |start|, 0 gives 0; default 1.
+findc	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.
+findc	chars	Character string; each character is a separate item of the list (order does not matter). Default blank (no characters, so only modifier classes are used).
+findc	a3	Either the modifiers (if character) or the start position (if numeric); the two may be given in either order. Modifiers: i ignores case; k (or v) searches for characters NOT in the list; b searches from right to left; t trims trailing blanks; o processes modifiers and characters only once; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the list. Start: a positive value searches rightwards from that position, a negative value searches leftwards from position |start|.
+findc	a4	Either the modifiers (if character) or the start position (if numeric); the two may be given in either order. Modifiers: i ignores case; k (or v) searches for characters NOT in the list; b searches from right to left; t trims trailing blanks; o processes modifiers and characters only once; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the list. Start: a positive value searches rightwards from that position, a negative value searches leftwards from position |start|.
+findw	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.
+findw	word	Character word to find; leading and trailing blanks are ignored. It must be delimited on both sides by delimiters or the string ends.
+findw	dlm	Optional delimiter characters. Default: blank ! $ percent-sign & ( ) * + , - . / ; < ^ |.
+findw	a4	Either the modifiers (if character) or the start position (if numeric). Modifiers: i ignores case; e returns the word number instead of the character position; t trims trailing blanks; a, d, l, u, s, p, n, f, x, c, h add the matching character classes to the delimiters; k makes the delimiters the characters NOT listed. Default blank (no modifiers). If numeric, it is the start position (see `a5`).
+findw	a5	Start position (numeric), used when `a4` holds modifiers. A positive value searches rightwards from that position; a negative value searches leftwards from position |start|. Default 1.
+finv	p	Numeric probability strictly between 0 and 1. A missing value gives a missing result.
+finv	n	Numerator degrees of freedom (SAS ndf), a positive number.
+finv	d	Denominator degrees of freedom (SAS ddf), a positive number.
+finv	nc	Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
+first	x	Character string. A numeric value is first converted to character with the BEST12. format. Its first character is returned, even if it is a blank.
+floor	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. Fuzzed: a value within about 1E-12 of an integer is treated as that integer.
+floorz	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. No fuzzing is applied.
+gamma	x	Numeric value; must not be 0 or a negative integer (poles), which give missing with a note in the log. Missing gives missing.
+gcd	...	Integer values. Any missing argument gives a missing result.
+geomean	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+harmean	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+hms	h	Numeric hours. Missing gives missing.
+hms	m	Numeric minutes; values above 59 carry over. Missing gives missing.
+hms	s	Numeric seconds, fractions allowed. Missing gives missing.
+hour	x	Numeric SAS time value (seconds since midnight) or datetime value (seconds since 1 January 1960); only the time of day is used. A missing value gives a missing result.
+ifc	cond	Numeric condition: nonzero and nonmissing is true, 0 is false, missing selects `m`.
+ifc	a	Character value returned when the condition is true.
+ifc	b	Character value returned when the condition is false.
+ifc	m	Optional character value returned when the condition is missing; when omitted, `b` is returned.
+ifn	cond	Numeric condition: nonzero and nonmissing is true, 0 is false, missing selects `m`.
+ifn	a	Numeric value returned when the condition is true.
+ifn	b	Numeric value returned when the condition is false.
+ifn	m	Optional numeric value returned when the condition is missing; when omitted, `b` is returned.
+index	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the source searched.
+index	s	Character excerpt to find, including its trailing blanks. The result is the start position of the first occurrence, or 0.
+indexc	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the source searched.
+indexc	...	One or more character excerpts; each character of any excerpt is a search target. The search is case sensitive.
+indexw	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the source searched.
+indexw	word	Character word to find; leading and trailing blanks are ignored. It must be delimited on both sides by delimiters or the string ends.
+indexw	dlm	Optional delimiter characters, default blank.
+input	s	Source value to read; a numeric source is first converted with BEST12.
+input	fmt	Parsed informat specification: a list with elements `name`, `w`, `d`, `char` and `text`, as produced by the translator from a informat written as `name w.d` (e.g. `8.3`, `z5.`, `$5.`). In SAS code this is the informat name itself, not a string.
+input	qq	Error-control modifier written before the informat: '' (default) writes a note and sets the error flag for invalid data; '?' suppresses the note; '??' suppresses the note and the error flag.
+inputc	s	Character source value to read.
+inputc	fmt	Character informat name given as a string, e.g. '$upcase3.'.
+inputc	w	Optional numeric width that overrides the informat width.
+inputn	s	Character source value to read.
+inputn	fmt	Numeric informat name given as a string, e.g. 'comma8.'.
+inputn	w	Optional numeric width that overrides the informat width.
+inputn	d	Optional number of decimal places that overrides the informat's.
+int	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. Fuzzed: a value within about 1E-12 of an integer is treated as that integer.
+intck	interval	Character interval name such as 'DAY', 'WEEK', 'MONTH', 'QTR', 'YEAR', 'DTDAY', 'HOUR'; may include a multiplier and shift index (e.g. 'MONTH2.2').
+intck	from	Starting date, time or datetime value (must match the interval type).
+intck	to	Ending date, time or datetime value.
+intck	method	Optional counting method: 'DISCRETE' (default, 'D') counts interval boundaries crossed; 'CONTINUOUS' ('C') counts complete intervals measured from `from`.
+intnx	interval	Character interval name such as 'DAY', 'WEEK', 'MONTH', 'QTR', 'YEAR', 'DTDAY', 'HOUR'; may include a multiplier and shift index (e.g. 'MONTH2.2').
+intnx	start	Starting date, time or datetime value (must match the interval type).
+intnx	n	Integer number of intervals to move; negative moves backwards, 0 stays in the interval of `start`. Non-integers are truncated.
+intnx	align	Optional alignment of the result within the interval: 'BEGINNING' ('B', default), 'MIDDLE' ('M'), 'END' ('E') or 'SAME' ('S', same position as `start`).
+intz	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. No fuzzing is applied.
+juldate	x	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+juldate7	x	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+kurtosis	...	Four or more numeric values. Missing values are ignored; with fewer than 4 nonmissing values or zero variance the result is missing.
+largest	k	Positive integer rank: 1 returns the largest nonmissing value, 2 the second largest, and so on. If `k` exceeds the number of nonmissing values the result is missing.
+largest	...	Numeric values; missing values are ignored.
+lcm	...	Integer values. Any missing argument gives a missing result.
+left	x	Character string. A numeric value is first converted to character with the BEST12. format. Leading blanks are moved to the end; the length is unchanged.
+length	x	Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 1 for a blank string.
+lengthc	x	Character string. A numeric value is first converted to character with the BEST12. format. The result includes trailing blanks.
+lengthm	x	Character string. A numeric value is first converted to character with the BEST12. format. The result is the number of bytes allocated, including trailing blanks.
+lengthn	x	Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 0 for a blank string.
+lgamma	x	Positive numeric value. Missing gives missing.
+log	x	Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.
+log10	x	Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.
+log2	x	Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.
+logbeta	a	First shape parameter, a positive number. Missing gives missing.
+logbeta	b	Second shape parameter, a positive number. Missing gives missing.
+logcdf	dist	Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.
+logcdf	x	Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.
+logcdf	...	Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
+logpdf	dist	Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.
+logpdf	x	Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.
+logpdf	...	Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
+logsdf	dist	Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.
+logsdf	x	Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.
+logsdf	...	Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
+lowcase	x	Character string. A numeric value is first converted to character with the BEST12. format.
+max	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+mdy	m	Month, an integer from 1 to 12.
+mdy	d	Day of the month, an integer valid for the month and year.
+mdy	y	Year with 2 or 4 digits; a 2-digit year is resolved with the YEARCUTOFF option. An invalid combination or a missing argument gives missing (with a note for invalid dates).
+mean	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+median	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+min	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+minute	x	Numeric SAS time value (seconds since midnight) or datetime value (seconds since 1 January 1960); only the time of day is used. A missing value gives a missing result.
+missing	x	Numeric or character value. A number is missing if it is `.` or a special missing value (`.A` to `.Z`, `._`); a character value is missing if it is blank.
+mod	a	Numeric dividend; the remainder has its sign. Missing gives missing.
+mod	b	Numeric divisor. 0 gives missing with a note in the log. The computation is fuzzed to correct for binary rounding.
+modz	a	Numeric dividend; the remainder has its sign. Missing gives missing.
+modz	b	Numeric divisor. 0 gives missing with a note in the log. No fuzzing is applied.
+month	x	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+n	...	Numeric values. `.` and special missing values are not counted.
+nmiss	...	Numeric values. `.` and special missing values such as `.A` are counted as missing.
+notalnum	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+notalnum	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+notalpha	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+notalpha	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+notdigit	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+notdigit	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+notlower	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+notlower	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+notpunct	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+notpunct	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+notspace	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+notspace	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+notupper	x	Character string to search. A numeric value is first converted to character with the BEST12. format.
+notupper	start	Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+nvalid	x	Character string to check as a SAS variable name; trailing blanks are ignored.
+nvalid	opt	Optional naming rules: 'V7' (default) requires a letter or underscore first, then letters, digits or underscores, up to 32 characters; 'ANY' accepts any 1 to 32 characters; 'UPCASE' is V7 with uppercase letters only; 'NLITERAL' accepts V7 names and name literals such as 'my var'n.
+ordinal	k	Positive integer rank from 1 to the number of values; 1 returns the smallest.
+ordinal	...	Numeric values; missing values are kept and sort lowest, so they can be returned.
+pctl	p	Percentage from 0 to 100 (percentile definition 5 of PROC UNIVARIATE). Outside that range or missing gives missing.
+pctl	...	Numeric values; missing values are ignored.
+pdf	dist	Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.
+pdf	x	Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.
+pdf	...	Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
+perm	n	Total number of elements, a nonnegative integer. Missing gives missing.
+perm	r	Optional number of elements arranged, an integer from 0 to `n`; when omitted the result is n!.
+poisson	m	Mean of the Poisson distribution, a nonnegative number.
+poisson	n	Count, a nonnegative integer; the result is P(X <= n).
+probbnml	p	Success probability of each trial, from 0 to 1.
+probbnml	n	Number of trials, a positive integer.
+probbnml	m	Number of successes, an integer from 0 to `n`; the result is P(X <= m).
+probchi	x	Numeric value at which the chi-square CDF is evaluated. Missing gives missing.
+probchi	df	Degrees of freedom, a positive number.
+probchi	nc	Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
+probf	x	Numeric value at which the F CDF is evaluated. Missing gives missing.
+probf	n	Numerator degrees of freedom (SAS ndf), a positive number.
+probf	d	Denominator degrees of freedom (SAS ddf), a positive number.
+probf	nc	Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
+probit	p	Numeric probability strictly between 0 and 1. A missing value gives a missing result.
+probnorm	x	Numeric value at which the standard normal CDF is evaluated. Missing gives missing.
+probt	x	Numeric value at which the t CDF is evaluated. Missing gives missing.
+probt	df	Degrees of freedom, a positive number.
+probt	nc	Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
+propcase	x	Character string. A numeric value is first converted to character with the BEST12. format. The first letter of each word is uppercased and all other letters lowercased.
+propcase	dlm	Optional characters that start a new word, replacing the default set: blank, slash, hyphen, open parenthesis, period and tab.
+prxchange	re	Pattern identifier from PRXPARSE or a Perl substitution string 's/pattern/replacement/' (capture groups referenced as $1, $2).
+prxchange	times	Number of matches to replace; -1 replaces all matches.
+prxchange	x	Character source string.
+prxmatch	re	Pattern identifier returned by PRXPARSE, or a Perl regular expression string in delimiters (e.g. '/b+/').
+prxmatch	x	Character source string to search; the result is the position of the first match, or 0.
+prxparse	re	Perl regular expression in delimiters, e.g. '/a+/i' or a substitution 's/a/b/'; options such as i follow the closing delimiter.
+put	x	Value to format; numeric for numeric formats, character for character ($) formats.
+put	fmt	Parsed format specification: a list with elements `name`, `w`, `d`, `char` and `text`, as produced by the translator from a format written as `name w.d` (e.g. `8.3`, `z5.`, `$5.`). In SAS code this is the format name itself, not a string.
+put	align	Optional alignment written after the format: 'l' left-aligns (-L), 'r' right-aligns (-R), 'c' centers (-C) the formatted value within the width. Default none.
+putc	x	Character value to format.
+putc	fmt	Character format name given as a string, e.g. '$upcase3.'.
+putc	w	Optional numeric width that overrides the format width.
+putn	x	Numeric value to format.
+putn	fmt	Numeric format name given as a string, e.g. 'comma10.'.
+putn	w	Optional numeric width that overrides the format width.
+putn	d	Optional number of decimal places that overrides the format's.
+qtr	x	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+quantile	dist	Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.
+quantile	x	Numeric probability; strictly between 0 and 1 for continuous distributions, 0 to 1 inclusive for discrete ones. Missing gives missing.
+quantile	...	Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
+quote	x	Character string. A numeric value is first converted to character with the BEST12. format. Embedded quotation marks of the chosen kind are doubled.
+quote	q	Optional quotation mark character, a double quote (default) or a single quote.
+range	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+rank	x	Character value; the ASCII code (0 to 255) of its first character is returned.
+repeat	x	Character string. A numeric value is first converted to character with the BEST12. format.
+repeat	n	Number of additional copies, a nonnegative integer; the result has n + 1 copies of `x`.
+reverse	x	Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks become leading blanks.
+right	x	Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are moved to the front; the length is unchanged.
+round	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result.
+round	unit	Optional positive rounding unit, default 1; the result is the multiple of the unit nearest to `x`. Ties are rounded away from zero, with fuzzing to correct for binary representation.
+rounde	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result.
+rounde	unit	Optional positive rounding unit, default 1; the result is the multiple of the unit nearest to `x`. Exact ties are rounded to the even multiple.
+roundz	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result.
+roundz	unit	Optional positive rounding unit, default 1; the result is the multiple of the unit nearest to `x`. No fuzzing is applied, and exact ties are rounded to the even multiple.
+scan	x	Character string. A numeric value is first converted to character with the BEST12. format. Words are extracted from it.
+scan	n	Nonzero integer word number. A positive value counts words from the left, a negative value from the right (-1 is the last word); 0 or missing gives a blank result with a note in the log.
+scan	dlm	Optional character list of delimiters, each character a separate delimiter. Default: blank ! $ percent-sign & ( ) * + , - . / ; < ^ |.
+scan	mods	Optional modifier string. m makes every delimiter separate words, so adjacent delimiters enclose an empty word; q ignores delimiters inside quoted substrings; b counts words from the end; i ignores case; k makes the delimiters all characters NOT listed; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the delimiters.
+sdf	dist	Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.
+sdf	x	Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.
+sdf	...	Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
+second	x	Numeric SAS time value (seconds since midnight) or datetime value (seconds since 1 January 1960); only the time of day is used. A missing value gives a missing result.
+sign	x	Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result.
+sin	x	Numeric value in radians. A missing value gives a missing result.
+sinh	x	Numeric value (any real number). A missing value gives a missing result.
+skewness	...	Three or more numeric values. Missing values are ignored; with fewer than 3 nonmissing values or zero variance the result is missing.
+smallest	k	Positive integer rank: 1 returns the smallest nonmissing value, 2 the second smallest, and so on. If `k` exceeds the number of nonmissing values the result is missing.
+smallest	...	Numeric values; missing values are ignored.
+sqlcase	...	Alternating conditions and values of a PROC SQL CASE expression: when1, then1, when2, then2, ..., followed by the ELSE value, which is returned if no condition is true.
+sqlinlist	x	Value tested by the IN operator; numeric or character.
+sqlinlist	...	List values; the result is 1 if `x` equals any of them (a missing value equals another missing value), else 0.
+sqllike	x	Character value tested by LIKE; trailing blanks are ignored.
+sqllike	pattern	LIKE pattern: percent sign matches any sequence of characters, underscore matches exactly one character, other characters match themselves.
+sqllike	escape	Optional single escape character (ESCAPE clause); the character after it in `pattern` is matched literally.
+sqlquant	x	Left-hand value of the comparison.
+sqlquant	values	Values returned by the subquery.
+sqlquant	op	Comparison operator as a string: '=', '^=', '<', '<=', '>' or '>='.
+sqlquant	quant	Quantifier: 'any' is true if the comparison holds for at least one value; 'all' if it holds for every value.
+sqrt	x	Nonnegative numeric value. A negative value gives missing with a note in the log; missing gives missing.
+std	...	Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
+stderr	...	Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
+strip	x	Character string. A numeric value is first converted to character with the BEST12. format. Leading and trailing blanks are removed; an all-blank value gives a zero-length string.
+substr	x	Character string. A numeric value is first converted to character with the BEST12. format.
+substr	pos	Starting position, an integer from 1 to the length of `x`; an invalid position writes a note and sets the error flag.
+substr	len	Optional number of characters; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log).
+substrn	x	Character string. A numeric value is first converted to character with the BEST12. format.
+substrn	pos	Starting position; may be 0, negative or beyond the end, in which case only the part of the requested range inside the string is returned (no note).
+substrn	len	Optional number of characters; when omitted the rest of the string is returned. Lengths running past the end are cut without a note.
+sum	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+symget	symtab	Macro symbol table to look the variable up in (an environment or macro session supplied by the generated code; not part of the SAS syntax).
+symget	name	Character name of the macro variable, not case sensitive; trailing blanks are ignored. A blank or invalid name gives a blank result with a note in the log.
+tan	x	Numeric value in radians. A missing value gives a missing result.
+tanh	x	Numeric value (any real number). A missing value gives a missing result.
+timepart	x	Numeric SAS datetime value (seconds since midnight, 1 January 1960). A missing value gives a missing result.
+tinv	p	Numeric probability strictly between 0 and 1. A missing value gives a missing result.
+tinv	df	Degrees of freedom, a positive number (need not be an integer).
+tinv	nc	Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
+translate	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the source.
+translate	...	Pairs of character arguments to, from: each character of from is replaced by the character at the same position in to (blank if to is shorter). Several pairs may be given.
+transtrn	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the source.
+transtrn	from	Character target substring; every occurrence is replaced.
+transtrn	to	Replacement string; may be zero-length (e.g. `TRIMN('')`), which deletes the target.
+tranwrd	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the source.
+tranwrd	from	Character target substring; every occurrence is replaced.
+tranwrd	to	Replacement string. A blank literal is one blank, so the target cannot be deleted; use TRANSTRN with TRIMN for that.
+trim	x	Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are removed; an all-blank value gives one blank.
+trimn	x	Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are removed; an all-blank value gives a zero-length string.
+upcase	x	Character string. A numeric value is first converted to character with the BEST12. format.
+uss	...	One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
+var	...	Two or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.
+verify	x	Character string. A numeric value is first converted to character with the BEST12. format. This is the source.
+verify	...	One or more character excerpts; the result is the position of the first character of `x` that is in none of them, or 0.
+week	x	Optional SAS date value; when omitted, today's date is used. Missing gives missing.
+week	desc	Optional descriptor (first letter used): 'U' (default) weeks start on Sunday, days before the first Sunday are week 0; 'V' ISO 8601 weeks starting on Monday, week 1 contains 4 January; 'W' weeks start on Monday, days before the first Monday are week 0.
+weekday	x	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+whichc	x	Character value to look up; trailing blanks are ignored. A blank value is looked up like any other.
+whichc	...	Character values; the result is the index of the first one equal to `x`, or 0.
+whichn	x	Numeric value to look up. A missing value gives a missing result.
+whichn	...	Numeric values; the result is the index of the first one equal to `x`, or 0.
+year	x	Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.
+yrdif	start	Starting SAS date value (SAS sdate). Missing gives missing.
+yrdif	end	Ending SAS date value (SAS edate). Missing gives missing.
+yrdif	basis	Optional basis: 'AGE' (default) gives the age in completed years plus a fraction; 'ACT/ACT' divides actual days in each calendar year by 365 or 366; '30/360' uses 30-day months and 360-day years; 'ACT/360' and 'ACT/365' divide actual days by 360 or 365.

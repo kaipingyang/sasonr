@@ -4,9 +4,9 @@
 \alias{sas_f_catx}
 \title{SAS \verb{CATX(delimiter, item-1 <, ..., item-n>)}}
 \arguments{
-\item{sep}{Delimiter.}
+\item{sep}{Delimiter string inserted between consecutive nonblank items, used as given (its blanks are kept).}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes \code{.}. Leading and trailing blanks are removed from every item, and blank or missing items are skipped together with their delimiter.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 
@@ -23,16 +23,24 @@ Strips items and joins the non-blank ones with a delimiter. See the \href{https:
 }
 
 \section{Verification}{
- Partial: 26 of 28 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ partial (26 of 28 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CATX: each call with the result of the same CATX call in SAS 9.4
-# (offline conformance cases; dates are SAS day counts from 1960-01-01)
-sas_f_catx("-", "a", "b", "c")  # SAS catx('-','a','b','c') = "a-b-c"
-sas_f_catx("-", "  a ", "b  ", " c")  # SAS catx('-','  a ','b  ',' c') = "a-b-c"
-sas_f_catx("-", "a", " ", "c")  # SAS catx('-','a',' ','c') = "a-c"
-sas_f_catx("-", "a", NA, "c")  # SAS catx('-','a',.,'c') = "a-.-c"
+# CATX: each call is explained above it and followed by the result of the same call in SAS 9.4
+# (dates are SAS day counts from 1960-01-01)
+
+# Join the items with the delimiter '-'.
+sas_f_catx("-", "a", "b", "c")  # SAS 9.4: catx('-','a','b','c') = "a-b-c"
+
+# Leading and trailing blanks of every item are removed before joining.
+sas_f_catx("-", "  a ", "b  ", " c")  # SAS 9.4: catx('-','  a ','b  ',' c') = "a-b-c"
+
+# A blank item is skipped (no doubled delimiter).
+sas_f_catx("-", "a", " ", "c")  # SAS 9.4: catx('-','a',' ','c') = "a-c"
+
+# A numeric missing item is not skipped: it is written as '.'.
+sas_f_catx("-", "a", NA, "c")  # SAS 9.4: catx('-','a',.,'c') = "a-.-c"
 }
 \seealso{
 Other character functions:

@@ -4,11 +4,11 @@
 \alias{sas_f_cdf}
 \title{SAS \verb{CDF(distribution, quantile <, parameters>)}}
 \arguments{
-\item{dist}{Distribution name, as in SAS (\code{"NORMAL"}, \code{"T"}, ...).}
+\item{dist}{Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,17 +21,17 @@ Cumulative distribution function. See the \href{https://documentation.sas.com/do
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) agree with SAS.
+ approximate (35 of 57 SAS 9.4 cases agree bit for bit; 14 case(s) differ in the last bits (largest relative difference 1.8e-15; different algorithm); 8 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CDF: each call is followed by the result of the same call in SAS 9.4
-# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_cdf("NORMAL", 1.96)  # SAS: cdf('NORMAL', 1.96) -> 0.97500210485178
-sas_f_cdf("BINOMIAL", 3, 0.5, 10)  # SAS: cdf('BINOMIAL', 3, 0.5, 10) -> 0.171875
-sas_f_cdf("POISSON", 2, 1.5)  # SAS: cdf('POISSON', 2, 1.5) -> 0.808846830538058
-sas_f_cdf("T", 2, 5)  # SAS: cdf('T', 2, 5) -> 0.94903026058507
-sas_f_cdf("NORMAL", NA_real_)  # SAS: cdf('NORMAL', .) -> .
+# CDF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# P(X <= 2) for a Poisson variable with mean 1.5.
+sas_f_cdf("POISSON", 2, 1.5)  # SAS 9.4: cdf('POISSON', 2, 1.5) = 0.808846830538058
+
+# A missing quantile gives a missing result.
+sas_f_cdf("NORMAL", NA_real_)  # SAS 9.4: cdf('NORMAL', .) = .
 }
 \seealso{
 Other probability functions:

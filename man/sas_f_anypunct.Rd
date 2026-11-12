@@ -4,9 +4,9 @@
 \alias{sas_f_anypunct}
 \title{SAS \verb{ANYPUNCT(string <, start>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string to search. A numeric value is first converted to character with the BEST12. format.}
 
-\item{start}{Starting position.}
+\item{start}{Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,21 @@ Position of the first punctuation character. See the \href{https://documentation
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ANYPUNCT: each call is followed by the result of the same call in SAS 9.4
-sas_f_anypunct("ab,c")  # SAS: anypunct('ab,c') -> 3
-sas_f_anypunct("abc")  # SAS: anypunct('abc') -> 0
-sas_f_anypunct("a!b?", 3)  # SAS: anypunct('a!b?', 3) -> 4
+# ANYPUNCT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The comma at position 3 is the first punctuation character.
+sas_f_anypunct("ab,c")  # SAS 9.4: anypunct('ab,c') = 3
+
+# No punctuation character occurs, so the result is 0.
+sas_f_anypunct("abc")  # SAS 9.4: anypunct('abc') = 0
+
+# Start 3 searches rightwards from position 3, skipping the '!' at position 2,
+# and finds '?' at position 4.
+sas_f_anypunct("a!b?", 3)  # SAS 9.4: anypunct('a!b?', 3) = 4
 }
 \seealso{
 Other character functions:

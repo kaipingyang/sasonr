@@ -14,16 +14,21 @@ Current datetime. See the \href{https://documentation.sas.com/doc/en/lefunctions
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 2 example call(s) and 1 offline conformance case(s) agree with SAS. The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only.
+ not comparable (4 SAS 9.4 cases check type and range only; the value depends on the session clock). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# DATETIME: each call is followed by the result of the same call in SAS 9.4
+# DATETIME: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
 # DATETIME() returns the current date and time (the clock of the session), so
 # its value cannot be reproduced; the examples check its type and range only.
-as.numeric(sas_f_datetime() > 2019686400)  # SAS: datetime() > '01JAN2024:00:00:00'dt -> 1
-as.numeric(sas_f_datepart(sas_f_datetime()) == sas_f_today())  # SAS: datepart(datetime()) = today() -> 1
+
+# DATETIME() returns the current date and time in seconds since midnight, 1
+# January 1960.
+as.numeric(sas_f_datetime() > 2019686400)  # SAS 9.4: datetime() > '01JAN2024:00:00:00'dt = 1
+
+# The date part of the current datetime equals today's date.
+as.numeric(sas_f_datepart(sas_f_datetime()) == sas_f_today())  # SAS 9.4: datepart(datetime()) = today() = 1
 }
 \seealso{
 Other datetime functions:

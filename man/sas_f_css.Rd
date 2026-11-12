@@ -4,7 +4,7 @@
 \alias{sas_f_css}
 \title{SAS \verb{CSS(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{One or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Corrected sum of squares. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (42 of 42 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CSS: each call is followed by the result of the same call in SAS 9.4
-sas_f_css(1, 2, 3, 4)  # SAS: css(1, 2, 3, 4) -> 5
-sas_f_css(1, NA_real_, 3)  # SAS: css(1, ., 3) -> 2
-sas_f_css(5)  # SAS: css(5) -> 0
-sas_f_css(NA_real_, NA_real_)  # SAS: css(., .) -> .
+# CSS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CSS is the corrected sum of squares about the mean (2.5): 2.25 + 0.25 + 0.25
+# + 2.25 = 5.
+sas_f_css(1, 2, 3, 4)  # SAS 9.4: css(1, 2, 3, 4) = 5
+
+# Missing values are ignored; the mean of 1 and 3 is 2, so CSS = 1 + 1 = 2.
+sas_f_css(1, NA_real_, 3)  # SAS 9.4: css(1, ., 3) = 2
+
+# A single value equals its own mean, so CSS is 0.
+sas_f_css(5)  # SAS 9.4: css(5) = 0
+
+# All arguments are missing, so the result is missing.
+sas_f_css(NA_real_, NA_real_)  # SAS 9.4: css(., .) = .
 }
 \seealso{
 Other descriptive functions:

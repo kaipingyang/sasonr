@@ -4,11 +4,11 @@
 \alias{sas_f_compare}
 \title{SAS \verb{COMPARE(string-1, string-2 <, modifiers>)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{First character string (SAS string-1).}
 
-\item{b}{Numeric argument.}
+\item{b}{Second character string (SAS string-2); the shorter string is padded with blanks.}
 
-\item{mods}{Modifiers, as in SAS.}
+\item{mods}{Optional modifier string, default none. i ignores case; l removes leading blanks before comparing; n treats both strings as SAS name literals (quotes and n removed, case ignored); : truncates the longer string to the length of the shorter one.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,17 +21,33 @@ Position of the first difference (signed). See the \href{https://documentation.s
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 6 example call(s) agree with SAS.
+ verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COMPARE: each call is followed by the result of the same call in SAS 9.4
-sas_f_compare("abc", "abc")  # SAS: compare('abc', 'abc') -> 0
-sas_f_compare("abc", "abd")  # SAS: compare('abc', 'abd') -> -3
-sas_f_compare("abd", "abc")  # SAS: compare('abd', 'abc') -> 3
-sas_f_compare("ABC", "abc", "i")  # SAS: compare('ABC', 'abc', 'i') -> 0
-sas_f_compare("abc", "ab")  # SAS: compare('abc', 'ab') -> 3
-sas_f_compare("ab", "abc", ":")  # SAS: compare('ab', 'abc', ':') -> 0
+# COMPARE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# COMPARE returns 0 when the two strings are equal.
+sas_f_compare("abc", "abc")  # SAS 9.4: compare('abc', 'abc') = 0
+
+# The strings first differ at position 3; the sign is negative because 'c'
+# sorts before 'd', so -3.
+sas_f_compare("abc", "abd")  # SAS 9.4: compare('abc', 'abd') = -3
+
+# The first difference is at position 3 and 'd' sorts after 'c', so the result
+# is +3.
+sas_f_compare("abd", "abc")  # SAS 9.4: compare('abd', 'abc') = 3
+
+# Modifier i ignores case, so 'ABC' and 'abc' compare equal (0).
+sas_f_compare("ABC", "abc", "i")  # SAS 9.4: compare('ABC', 'abc', 'i') = 0
+
+# The shorter string is padded with blanks; 'c' sorts after a blank, so the
+# result is +3 (first difference at 3).
+sas_f_compare("abc", "ab")  # SAS 9.4: compare('abc', 'ab') = 3
+
+# Modifier : truncates the longer string to the length of the shorter one, so
+# 'ab' and 'abc' compare equal.
+sas_f_compare("ab", "abc", ":")  # SAS 9.4: compare('ab', 'abc', ':') = 0
 }
 \seealso{
 Other character functions:

@@ -4,7 +4,7 @@
 \alias{sas_f_prxparse}
 \title{SAS \code{PRXPARSE(perl-regular-expression)}}
 \arguments{
-\item{re}{Perl regular expression or its id.}
+\item{re}{Perl regular expression in delimiters, e.g. '/a+/i' or a substitution 's/a/b/'; options such as i follow the closing delimiter.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,13 +19,18 @@ Compiles a Perl regular expression. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 2 example call(s) agree with SAS.
+ partial (5 of 7 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PRXPARSE: each call is followed by the result of the same call in SAS 9.4
-sas_f_prxparse("/a+/")  # SAS: prxparse('/a+/') -> 1
-sas_f_prxparse("/b/i")  # SAS: prxparse('/b/i') -> 2
+# PRXPARSE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# PRXPARSE compiles a Perl regular expression and returns a numeric pattern
+# identifier; the first one is 1.
+sas_f_prxparse("/a+/")  # SAS 9.4: prxparse('/a+/') = 1
+
+# Each further PRXPARSE call gets the next identifier, 2.
+sas_f_prxparse("/b/i")  # SAS 9.4: prxparse('/b/i') = 2
 }
 \seealso{
 Other special functions:

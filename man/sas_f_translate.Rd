@@ -4,9 +4,9 @@
 \alias{sas_f_translate}
 \title{SAS \verb{TRANSLATE(source, to-1, from-1 <, ..., to-n, from-n>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the source.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Pairs of character arguments to, from: each character of from is replaced by the character at the same position in to (blank if to is shorter). Several pairs may be given.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,21 @@ Replaces characters. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TRANSLATE: each call is followed by the result of the same call in SAS 9.4
-sas_f_translate("abcabc", "xy", "ab")  # SAS: translate('abcabc', 'xy', 'ab') -> "xycxyc"
-sas_f_translate("abc", "X", "a", "Y", "b")  # SAS: translate('abc', 'X', 'a', 'Y', 'b') -> "XYc"
-sas_f_translate("abc", "x", "z")  # SAS: translate('abc', 'x', 'z') -> "abc"
+# TRANSLATE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# TRANSLATE(source, to, from) replaces each character of from by the character
+# at the same position in to: a to x, b to y.
+sas_f_translate("abcabc", "xy", "ab")  # SAS 9.4: translate('abcabc', 'xy', 'ab') = "xycxyc"
+
+# Several to/from pairs may be given: a becomes X and b becomes Y.
+sas_f_translate("abc", "X", "a", "Y", "b")  # SAS 9.4: translate('abc', 'X', 'a', 'Y', 'b') = "XYc"
+
+# A from character that does not occur leaves the string unchanged.
+sas_f_translate("abc", "x", "z")  # SAS 9.4: translate('abc', 'x', 'z') = "abc"
 }
 \seealso{
 Other character functions:

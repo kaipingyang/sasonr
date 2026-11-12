@@ -4,11 +4,11 @@
 \alias{sas_f_compress}
 \title{SAS \verb{COMPRESS(source <, characters> <, modifiers>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 
-\item{chars}{Characters to remove or find.}
+\item{chars}{Optional character list; each character is removed (or kept with modifier k). When both \code{chars} and \code{mods} are omitted, blanks are removed.}
 
-\item{mods}{Modifiers, as in SAS.}
+\item{mods}{Optional modifier string. k keeps the listed characters instead of removing them; i ignores case; t trims trailing blanks first; a adds letters, d digits, l lowercase letters, u uppercase letters, s whitespace, p punctuation, n letters, digits and underscore, f letters and underscore, x hexadecimal digits, c control characters, h horizontal tab to the list.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,17 +21,29 @@ Removes characters from a string. See the \href{https://documentation.sas.com/do
 }
 
 \section{Verification}{
- Partial: 34 of 36 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ partial (34 of 36 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COMPRESS: each call with the result of the same COMPRESS call in SAS 9.4
-# (offline conformance cases; dates are SAS day counts from 1960-01-01)
-sas_f_compress("a b c")  # SAS compress('a b c') = "abc"
-sas_f_compress("a-b-c", "-")  # SAS compress('a-b-c','-') = "abc"
-sas_f_compress("a1 b2", "", "d")  # SAS compress('a1 b2','','d') = "ab"
-sas_f_compress("a1 b2", "", "kd")  # SAS compress('a1 b2','','kd') = "1 2"
-sas_f_compress("ABC abc", "a", "i")  # SAS compress('ABC abc','a','i') = "BC bc"
+# COMPRESS: each call is explained above it and followed by the result of the same call in SAS 9.4
+# (dates are SAS day counts from 1960-01-01)
+
+# With one argument COMPRESS removes all blanks.
+sas_f_compress("a b c")  # SAS 9.4: compress('a b c') = "abc"
+
+# The second argument lists the characters to remove: here '-'.
+sas_f_compress("a-b-c", "-")  # SAS 9.4: compress('a-b-c','-') = "abc"
+
+# The list '' is one blank and modifier 'd' adds the digits: blanks and digits
+# are removed.
+sas_f_compress("a1 b2", "", "d")  # SAS 9.4: compress('a1 b2','','d') = "ab"
+
+# Modifier 'k' keeps instead of removing: the listed blank and the digits ('d')
+# are kept.
+sas_f_compress("a1 b2", "", "kd")  # SAS 9.4: compress('a1 b2','','kd') = "1 2"
+
+# Modifier 'i' ignores case: removing 'a' also removes 'A'.
+sas_f_compress("ABC abc", "a", "i")  # SAS 9.4: compress('ABC abc','a','i') = "BC bc"
 }
 \seealso{
 Other character functions:

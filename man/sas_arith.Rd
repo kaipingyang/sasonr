@@ -4,7 +4,7 @@
 \alias{sas_arith}
 \title{Arithmetic operators \verb{+ - *} with SAS missing-value semantics and NOTEs}
 \usage{
-sas_arith(a, b, op, .at = NULL, .exact = TRUE)
+sas_arith(a, b, op, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE)
 }
 \description{
 Arithmetic operators \verb{+ - *} with SAS missing-value semantics and NOTEs

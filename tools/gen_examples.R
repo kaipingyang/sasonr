@@ -54,6 +54,57 @@ pilot <- list(
              `006` = 'sas_f_substr("abcdef", 7)', `011` = 'sas_f_substr("abcdef", 2, 10)')
 )
 
+# what each pilot example demonstrates (shown above the call)
+pilot_desc <- list(
+  CATX = c(`001` = "Join the items with the delimiter '-'.",
+           `002` = "Leading and trailing blanks of every item are removed before joining.",
+           `003` = "A blank item is skipped (no doubled delimiter).",
+           `006` = "A numeric missing item is not skipped: it is written as '.'."),
+  COMPRESS = c(`001` = "With one argument COMPRESS removes all blanks.",
+               `002` = "The second argument lists the characters to remove: here '-'.",
+               `004` = "The list '' is one blank and modifier 'd' adds the digits: blanks and digits are removed.",
+               `006` = "Modifier 'k' keeps instead of removing: the listed blank and the digits ('d') are kept.",
+               `007` = "Modifier 'i' ignores case: removing 'a' also removes 'A'."),
+  INDEX = c(`001` = "Position of the first occurrence of 'bc'.",
+            `002` = "0 when the excerpt does not occur.",
+            `004` = "The search is case-sensitive: 'b' does not match 'B'.",
+            `005` = "A blank excerpt finds the first blank."),
+  INPUT = c(`001` = "Read the text '123' with the 8. informat.",
+            `004` = "Without a decimal point in the text, the informat 4.2 places two implied decimals: 12.34.",
+            `005` = "A decimal point in the text overrides the informat's decimals.",
+            `006` = "COMMA8. ignores the thousands separator.",
+            `008` = "COMMA5. reads a value in parentheses as negative."),
+  INTCK = c(`001` = "Discrete method (default): one month boundary between 31 Jan and 1 Feb 2020.",
+            `002` = "Continuous method 'c': less than a full month between 31 Jan and 1 Feb 2020, so 0.",
+            `006` = "One year boundary between 31 Dec 2019 and 1 Jan 2020.",
+            `009` = "A start after the end counts boundaries backwards: -2 months."),
+  INTNX = c(`001` = "Advance 1 month: the beginning of the next month (alignment 'b' is the default).",
+            `002` = "Alignment 'e': the end of the next month.",
+            `004` = "Alignment 's': the same day in the next month.",
+            `005` = "Alignment 's' from 31 Jan: the same day does not exist in February, so the last day (29 Feb 2020).",
+            `008` = "A negative increment goes back: the beginning of the previous month."),
+  PUT = c(`001` = "Write 123 with the 8. format: right-aligned in 8 columns.",
+          `003` = "8.2 rounds to two decimals.",
+          `005` = "Format 1. rounds 2.5 half away from zero: 3.",
+          `008` = "A value too wide for 8. is written in E notation.",
+          `011` = "DOLLAR10.2: dollar sign, thousands separator, minus sign.",
+          `012` = "PERCENT8.1 multiplies by 100 and adds a percent sign."),
+  ROUND = c(`001` = "Round to the nearest integer: halves go away from zero.",
+            `002` = "Negative halves also go away from zero: -3.",
+            `005` = "Rounding unit 0.1: SAS treats 2.45 as the exact decimal, so 2.5 (base R gives 2.4).",
+            `006` = "Rounding unit 0.01: 1.005 gives 1.01.",
+            `007` = "Rounding unit 100: the nearest multiple of 100.",
+            `011` = "A rounding unit of 1/3: the nearest multiple of 1/3."),
+  SCAN = c(`001` = "The first word (default delimiters include the blank).",
+           `004` = "A negative count counts words from the end: -1 is the last word.",
+           `003` = "A count beyond the number of words gives a blank.",
+           `011` = "Consecutive delimiters count as one, so the third word is 'c'."),
+  SUBSTR = c(`001` = "From position 2 to the end.",
+             `002` = "Three characters from position 2.",
+             `006` = "A position beyond the end is invalid: blank result, NOTE and _ERROR_ = 1 in a DATA step.",
+             `011` = "A length beyond the end: the rest of the string (with a NOTE and _ERROR_ = 1 in a DATA step).")
+)
+
 pilot_result <- function(root, fn, id) {
   case <- file.path(root, fn, paste0(fn, "_", id))
   meta <- readLines(file.path(case, "meta.yaml"))
@@ -72,12 +123,14 @@ write_pilot <- function() {
   root <- file.path("tests", "conformance", "functions")
   if (!dir.exists(root)) stop("tests/conformance/functions not found (local conformance assets)")
   for (fn in names(pilot)) {
-    out <- c(sprintf("# %s: each call with the result of the same %s call in SAS 9.4", fn, fn),
-             "# (offline conformance cases; dates are SAS day counts from 1960-01-01)")
+    out <- c(sprintf("# %s: each call is explained above it and followed by the result of the same call in SAS 9.4", fn),
+             "# (dates are SAS day counts from 1960-01-01)")
     for (id in names(pilot[[fn]])) {
       g <- pilot_result(root, fn, id)
       if (is.null(g)) next
-      out <- c(out, sprintf("%s  # SAS %s = %s", pilot[[fn]][[id]], g$expr, g$value))
+      d <- pilot_desc[[fn]][[id]] %||% ""
+      out <- c(out, "", if (nzchar(d)) paste("#", strwrap(d, 78)),
+               sprintf("%s  # SAS 9.4: %s = %s", pilot[[fn]][[id]], g$expr, g$value))
     }
     nm <- if (fn == "INPUT") "inputn" else if (fn == "PUT") "putn" else tolower(fn)
     writeLines(out, file.path("inst", "examples", paste0("sas_f_", nm, ".R")))
@@ -93,6 +146,7 @@ parse_spec <- function(path = "tools/fn_examples.txt") {
   x <- readLines(path, warn = FALSE)
   out <- list()
   cur <- NULL
+  desc <- ""
   for (ln in x) {
     if (grepl("^## ", ln)) {
       cur <- trimws(sub("^## ", "", ln))
@@ -100,6 +154,10 @@ parse_spec <- function(path = "tools/fn_examples.txt") {
       next
     }
     if (is.null(cur) || !nzchar(trimws(ln)) || grepl("^#", ln)) next
+    if (grepl("^desc: ", ln)) {
+      desc <- sub("^desc: ", "", ln)
+      next
+    }
     if (grepl("^(glob|pre|mode|note): ", ln)) {
       key <- sub(":.*$", "", ln)
       val <- sub("^[a-z]+: ", "", ln)
@@ -109,7 +167,8 @@ parse_spec <- function(path = "tools/fn_examples.txt") {
     parts <- strsplit(ln, " => ", fixed = TRUE)[[1]]
     sas <- trimws(parts[1])
     r <- if (length(parts) > 1) trimws(paste(parts[-1], collapse = " => ")) else sas_to_r(sas)
-    out[[cur]]$calls[[length(out[[cur]]$calls) + 1L]] <- list(sas = sas, r = r)
+    out[[cur]]$calls[[length(out[[cur]]$calls) + 1L]] <- list(sas = sas, r = r, desc = desc)
+    desc <- ""
   }
   out
 }
@@ -143,7 +202,8 @@ sas_to_r <- function(e) {
         d = num_lit(sas_day(body)),
         dt = num_lit(sas_day(sub(":.*$", "", body)) * 86400 + sas_secs(sub("^[^:]*:", "", body))),
         t = num_lit(sas_secs(body)),
-        encodeString(body, quote = "\""))
+        # SAS has no zero-length literal: '' is one blank
+        encodeString(if (nzchar(body)) body else " ", quote = "\""))
     } else if (grepl("^[A-Za-z_]", t)) {
       if (!is.na(nxt) && tk[nxt] == "(") paste0("sas_f_", tolower(t)) else t
     } else if (t == ".") {
@@ -233,7 +293,8 @@ compare_value <- function(a, b) {
   if (a$type == "C") return(if (identical(a$v, b$v)) "agree" else "mismatch")
   if (!is.na(a$miss) || !is.na(b$miss)) return(if (identical(a$miss, b$miss)) "agree" else "mismatch")
   if (identical(a$v, b$v)) return("agree")
-  if (is.finite(a$v) && is.finite(b$v) && abs(a$v - b$v) <= 1e-9 * max(abs(a$v), abs(b$v), 1e-300)) return("agree_tol")
+  # no tolerance: a number that differs only in the last bits is "approximate" (not shown as an example)
+  if (is.finite(a$v) && is.finite(b$v) && abs(a$v - b$v) <= 1e-9 * max(abs(a$v), abs(b$v), 1e-300)) return("approximate")
   "mismatch"
 }
 
@@ -270,12 +331,12 @@ run_examples <- function(spec) {
       r <- eval_call(cl$r, env)
       st <- if (is.null(ds)) "no_gold" else if (r$status != "ok") r$status else compare_value(g, r$value)
       # within the tolerance: show only the significant digits both agree on
-      dig <- if (st == "agree_tol") {
+      dig <- if (st == "approximate") {
         rel <- abs(g$v - r$value$v) / max(abs(g$v), abs(r$value$v))
         max(6L, min(15L, floor(-log10(rel)) - 1L))
       } else 15L
       rows[[length(rows) + 1L]] <- data.frame(
-        fn = s$name, k = k, sas = cl$sas, r = cl$r, status = st, sas_rc = rc,
+        fn = s$name, k = k, sas = cl$sas, r = cl$r, desc = cl$desc %||% "", status = st, sas_rc = rc,
         sas_value = show_value(g, TRUE), son_value = if (r$status == "ok") show_value(r$value, TRUE) else r$msg,
         sas_show = show_value(g, digits = dig), stringsAsFactors = FALSE)
     }
@@ -287,16 +348,19 @@ write_fx_examples <- function(spec, res) {
   n <- 0L
   for (s in spec) {
     f <- file.path("inst", "examples", paste0("sas_f_", tolower(s$name), ".R"))
-    ok <- res[res$fn == s$name & res$status %in% c("agree", "agree_tol"), ]
+    ok <- res[res$fn == s$name & res$status == "agree", ]
     if (nrow(ok) == 0L) {
       if (file.exists(f)) unlink(f)
       next
     }
     dates <- any(grepl("'[dD]|'[dD][tT]|'[tT]", paste(ok$sas, collapse = " ")))
-    out <- c(sprintf("# %s: each call is followed by the result of the same call in SAS 9.4", s$name),
+    out <- c(sprintf("# %s: each call is explained above it and followed by the result of the same call in SAS 9.4", s$name),
              if (dates) "# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)",
-             if (nzchar(s$note)) paste("#", strwrap(s$note, 76)),
-             sprintf("%s  # SAS: %s -> %s", ok$r, ok$sas, ok$sas_show))
+             if (nzchar(s$note)) paste("#", strwrap(s$note, 76)))
+    for (j in seq_len(nrow(ok))) {
+      out <- c(out, "", if (nzchar(ok$desc[j])) paste("#", strwrap(ok$desc[j], 78)),
+               sprintf("%s  # SAS 9.4: %s = %s", ok$r[j], ok$sas[j], ok$sas_show[j]))
+    }
     writeLines(out, f)
     n <- n + 1L
   }
@@ -304,21 +368,21 @@ write_fx_examples <- function(spec, res) {
 }
 
 write_mismatch_md <- function(res, path, conf_csv = "") {
-  bad <- res[!res$status %in% c("agree", "agree_tol"), ]
-  tol <- res[res$status == "agree_tol", ]
+  bad <- res[!res$status %in% c("agree", "approximate"), ]
+  tol <- res[res$status == "approximate", ]
   md_esc <- function(x) gsub("|", "\\|", x, fixed = TRUE)
   fns <- unique(res$fn)
-  agree_fns <- unique(res$fn[res$status %in% c("agree", "agree_tol")])
+  agree_fns <- unique(res$fn[res$status == "agree"])
   out <- c(
     "# sas_f_* 参考页示例：sasonr 与 SAS 9.4 不一致的调用",
     "",
     sprintf("> %s 由 `sasonr/tools/gen_examples.R` 生成（勿手改）。用例：`sasonr/tests/conformance/fn_examples/<FN>/`（仅本地），SAS 金标准由 `tools/refresh_gold.py` 取得。", format(Sys.Date())),
     "",
-    sprintf("- 函数 %d 个、调用 %d 个；一致 %d（其中按 1e-9 相对误差一致 %d），不一致/不支持/出错 %d。",
-            length(fns), nrow(res), sum(res$status %in% c("agree", "agree_tol")), nrow(tol), nrow(bad)),
+    sprintf("- 函数 %d 个、调用 %d 个；逐位一致 %d，仅末位不同（approximate，不进示例）%d，不一致/不支持/出错 %d。",
+            length(fns), nrow(res), sum(res$status == "agree"), nrow(tol), nrow(bad)),
     sprintf("- 有示例的函数 %d 个；没有任何一致调用的函数：%s。", length(agree_fns),
             if (length(setdiff(fns, agree_fns))) paste(setdiff(fns, agree_fns), collapse = ", ") else "无"),
-    "- 只有一致的调用进入 `inst/examples/`；下表的调用都没有进示例。本任务不修 sasonr，仅报告。",
+    "- 只有逐位一致的调用进入 `inst/examples/`；下面两表的调用都没有进示例。",
     "- 状态：`mismatch` 值不同；`type` 类型不同；`unsupported` sasonr 报 `sasonr_unsupported`；`error` sasonr 报其它错误；`no_sas_value` SAS 未产生该结果。",
     "",
     "## 不一致清单",
@@ -328,7 +392,7 @@ write_mismatch_md <- function(res, path, conf_csv = "") {
     sprintf("| %s | `%s` | `%s` | %s | %s | %s |", bad$fn, md_esc(bad$sas), md_esc(bad$r), bad$status,
             md_esc(bad$sas_value), md_esc(gsub("\n", " ", bad$son_value))),
     "",
-    "## 非逐位一致（相对误差 ≤ 1e-9，已进示例）",
+    "## 仅末位不同（approximate，相对误差 ≤ 1e-9，不算一致、不进示例）",
     "",
     "| 函数 | SAS 调用 | SAS 结果 | sasonr 结果 |",
     "|---|---|---|---|",

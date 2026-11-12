@@ -4,9 +4,9 @@
 \alias{sas_f_choosen}
 \title{SAS \verb{CHOOSEN(index, value-1 <, ..., value-n>)}}
 \arguments{
-\item{k}{Index.}
+\item{k}{Numeric index of the value to return. A negative index counts from the end of the list (-1 is the last); 0, missing, or an index beyond the list gives a missing result with a note in the log.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Numeric values to choose from.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,22 @@ Numeric value selected by index. See the \href{https://documentation.sas.com/doc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (43 of 43 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CHOOSEN: each call is followed by the result of the same call in SAS 9.4
-sas_f_choosen(2, 10, 20, 30)  # SAS: choosen(2, 10, 20, 30) -> 20
-sas_f_choosen(-1, 10, 20, 30)  # SAS: choosen(-1, 10, 20, 30) -> 30
-sas_f_choosen(5, 1, 2)  # SAS: choosen(5, 1, 2) -> .
+# CHOOSEN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Index 2 selects the second value, 20.
+sas_f_choosen(2, 10, 20, 30)  # SAS 9.4: choosen(2, 10, 20, 30) = 20
+
+# A negative index counts from the end of the list: -1 selects the last value,
+# 30.
+sas_f_choosen(-1, 10, 20, 30)  # SAS 9.4: choosen(-1, 10, 20, 30) = 30
+
+# Index 5 is beyond the two values given, so the result is missing (with a note
+# in the log).
+sas_f_choosen(5, 1, 2)  # SAS 9.4: choosen(5, 1, 2) = .
 }
 \seealso{
 Other numeric functions:

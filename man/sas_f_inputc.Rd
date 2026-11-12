@@ -4,11 +4,11 @@
 \alias{sas_f_inputc}
 \title{SAS \verb{INPUTC(source, informat <, w>)}}
 \arguments{
-\item{s}{Source text.}
+\item{s}{Character source value to read.}
 
-\item{fmt}{Format or informat (text such as \code{"8.2"} or a parsed specification).}
+\item{fmt}{Character informat name given as a string, e.g. '$upcase3.'.}
 
-\item{w}{Width override.}
+\item{w}{Optional numeric width that overrides the informat width.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,25 @@ Reads a character value with an informat given at run time. See the \href{https:
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (35 of 35 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INPUTC: each call is followed by the result of the same call in SAS 9.4
-sas_f_inputc("abc", "$3.")  # SAS: inputc('abc', '$3.') -> "abc"
-sas_f_inputc("abc", "$upcase3.")  # SAS: inputc('abc', '$upcase3.') -> "ABC"
-sas_f_inputc("abcdef", "$3.")  # SAS: inputc('abcdef', '$3.') -> "abc"
-sas_f_inputc("abcdef", "$char.", 2)  # SAS: inputc('abcdef', '$char.', 2) -> "ab"
+# INPUTC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# INPUTC reads a character value with a character informat that is given as a
+# string.
+sas_f_inputc("abc", "$3.")  # SAS 9.4: inputc('abc', '$3.') = "abc"
+
+# The $UPCASE informat converts the value to upper case.
+sas_f_inputc("abc", "$upcase3.")  # SAS 9.4: inputc('abc', '$upcase3.') = "ABC"
+
+# The width 3 in $3. reads only the first 3 characters.
+sas_f_inputc("abcdef", "$3.")  # SAS 9.4: inputc('abcdef', '$3.') = "abc"
+
+# The optional third argument overrides the informat width: $CHAR. with width 2
+# reads 'ab'.
+sas_f_inputc("abcdef", "$char.", 2)  # SAS 9.4: inputc('abcdef', '$char.', 2) = "ab"
 }
 \seealso{
 Other special functions:

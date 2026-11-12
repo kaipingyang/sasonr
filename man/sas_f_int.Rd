@@ -4,7 +4,7 @@
 \alias{sas_f_int}
 \title{SAS \code{INT(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result. Fuzzed: a value within about 1E-12 of an integer is treated as that integer.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Integer part, with fuzz. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INT: each call is followed by the result of the same call in SAS 9.4
-sas_f_int(2.7)  # SAS: int(2.7) -> 2
-sas_f_int(-2.7)  # SAS: int(-2.7) -> -2
-sas_f_int(3 - 1e-13)  # SAS: int(3 - 1e-13) -> 3
-sas_f_int(NA_real_)  # SAS: int(.) -> .
+# INT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# INT returns the integer part, dropping the fraction: 2.
+sas_f_int(2.7)  # SAS 9.4: int(2.7) = 2
+
+# INT truncates towards zero, so -2.7 gives -2.
+sas_f_int(-2.7)  # SAS 9.4: int(-2.7) = -2
+
+# INT is fuzzed: a value within about 1E-12 of an integer gives that integer,
+# 3.
+sas_f_int(3 - 1e-13)  # SAS 9.4: int(3 - 1e-13) = 3
+
+# A missing argument gives a missing result.
+sas_f_int(NA_real_)  # SAS 9.4: int(.) = .
 }
 \seealso{
 Other numeric functions:

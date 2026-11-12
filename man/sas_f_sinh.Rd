@@ -4,7 +4,7 @@
 \alias{sas_f_sinh}
 \title{SAS \code{SINH(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value (any real number). A missing value gives a missing result.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,20 @@ Hyperbolic sine. See the \href{https://documentation.sas.com/doc/en/lefunctionsr
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.2e-16; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SINH: each call is followed by the result of the same call in SAS 9.4
-sas_f_sinh(0)  # SAS: sinh(0) -> 0
-sas_f_sinh(1)  # SAS: sinh(1) -> 1.1752011936438
-sas_f_sinh(-2)  # SAS: sinh(-2) -> -3.626860407847
-sas_f_sinh(NA_real_)  # SAS: sinh(.) -> .
+# SINH: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The hyperbolic sine of 0 is 0.
+sas_f_sinh(0)  # SAS 9.4: sinh(0) = 0
+
+# The hyperbolic sine of 1 is (e - 1/e) / 2.
+sas_f_sinh(1)  # SAS 9.4: sinh(1) = 1.1752011936438
+
+# A missing argument gives a missing result.
+sas_f_sinh(NA_real_)  # SAS 9.4: sinh(.) = .
 }
 \seealso{
 Other numeric functions:

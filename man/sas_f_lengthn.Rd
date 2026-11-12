@@ -4,7 +4,7 @@
 \alias{sas_f_lengthn}
 \title{SAS \code{LENGTHN(string)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 0 for a blank string.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Length without trailing blanks (0 for a blank string). See the \href{https://doc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (16 of 16 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LENGTHN: each call is followed by the result of the same call in SAS 9.4
-sas_f_lengthn("abc  ")  # SAS: lengthn('abc  ') -> 3
-sas_f_lengthn("")  # SAS: lengthn('') -> 0
-sas_f_lengthn("  a")  # SAS: lengthn('  a') -> 3
+# LENGTHN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LENGTHN returns the length without trailing blanks: 3.
+sas_f_lengthn("abc  ")  # SAS 9.4: lengthn('abc  ') = 3
+
+# Unlike LENGTH, LENGTHN returns 0 for a blank string.
+sas_f_lengthn(" ")  # SAS 9.4: lengthn('') = 0
+
+# Leading blanks are counted.
+sas_f_lengthn("  a")  # SAS 9.4: lengthn('  a') = 3
 }
 \seealso{
 Other character functions:

@@ -4,9 +4,9 @@
 \alias{sas_f_smallest}
 \title{SAS \verb{SMALLEST(k, value-1 <, ..., value-n>)}}
 \arguments{
-\item{k}{Index.}
+\item{k}{Positive integer rank: 1 returns the smallest nonmissing value, 2 the second smallest, and so on. If \code{k} exceeds the number of nonmissing values the result is missing.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Numeric values; missing values are ignored.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,24 @@ k-th smallest non-missing value. See the \href{https://documentation.sas.com/doc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (42 of 42 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SMALLEST: each call is followed by the result of the same call in SAS 9.4
-sas_f_smallest(1, 3, 9, 5)  # SAS: smallest(1, 3, 9, 5) -> 3
-sas_f_smallest(2, NA_real_, 9, 5)  # SAS: smallest(2, ., 9, 5) -> 9
-sas_f_smallest(3, 1, 2)  # SAS: smallest(3, 1, 2) -> .
-sas_f_smallest(1, NA_real_, NA_real_)  # SAS: smallest(1, ., .) -> .
+# SMALLEST: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# SMALLEST(k, ...) returns the k-th smallest nonmissing value; with k = 1 the
+# minimum of 3, 9, 5 is 3.
+sas_f_smallest(1, 3, 9, 5)  # SAS 9.4: smallest(1, 3, 9, 5) = 3
+
+# Missing values are ignored: with k = 2 the second smallest of 9 and 5 is 9.
+sas_f_smallest(2, NA_real_, 9, 5)  # SAS 9.4: smallest(2, ., 9, 5) = 9
+
+# k = 3 exceeds the number of values (2), so the result is missing.
+sas_f_smallest(3, 1, 2)  # SAS 9.4: smallest(3, 1, 2) = .
+
+# With k = 1 but no nonmissing value, the result is missing.
+sas_f_smallest(1, NA_real_, NA_real_)  # SAS 9.4: smallest(1, ., .) = .
 }
 \seealso{
 Other descriptive functions:

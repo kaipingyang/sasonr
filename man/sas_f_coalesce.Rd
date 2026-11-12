@@ -4,7 +4,7 @@
 \alias{sas_f_coalesce}
 \title{SAS \verb{COALESCE(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Numeric values; the first one that is not \code{.} or a special missing value is returned. If all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,21 @@ First non-missing numeric argument. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COALESCE: each call is followed by the result of the same call in SAS 9.4
-sas_f_coalesce(NA_real_, 2, 3)  # SAS: coalesce(., 2, 3) -> 2
-sas_f_coalesce(NA_real_, NA_real_)  # SAS: coalesce(., .) -> .
-sas_f_coalesce(sas_missing(".A"), sas_missing("._"), 5)  # SAS: coalesce(.A, ._, 5) -> 5
+# COALESCE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# COALESCE returns the first nonmissing argument, 2.
+sas_f_coalesce(NA_real_, 2, 3)  # SAS 9.4: coalesce(., 2, 3) = 2
+
+# All arguments are missing, so the result is missing.
+sas_f_coalesce(NA_real_, NA_real_)  # SAS 9.4: coalesce(., .) = .
+
+# Special missing values (.A, ._) are skipped like ., so the first nonmissing
+# value is 5.
+sas_f_coalesce(sas_missing(".A"), sas_missing("._"), 5)  # SAS 9.4: coalesce(.A, ._, 5) = 5
 }
 \seealso{
 Other numeric functions:

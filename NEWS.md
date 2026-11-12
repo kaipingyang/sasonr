@@ -1,5 +1,31 @@
 # sasonr (development version)
 
+## Round 8 (2026-11-12): verification matrix and feature registry
+
+* Every implemented function, format and informat now has a verification
+  matrix of SAS 9.4 cases (7,068 programs: documented usages, missing and
+  special missing values, extreme numbers, blank and long strings, type
+  conversion, argument counts, `%SYSFUNC` and PROC SQL), compared exactly:
+  numbers bit for bit, no tolerance.
+* Functions: 120 verified, 28 approximate (last bits differ, mostly
+  probability functions), 36 partial (some inputs fail loud or differ only in
+  a log NOTE), 4 clock-dependent. Formats and informats: 96 verified, 11
+  partial. No silent difference.
+* Missing and invalid arguments now give SAS's log NOTEs, `_ERROR_` and
+  missing results for about 130 functions; argument conversion and argument
+  counts follow SAS for all functions; the SAS calendar has no 29 February in
+  years divisible by 4000.
+* Fixes found by the matrix include CAT/CATT numeric items, COUNTC `V`,
+  INDEXC with several excerpts, JULDATE, YRDIF `AGE` (also the default
+  basis), MDY two-digit years, noncentral F, DATETIME/TIME rounding,
+  default informat widths, NEGPAREN, PVALUE and COMMAX E notation.
+* Feature registries `inst/registry/functions.csv` and `formats.csv`
+  (Developers > Feature registry); option `sasonr.strict` (`TRUE`: features
+  that are not verified fail loud; `FALSE`: warning `sasonr_unverified`;
+  unset: no check).
+* Reference pages: every example call is explained and checked against SAS
+  9.4; parameter descriptions give the SAS semantics.
+
 ## Round 7a (2026-11-12)
 
 * Offline conformance cases: program + invented data + SAS 9.4 output (data

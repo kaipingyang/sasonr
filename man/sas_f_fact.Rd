@@ -4,7 +4,7 @@
 \alias{sas_f_fact}
 \title{SAS \code{FACT(n)}}
 \arguments{
-\item{n}{Count or position.}
+\item{n}{Nonnegative integer. Missing gives missing; a result too large to represent gives missing with a note in the log.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,23 @@ Factorial. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (20 of 20 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# FACT: each call is followed by the result of the same call in SAS 9.4
-sas_f_fact(5)  # SAS: fact(5) -> 120
-sas_f_fact(0)  # SAS: fact(0) -> 1
-sas_f_fact(20)  # SAS: fact(20) -> 2.43290200817664e+18
-sas_f_fact(NA_real_)  # SAS: fact(.) -> .
+# FACT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# 5! = 5 * 4 * 3 * 2 * 1 = 120.
+sas_f_fact(5)  # SAS 9.4: fact(5) = 120
+
+# 0! is 1 by definition.
+sas_f_fact(0)  # SAS 9.4: fact(0) = 1
+
+# 20! is about 2.43E18.
+sas_f_fact(20)  # SAS 9.4: fact(20) = 2.43290200817664e+18
+
+# A missing argument gives a missing result.
+sas_f_fact(NA_real_)  # SAS 9.4: fact(.) = .
 }
 \seealso{
 Other numeric functions:

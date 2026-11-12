@@ -4,7 +4,7 @@
 \alias{sas_f_intz}
 \title{SAS \code{INTZ(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result. No fuzzing is applied.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Integer part, without fuzz. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (20 of 20 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INTZ: each call is followed by the result of the same call in SAS 9.4
-sas_f_intz(2.7)  # SAS: intz(2.7) -> 2
-sas_f_intz(-2.7)  # SAS: intz(-2.7) -> -2
-sas_f_intz(3 - 1e-13)  # SAS: intz(3 - 1e-13) -> 2
-sas_f_intz(NA_real_)  # SAS: intz(.) -> .
+# INTZ: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# INTZ returns the integer part, dropping the fraction: 2.
+sas_f_intz(2.7)  # SAS 9.4: intz(2.7) = 2
+
+# INTZ truncates towards zero, so -2.7 gives -2.
+sas_f_intz(-2.7)  # SAS 9.4: intz(-2.7) = -2
+
+# INTZ uses zero fuzzing, so a value only slightly below 3 truncates to 2.
+sas_f_intz(3 - 1e-13)  # SAS 9.4: intz(3 - 1e-13) = 2
+
+# A missing argument gives a missing result.
+sas_f_intz(NA_real_)  # SAS 9.4: intz(.) = .
 }
 \seealso{
 Other numeric functions:

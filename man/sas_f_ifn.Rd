@@ -4,13 +4,13 @@
 \alias{sas_f_ifn}
 \title{SAS \verb{IFN(condition, true, false <, missing>)}}
 \arguments{
-\item{cond}{Condition.}
+\item{cond}{Numeric condition: nonzero and nonmissing is true, 0 is false, missing selects \code{m}.}
 
-\item{a}{Numeric argument.}
+\item{a}{Numeric value returned when the condition is true.}
 
-\item{b}{Numeric argument.}
+\item{b}{Numeric value returned when the condition is false.}
 
-\item{m}{Value when missing.}
+\item{m}{Optional numeric value returned when the condition is missing; when omitted, \code{b} is returned.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -23,15 +23,23 @@ Numeric value chosen by a condition. See the \href{https://documentation.sas.com
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (47 of 47 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# IFN: each call is followed by the result of the same call in SAS 9.4
-sas_f_ifn(1, 10, 20)  # SAS: ifn(1, 10, 20) -> 10
-sas_f_ifn(0, 10, 20)  # SAS: ifn(0, 10, 20) -> 20
-sas_f_ifn(NA_real_, 10, 20, 99)  # SAS: ifn(., 10, 20, 99) -> 99
-sas_f_ifn(-1, 10, 20)  # SAS: ifn(-1, 10, 20) -> 10
+# IFN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# A true (nonzero, nonmissing) condition returns the second argument.
+sas_f_ifn(1, 10, 20)  # SAS 9.4: ifn(1, 10, 20) = 10
+
+# A condition of 0 is false, so the third argument is returned.
+sas_f_ifn(0, 10, 20)  # SAS 9.4: ifn(0, 10, 20) = 20
+
+# A missing condition returns the optional fourth argument.
+sas_f_ifn(NA_real_, 10, 20, 99)  # SAS 9.4: ifn(., 10, 20, 99) = 99
+
+# Any nonzero, nonmissing value, including a negative number, counts as true.
+sas_f_ifn(-1, 10, 20)  # SAS 9.4: ifn(-1, 10, 20) = 10
 }
 \seealso{
 Other numeric functions:

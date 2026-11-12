@@ -4,7 +4,7 @@
 \alias{sas_f_lowcase}
 \title{SAS \code{LOWCASE(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Converts to lowercase. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) and 1 offline conformance case(s) agree with SAS.
+ partial (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOWCASE: each call is followed by the result of the same call in SAS 9.4
-sas_f_lowcase("ABC def")  # SAS: lowcase('ABC def') -> "abc def"
-sas_f_lowcase("")  # SAS: lowcase('') -> ""
-sas_f_lowcase("A1!")  # SAS: lowcase('A1!') -> "a1!"
+# LOWCASE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LOWCASE converts all letters to lower case.
+sas_f_lowcase("ABC def")  # SAS 9.4: lowcase('ABC def') = "abc def"
+
+# A blank string stays blank.
+sas_f_lowcase(" ")  # SAS 9.4: lowcase('') = ""
+
+# Digits and punctuation are not changed.
+sas_f_lowcase("A1!")  # SAS 9.4: lowcase('A1!') = "a1!"
 }
 \seealso{
 Other character functions:

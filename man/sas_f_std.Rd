@@ -4,7 +4,7 @@
 \alias{sas_f_std}
 \title{SAS \verb{STD(argument-1, argument-2 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Two or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Standard deviation. See the \href{https://documentation.sas.com/doc/en/lefunctio
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (70 of 70 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# STD: each call is followed by the result of the same call in SAS 9.4
-sas_f_std(1, 2, 3, 4)  # SAS: std(1, 2, 3, 4) -> 1.29099444873581
-sas_f_std(5, NA_real_, 7)  # SAS: std(5, ., 7) -> 1.4142135623731
-sas_f_std(5, NA_real_)  # SAS: std(5, .) -> .
-sas_f_std(2, 4, 4, 4, 5, 5, 7, 9)  # SAS: std(2, 4, 4, 4, 5, 5, 7, 9) -> 2.1380899352994
+# STD: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# STD returns the sample standard deviation (divisor n - 1).
+sas_f_std(1, 2, 3, 4)  # SAS 9.4: std(1, 2, 3, 4) = 1.29099444873581
+
+# Missing values are ignored: the standard deviation of 5 and 7 is sqrt(2).
+sas_f_std(5, NA_real_, 7)  # SAS 9.4: std(5, ., 7) = 1.4142135623731
+
+# At least two nonmissing values are needed, so the result is missing.
+sas_f_std(5, NA_real_)  # SAS 9.4: std(5, .) = .
+
+# The sample standard deviation of eight values.
+sas_f_std(2, 4, 4, 4, 5, 5, 7, 9)  # SAS 9.4: std(2, 4, 4, 4, 5, 5, 7, 9) = 2.1380899352994
 }
 \seealso{
 Other descriptive functions:

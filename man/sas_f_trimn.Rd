@@ -4,7 +4,7 @@
 \alias{sas_f_trimn}
 \title{SAS \code{TRIMN(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are removed; an all-blank value gives a zero-length string.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,13 +17,21 @@ Removes trailing blanks (empty for a blank string). See the \href{https://docume
 }
 
 \section{Verification}{
- Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TRIMN: each call is followed by the result of the same call in SAS 9.4
-sas_f_trimn("abc  ")  # SAS: trimn('abc  ') -> "abc"
-sas_f_trimn("  a")  # SAS: trimn('  a') -> "  a"
+# TRIMN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# TRIMN removes trailing blanks.
+sas_f_trimn("abc  ")  # SAS 9.4: trimn('abc  ') = "abc"
+
+# Leading blanks are kept.
+sas_f_trimn("  a")  # SAS 9.4: trimn('  a') = "  a"
+
+# Unlike TRIM, TRIMN returns a zero-length string for an all-blank value, so
+# LENGTHC is 0.
+sas_f_lengthc(sas_f_trimn("   "))  # SAS 9.4: lengthc(trimn('   ')) = 0
 }
 \seealso{
 Other character functions:

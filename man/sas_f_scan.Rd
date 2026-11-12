@@ -4,13 +4,13 @@
 \alias{sas_f_scan}
 \title{SAS \verb{SCAN(string, count <, character-list <, modifiers>>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Words are extracted from it.}
 
-\item{n}{Count or position.}
+\item{n}{Nonzero integer word number. A positive value counts words from the left, a negative value from the right (-1 is the last word); 0 or missing gives a blank result with a note in the log.}
 
-\item{dlm}{Delimiters.}
+\item{dlm}{Optional character list of delimiters, each character a separate delimiter. Default: blank ! $ percent-sign & ( ) * + , - . / ; < ^ |.}
 
-\item{mods}{Modifiers, as in SAS.}
+\item{mods}{Optional modifier string. m makes every delimiter separate words, so adjacent delimiters enclose an empty word; q ignores delimiters inside quoted substrings; b counts words from the end; i ignores case; k makes the delimiters all characters NOT listed; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the delimiters.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -25,16 +25,24 @@ The n-th word. See the \href{https://documentation.sas.com/doc/en/lefunctionsref
 }
 
 \section{Verification}{
- Partial: 37 of 39 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ partial (37 of 39 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SCAN: each call with the result of the same SCAN call in SAS 9.4
-# (offline conformance cases; dates are SAS day counts from 1960-01-01)
-sas_f_scan("a b c", 1)  # SAS scan('a b c',1) = "a"
-sas_f_scan("a b c", -1)  # SAS scan('a b c',-1) = "c"
-sas_f_scan("a b c", 4)  # SAS scan('a b c',4) = ""
-sas_f_scan("a,b,,c", 3)  # SAS scan('a,b,,c',3) = "c"
+# SCAN: each call is explained above it and followed by the result of the same call in SAS 9.4
+# (dates are SAS day counts from 1960-01-01)
+
+# The first word (default delimiters include the blank).
+sas_f_scan("a b c", 1)  # SAS 9.4: scan('a b c',1) = "a"
+
+# A negative count counts words from the end: -1 is the last word.
+sas_f_scan("a b c", -1)  # SAS 9.4: scan('a b c',-1) = "c"
+
+# A count beyond the number of words gives a blank.
+sas_f_scan("a b c", 4)  # SAS 9.4: scan('a b c',4) = ""
+
+# Consecutive delimiters count as one, so the third word is 'c'.
+sas_f_scan("a,b,,c", 3)  # SAS 9.4: scan('a,b,,c',3) = "c"
 }
 \seealso{
 Other character functions:

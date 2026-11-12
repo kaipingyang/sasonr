@@ -4,11 +4,11 @@
 \alias{sas_f_sqllike}
 \title{Runtime helper: PROC SQL LIKE operator.}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character value tested by LIKE; trailing blanks are ignored.}
 
-\item{pattern}{LIKE pattern.}
+\item{pattern}{LIKE pattern: percent sign matches any sequence of characters, underscore matches exactly one character, other characters match themselves.}
 
-\item{escape}{Escape character.}
+\item{escape}{Optional single escape character (ESCAPE clause); the character after it in \code{pattern} is matched literally.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -25,11 +25,22 @@ PROC SQL LIKE operator.
 }
 
 \examples{
-# SQLLIKE: each call is followed by the result of the same call in SAS 9.4
-as.numeric(sas_f_sqllike("abc", "a\%"))  # SAS: 'abc' like 'a\%' -> 1
-as.numeric(sas_f_sqllike("abc", "_b_"))  # SAS: 'abc' like '_b_' -> 1
-as.numeric(sas_f_sqllike("abc", "b\%"))  # SAS: 'abc' like 'b\%' -> 0
-as.numeric(sas_f_sqllike("a\%c", "a\\\\\%c", "\\\\"))  # SAS: 'a\%c' like 'a\\%c' escape '\' -> 1
+# SQLLIKE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# In a LIKE pattern percent matches any sequence of characters, so 'a\%' matches
+# strings that start with 'a'.
+as.numeric(sas_f_sqllike("abc", "a\%"))  # SAS 9.4: 'abc' like 'a\%' = 1
+
+# Underscore matches exactly one character, so '_b_' matches any 3-character
+# string with 'b' in the middle.
+as.numeric(sas_f_sqllike("abc", "_b_"))  # SAS 9.4: 'abc' like '_b_' = 1
+
+# 'abc' does not start with 'b', so the result is 0.
+as.numeric(sas_f_sqllike("abc", "b\%"))  # SAS 9.4: 'abc' like 'b\%' = 0
+
+# ESCAPE '\' makes the following percent sign literal, so 'a\\%c' matches
+# exactly 'a\%c'.
+as.numeric(sas_f_sqllike("a\%c", "a\\\\\%c", "\\\\"))  # SAS 9.4: 'a\%c' like 'a\\%c' escape '\' = 1
 }
 \seealso{
 Other internal functions:

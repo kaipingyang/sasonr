@@ -4,7 +4,7 @@
 \alias{sas_f_var}
 \title{SAS \verb{VAR(argument-1, argument-2 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Two or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Variance. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (41 of 41 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# VAR: each call is followed by the result of the same call in SAS 9.4
-sas_f_var(1, 2, 3, 4)  # SAS: var(1, 2, 3, 4) -> 1.66666666666667
-sas_f_var(5, NA_real_, 7)  # SAS: var(5, ., 7) -> 2
-sas_f_var(5, NA_real_)  # SAS: var(5, .) -> .
+# VAR: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# VAR returns the sample variance (divisor n - 1).
+sas_f_var(1, 2, 3, 4)  # SAS 9.4: var(1, 2, 3, 4) = 1.66666666666667
+
+# Missing values are ignored: the variance of 5 and 7 is 2.
+sas_f_var(5, NA_real_, 7)  # SAS 9.4: var(5, ., 7) = 2
+
+# At least two nonmissing values are needed, so the result is missing.
+sas_f_var(5, NA_real_)  # SAS 9.4: var(5, .) = .
 }
 \seealso{
 Other descriptive functions:

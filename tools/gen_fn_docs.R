@@ -97,7 +97,35 @@ ex_text <- function(nm) {
   if (nrow(r) == 0) return(NULL)
   list(ok = sum(r$status %in% c("agree", "agree_tol")), n = nrow(r))
 }
+# the feature registry (tools/update_registry.R) is the primary source
+reg <- if (file.exists("inst/registry/functions.csv")) utils::read.csv("inst/registry/functions.csv", stringsAsFactors = FALSE) else NULL
+# per-function parameter descriptions (SAS semantics), else the generic ones
+fn_params <- if (file.exists("tools/fn_params.tsv")) utils::read.delim("tools/fn_params.tsv", quote = "", colClasses = "character") else NULL
+param_text <- function(nm, p) {
+  if (!is.null(fn_params)) {
+    d <- fn_params$description[fn_params$name == nm & fn_params$param == p]
+    if (length(d) && nzchar(d[1])) return(d[1])
+  }
+  if (p %in% names(param_desc)) param_desc[[p]] else sprintf("Argument `%s` of the SAS function.", p)
+}
+registry_url <- "https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html"
+reg_text <- function(r) {
+  ctx <- if (nzchar(r$contexts_verified %||% "")) sprintf(" Contexts where every case agrees: %s.", gsub(" ", ", ", r$contexts_verified)) else ""
+  head <- switch(r$status,
+    verified = sprintf("verified (%d of %d SAS 9.4 cases agree bit for bit).", r$pass, r$cases),
+    partial = sprintf("partial (%d of %d SAS 9.4 cases agree bit for bit; %s).", r$pass, r$cases, r$note),
+    approximate = sprintf("approximate (%d of %d SAS 9.4 cases agree bit for bit; %s).", r$pass, r$cases, r$note),
+    not_comparable = sprintf("not comparable (%d SAS 9.4 cases check type and range only; the value depends on the session clock).", r$cases),
+    unverified = "unverified (no SAS 9.4 case yet).",
+    sprintf("%s (%s).", r$status, r$note)
+  )
+  sprintf("%s%s See the [feature registry](%s).", head, ctx, registry_url)
+}
 verif_text <- function(nm) {
+  if (!is.null(reg) && toupper(nm) %in% reg$name) {
+    r <- reg[reg$name == toupper(nm), ][1, ]
+    return(paste0(reg_text(r), " Updated ", r$updated, "."))
+  }
   clock <- if (nm %in% names(ex_note)) " The value depends on the clock of the session and cannot be reproduced; the examples check its type and range only." else ""
   paste0(verif_text0(nm), clock)
 }
@@ -144,7 +172,7 @@ for (i in seq_len(nrow(tab))) {
     sprintf("#' %s %s", esc(tab$description[i]),
             if (internal) "" else sprintf("See the [SAS documentation](%s) (Functions and CALL Routines).", docs_url)),
     "#'",
-    vapply(fm, function(p) sprintf("#' @param %s %s", p, if (p %in% names(param_desc)) param_desc[[p]] else sprintf("Argument `%s` of the SAS function.", p)), ""),
+    vapply(fm, function(p) sprintf("#' @param %s %s", p, esc(param_text(nm, p))), ""),
     sprintf("#' @return %s", "A vector with one result per element (arguments are recycled), as the SAS function returns per observation."),
     sprintf("#' @section Differences from R: %s", esc(diff_specific[[nm]] %||% diff_text[[tab$category[i]]])),
     sprintf("#' @section Verification: %s", verif_text(nm)),

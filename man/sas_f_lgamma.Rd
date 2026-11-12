@@ -4,7 +4,7 @@
 \alias{sas_f_lgamma}
 \title{SAS \code{LGAMMA(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Positive numeric value. Missing gives missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Natural logarithm of the gamma function. See the \href{https://documentation.sas
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LGAMMA: each call is followed by the result of the same call in SAS 9.4
-sas_f_lgamma(10)  # SAS: lgamma(10) -> 12.8018274800815
-sas_f_lgamma(0.5)  # SAS: lgamma(0.5) -> 0.5723649429247
-sas_f_lgamma(100)  # SAS: lgamma(100) -> 359.134205369575
-sas_f_lgamma(NA_real_)  # SAS: lgamma(.) -> .
+# LGAMMA: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LGAMMA is the natural log of the gamma function: for 10 it is log(9!).
+sas_f_lgamma(10)  # SAS 9.4: lgamma(10) = 12.8018274800815
+
+# LGAMMA(0.5) is the log of the square root of pi.
+sas_f_lgamma(0.5)  # SAS 9.4: lgamma(0.5) = 0.5723649429247
+
+# LGAMMA is convenient for large arguments: log(99!) is about 359.13.
+sas_f_lgamma(100)  # SAS 9.4: lgamma(100) = 359.134205369575
+
+# A missing argument gives a missing result.
+sas_f_lgamma(NA_real_)  # SAS 9.4: lgamma(.) = .
 }
 \seealso{
 Other numeric functions:

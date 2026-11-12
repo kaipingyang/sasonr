@@ -4,7 +4,7 @@
 \alias{sas_f_floorz}
 \title{SAS \code{FLOORZ(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result. No fuzzing is applied.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Largest integer <= the argument, without fuzz. See the \href{https://documentati
 }
 
 \section{Verification}{
- Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (20 of 20 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# FLOORZ: each call is followed by the result of the same call in SAS 9.4
-sas_f_floorz(2.7)  # SAS: floorz(2.7) -> 2
-sas_f_floorz(3 - 1e-13)  # SAS: floorz(3 - 1e-13) -> 2
-sas_f_floorz(-2.5)  # SAS: floorz(-2.5) -> -3
-sas_f_floorz(NA_real_)  # SAS: floorz(.) -> .
+# FLOORZ: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The largest integer less than or equal to 2.7 is 2.
+sas_f_floorz(2.7)  # SAS 9.4: floorz(2.7) = 2
+
+# FLOORZ uses zero fuzzing, so a value only slightly below 3 gives 2.
+sas_f_floorz(3 - 1e-13)  # SAS 9.4: floorz(3 - 1e-13) = 2
+
+# The floor of -2.5 is -3.
+sas_f_floorz(-2.5)  # SAS 9.4: floorz(-2.5) = -3
+
+# A missing argument gives a missing result.
+sas_f_floorz(NA_real_)  # SAS 9.4: floorz(.) = .
 }
 \seealso{
 Other numeric functions:

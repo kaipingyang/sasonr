@@ -4,9 +4,9 @@
 \alias{sas_f_logbeta}
 \title{SAS \code{LOGBETA(a, b)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{First shape parameter, a positive number. Missing gives missing.}
 
-\item{b}{Numeric argument.}
+\item{b}{Second shape parameter, a positive number. Missing gives missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,17 @@ Logarithm of the beta function. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (24 of 29 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 1.3e-15; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOGBETA: each call is followed by the result of the same call in SAS 9.4
-sas_f_logbeta(2, 3)  # SAS: logbeta(2, 3) -> -2.484906649788
-sas_f_logbeta(0.5, 0.5)  # SAS: logbeta(0.5, 0.5) -> 1.1447298858494
-sas_f_logbeta(100, 100)  # SAS: logbeta(100, 100) -> -139.66525908671
-sas_f_logbeta(NA_real_, 1)  # SAS: logbeta(., 1) -> .
+# LOGBETA: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LOGBETA is the natural log of the beta function: log(B(2, 3)) = log(1/12).
+sas_f_logbeta(2, 3)  # SAS 9.4: logbeta(2, 3) = -2.484906649788
+
+# A missing argument gives a missing result.
+sas_f_logbeta(NA_real_, 1)  # SAS 9.4: logbeta(., 1) = .
 }
 \seealso{
 Other numeric functions:

@@ -4,7 +4,7 @@
 \alias{sas_f_harmean}
 \title{SAS \verb{HARMEAN(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{One or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Harmonic mean. See the \href{https://documentation.sas.com/doc/en/lefunctionsref
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (31 of 35 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# HARMEAN: each call is followed by the result of the same call in SAS 9.4
-sas_f_harmean(1, 2, 4)  # SAS: harmean(1, 2, 4) -> 1.71428571428571
-sas_f_harmean(2, NA_real_, 2)  # SAS: harmean(2, ., 2) -> 2
-sas_f_harmean(1, 1)  # SAS: harmean(1, 1) -> 1
-sas_f_harmean(NA_real_, NA_real_)  # SAS: harmean(., .) -> .
+# HARMEAN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The harmonic mean is n divided by the sum of reciprocals: 3 / (1 + 0.5 +
+# 0.25).
+sas_f_harmean(1, 2, 4)  # SAS 9.4: harmean(1, 2, 4) = 1.71428571428571
+
+# Missing values are ignored: the harmonic mean of 2 and 2 is 2.
+sas_f_harmean(2, NA_real_, 2)  # SAS 9.4: harmean(2, ., 2) = 2
+
+# The harmonic mean of equal values is that value.
+sas_f_harmean(1, 1)  # SAS 9.4: harmean(1, 1) = 1
+
+# All arguments are missing, so the result is missing.
+sas_f_harmean(NA_real_, NA_real_)  # SAS 9.4: harmean(., .) = .
 }
 \seealso{
 Other descriptive functions:

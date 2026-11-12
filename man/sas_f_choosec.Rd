@@ -4,9 +4,9 @@
 \alias{sas_f_choosec}
 \title{SAS \verb{CHOOSEC(index, value-1 <, ..., value-n>)}}
 \arguments{
-\item{k}{Index.}
+\item{k}{Numeric index of the value to return. A negative index counts from the end of the list (-1 is the last); 0, missing, or an index beyond the list gives a blank result with a note in the log.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Character values to choose from.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,22 @@ Character value selected by index. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (36 of 36 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CHOOSEC: each call is followed by the result of the same call in SAS 9.4
-sas_f_choosec(2, "a", "b", "c")  # SAS: choosec(2, 'a', 'b', 'c') -> "b"
-sas_f_choosec(-1, "a", "b", "c")  # SAS: choosec(-1, 'a', 'b', 'c') -> "c"
-sas_f_choosec(4, "a", "b")  # SAS: choosec(4, 'a', 'b') -> ""
+# CHOOSEC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Index 2 selects the second value, 'b'.
+sas_f_choosec(2, "a", "b", "c")  # SAS 9.4: choosec(2, 'a', 'b', 'c') = "b"
+
+# A negative index counts from the end of the list: -1 selects the last value,
+# 'c'.
+sas_f_choosec(-1, "a", "b", "c")  # SAS 9.4: choosec(-1, 'a', 'b', 'c') = "c"
+
+# Index 4 is beyond the two values given, so the result is blank (with a note
+# in the log).
+sas_f_choosec(4, "a", "b")  # SAS 9.4: choosec(4, 'a', 'b') = ""
 }
 \seealso{
 Other character functions:

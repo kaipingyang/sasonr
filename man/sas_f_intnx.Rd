@@ -4,13 +4,13 @@
 \alias{sas_f_intnx}
 \title{SAS \verb{INTNX(interval, start, increment <, alignment>)}}
 \arguments{
-\item{interval}{Interval name, as in SAS.}
+\item{interval}{Character interval name such as 'DAY', 'WEEK', 'MONTH', 'QTR', 'YEAR', 'DTDAY', 'HOUR'; may include a multiplier and shift index (e.g. 'MONTH2.2').}
 
-\item{start}{Starting position.}
+\item{start}{Starting date, time or datetime value (must match the interval type).}
 
-\item{n}{Count or position.}
+\item{n}{Integer number of intervals to move; negative moves backwards, 0 stays in the interval of \code{start}. Non-integers are truncated.}
 
-\item{align}{Alignment (\code{"-l"}, \code{"-r"}, \code{"-c"}).}
+\item{align}{Optional alignment of the result within the interval: 'BEGINNING' ('B', default), 'MIDDLE' ('M'), 'END' ('E') or 'SAME' ('S', same position as \code{start}).}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -25,17 +25,29 @@ Date advanced by a number of intervals. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- Partial: 35 of 38 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ partial (35 of 38 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INTNX: each call with the result of the same INTNX call in SAS 9.4
-# (offline conformance cases; dates are SAS day counts from 1960-01-01)
-sas_f_intnx("month", 21929, 1)  # SAS intnx('month','15JAN2020'd,1) = 21946
-sas_f_intnx("month", 21929, 1, "e")  # SAS intnx('month','15JAN2020'd,1,'e') = 21974
-sas_f_intnx("month", 21929, 1, "s")  # SAS intnx('month','15JAN2020'd,1,'s') = 21960
-sas_f_intnx("month", 21945, 1, "s")  # SAS intnx('month','31JAN2020'd,1,'s') = 21974
-sas_f_intnx("month", 21929, -1)  # SAS intnx('month','15JAN2020'd,-1) = 21884
+# INTNX: each call is explained above it and followed by the result of the same call in SAS 9.4
+# (dates are SAS day counts from 1960-01-01)
+
+# Advance 1 month: the beginning of the next month (alignment 'b' is the
+# default).
+sas_f_intnx("month", 21929, 1)  # SAS 9.4: intnx('month','15JAN2020'd,1) = 21946
+
+# Alignment 'e': the end of the next month.
+sas_f_intnx("month", 21929, 1, "e")  # SAS 9.4: intnx('month','15JAN2020'd,1,'e') = 21974
+
+# Alignment 's': the same day in the next month.
+sas_f_intnx("month", 21929, 1, "s")  # SAS 9.4: intnx('month','15JAN2020'd,1,'s') = 21960
+
+# Alignment 's' from 31 Jan: the same day does not exist in February, so the
+# last day (29 Feb 2020).
+sas_f_intnx("month", 21945, 1, "s")  # SAS 9.4: intnx('month','31JAN2020'd,1,'s') = 21974
+
+# A negative increment goes back: the beginning of the previous month.
+sas_f_intnx("month", 21929, -1)  # SAS 9.4: intnx('month','15JAN2020'd,-1) = 21884
 }
 \seealso{
 Other datetime functions:

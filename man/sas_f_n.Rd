@@ -4,7 +4,7 @@
 \alias{sas_f_n}
 \title{SAS \verb{N(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Numeric values. \code{.} and special missing values are not counted.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Number of non-missing values. See the \href{https://documentation.sas.com/doc/en
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# N: each call is followed by the result of the same call in SAS 9.4
-sas_f_n(1, NA_real_, 3)  # SAS: n(1, ., 3) -> 2
-sas_f_n(NA_real_, NA_real_)  # SAS: n(., .) -> 0
-sas_f_n(sas_missing(".A"), 1)  # SAS: n(.A, 1) -> 1
-sas_f_n(0)  # SAS: n(0) -> 1
+# N: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# N counts the nonmissing numeric arguments: 2.
+sas_f_n(1, NA_real_, 3)  # SAS 9.4: n(1, ., 3) = 2
+
+# All arguments are missing, so the count is 0.
+sas_f_n(NA_real_, NA_real_)  # SAS 9.4: n(., .) = 0
+
+# The special missing value .A is not counted.
+sas_f_n(sas_missing(".A"), 1)  # SAS 9.4: n(.A, 1) = 1
+
+# 0 is a nonmissing value, so it is counted.
+sas_f_n(0)  # SAS 9.4: n(0) = 1
 }
 \seealso{
 Other descriptive functions:

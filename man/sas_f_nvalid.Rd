@@ -4,9 +4,9 @@
 \alias{sas_f_nvalid}
 \title{SAS \verb{NVALID(string <, validvarname>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string to check as a SAS variable name; trailing blanks are ignored.}
 
-\item{opt}{Option, as in SAS.}
+\item{opt}{Optional naming rules: 'V7' (default) requires a letter or underscore first, then letters, digits or underscores, up to 32 characters; 'ANY' accepts any 1 to 32 characters; 'UPCASE' is V7 with uppercase letters only; 'NLITERAL' accepts V7 names and name literals such as 'my var'n.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,16 +19,28 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) agree with SAS.
+ verified (27 of 27 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# NVALID: each call is followed by the result of the same call in SAS 9.4
-sas_f_nvalid("abc")  # SAS: nvalid('abc') -> 1
-sas_f_nvalid("1abc")  # SAS: nvalid('1abc') -> 0
-sas_f_nvalid("my var", "v7")  # SAS: nvalid('my var', 'v7') -> 0
-sas_f_nvalid("my var", "any")  # SAS: nvalid('my var', 'any') -> 1
-sas_f_nvalid("_x1", "nliteral")  # SAS: nvalid('_x1', 'nliteral') -> 1
+# NVALID: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# NVALID returns 1 if the string is a valid SAS variable name; under the
+# default V7 rules 'abc' is valid.
+sas_f_nvalid("abc")  # SAS 9.4: nvalid('abc') = 1
+
+# A V7 name cannot start with a digit, so the result is 0.
+sas_f_nvalid("1abc")  # SAS 9.4: nvalid('1abc') = 0
+
+# V7 names cannot contain blanks, so 'my var' is not valid.
+sas_f_nvalid("my var", "v7")  # SAS 9.4: nvalid('my var', 'v7') = 0
+
+# Option 'any' accepts any characters (1 to 32 bytes), including blanks.
+sas_f_nvalid("my var", "any")  # SAS 9.4: nvalid('my var', 'any') = 1
+
+# Option 'nliteral' accepts V7 names as well as name literals such as 'my
+# var'n; '_x1' is a V7 name.
+sas_f_nvalid("_x1", "nliteral")  # SAS 9.4: nvalid('_x1', 'nliteral') = 1
 }
 \seealso{
 Other special functions:

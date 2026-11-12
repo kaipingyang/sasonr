@@ -4,13 +4,13 @@
 \alias{sas_f_ifc}
 \title{SAS \verb{IFC(condition, true, false <, missing>)}}
 \arguments{
-\item{cond}{Condition.}
+\item{cond}{Numeric condition: nonzero and nonmissing is true, 0 is false, missing selects \code{m}.}
 
-\item{a}{Numeric argument.}
+\item{a}{Character value returned when the condition is true.}
 
-\item{b}{Numeric argument.}
+\item{b}{Character value returned when the condition is false.}
 
-\item{m}{Value when missing.}
+\item{m}{Optional character value returned when the condition is missing; when omitted, \code{b} is returned.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -23,15 +23,23 @@ Character value chosen by a condition. See the \href{https://documentation.sas.c
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (41 of 41 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# IFC: each call is followed by the result of the same call in SAS 9.4
-sas_f_ifc(1, "yes", "no")  # SAS: ifc(1, 'yes', 'no') -> "yes"
-sas_f_ifc(0, "yes", "no")  # SAS: ifc(0, 'yes', 'no') -> "no"
-sas_f_ifc(NA_real_, "yes", "no", "miss")  # SAS: ifc(., 'yes', 'no', 'miss') -> "miss"
-sas_f_ifc(2 > 1, "a", "b")  # SAS: ifc(2 > 1, 'a', 'b') -> "a"
+# IFC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# A true (nonzero, nonmissing) condition returns the second argument.
+sas_f_ifc(1, "yes", "no")  # SAS 9.4: ifc(1, 'yes', 'no') = "yes"
+
+# A condition of 0 is false, so the third argument is returned.
+sas_f_ifc(0, "yes", "no")  # SAS 9.4: ifc(0, 'yes', 'no') = "no"
+
+# A missing condition returns the optional fourth argument.
+sas_f_ifc(NA_real_, "yes", "no", "miss")  # SAS 9.4: ifc(., 'yes', 'no', 'miss') = "miss"
+
+# A comparison evaluates to 1 (true) or 0 (false); 2 > 1 is true.
+sas_f_ifc(2 > 1, "a", "b")  # SAS 9.4: ifc(2 > 1, 'a', 'b') = "a"
 }
 \seealso{
 Other character functions:

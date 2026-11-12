@@ -4,7 +4,11 @@
 \alias{sasonr-runtime}
 \alias{sas_and}
 \alias{sas_concat}
+\alias{sas_date_ok}
+\alias{sas_day_to_greg}
 \alias{sas_delete}
+\alias{sas_dist_known}
+\alias{sas_dist_names}
 \alias{sas_div}
 \alias{sas_epoch}
 \alias{sas_eq}

@@ -4,11 +4,11 @@
 \alias{sas_f_putc}
 \title{SAS \verb{PUTC(source, format <, w>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character value to format.}
 
-\item{fmt}{Format or informat (text such as \code{"8.2"} or a parsed specification).}
+\item{fmt}{Character format name given as a string, e.g. '$upcase3.'.}
 
-\item{w}{Width override.}
+\item{w}{Optional numeric width that overrides the format width.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,14 +21,24 @@ Writes a character value with a format given at run time. See the \href{https://
 }
 
 \section{Verification}{
- Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ partial (35 of 37 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PUTC: each call is followed by the result of the same call in SAS 9.4
-sas_f_putc("abc", "$5.")  # SAS: putc('abc', '$5.') -> "abc"
-sas_f_putc("abc", "$upcase3.")  # SAS: putc('abc', '$upcase3.') -> "ABC"
-sas_f_putc("abcdef", "$3.")  # SAS: putc('abcdef', '$3.') -> "abc"
+# PUTC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# PUTC applies a character format given as a string; $5. pads 'abc' to width 5.
+sas_f_putc("abc", "$5.")  # SAS 9.4: putc('abc', '$5.') = "abc"
+
+# The $UPCASE3. format writes the value in upper case.
+sas_f_putc("abc", "$upcase3.")  # SAS 9.4: putc('abc', '$upcase3.') = "ABC"
+
+# $HEX6. writes 616263 (two hex digits per character); a new variable gets the
+# length of the first argument (3), so SAS stores 616.
+substr(sas_f_putc("abc", "$hex6."), 1, 3)  # SAS 9.4: putc('abc', '$hex6.') = "616"
+
+# The format $3. writes only the first 3 characters.
+sas_f_putc("abcdef", "$3.")  # SAS 9.4: putc('abcdef', '$3.') = "abc"
 }
 \seealso{
 Other special functions:

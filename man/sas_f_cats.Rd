@@ -4,7 +4,11 @@
 \alias{sas_f_cats}
 \title{SAS \verb{CATS(item-1 <, ..., item-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes \code{.}. Leading and trailing blanks are removed from every item.}
+
+\item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
+
+\item{.len}{Internal: length of the result buffer (CATX).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +21,24 @@ Concatenates after removing leading and trailing blanks. See the \href{https://d
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CATS: each call is followed by the result of the same call in SAS 9.4
-sas_f_cats(" a ", "b ", " c")  # SAS: cats(' a ', 'b ', ' c') -> "abc"
-sas_f_cats("x", 12.5)  # SAS: cats('x', 12.5) -> "x12.5"
-sas_f_cats("", "")  # SAS: cats('', '') -> ""
-sas_f_cats("a", NA_real_, "b")  # SAS: cats('a', ., 'b') -> "a.b"
+# CATS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CATS removes leading and trailing blanks from every argument before
+# concatenating.
+sas_f_cats(" a ", "b ", " c")  # SAS 9.4: cats(' a ', 'b ', ' c') = "abc"
+
+# The number 12.5 is converted to character without blanks, giving 'x12.5'.
+sas_f_cats("x", 12.5)  # SAS 9.4: cats('x', 12.5) = "x12.5"
+
+# Blank strings contribute nothing, so the result is blank.
+sas_f_cats(" ", " ")  # SAS 9.4: cats('', '') = ""
+
+# A missing numeric argument is converted to '.', giving 'a.b'.
+sas_f_cats("a", NA_real_, "b")  # SAS 9.4: cats('a', ., 'b') = "a.b"
 }
 \seealso{
 Other character functions:

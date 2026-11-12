@@ -4,7 +4,7 @@
 \alias{sas_f_skewness}
 \title{SAS \verb{SKEWNESS(argument-1, argument-2, argument-3 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Three or more numeric values. Missing values are ignored; with fewer than 3 nonmissing values or zero variance the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,20 @@ Skewness. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS.
+ approximate (29 of 70 SAS 9.4 cases agree bit for bit; 41 case(s) differ in the last bits (largest relative difference 7.3e-15; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SKEWNESS: each call is followed by the result of the same call in SAS 9.4
-sas_f_skewness(1, 2, 3, 10)  # SAS: skewness(1, 2, 3, 10) -> 1.7636326148039
-sas_f_skewness(1, 2, NA_real_, 3)  # SAS: skewness(1, 2, ., 3) -> 0
-sas_f_skewness(2, 4, 4, 4, 5, 5, 7, 9)  # SAS: skewness(2, 4, 4, 4, 5, 5, 7, 9) -> 0.8184875533568
-sas_f_skewness(1, 1, 1)  # SAS: skewness(1, 1, 1) -> .
+# SKEWNESS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Missing values are ignored; 1, 2, 3 are symmetric, so the skewness is 0.
+sas_f_skewness(1, 2, NA_real_, 3)  # SAS 9.4: skewness(1, 2, ., 3) = 0
+
+# The sample skewness of eight values.
+sas_f_skewness(2, 4, 4, 4, 5, 5, 7, 9)  # SAS 9.4: skewness(2, 4, 4, 4, 5, 5, 7, 9) = 0.8184875533568
+
+# Values with zero variance have no defined skewness, so the result is missing.
+sas_f_skewness(1, 1, 1)  # SAS 9.4: skewness(1, 1, 1) = .
 }
 \seealso{
 Other descriptive functions:

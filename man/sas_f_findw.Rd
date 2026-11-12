@@ -4,15 +4,15 @@
 \alias{sas_f_findw}
 \title{SAS \verb{FINDW(string, word <, delimiters> <, modifiers> <, start>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the string searched.}
 
-\item{word}{Word to find.}
+\item{word}{Character word to find; leading and trailing blanks are ignored. It must be delimited on both sides by delimiters or the string ends.}
 
-\item{dlm}{Delimiters.}
+\item{dlm}{Optional delimiter characters. Default: blank ! $ percent-sign & ( ) * + , - . / ; < ^ |.}
 
-\item{a4}{Start position or modifiers (as in SAS).}
+\item{a4}{Either the modifiers (if character) or the start position (if numeric). Modifiers: i ignores case; e returns the word number instead of the character position; t trims trailing blanks; a, d, l, u, s, p, n, f, x, c, h add the matching character classes to the delimiters; k makes the delimiters the characters NOT listed. Default blank (no modifiers). If numeric, it is the start position (see \code{a5}).}
 
-\item{a5}{Argument \code{a5} of the SAS function.}
+\item{a5}{Start position (numeric), used when \code{a4} holds modifiers. A positive value searches rightwards from that position; a negative value searches leftwards from position |start|. Default 1.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -25,17 +25,29 @@ Position (or number) of a word. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 5 example call(s) agree with SAS.
+ partial (33 of 37 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# FINDW: each call is followed by the result of the same call in SAS 9.4
+# FINDW: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_findw("the cat sat", "cat")  # SAS: findw('the cat sat', 'cat') -> 5
-sas_f_findw("the cat sat", "at")  # SAS: findw('the cat sat', 'at') -> 0
-sas_f_findw("a,b,c", "b", ",")  # SAS: findw('a,b,c', 'b', ',') -> 3
-sas_f_findw("The Cat", "cat", " ", "i")  # SAS: findw('The Cat', 'cat', ' ', 'i') -> 5
-sas_f_findw("the cat sat", "sat", " ", "e")  # SAS: findw('the cat sat', 'sat', ' ', 'e') -> 3
+
+# FINDW returns the position of the word 'cat', delimited by blanks: 5.
+sas_f_findw("the cat sat", "cat")  # SAS 9.4: findw('the cat sat', 'cat') = 5
+
+# 'at' occurs only inside other words, never as a whole word, so the result is
+# 0.
+sas_f_findw("the cat sat", "at")  # SAS 9.4: findw('the cat sat', 'at') = 0
+
+# With ',' as the delimiter, the word 'b' starts at position 3.
+sas_f_findw("a,b,c", "b", ",")  # SAS 9.4: findw('a,b,c', 'b', ',') = 3
+
+# Modifier i ignores case, so 'cat' matches 'Cat' at position 5.
+sas_f_findw("The Cat", "cat", " ", "i")  # SAS 9.4: findw('The Cat', 'cat', ' ', 'i') = 5
+
+# Modifier e returns the word number instead of the character position: 'sat'
+# is the 3rd word.
+sas_f_findw("the cat sat", "sat", " ", "e")  # SAS 9.4: findw('the cat sat', 'sat', ' ', 'e') = 3
 }
 \seealso{
 Other character functions:

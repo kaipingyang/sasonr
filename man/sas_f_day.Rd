@@ -4,7 +4,7 @@
 \alias{sas_f_day}
 \title{SAS \code{DAY(date)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,24 @@ Day of the month. See the \href{https://documentation.sas.com/doc/en/lefunctions
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# DAY: each call is followed by the result of the same call in SAS 9.4
+# DAY: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_day(23450)  # SAS: day('15MAR2024'd) -> 15
-sas_f_day(0)  # SAS: day(0) -> 1
-sas_f_day(23435)  # SAS: day('29FEB2024'd) -> 29
-sas_f_day(NA_real_)  # SAS: day(.) -> .
+
+# DAY returns the day of the month of a SAS date value.
+sas_f_day(23450)  # SAS 9.4: day('15MAR2024'd) = 15
+
+# Date 0 is 1 January 1960, so the day is 1.
+sas_f_day(0)  # SAS 9.4: day(0) = 1
+
+# 29 February exists in the leap year 2024.
+sas_f_day(23435)  # SAS 9.4: day('29FEB2024'd) = 29
+
+# A missing argument gives a missing result.
+sas_f_day(NA_real_)  # SAS 9.4: day(.) = .
 }
 \seealso{
 Other datetime functions:

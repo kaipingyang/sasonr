@@ -4,9 +4,9 @@
 \alias{sas_f_mod}
 \title{SAS \code{MOD(dividend, divisor)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{Numeric dividend; the remainder has its sign. Missing gives missing.}
 
-\item{b}{Numeric argument.}
+\item{b}{Numeric divisor. 0 gives missing with a note in the log. The computation is fuzzed to correct for binary rounding.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,17 +21,29 @@ Remainder, with fuzz; sign of the dividend. See the \href{https://documentation.
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 6 example call(s) agree with SAS.
+ approximate (37 of 38 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 1.0e-13; different algorithm)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MOD: each call is followed by the result of the same call in SAS 9.4
-sas_f_mod(10, 3)  # SAS: mod(10, 3) -> 1
-sas_f_mod(-10, 3)  # SAS: mod(-10, 3) -> -1
-sas_f_mod(10, -3)  # SAS: mod(10, -3) -> 1
-sas_f_mod(5.5, 2)  # SAS: mod(5.5, 2) -> 1.5
-sas_f_mod(0.3, 0.1)  # SAS: mod(0.3, 0.1) -> 0
-sas_f_mod(10, 0)  # SAS: mod(10, 0) -> .
+# MOD: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The remainder of 10 divided by 3 is 1.
+sas_f_mod(10, 3)  # SAS 9.4: mod(10, 3) = 1
+
+# The remainder has the sign of the dividend: -1.
+sas_f_mod(-10, 3)  # SAS 9.4: mod(-10, 3) = -1
+
+# With a negative divisor and a positive dividend the remainder is positive: 1.
+sas_f_mod(10, -3)  # SAS 9.4: mod(10, -3) = 1
+
+# MOD also works with non-integers: 5.5 - 2*2 = 1.5.
+sas_f_mod(5.5, 2)  # SAS 9.4: mod(5.5, 2) = 1.5
+
+# MOD is fuzzed: 0.3 / 0.1 is treated as exactly 3, so the remainder is 0.
+sas_f_mod(0.3, 0.1)  # SAS 9.4: mod(0.3, 0.1) = 0
+
+# Division by 0 gives a missing result (with a note in the log).
+sas_f_mod(10, 0)  # SAS 9.4: mod(10, 0) = .
 }
 \seealso{
 Other numeric functions:

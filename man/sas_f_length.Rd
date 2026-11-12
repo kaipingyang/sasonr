@@ -4,7 +4,7 @@
 \alias{sas_f_length}
 \title{SAS \code{LENGTH(string)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 1 for a blank string.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Position of the last non-blank character (1 for a blank string). See the \href{h
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) and 3 offline conformance case(s) agree with SAS.
+ verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LENGTH: each call is followed by the result of the same call in SAS 9.4
-sas_f_length("abc  ")  # SAS: length('abc  ') -> 3
-sas_f_length("")  # SAS: length('') -> 1
-sas_f_length("  a")  # SAS: length('  a') -> 3
-sas_f_length(123)  # SAS: length(123) -> 12
+# LENGTH: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LENGTH returns the length without trailing blanks: 3.
+sas_f_length("abc  ")  # SAS 9.4: length('abc  ') = 3
+
+# For a blank string LENGTH returns 1, not 0.
+sas_f_length(" ")  # SAS 9.4: length('') = 1
+
+# Leading blanks are counted.
+sas_f_length("  a")  # SAS 9.4: length('  a') = 3
+
+# A numeric argument is converted with BEST12. to a 12-character string, so the
+# length is 12.
+sas_f_length(123)  # SAS 9.4: length(123) = 12
 }
 \seealso{
 Other character functions:

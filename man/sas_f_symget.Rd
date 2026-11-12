@@ -4,9 +4,9 @@
 \alias{sas_f_symget}
 \title{SAS \code{SYMGET(argument)}}
 \arguments{
-\item{symtab}{Internal: macro symbol table.}
+\item{symtab}{Macro symbol table to look the variable up in (an environment or macro session supplied by the generated code; not part of the SAS syntax).}
 
-\item{name}{Name.}
+\item{name}{Character name of the macro variable, not case sensitive; trailing blanks are ignored. A blank or invalid name gives a blank result with a note in the log.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,12 +21,21 @@ Value of a macro variable at run time. See the \href{https://documentation.sas.c
 }
 
 \section{Verification}{
- Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SYMGET: each call is followed by the result of the same call in SAS 9.4
-sas_f_symget(list2env(list(mv = "hello")), "mv")  # SAS: symget('mv') -> "hello"
-sas_f_symget(list2env(list(mv = "hello")), "MV")  # SAS: symget('MV') -> "hello"
+# SYMGET: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# SYMGET returns the value of the macro variable mv, which was set with a LET
+# statement.
+sas_f_symget(list2env(list(mv = "hello")), "mv")  # SAS 9.4: symget('mv') = "hello"
+
+# Macro variable names are not case sensitive.
+sas_f_symget(list2env(list(mv = "hello")), "MV")  # SAS 9.4: symget('MV') = "hello"
+
+# A name with a leading blank is invalid, so the result is blank (with a note
+# in the log).
+sas_f_symget(list2env(list(mv = "hello")), " mv ")  # SAS 9.4: symget(' mv ') = ""
 }
 \concept{macro functions}

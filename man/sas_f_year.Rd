@@ -4,7 +4,7 @@
 \alias{sas_f_year}
 \title{SAS \code{YEAR(date)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,24 @@ Year. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titl
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (24 of 24 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# YEAR: each call is followed by the result of the same call in SAS 9.4
+# YEAR: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_year(23450)  # SAS: year('15MAR2024'd) -> 2024
-sas_f_year(0)  # SAS: year(0) -> 1960
-sas_f_year(-1)  # SAS: year(-1) -> 1959
-sas_f_year(NA_real_)  # SAS: year(.) -> .
+
+# YEAR returns the year of a SAS date value.
+sas_f_year(23450)  # SAS 9.4: year('15MAR2024'd) = 2024
+
+# Date 0 is 1 January 1960.
+sas_f_year(0)  # SAS 9.4: year(0) = 1960
+
+# Date -1 is 31 December 1959.
+sas_f_year(-1)  # SAS 9.4: year(-1) = 1959
+
+# A missing argument gives a missing result.
+sas_f_year(NA_real_)  # SAS 9.4: year(.) = .
 }
 \seealso{
 Other datetime functions:

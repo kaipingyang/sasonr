@@ -4,9 +4,9 @@
 \alias{sas_f_anydigit}
 \title{SAS \verb{ANYDIGIT(string <, start>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string to search. A numeric value is first converted to character with the BEST12. format.}
 
-\item{start}{Starting position.}
+\item{start}{Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,25 @@ Position of the first digit. See the \href{https://documentation.sas.com/doc/en/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ANYDIGIT: each call is followed by the result of the same call in SAS 9.4
-sas_f_anydigit("ab12")  # SAS: anydigit('ab12') -> 3
-sas_f_anydigit("abc")  # SAS: anydigit('abc') -> 0
-sas_f_anydigit("1a2", 2)  # SAS: anydigit('1a2', 2) -> 3
-sas_f_anydigit("1a2", -2)  # SAS: anydigit('1a2', -2) -> 1
+# ANYDIGIT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The first digit is '1' at position 3.
+sas_f_anydigit("ab12")  # SAS 9.4: anydigit('ab12') = 3
+
+# No digit occurs, so the result is 0.
+sas_f_anydigit("abc")  # SAS 9.4: anydigit('abc') = 0
+
+# Start 2 searches rightwards from position 2, skipping the '1' at position 1,
+# and finds '2' at position 3.
+sas_f_anydigit("1a2", 2)  # SAS 9.4: anydigit('1a2', 2) = 3
+
+# Negative start -2 searches leftwards from position 2 ('a') and finds the
+# digit '1' at position 1.
+sas_f_anydigit("1a2", -2)  # SAS 9.4: anydigit('1a2', -2) = 1
 }
 \seealso{
 Other character functions:

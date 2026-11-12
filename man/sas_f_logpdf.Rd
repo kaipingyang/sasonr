@@ -4,11 +4,11 @@
 \alias{sas_f_logpdf}
 \title{SAS \verb{LOGPDF(distribution, quantile <, parameters>)}}
 \arguments{
-\item{dist}{Distribution name, as in SAS (\code{"NORMAL"}, \code{"T"}, ...).}
+\item{dist}{Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,21 @@ Logarithm of the density. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (25 of 38 SAS 9.4 cases agree bit for bit; 8 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOGPDF: each call is followed by the result of the same call in SAS 9.4
-sas_f_logpdf("NORMAL", 0)  # SAS: logpdf('NORMAL', 0) -> -0.91893853320467
-sas_f_logpdf("EXPONENTIAL", 1, 2)  # SAS: logpdf('EXPONENTIAL', 1, 2) -> -1.19314718055995
-sas_f_logpdf("BINOMIAL", 3, 0.5, 10)  # SAS: logpdf('BINOMIAL', 3, 0.5, 10) -> -2.1439800628174
-sas_f_logpdf("NORMAL", NA_real_)  # SAS: logpdf('NORMAL', .) -> .
+# LOGPDF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The log of the standard normal density at 0 is -log(sqrt(2*pi)).
+sas_f_logpdf("NORMAL", 0)  # SAS 9.4: logpdf('NORMAL', 0) = -0.918938533204673
+
+# Exponential distribution with scale 2: the density at 1 is exp(-1/2) / 2,
+# whose log is -0.5 - log(2).
+sas_f_logpdf("EXPONENTIAL", 1, 2)  # SAS 9.4: logpdf('EXPONENTIAL', 1, 2) = -1.19314718055995
+
+# A missing quantile gives a missing result.
+sas_f_logpdf("NORMAL", NA_real_)  # SAS 9.4: logpdf('NORMAL', .) = .
 }
 \seealso{
 Other probability functions:

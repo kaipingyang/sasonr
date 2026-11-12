@@ -4,7 +4,7 @@
 \alias{sas_f_uss}
 \title{SAS \verb{USS(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{One or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Uncorrected sum of squares. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (34 of 34 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# USS: each call is followed by the result of the same call in SAS 9.4
-sas_f_uss(1, 2, 3)  # SAS: uss(1, 2, 3) -> 14
-sas_f_uss(1, NA_real_, 2)  # SAS: uss(1, ., 2) -> 5
-sas_f_uss(NA_real_, NA_real_)  # SAS: uss(., .) -> .
+# USS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# USS is the uncorrected sum of squares: 1 + 4 + 9 = 14.
+sas_f_uss(1, 2, 3)  # SAS 9.4: uss(1, 2, 3) = 14
+
+# Missing values are ignored: 1 + 4 = 5.
+sas_f_uss(1, NA_real_, 2)  # SAS 9.4: uss(1, ., 2) = 5
+
+# All arguments are missing, so the result is missing.
+sas_f_uss(NA_real_, NA_real_)  # SAS 9.4: uss(., .) = .
 }
 \seealso{
 Other descriptive functions:

@@ -4,9 +4,9 @@
 \alias{sas_f_largest}
 \title{SAS \verb{LARGEST(k, value-1 <, ..., value-n>)}}
 \arguments{
-\item{k}{Index.}
+\item{k}{Positive integer rank: 1 returns the largest nonmissing value, 2 the second largest, and so on. If \code{k} exceeds the number of nonmissing values the result is missing.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Numeric values; missing values are ignored.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,24 @@ k-th largest non-missing value. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (45 of 45 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LARGEST: each call is followed by the result of the same call in SAS 9.4
-sas_f_largest(1, 3, 9, 5)  # SAS: largest(1, 3, 9, 5) -> 9
-sas_f_largest(2, 3, 9, 5)  # SAS: largest(2, 3, 9, 5) -> 5
-sas_f_largest(1, NA_real_, 4, NA_real_)  # SAS: largest(1, ., 4, .) -> 4
-sas_f_largest(3, 3, NA_real_)  # SAS: largest(3, 3, .) -> .
+# LARGEST: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# LARGEST(k, ...) returns the k-th largest nonmissing value; with k = 1 that is
+# the maximum of 3, 9, 5: 9.
+sas_f_largest(1, 3, 9, 5)  # SAS 9.4: largest(1, 3, 9, 5) = 9
+
+# With k = 2 the second largest of 3, 9, 5 is 5.
+sas_f_largest(2, 3, 9, 5)  # SAS 9.4: largest(2, 3, 9, 5) = 5
+
+# Missing values are ignored: the largest of the remaining value 4 is 4.
+sas_f_largest(1, NA_real_, 4, NA_real_)  # SAS 9.4: largest(1, ., 4, .) = 4
+
+# k = 3 exceeds the number of nonmissing values (2), so the result is missing.
+sas_f_largest(3, 3, NA_real_)  # SAS 9.4: largest(3, 3, .) = .
 }
 \seealso{
 Other descriptive functions:

@@ -4,13 +4,13 @@
 \alias{sas_f_sqlquant}
 \title{Runtime helper: PROC SQL quantified comparison.}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Left-hand value of the comparison.}
 
-\item{values}{Values.}
+\item{values}{Values returned by the subquery.}
 
-\item{op}{Operator.}
+\item{op}{Comparison operator as a string: '=', '^=', '<', '<=', '>' or '>='.}
 
-\item{quant}{\code{"any"} or \code{"all"}.}
+\item{quant}{Quantifier: 'any' is true if the comparison holds for at least one value; 'all' if it holds for every value.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -27,10 +27,18 @@ PROC SQL quantified comparison.
 }
 
 \examples{
-# SQLQUANT: each call is followed by the result of the same call in SAS 9.4
-sas_f_sqlquant(1, c(2, 3), "<", "any")  # SAS: 1 < any (select v from work.t) -> 1
-sas_f_sqlquant(3, c(2, 3), ">", "all")  # SAS: 3 > all (select v from work.t) -> 0
-sas_f_sqlquant(3, c(2, 3), ">=", "all")  # SAS: 3 >= all (select v from work.t) -> 1
+# SQLQUANT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# ANY is true if the comparison holds for at least one value of the subquery: 1
+# < 2 holds.
+sas_f_sqlquant(1, c(2, 3), "<", "any")  # SAS 9.4: 1 < any (select v from work.t) = 1
+
+# ALL requires the comparison to hold for every value; 3 > 3 is false, so the
+# result is 0.
+sas_f_sqlquant(3, c(2, 3), ">", "all")  # SAS 9.4: 3 > all (select v from work.t) = 0
+
+# 3 >= 2 and 3 >= 3 both hold, so the result is 1.
+sas_f_sqlquant(3, c(2, 3), ">=", "all")  # SAS 9.4: 3 >= all (select v from work.t) = 1
 }
 \seealso{
 Other internal functions:

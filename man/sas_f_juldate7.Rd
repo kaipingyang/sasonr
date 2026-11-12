@@ -4,7 +4,7 @@
 \alias{sas_f_juldate7}
 \title{SAS \code{JULDATE7(date)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,25 @@ Seven-digit Julian date (yyyyddd). See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# JULDATE7: each call is followed by the result of the same call in SAS 9.4
+# JULDATE7: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_juldate7(23450)  # SAS: juldate7('15MAR2024'd) -> 2024075
-sas_f_juldate7(0)  # SAS: juldate7(0) -> 1960001
-sas_f_juldate7(-21915)  # SAS: juldate7('31DEC1899'd) -> 1899365
-sas_f_juldate7(NA_real_)  # SAS: juldate7(.) -> .
+
+# JULDATE7 always returns a 7-digit Julian date yyyyddd: day 75 of 2024 is
+# 2024075.
+sas_f_juldate7(23450)  # SAS 9.4: juldate7('15MAR2024'd) = 2024075
+
+# SAS date 0 (1 January 1960) is 1960001.
+sas_f_juldate7(0)  # SAS 9.4: juldate7(0) = 1960001
+
+# 31 December 1899 is day 365 of 1899.
+sas_f_juldate7(-21915)  # SAS 9.4: juldate7('31DEC1899'd) = 1899365
+
+# A missing argument gives a missing result.
+sas_f_juldate7(NA_real_)  # SAS 9.4: juldate7(.) = .
 }
 \seealso{
 Other datetime functions:

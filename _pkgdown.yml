@@ -29,6 +29,8 @@ navbar:
         href: articles/dev-conformance-cases.html
       - text: Semantics registry
         href: articles/dev-registry.html
+      - text: Feature registry
+        href: articles/dev-feature-registry.html
     progress:
       text: Progress
       menu:
@@ -53,6 +55,7 @@ articles:
   - articles/architecture
   - articles/dev-conformance-cases
   - articles/dev-registry
+  - articles/dev-feature-registry
 - title: Progress
   contents:
   - articles/conformance

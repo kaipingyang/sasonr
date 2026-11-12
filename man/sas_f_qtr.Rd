@@ -4,7 +4,7 @@
 \alias{sas_f_qtr}
 \title{SAS \code{QTR(date)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS date value (days since 1 January 1960; negative values are dates before 1960). A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,24 @@ Quarter of the year. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (22 of 22 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# QTR: each call is followed by the result of the same call in SAS 9.4
+# QTR: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_qtr(23450)  # SAS: qtr('15MAR2024'd) -> 1
-sas_f_qtr(23695)  # SAS: qtr('15NOV2024'd) -> 4
-sas_f_qtr(0)  # SAS: qtr(0) -> 1
-sas_f_qtr(NA_real_)  # SAS: qtr(.) -> .
+
+# March is in quarter 1.
+sas_f_qtr(23450)  # SAS 9.4: qtr('15MAR2024'd) = 1
+
+# November is in quarter 4.
+sas_f_qtr(23695)  # SAS 9.4: qtr('15NOV2024'd) = 4
+
+# Date 0 (1 January 1960) is in quarter 1.
+sas_f_qtr(0)  # SAS 9.4: qtr(0) = 1
+
+# A missing argument gives a missing result.
+sas_f_qtr(NA_real_)  # SAS 9.4: qtr(.) = .
 }
 \seealso{
 Other datetime functions:

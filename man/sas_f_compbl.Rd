@@ -4,7 +4,7 @@
 \alias{sas_f_compbl}
 \title{SAS \code{COMPBL(source)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Each run of two or more blanks is replaced by one blank.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Compresses runs of blanks to one blank. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COMPBL: each call is followed by the result of the same call in SAS 9.4
-sas_f_compbl("a   b    c")  # SAS: compbl('a   b    c') -> "a b c"
-sas_f_compbl("  a  b")  # SAS: compbl('  a  b') -> " a b"
-sas_f_compbl("a")  # SAS: compbl('a') -> "a"
+# COMPBL: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# COMPBL replaces each run of two or more blanks with a single blank.
+sas_f_compbl("a   b    c")  # SAS 9.4: compbl('a   b    c') = "a b c"
+
+# Leading blanks are also reduced to one blank, but not removed.
+sas_f_compbl("  a  b")  # SAS 9.4: compbl('  a  b') = " a b"
+
+# A string without repeated blanks is returned unchanged.
+sas_f_compbl("a")  # SAS 9.4: compbl('a') = "a"
 }
 \seealso{
 Other character functions:

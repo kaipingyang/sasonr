@@ -4,13 +4,13 @@
 \alias{sas_f_probf}
 \title{SAS \verb{PROBF(x, ndf, ddf <, nc>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the F CDF is evaluated. Missing gives missing.}
 
-\item{n}{Count or position.}
+\item{n}{Numerator degrees of freedom (SAS ndf), a positive number.}
 
-\item{d}{Decimals override.}
+\item{d}{Denominator degrees of freedom (SAS ddf), a positive number.}
 
-\item{nc}{Noncentrality parameter.}
+\item{nc}{Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -23,15 +23,17 @@ F cumulative probability. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (28 of 45 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 2.2e-14; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PROBF: each call is followed by the result of the same call in SAS 9.4
-sas_f_probf(4, 2, 10)  # SAS: probf(4, 2, 10) -> 0.947077850598655
-sas_f_probf(1, 1, 1)  # SAS: probf(1, 1, 1) -> 0.5
-sas_f_probf(1, 2, 10, 1)  # SAS: probf(1, 2, 10, 1) -> 0.45026969
-sas_f_probf(NA_real_, 1, 1)  # SAS: probf(., 1, 1) -> .
+# PROBF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# P(F <= 4) for an F distribution with 2 and 10 degrees of freedom.
+sas_f_probf(4, 2, 10)  # SAS 9.4: probf(4, 2, 10) = 0.947077850598655
+
+# A missing argument gives a missing result.
+sas_f_probf(NA_real_, 1, 1)  # SAS 9.4: probf(., 1, 1) = .
 }
 \seealso{
 Other probability functions:

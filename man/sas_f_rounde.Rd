@@ -4,9 +4,9 @@
 \alias{sas_f_rounde}
 \title{SAS \verb{ROUNDE(argument <, rounding-unit>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result.}
 
-\item{unit}{Rounding unit (default 1).}
+\item{unit}{Optional positive rounding unit, default 1; the result is the multiple of the unit nearest to \code{x}. Exact ties are rounded to the even multiple.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,16 +21,28 @@ Rounds to a multiple of the unit, ties to even, with fuzz. See the \href{https:/
 }
 
 \section{Verification}{
- Partial: 5 of 5 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (34 of 34 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ROUNDE: each call is followed by the result of the same call in SAS 9.4
-sas_f_rounde(2.5)  # SAS: rounde(2.5) -> 2
-sas_f_rounde(3.5)  # SAS: rounde(3.5) -> 4
-sas_f_rounde(-2.5)  # SAS: rounde(-2.5) -> -2
-sas_f_rounde(2.45, 0.1)  # SAS: rounde(2.45, 0.1) -> 2.4
-sas_f_rounde(NA_real_)  # SAS: rounde(.) -> .
+# ROUNDE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# ROUNDE rounds a value exactly halfway between two integers to the even one:
+# 2.5 gives 2.
+sas_f_rounde(2.5)  # SAS 9.4: rounde(2.5) = 2
+
+# 3.5 is halfway between 3 and 4, so the even integer 4 is chosen.
+sas_f_rounde(3.5)  # SAS 9.4: rounde(3.5) = 4
+
+# -2.5 is halfway between -3 and -2, so the even integer -2 is chosen.
+sas_f_rounde(-2.5)  # SAS 9.4: rounde(-2.5) = -2
+
+# The second argument is the rounding unit: 2.45 is halfway between 2.4 and
+# 2.5, so the even multiple 2.4 is chosen.
+sas_f_rounde(2.45, 0.1)  # SAS 9.4: rounde(2.45, 0.1) = 2.4
+
+# A missing argument gives a missing result.
+sas_f_rounde(NA_real_)  # SAS 9.4: rounde(.) = .
 }
 \seealso{
 Other numeric functions:

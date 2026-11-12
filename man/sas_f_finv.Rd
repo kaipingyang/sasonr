@@ -4,13 +4,13 @@
 \alias{sas_f_finv}
 \title{SAS \verb{FINV(p, ndf, ddf <, nc>)}}
 \arguments{
-\item{p}{Probability.}
+\item{p}{Numeric probability strictly between 0 and 1. A missing value gives a missing result.}
 
-\item{n}{Count or position.}
+\item{n}{Numerator degrees of freedom (SAS ndf), a positive number.}
 
-\item{d}{Decimals override.}
+\item{d}{Denominator degrees of freedom (SAS ddf), a positive number.}
 
-\item{nc}{Noncentrality parameter.}
+\item{nc}{Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -23,14 +23,14 @@ Quantile of the F distribution. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Partial: 3 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ approximate (26 of 45 SAS 9.4 cases agree bit for bit; 13 case(s) differ in the last bits (largest relative difference 4.1e-13; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# FINV: each call is followed by the result of the same call in SAS 9.4
-sas_f_finv(0.95, 2, 10)  # SAS: finv(0.95, 2, 10) -> 4.1028210151304
-sas_f_finv(0.5, 1, 1)  # SAS: finv(0.5, 1, 1) -> 1
-sas_f_finv(NA_real_, 1, 1)  # SAS: finv(., 1, 1) -> .
+# FINV: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# A missing probability gives a missing result.
+sas_f_finv(NA_real_, 1, 1)  # SAS 9.4: finv(., 1, 1) = .
 }
 \seealso{
 Other probability functions:

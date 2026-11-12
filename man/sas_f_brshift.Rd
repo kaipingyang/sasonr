@@ -4,9 +4,9 @@
 \alias{sas_f_brshift}
 \title{SAS \code{BRSHIFT(argument-1, argument-2)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.}
 
-\item{n}{Count or position.}
+\item{n}{Number of bit positions to shift right, an integer from 0 to 31; zeros are shifted in from the left.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,14 +21,20 @@ Bitwise right shift. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# BRSHIFT: each call is followed by the result of the same call in SAS 9.4
-sas_f_brshift(16, 2)  # SAS: brshift(16, 2) -> 4
-sas_f_brshift(255, 4)  # SAS: brshift(255, 4) -> 15
-sas_f_brshift(NA_real_, 1)  # SAS: brshift(., 1) -> .
+# BRSHIFT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Shifting 16 right by 2 bits divides it by 4, giving 4.
+sas_f_brshift(16, 2)  # SAS 9.4: brshift(16, 2) = 4
+
+# Shifting 255 right by 4 bits drops the low four bits, giving 15.
+sas_f_brshift(255, 4)  # SAS 9.4: brshift(255, 4) = 15
+
+# A missing argument gives a missing result.
+sas_f_brshift(NA_real_, 1)  # SAS 9.4: brshift(., 1) = .
 }
 \seealso{
 Other special functions:

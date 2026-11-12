@@ -4,11 +4,11 @@
 \alias{sas_f_tinv}
 \title{SAS \verb{TINV(p, df <, nc>)}}
 \arguments{
-\item{p}{Probability.}
+\item{p}{Numeric probability strictly between 0 and 1. A missing value gives a missing result.}
 
-\item{df}{Degrees of freedom.}
+\item{df}{Degrees of freedom, a positive number (need not be an integer).}
 
-\item{nc}{Noncentrality parameter.}
+\item{nc}{Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,17 @@ Quantile of the t distribution. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (22 of 39 SAS 9.4 cases agree bit for bit; 12 case(s) differ in the last bits (largest relative difference 3.6e-11; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TINV: each call is followed by the result of the same call in SAS 9.4
-sas_f_tinv(0.975, 10)  # SAS: tinv(0.975, 10) -> 2.2281388519863
-sas_f_tinv(0.5, 5)  # SAS: tinv(0.5, 5) -> 0
-sas_f_tinv(0.975, 10, 1)  # SAS: tinv(0.975, 10, 1) -> 3.540505535
-sas_f_tinv(NA_real_, 5)  # SAS: tinv(., 5) -> .
+# TINV: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The t distribution is symmetric about 0, so its median is 0.
+sas_f_tinv(0.5, 5)  # SAS 9.4: tinv(0.5, 5) = 0
+
+# A missing probability gives a missing result.
+sas_f_tinv(NA_real_, 5)  # SAS 9.4: tinv(., 5) = .
 }
 \seealso{
 Other probability functions:

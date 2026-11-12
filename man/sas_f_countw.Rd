@@ -4,11 +4,11 @@
 \alias{sas_f_countw}
 \title{SAS \verb{COUNTW(string <, delimiters> <, modifiers>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Words are counted in it.}
 
-\item{dlm}{Delimiters.}
+\item{dlm}{Optional character list of delimiters, each character a separate delimiter. Default: blank ! $ percent-sign & ( ) * + , - . / ; < ^ |.}
 
-\item{mods}{Modifiers, as in SAS.}
+\item{mods}{Optional modifier string. m makes every delimiter separate words, so adjacent delimiters enclose an empty word; q ignores delimiters inside quoted substrings; b counts words from the end; i ignores case; k makes the delimiters all characters NOT listed; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the delimiters.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,26 @@ Number of words. See the \href{https://documentation.sas.com/doc/en/lefunctionsr
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COUNTW: each call is followed by the result of the same call in SAS 9.4
-sas_f_countw("a b  c")  # SAS: countw('a b  c') -> 3
-sas_f_countw("a,b,,c", ",")  # SAS: countw('a,b,,c', ',') -> 3
-sas_f_countw("a,b,,c", ",", "m")  # SAS: countw('a,b,,c', ',', 'm') -> 4
-sas_f_countw("")  # SAS: countw('') -> 0
+# COUNTW: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# With the default delimiters, consecutive blanks act as one separator, giving
+# 3 words.
+sas_f_countw("a b  c")  # SAS 9.4: countw('a b  c') = 3
+
+# With ',' as the delimiter, consecutive commas act as one separator, giving 3
+# words.
+sas_f_countw("a,b,,c", ",")  # SAS 9.4: countw('a,b,,c', ',') = 3
+
+# Modifier m makes each delimiter count, so the two adjacent commas enclose an
+# empty word: 4 words.
+sas_f_countw("a,b,,c", ",", "m")  # SAS 9.4: countw('a,b,,c', ',', 'm') = 4
+
+# A blank string contains no words.
+sas_f_countw(" ")  # SAS 9.4: countw('') = 0
 }
 \seealso{
 Other character functions:

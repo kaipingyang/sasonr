@@ -4,7 +4,7 @@
 \alias{sas_f_probit}
 \title{SAS \code{PROBIT(p)}}
 \arguments{
-\item{p}{Probability.}
+\item{p}{Numeric probability strictly between 0 and 1. A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,17 @@ Standard normal quantile. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (20 of 24 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 2.3e-16; different algorithm)). Contexts where every case agrees: sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PROBIT: each call is followed by the result of the same call in SAS 9.4
-sas_f_probit(0.975)  # SAS: probit(0.975) -> 1.9599639845401
-sas_f_probit(0.5)  # SAS: probit(0.5) -> 0
-sas_f_probit(1e-10)  # SAS: probit(1e-10) -> -6.3613409024041
-sas_f_probit(NA_real_)  # SAS: probit(.) -> .
+# PROBIT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The probability 0.5 maps to 0.
+sas_f_probit(0.5)  # SAS 9.4: probit(0.5) = 0
+
+# A missing argument gives a missing result.
+sas_f_probit(NA_real_)  # SAS 9.4: probit(.) = .
 }
 \seealso{
 Other probability functions:

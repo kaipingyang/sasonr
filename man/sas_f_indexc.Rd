@@ -4,9 +4,9 @@
 \alias{sas_f_indexc}
 \title{SAS \verb{INDEXC(source, excerpt-1 <, ..., excerpt-n>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the source searched.}
 
-\item{chars}{Characters to remove or find.}
+\item{...}{One or more character excerpts; each character of any excerpt is a search target. The search is case sensitive.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,13 +19,25 @@ Position of the first character from a list. See the \href{https://documentation
 }
 
 \section{Verification}{
- Partial: 2 of 4 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (32 of 32 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# INDEXC: each call is followed by the result of the same call in SAS 9.4
-sas_f_indexc("abcdef", "fd")  # SAS: indexc('abcdef', 'fd') -> 4
-sas_f_indexc("ABC", "b")  # SAS: indexc('ABC', 'b') -> 0
+# INDEXC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# INDEXC returns the position of the first character that appears in the
+# excerpt 'fd': 'd' at position 4.
+sas_f_indexc("abcdef", "fd")  # SAS 9.4: indexc('abcdef', 'fd') = 4
+
+# With several excerpts, a character of any of them counts; none of x, y, z
+# occurs, so the result is 0.
+sas_f_indexc("abc", "x", "yz")  # SAS 9.4: indexc('abc', 'x', 'yz') = 0
+
+# 'c' from the second excerpt occurs at position 3.
+sas_f_indexc("abc", "x", "c")  # SAS 9.4: indexc('abc', 'x', 'c') = 3
+
+# INDEXC is case sensitive, so 'b' does not match 'B'.
+sas_f_indexc("ABC", "b")  # SAS 9.4: indexc('ABC', 'b') = 0
 }
 \seealso{
 Other character functions:

@@ -4,11 +4,11 @@
 \alias{sas_f_probt}
 \title{SAS \verb{PROBT(x, df <, nc>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the t CDF is evaluated. Missing gives missing.}
 
-\item{df}{Degrees of freedom.}
+\item{df}{Degrees of freedom, a positive number.}
 
-\item{nc}{Noncentrality parameter.}
+\item{nc}{Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,17 @@ t cumulative probability. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (15 of 38 SAS 9.4 cases agree bit for bit; 17 case(s) differ in the last bits (largest relative difference 3.0e-10; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PROBT: each call is followed by the result of the same call in SAS 9.4
-sas_f_probt(2, 10)  # SAS: probt(2, 10) -> 0.96330598261463
-sas_f_probt(0, 5)  # SAS: probt(0, 5) -> 0.5
-sas_f_probt(2, 10, 1)  # SAS: probt(2, 10, 1) -> 0.80761156253
-sas_f_probt(NA_real_, 5)  # SAS: probt(., 5) -> .
+# PROBT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The t distribution is symmetric about 0, so P(T <= 0) is 0.5.
+sas_f_probt(0, 5)  # SAS 9.4: probt(0, 5) = 0.5
+
+# A missing argument gives a missing result.
+sas_f_probt(NA_real_, 5)  # SAS 9.4: probt(., 5) = .
 }
 \seealso{
 Other probability functions:

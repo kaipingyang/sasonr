@@ -4,11 +4,11 @@
 \alias{sas_f_sdf}
 \title{SAS \verb{SDF(distribution, quantile <, parameters>)}}
 \arguments{
-\item{dist}{Distribution name, as in SAS (\code{"NORMAL"}, \code{"T"}, ...).}
+\item{dist}{Character name of the distribution, not case sensitive: 'NORMAL' (or 'GAUSS'), 'T', 'CHISQ', 'F', 'BINOMIAL', 'POISSON', 'UNIFORM', 'EXPONENTIAL', 'BETA', 'GAMMA' or 'LOGNORMAL'.}
 
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value at which the function is evaluated (a count for discrete distributions). A missing value gives a missing result.}
 
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,17 @@ Survival function. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (28 of 42 SAS 9.4 cases agree bit for bit; 9 case(s) differ in the last bits (largest relative difference 2.3e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SDF: each call is followed by the result of the same call in SAS 9.4
-sas_f_sdf("NORMAL", 1.96)  # SAS: sdf('NORMAL', 1.96) -> 0.02499789514822
-sas_f_sdf("POISSON", 2, 1.5)  # SAS: sdf('POISSON', 2, 1.5) -> 0.19115316946194
-sas_f_sdf("EXPONENTIAL", 1)  # SAS: sdf('EXPONENTIAL', 1) -> 0.367879441171442
-sas_f_sdf("NORMAL", NA_real_)  # SAS: sdf('NORMAL', .) -> .
+# SDF: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Exponential distribution with the default scale 1: P(X > 1) = exp(-1).
+sas_f_sdf("EXPONENTIAL", 1)  # SAS 9.4: sdf('EXPONENTIAL', 1) = 0.367879441171442
+
+# A missing quantile gives a missing result.
+sas_f_sdf("NORMAL", NA_real_)  # SAS 9.4: sdf('NORMAL', .) = .
 }
 \seealso{
 Other probability functions:

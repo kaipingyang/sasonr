@@ -4,7 +4,7 @@
 \alias{sas_f_ceil}
 \title{SAS \code{CEIL(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result. Fuzzed: a value within about 1E-12 of an integer is treated as that integer.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Smallest integer >= the argument, with fuzz. See the \href{https://documentation
 }
 
 \section{Verification}{
- Partial: 4 of 4 example call(s) and 3 of 6 offline conformance case(s) agree with SAS 9.4; the examples show only calls that agree.
+ verified (27 of 27 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CEIL: each call is followed by the result of the same call in SAS 9.4
-sas_f_ceil(2.1)  # SAS: ceil(2.1) -> 3
-sas_f_ceil(-2.1)  # SAS: ceil(-2.1) -> -2
-sas_f_ceil(1 + 1e-13)  # SAS: ceil(1 + 1e-13) -> 1
-sas_f_ceil(NA_real_)  # SAS: ceil(.) -> .
+# CEIL: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CEIL returns the smallest integer greater than or equal to the argument: 3.
+sas_f_ceil(2.1)  # SAS 9.4: ceil(2.1) = 3
+
+# For a negative number the ceiling moves towards zero: -2.
+sas_f_ceil(-2.1)  # SAS 9.4: ceil(-2.1) = -2
+
+# CEIL is fuzzed: a value within about 1E-12 of an integer is treated as that
+# integer, so the result is 1.
+sas_f_ceil(1 + 1e-13)  # SAS 9.4: ceil(1 + 1e-13) = 1
+
+# A missing argument gives a missing result.
+sas_f_ceil(NA_real_)  # SAS 9.4: ceil(.) = .
 }
 \seealso{
 Other numeric functions:

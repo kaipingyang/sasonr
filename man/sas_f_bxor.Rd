@@ -4,9 +4,9 @@
 \alias{sas_f_bxor}
 \title{SAS \code{BXOR(argument-1, argument-2)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.}
 
-\item{b}{Numeric argument.}
+\item{b}{Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -21,14 +21,20 @@ Bitwise exclusive OR. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# BXOR: each call is followed by the result of the same call in SAS 9.4
-sas_f_bxor(12, 10)  # SAS: bxor(12, 10) -> 6
-sas_f_bxor(5, 5)  # SAS: bxor(5, 5) -> 0
-sas_f_bxor(NA_real_, 1)  # SAS: bxor(., 1) -> .
+# BXOR: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# Bitwise exclusive OR of 1100 (12) and 1010 (10) is 0110, which is 6.
+sas_f_bxor(12, 10)  # SAS 9.4: bxor(12, 10) = 6
+
+# The exclusive OR of a value with itself is always 0.
+sas_f_bxor(5, 5)  # SAS 9.4: bxor(5, 5) = 0
+
+# A missing argument gives a missing result.
+sas_f_bxor(NA_real_, 1)  # SAS 9.4: bxor(., 1) = .
 }
 \seealso{
 Other special functions:

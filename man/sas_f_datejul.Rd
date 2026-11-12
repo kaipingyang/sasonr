@@ -4,7 +4,7 @@
 \alias{sas_f_datejul}
 \title{SAS \code{DATEJUL(julian-date)}}
 \arguments{
-\item{j}{Julian date.}
+\item{j}{Julian date as a number yyddd or yyyyddd (year followed by the 3-digit day of the year); a 2-digit year is resolved with the YEARCUTOFF option. Missing gives missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ SAS date from a Julian date (yyddd or yyyyddd). See the \href{https://documentat
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (26 of 27 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# DATEJUL: each call is followed by the result of the same call in SAS 9.4
-sas_f_datejul(2024075)  # SAS: datejul(2024075) -> 23450
-sas_f_datejul(2024001)  # SAS: datejul(2024001) -> 23376
-sas_f_datejul(1960001)  # SAS: datejul(1960001) -> 0
-sas_f_datejul(NA_real_)  # SAS: datejul(.) -> .
+# DATEJUL: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# DATEJUL converts a Julian date yyyyddd (day 75 of 2024) to a SAS date value:
+# 15 March 2024 is 23450.
+sas_f_datejul(2024075)  # SAS 9.4: datejul(2024075) = 23450
+
+# Day 1 of 2024 is 1 January 2024, SAS date 23376.
+sas_f_datejul(2024001)  # SAS 9.4: datejul(2024001) = 23376
+
+# 1 January 1960 is SAS date 0, the origin of SAS dates.
+sas_f_datejul(1960001)  # SAS 9.4: datejul(1960001) = 0
+
+# A missing argument gives a missing result.
+sas_f_datejul(NA_real_)  # SAS 9.4: datejul(.) = .
 }
 \seealso{
 Other datetime functions:

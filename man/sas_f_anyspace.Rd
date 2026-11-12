@@ -4,9 +4,9 @@
 \alias{sas_f_anyspace}
 \title{SAS \verb{ANYSPACE(string <, start>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string to search. A numeric value is first converted to character with the BEST12. format.}
 
-\item{start}{Starting position.}
+\item{start}{Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,14 +19,21 @@ Position of the first white-space character. See the \href{https://documentation
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# ANYSPACE: each call is followed by the result of the same call in SAS 9.4
-sas_f_anyspace("ab c")  # SAS: anyspace('ab c') -> 3
-sas_f_anyspace("abc")  # SAS: anyspace('abc') -> 0
-sas_f_anyspace("a b c", 3)  # SAS: anyspace('a b c', 3) -> 4
+# ANYSPACE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The first whitespace character (a blank) is at position 3.
+sas_f_anyspace("ab c")  # SAS 9.4: anyspace('ab c') = 3
+
+# No blank or other whitespace character occurs, so the result is 0.
+sas_f_anyspace("abc")  # SAS 9.4: anyspace('abc') = 0
+
+# Start 3 searches rightwards from position 3, skipping the blank at position
+# 2, and finds the blank at position 4.
+sas_f_anyspace("a b c", 3)  # SAS 9.4: anyspace('a b c', 3) = 4
 }
 \seealso{
 Other character functions:

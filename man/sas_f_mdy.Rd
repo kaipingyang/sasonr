@@ -4,11 +4,11 @@
 \alias{sas_f_mdy}
 \title{SAS \code{MDY(month, day, year)}}
 \arguments{
-\item{m}{Value when missing.}
+\item{m}{Month, an integer from 1 to 12.}
 
-\item{d}{Decimals override.}
+\item{d}{Day of the month, an integer valid for the month and year.}
 
-\item{y}{Numeric argument.}
+\item{y}{Year with 2 or 4 digits; a 2-digit year is resolved with the YEARCUTOFF option. An invalid combination or a missing argument gives missing (with a note for invalid dates).}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -23,15 +23,24 @@ SAS date from month, day and year. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (50 of 52 SAS 9.4 cases agree bit for bit; 2 case(s) differ in a log NOTE only). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MDY: each call is followed by the result of the same call in SAS 9.4
-sas_f_mdy(3, 15, 2024)  # SAS: mdy(3, 15, 2024) -> 23450
-sas_f_mdy(2, 30, 2024)  # SAS: mdy(2, 30, 2024) -> .
-sas_f_mdy(1, 1, 1960)  # SAS: mdy(1, 1, 1960) -> 0
-sas_f_mdy(NA_real_, 1, 2024)  # SAS: mdy(., 1, 2024) -> .
+# MDY: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# MDY builds a SAS date from month, day and year: 15 March 2024 is 23450.
+sas_f_mdy(3, 15, 2024)  # SAS 9.4: mdy(3, 15, 2024) = 23450
+
+# 30 February is not a valid date, so the result is missing (with a note in the
+# log).
+sas_f_mdy(2, 30, 2024)  # SAS 9.4: mdy(2, 30, 2024) = .
+
+# 1 January 1960 is SAS date 0.
+sas_f_mdy(1, 1, 1960)  # SAS 9.4: mdy(1, 1, 1960) = 0
+
+# A missing argument gives a missing result.
+sas_f_mdy(NA_real_, 1, 2024)  # SAS 9.4: mdy(., 1, 2024) = .
 }
 \seealso{
 Other datetime functions:

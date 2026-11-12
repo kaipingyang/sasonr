@@ -4,7 +4,7 @@
 \alias{sas_f_hour}
 \title{SAS \code{HOUR(time | datetime)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric SAS time value (seconds since midnight) or datetime value (seconds since 1 January 1960); only the time of day is used. A missing value gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,16 +17,24 @@ Hour. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titl
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# HOUR: each call is followed by the result of the same call in SAS 9.4
+# HOUR: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_hour(37815)  # SAS: hour('10:30:15't) -> 10
-sas_f_hour(2026166399)  # SAS: hour('15MAR2024:23:59:59'dt) -> 23
-sas_f_hour(0)  # SAS: hour(0) -> 0
-sas_f_hour(NA_real_)  # SAS: hour(.) -> .
+
+# HOUR extracts the hour from a SAS time value.
+sas_f_hour(37815)  # SAS 9.4: hour('10:30:15't) = 10
+
+# HOUR also accepts a datetime value and returns the hour of the day.
+sas_f_hour(2026166399)  # SAS 9.4: hour('15MAR2024:23:59:59'dt) = 23
+
+# Time 0 is midnight, hour 0.
+sas_f_hour(0)  # SAS 9.4: hour(0) = 0
+
+# A missing argument gives a missing result.
+sas_f_hour(NA_real_)  # SAS 9.4: hour(.) = .
 }
 \seealso{
 Other datetime functions:

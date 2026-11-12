@@ -4,9 +4,9 @@
 \alias{sas_f_comb}
 \title{SAS \code{COMB(n, r)}}
 \arguments{
-\item{n}{Count or position.}
+\item{n}{Total number of elements, a nonnegative integer. Missing gives missing.}
 
-\item{r}{Count.}
+\item{r}{Number of chosen elements, an integer from 0 to \code{n}. Missing gives missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,23 @@ Number of combinations. See the \href{https://documentation.sas.com/doc/en/lefun
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (29 of 30 SAS 9.4 cases agree bit for bit; 1 case(s) differ in the last bits (largest relative difference 2.3e-13; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COMB: each call is followed by the result of the same call in SAS 9.4
-sas_f_comb(5, 2)  # SAS: comb(5, 2) -> 10
-sas_f_comb(10, 0)  # SAS: comb(10, 0) -> 1
-sas_f_comb(52, 5)  # SAS: comb(52, 5) -> 2598960
-sas_f_comb(NA_real_, 2)  # SAS: comb(., 2) -> .
+# COMB: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The number of ways to choose 2 items out of 5 is 10.
+sas_f_comb(5, 2)  # SAS 9.4: comb(5, 2) = 10
+
+# There is exactly one way to choose 0 items.
+sas_f_comb(10, 0)  # SAS 9.4: comb(10, 0) = 1
+
+# The number of different 5-card hands from a 52-card deck.
+sas_f_comb(52, 5)  # SAS 9.4: comb(52, 5) = 2598960
+
+# A missing argument gives a missing result.
+sas_f_comb(NA_real_, 2)  # SAS 9.4: comb(., 2) = .
 }
 \seealso{
 Other numeric functions:

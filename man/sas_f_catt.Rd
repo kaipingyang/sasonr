@@ -4,7 +4,11 @@
 \alias{sas_f_catt}
 \title{SAS \verb{CATT(item-1 <, ..., item-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Character or numeric items to concatenate. Numeric items are converted with the BESTw. format and leading blanks are removed; a missing number becomes \code{.}. Trailing blanks are removed from every item; leading blanks are kept.}
+
+\item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
+
+\item{.len}{Internal: length of the result buffer (CATX).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,13 +21,21 @@ Concatenates after removing trailing blanks. See the \href{https://documentation
 }
 
 \section{Verification}{
- Partial: 2 of 3 example call(s) agree with SAS 9.4; the examples show only calls that agree.
+ partial (32 of 34 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: data, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CATT: each call is followed by the result of the same call in SAS 9.4
-sas_f_catt(" a ", "b ", " c")  # SAS: catt(' a ', 'b ', ' c') -> " ab c"
-sas_f_catt("a", "", "b")  # SAS: catt('a', '', 'b') -> "ab"
+# CATT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CATT removes only trailing blanks of each argument; the leading blanks of ' a
+# ' and ' c' are kept.
+sas_f_catt(" a ", "b ", " c")  # SAS 9.4: catt(' a ', 'b ', ' c') = " ab c"
+
+# The number 3 is converted to character without leading blanks, giving 'x3'.
+sas_f_catt("x", 3)  # SAS 9.4: catt('x', 3) = "x3"
+
+# The blank string '' is trimmed to nothing, so the result is 'ab'.
+sas_f_catt("a", " ", "b")  # SAS 9.4: catt('a', '', 'b') = "ab"
 }
 \seealso{
 Other character functions:

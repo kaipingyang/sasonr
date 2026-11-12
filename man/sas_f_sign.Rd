@@ -4,7 +4,7 @@
 \alias{sas_f_sign}
 \title{SAS \code{SIGN(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Numeric value. A missing value (\code{.} or a special missing value such as \code{.A}) gives a missing result.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Sign of the argument. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SIGN: each call is followed by the result of the same call in SAS 9.4
-sas_f_sign(-3)  # SAS: sign(-3) -> -1
-sas_f_sign(0)  # SAS: sign(0) -> 0
-sas_f_sign(2.5)  # SAS: sign(2.5) -> 1
-sas_f_sign(NA_real_)  # SAS: sign(.) -> .
+# SIGN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# A negative number has sign -1.
+sas_f_sign(-3)  # SAS 9.4: sign(-3) = -1
+
+# Zero has sign 0.
+sas_f_sign(0)  # SAS 9.4: sign(0) = 0
+
+# A positive number has sign 1.
+sas_f_sign(2.5)  # SAS 9.4: sign(2.5) = 1
+
+# A missing argument gives a missing result.
+sas_f_sign(NA_real_)  # SAS 9.4: sign(.) = .
 }
 \seealso{
 Other numeric functions:

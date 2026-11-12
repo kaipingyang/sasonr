@@ -4,7 +4,7 @@
 \alias{sas_f_reverse}
 \title{SAS \code{REVERSE(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks become leading blanks.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Reverses a string. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# REVERSE: each call is followed by the result of the same call in SAS 9.4
-sas_f_reverse("abc")  # SAS: reverse('abc') -> "cba"
-sas_f_reverse("abc  ")  # SAS: reverse('abc  ') -> "  cba"
-sas_f_reverse("")  # SAS: reverse('') -> ""
+# REVERSE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# REVERSE reverses the order of the characters.
+sas_f_reverse("abc")  # SAS 9.4: reverse('abc') = "cba"
+
+# Trailing blanks become leading blanks.
+sas_f_reverse("abc  ")  # SAS 9.4: reverse('abc  ') = "  cba"
+
+# A blank string stays blank.
+sas_f_reverse(" ")  # SAS 9.4: reverse('') = ""
 }
 \seealso{
 Other character functions:

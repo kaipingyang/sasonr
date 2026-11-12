@@ -4,9 +4,9 @@
 \alias{sas_f_poisson}
 \title{SAS \code{POISSON(m, n)}}
 \arguments{
-\item{m}{Value when missing.}
+\item{m}{Mean of the Poisson distribution, a nonnegative number.}
 
-\item{n}{Count or position.}
+\item{n}{Count, a nonnegative integer; the result is P(X <= n).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -19,15 +19,17 @@ Poisson cumulative probability. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (21 of 29 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 1.1e-14; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# POISSON: each call is followed by the result of the same call in SAS 9.4
-sas_f_poisson(1.5, 2)  # SAS: poisson(1.5, 2) -> 0.80884683053806
-sas_f_poisson(0.5, 0)  # SAS: poisson(0.5, 0) -> 0.606530659712633
-sas_f_poisson(10, 15)  # SAS: poisson(10, 15) -> 0.95125959669602
-sas_f_poisson(NA_real_, 1)  # SAS: poisson(., 1) -> .
+# POISSON: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# P(X <= 0) with mean 0.5 is exp(-0.5).
+sas_f_poisson(0.5, 0)  # SAS 9.4: poisson(0.5, 0) = 0.606530659712633
+
+# A missing mean gives a missing result.
+sas_f_poisson(NA_real_, 1)  # SAS 9.4: poisson(., 1) = .
 }
 \seealso{
 Other probability functions:

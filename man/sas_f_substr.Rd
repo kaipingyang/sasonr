@@ -4,11 +4,11 @@
 \alias{sas_f_substr}
 \title{SAS \verb{SUBSTR(string, position <, length>)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 
-\item{pos}{Position.}
+\item{pos}{Starting position, an integer from 1 to the length of \code{x}; an invalid position writes a note and sets the error flag.}
 
-\item{len}{Length.}
+\item{len}{Optional number of characters; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log).}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -23,16 +23,26 @@ Extracts a substring. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- Partial: 35 of 41 offline conformance cases agree with SAS 9.4; inputs outside the verified range fail loud (\code{sasonr_unsupported}).
+ partial (36 of 41 SAS 9.4 cases agree bit for bit; 5 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SUBSTR: each call with the result of the same SUBSTR call in SAS 9.4
-# (offline conformance cases; dates are SAS day counts from 1960-01-01)
-sas_f_substr("abcdef", 2)  # SAS substr('abcdef',2) = "bcdef"
-sas_f_substr("abcdef", 2, 3)  # SAS substr('abcdef',2,3) = "bcd"
-sas_f_substr("abcdef", 7)  # SAS substr('abcdef',7) = ""
-sas_f_substr("abcdef", 2, 10)  # SAS substr('abcdef',2,10) = "bcdef"
+# SUBSTR: each call is explained above it and followed by the result of the same call in SAS 9.4
+# (dates are SAS day counts from 1960-01-01)
+
+# From position 2 to the end.
+sas_f_substr("abcdef", 2)  # SAS 9.4: substr('abcdef',2) = "bcdef"
+
+# Three characters from position 2.
+sas_f_substr("abcdef", 2, 3)  # SAS 9.4: substr('abcdef',2,3) = "bcd"
+
+# A position beyond the end is invalid: blank result, NOTE and _ERROR_ = 1 in a
+# DATA step.
+sas_f_substr("abcdef", 7)  # SAS 9.4: substr('abcdef',7) = ""
+
+# A length beyond the end: the rest of the string (with a NOTE and _ERROR_ = 1
+# in a DATA step).
+sas_f_substr("abcdef", 2, 10)  # SAS 9.4: substr('abcdef',2,10) = "bcdef"
 }
 \seealso{
 Other character functions:

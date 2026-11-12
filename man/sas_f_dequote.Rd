@@ -4,7 +4,7 @@
 \alias{sas_f_dequote}
 \title{SAS \code{DEQUOTE(string)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. If it starts with a quotation mark, the quoted part is returned with doubled quotes undoubled and the rest discarded; otherwise it is returned unchanged.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,24 @@ Removes matching quotation marks. See the \href{https://documentation.sas.com/do
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# DEQUOTE: each call is followed by the result of the same call in SAS 9.4
-sas_f_dequote("\"abc\"")  # SAS: dequote('"abc"') -> "abc"
-sas_f_dequote("'a''b'")  # SAS: dequote("'a''b'") -> "a'b"
-sas_f_dequote("abc")  # SAS: dequote('abc') -> "abc"
-sas_f_dequote("\"ab\"cd")  # SAS: dequote('"ab"cd') -> "ab"
+# DEQUOTE: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# DEQUOTE removes the enclosing double quotation marks.
+sas_f_dequote("\"abc\"")  # SAS 9.4: dequote('"abc"') = "abc"
+
+# Inside single quotes a doubled quote '' stands for one quote, so the result
+# is a'b.
+sas_f_dequote("'a''b'")  # SAS 9.4: dequote("'a''b'") = "a'b"
+
+# A string that does not start with a quotation mark is returned unchanged.
+sas_f_dequote("abc")  # SAS 9.4: dequote('abc') = "abc"
+
+# Text after the closing quotation mark is discarded, so only 'ab' remains.
+sas_f_dequote("\"ab\"cd")  # SAS 9.4: dequote('"ab"cd') = "ab"
 }
 \seealso{
 Other character functions:

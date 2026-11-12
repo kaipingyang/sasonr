@@ -4,7 +4,7 @@
 \alias{sas_f_bnot}
 \title{SAS \code{BNOT(argument)}}
 \arguments{
-\item{a}{Numeric argument.}
+\item{a}{Numeric value treated as an unsigned 32-bit integer (0 to 4294967295); non-integers and values outside that range are invalid. Missing gives missing. All 32 bits are inverted.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,14 +19,21 @@ Bitwise NOT. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# BNOT: each call is followed by the result of the same call in SAS 9.4
-sas_f_bnot(0)  # SAS: bnot(0) -> 4294967295
-sas_f_bnot(4294967295)  # SAS: bnot(4294967295) -> 0
-sas_f_bnot(NA_real_)  # SAS: bnot(.) -> .
+# BNOT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# BNOT flips all 32 bits, so the complement of 0 is 2 to the power 32 minus 1 =
+# 4294967295.
+sas_f_bnot(0)  # SAS 9.4: bnot(0) = 4294967295
+
+# The complement of a value with all 32 bits set is 0.
+sas_f_bnot(4294967295)  # SAS 9.4: bnot(4294967295) = 0
+
+# A missing argument gives a missing result.
+sas_f_bnot(NA_real_)  # SAS 9.4: bnot(.) = .
 }
 \seealso{
 Other special functions:

@@ -4,7 +4,7 @@
 \alias{sas_f_coalescec}
 \title{SAS \verb{COALESCEC(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Character values; the first one that is not blank is returned. If all are blank the result is blank.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ First non-blank character argument. See the \href{https://documentation.sas.com/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (24 of 24 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# COALESCEC: each call is followed by the result of the same call in SAS 9.4
-sas_f_coalescec("", "b", "c")  # SAS: coalescec('', 'b', 'c') -> "b"
-sas_f_coalescec("", " ")  # SAS: coalescec('', ' ') -> ""
-sas_f_coalescec(" a", "b")  # SAS: coalescec(' a', 'b') -> " a"
+# COALESCEC: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# COALESCEC returns the first nonblank character argument, 'b'.
+sas_f_coalescec(" ", "b", "c")  # SAS 9.4: coalescec('', 'b', 'c') = "b"
+
+# All arguments are blank, so the result is blank.
+sas_f_coalescec(" ", " ")  # SAS 9.4: coalescec('', ' ') = ""
+
+# A leading blank does not make a string blank, so ' a' is returned unchanged.
+sas_f_coalescec(" a", "b")  # SAS 9.4: coalescec(' a', 'b') = " a"
 }
 \seealso{
 Other character functions:

@@ -4,11 +4,11 @@
 \alias{sas_f_datdif}
 \title{SAS \code{DATDIF(sdate, edate, basis)}}
 \arguments{
-\item{start}{Starting position.}
+\item{start}{Starting SAS date value (SAS sdate). Missing gives missing.}
 
-\item{end}{End position.}
+\item{end}{Ending SAS date value (SAS edate); before \code{start} gives a negative result. Missing gives missing.}
 
-\item{basis}{Day-count basis, as in SAS.}
+\item{basis}{Day-count basis: 'ACT/ACT' (or 'ACTUAL') counts actual days; '30/360' (or '360') counts 30-day months, treating the 31st as the 30th. Default 'ACT/ACT'.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,16 +21,26 @@ Days between two dates under a day-count basis. See the \href{https://documentat
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# DATDIF: each call is followed by the result of the same call in SAS 9.4
+# DATDIF: each call is explained above it and followed by the result of the same call in SAS 9.4
 # (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)
-sas_f_datdif(23376, 23436, "ACT/ACT")  # SAS: datdif('01JAN2024'd, '01MAR2024'd, 'ACT/ACT') -> 60
-sas_f_datdif(23376, 23436, "30/360")  # SAS: datdif('01JAN2024'd, '01MAR2024'd, '30/360') -> 60
-sas_f_datdif(23406, 23436, "30/360")  # SAS: datdif('31JAN2024'd, '01MAR2024'd, '30/360') -> 31
-sas_f_datdif(23436, 23376, "ACT/ACT")  # SAS: datdif('01MAR2024'd, '01JAN2024'd, 'ACT/ACT') -> -60
+
+# With basis 'ACT/ACT' DATDIF counts actual days: 31 in January plus 29 in
+# February 2024 = 60.
+sas_f_datdif(23376, 23436, "ACT/ACT")  # SAS 9.4: datdif('01JAN2024'd, '01MAR2024'd, 'ACT/ACT') = 60
+
+# Basis '30/360' treats every month as 30 days, so two months are 60 days.
+sas_f_datdif(23376, 23436, "30/360")  # SAS 9.4: datdif('01JAN2024'd, '01MAR2024'd, '30/360') = 60
+
+# Under '30/360' the 31st counts as the 30th, so 31 January to 1 March is 31
+# days.
+sas_f_datdif(23406, 23436, "30/360")  # SAS 9.4: datdif('31JAN2024'd, '01MAR2024'd, '30/360') = 31
+
+# If the end date is before the start date, the result is negative.
+sas_f_datdif(23436, 23376, "ACT/ACT")  # SAS 9.4: datdif('01MAR2024'd, '01JAN2024'd, 'ACT/ACT') = -60
 }
 \seealso{
 Other datetime functions:

@@ -4,11 +4,11 @@
 \alias{sas_f_probbnml}
 \title{SAS \code{PROBBNML(p, n, m)}}
 \arguments{
-\item{p}{Probability.}
+\item{p}{Success probability of each trial, from 0 to 1.}
 
-\item{n}{Count or position.}
+\item{n}{Number of trials, a positive integer.}
 
-\item{m}{Value when missing.}
+\item{m}{Number of successes, an integer from 0 to \code{n}; the result is P(X <= m).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,17 @@ Binomial cumulative probability. See the \href{https://documentation.sas.com/doc
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (28 of 37 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 7.1e-15; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# PROBBNML: each call is followed by the result of the same call in SAS 9.4
-sas_f_probbnml(0.5, 10, 3)  # SAS: probbnml(0.5, 10, 3) -> 0.171875
-sas_f_probbnml(0.2, 5, 5)  # SAS: probbnml(0.2, 5, 5) -> 1
-sas_f_probbnml(0.1, 20, 0)  # SAS: probbnml(0.1, 20, 0) -> 0.1215766545906
-sas_f_probbnml(NA_real_, 5, 1)  # SAS: probbnml(., 5, 1) -> .
+# PROBBNML: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# P(X <= n) is always 1.
+sas_f_probbnml(0.2, 5, 5)  # SAS 9.4: probbnml(0.2, 5, 5) = 1
+
+# A missing probability gives a missing result.
+sas_f_probbnml(NA_real_, 5, 1)  # SAS 9.4: probbnml(., 5, 1) = .
 }
 \seealso{
 Other probability functions:

@@ -4,11 +4,11 @@
 \alias{sas_f_transtrn}
 \title{SAS \code{TRANSTRN(source, target, replacement)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. This is the source.}
 
-\item{from}{Start value.}
+\item{from}{Character target substring; every occurrence is replaced.}
 
-\item{to}{End value.}
+\item{to}{Replacement string; may be zero-length (e.g. \code{TRIMN('')}), which deletes the target.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,14 +21,20 @@ Replaces substrings (zero-length allowed). See the \href{https://documentation.s
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (24 of 24 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TRANSTRN: each call is followed by the result of the same call in SAS 9.4
-sas_f_transtrn("banana", "an", "AN")  # SAS: transtrn('banana', 'an', 'AN') -> "bANANa"
-sas_f_transtrn("abc", "b", sas_f_trimn(""))  # SAS: transtrn('abc', 'b', trimn('')) -> "ac"
-sas_f_transtrn("abc", "x", "y")  # SAS: transtrn('abc', 'x', 'y') -> "abc"
+# TRANSTRN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# TRANSTRN replaces every occurrence of the substring 'an' by 'AN'.
+sas_f_transtrn("banana", "an", "AN")  # SAS 9.4: transtrn('banana', 'an', 'AN') = "bANANa"
+
+# TRIMN('') is a zero-length string, so the target 'b' is removed entirely.
+sas_f_transtrn("abc", "b", sas_f_trimn(" "))  # SAS 9.4: transtrn('abc', 'b', trimn('')) = "ac"
+
+# The target does not occur, so the string is unchanged.
+sas_f_transtrn("abc", "x", "y")  # SAS 9.4: transtrn('abc', 'x', 'y') = "abc"
 }
 \seealso{
 Other character functions:

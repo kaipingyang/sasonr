@@ -4,7 +4,7 @@
 \alias{sas_f_trim}
 \title{SAS \code{TRIM(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are removed; an all-blank value gives one blank.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,20 @@ Removes trailing blanks (one blank for a blank string). See the \href{https://do
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# TRIM: each call is followed by the result of the same call in SAS 9.4
-sas_f_trim("abc  ")  # SAS: trim('abc  ') -> "abc"
-sas_f_trim("  a")  # SAS: trim('  a') -> "  a"
-sas_f_lengthc(sas_f_trim("   "))  # SAS: lengthc(trim('   ')) -> 1
+# TRIM: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# TRIM removes trailing blanks.
+sas_f_trim("abc  ")  # SAS 9.4: trim('abc  ') = "abc"
+
+# Leading blanks are kept.
+sas_f_trim("  a")  # SAS 9.4: trim('  a') = "  a"
+
+# TRIM of an all-blank string returns one blank, so LENGTHC is 1.
+sas_f_lengthc(sas_f_trim("   "))  # SAS 9.4: lengthc(trim('   ')) = 1
 }
 \seealso{
 Other character functions:

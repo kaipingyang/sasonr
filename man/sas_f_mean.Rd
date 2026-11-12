@@ -4,7 +4,7 @@
 \alias{sas_f_mean}
 \title{SAS \verb{MEAN(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{One or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,15 +17,23 @@ Mean of the non-missing values. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) and 1 offline conformance case(s) agree with SAS (1 case(s) with a known log or listing difference).
+ verified (46 of 46 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# MEAN: each call is followed by the result of the same call in SAS 9.4
-sas_f_mean(1, 2, 3, 4)  # SAS: mean(1, 2, 3, 4) -> 2.5
-sas_f_mean(1, NA_real_, 3)  # SAS: mean(1, ., 3) -> 2
-sas_f_mean(NA_real_, NA_real_)  # SAS: mean(., .) -> .
-sas_f_mean(sas_missing(".A"), 4)  # SAS: mean(.A, 4) -> 4
+# MEAN: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# MEAN returns the arithmetic mean, 2.5.
+sas_f_mean(1, 2, 3, 4)  # SAS 9.4: mean(1, 2, 3, 4) = 2.5
+
+# Missing values are ignored: (1 + 3) / 2 = 2.
+sas_f_mean(1, NA_real_, 3)  # SAS 9.4: mean(1, ., 3) = 2
+
+# All arguments are missing, so the result is missing.
+sas_f_mean(NA_real_, NA_real_)  # SAS 9.4: mean(., .) = .
+
+# The special missing value .A is ignored, so the mean is 4.
+sas_f_mean(sas_missing(".A"), 4)  # SAS 9.4: mean(.A, 4) = 4
 }
 \seealso{
 Other descriptive functions:

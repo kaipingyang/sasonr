@@ -4,7 +4,7 @@
 \alias{sas_f_cv}
 \title{SAS \verb{CV(argument-1 <, ..., argument-n>)}}
 \arguments{
-\item{...}{Further arguments, as in SAS (vectorised).}
+\item{...}{Two or more numeric values (constants, variables or \code{OF} lists). Missing values, including special missing values, are ignored; if too few nonmissing values remain the result is missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -17,14 +17,21 @@ Coefficient of variation. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 3 example call(s) agree with SAS.
+ verified (42 of 42 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CV: each call is followed by the result of the same call in SAS 9.4
-sas_f_cv(1, 2, 3, 4)  # SAS: cv(1, 2, 3, 4) -> 51.6397779494322
-sas_f_cv(2, 2)  # SAS: cv(2, 2) -> 0
-sas_f_cv(1, NA_real_, 3)  # SAS: cv(1, ., 3) -> 70.7106781186548
+# CV: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# CV is the coefficient of variation: 100 times the standard deviation divided
+# by the mean.
+sas_f_cv(1, 2, 3, 4)  # SAS 9.4: cv(1, 2, 3, 4) = 51.6397779494322
+
+# Values without spread have a coefficient of variation of 0.
+sas_f_cv(2, 2)  # SAS 9.4: cv(2, 2) = 0
+
+# Missing values are ignored; the CV is computed from 1 and 3.
+sas_f_cv(1, NA_real_, 3)  # SAS 9.4: cv(1, ., 3) = 70.7106781186548
 }
 \seealso{
 Other descriptive functions:

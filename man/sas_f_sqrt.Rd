@@ -4,7 +4,7 @@
 \alias{sas_f_sqrt}
 \title{SAS \code{SQRT(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Nonnegative numeric value. A negative value gives missing with a note in the log; missing gives missing.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,24 @@ Square root. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# SQRT: each call is followed by the result of the same call in SAS 9.4
-sas_f_sqrt(16)  # SAS: sqrt(16) -> 4
-sas_f_sqrt(2)  # SAS: sqrt(2) -> 1.4142135623731
-sas_f_sqrt(-1)  # SAS: sqrt(-1) -> .
-sas_f_sqrt(NA_real_)  # SAS: sqrt(.) -> .
+# SQRT: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The square root of 16 is 4.
+sas_f_sqrt(16)  # SAS 9.4: sqrt(16) = 4
+
+# The square root of 2.
+sas_f_sqrt(2)  # SAS 9.4: sqrt(2) = 1.4142135623731
+
+# The square root of a negative number is undefined, so the result is missing
+# (with a note in the log).
+sas_f_sqrt(-1)  # SAS 9.4: sqrt(-1) = .
+
+# A missing argument gives a missing result.
+sas_f_sqrt(NA_real_)  # SAS 9.4: sqrt(.) = .
 }
 \seealso{
 Other numeric functions:

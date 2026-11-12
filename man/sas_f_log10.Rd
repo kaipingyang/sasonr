@@ -4,7 +4,7 @@
 \alias{sas_f_log10}
 \title{SAS \code{LOG10(argument)}}
 \arguments{
-\item{x}{Argument (vector; character values are SAS fixed-width strings).}
+\item{x}{Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,15 +19,24 @@ Base-10 logarithm. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ verified (18 of 18 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# LOG10: each call is followed by the result of the same call in SAS 9.4
-sas_f_log10(1000)  # SAS: log10(1000) -> 3
-sas_f_log10(2)  # SAS: log10(2) -> 0.301029995663981
-sas_f_log10(0.001)  # SAS: log10(0.001) -> -3
-sas_f_log10(0)  # SAS: log10(0) -> .
+# LOG10: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# The base-10 logarithm of 1000 is 3.
+sas_f_log10(1000)  # SAS 9.4: log10(1000) = 3
+
+# The base-10 logarithm of 2.
+sas_f_log10(2)  # SAS 9.4: log10(2) = 0.301029995663981
+
+# The base-10 logarithm of 0.001 is -3.
+sas_f_log10(0.001)  # SAS 9.4: log10(0.001) = -3
+
+# The logarithm of 0 is undefined, so the result is missing (with a note in the
+# log).
+sas_f_log10(0)  # SAS 9.4: log10(0) = .
 }
 \seealso{
 Other numeric functions:

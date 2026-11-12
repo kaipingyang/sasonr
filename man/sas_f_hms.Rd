@@ -4,11 +4,11 @@
 \alias{sas_f_hms}
 \title{SAS \code{HMS(hour, minute, second)}}
 \arguments{
-\item{h}{Hours.}
+\item{h}{Numeric hours. Missing gives missing.}
 
-\item{m}{Value when missing.}
+\item{m}{Numeric minutes; values above 59 carry over. Missing gives missing.}
 
-\item{s}{Source text.}
+\item{s}{Numeric seconds, fractions allowed. Missing gives missing.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,24 @@ Time value from hour, minute and second. See the \href{https://documentation.sas
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ partial (37 of 41 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# HMS: each call is followed by the result of the same call in SAS 9.4
-sas_f_hms(10, 30, 15)  # SAS: hms(10, 30, 15) -> 37815
-sas_f_hms(0, 90, 0)  # SAS: hms(0, 90, 0) -> 5400
-sas_f_hms(1, 0, 0.25)  # SAS: hms(1, 0, 0.25) -> 3600.25
-sas_f_hms(NA_real_, 1, 1)  # SAS: hms(., 1, 1) -> .
+# HMS: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# HMS converts hours, minutes and seconds to a SAS time value in seconds:
+# 10*3600 + 30*60 + 15.
+sas_f_hms(10, 30, 15)  # SAS 9.4: hms(10, 30, 15) = 37815
+
+# Minutes may exceed 59: 90 minutes are 5400 seconds.
+sas_f_hms(0, 90, 0)  # SAS 9.4: hms(0, 90, 0) = 5400
+
+# Fractional seconds are kept.
+sas_f_hms(1, 0, 0.25)  # SAS 9.4: hms(1, 0, 0.25) = 3600.25
+
+# A missing argument gives a missing result.
+sas_f_hms(NA_real_, 1, 1)  # SAS 9.4: hms(., 1, 1) = .
 }
 \seealso{
 Other datetime functions:

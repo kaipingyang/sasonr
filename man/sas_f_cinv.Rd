@@ -4,11 +4,11 @@
 \alias{sas_f_cinv}
 \title{SAS \verb{CINV(p, df <, nc>)}}
 \arguments{
-\item{p}{Probability.}
+\item{p}{Numeric probability strictly between 0 and 1. A missing value gives a missing result.}
 
-\item{df}{Degrees of freedom.}
+\item{df}{Degrees of freedom, a positive number (need not be an integer).}
 
-\item{nc}{Noncentrality parameter.}
+\item{nc}{Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,15 +21,14 @@ Quantile of the chi-square distribution. See the \href{https://documentation.sas
 }
 
 \section{Verification}{
- Verified against SAS 9.4: 4 example call(s) agree with SAS.
+ approximate (23 of 39 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 6.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{
-# CINV: each call is followed by the result of the same call in SAS 9.4
-sas_f_cinv(0.95, 3)  # SAS: cinv(0.95, 3) -> 7.81472790325
-sas_f_cinv(0.5, 1)  # SAS: cinv(0.5, 1) -> 0.45493642312
-sas_f_cinv(0.95, 3, 2)  # SAS: cinv(0.95, 3, 2) -> 12.28375372313
-sas_f_cinv(NA_real_, 2)  # SAS: cinv(., 2) -> .
+# CINV: each call is explained above it and followed by the result of the same call in SAS 9.4
+
+# A missing probability gives a missing result.
+sas_f_cinv(NA_real_, 2)  # SAS 9.4: cinv(., 2) = .
 }
 \seealso{
 Other probability functions:
