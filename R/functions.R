@@ -990,7 +990,22 @@ sas_f_probit <- function(p) {
   out
 }
 #' @export
-sas_f_probt <- function(x, df, nc = 0) stats::pt(x, df, nc)
+sas_f_probt <- function(x, df, nc = 0, .at = NULL) {
+  # R's noncentral t (pnt) stops at an absolute error of about 1e-13: for
+  # t = -40, df = 100, nc = 5 it returns 2.3e-13 where SAS returns 7.5e-88, and
+  # pt(-1000, 100, 5) returns the same number as pt(-1e6, 1000, 5).  log.p and
+  # lower.tail = FALSE do not help (the loss happens before the logarithm, and
+  # pnt is symmetric internally).  Spec 04 Q3 therefore says noncentral variants
+  # fail loud; the central case keeps the documented last-bit tolerance.
+  if (any(!is.na(nc) & nc != 0)) {
+    abort_unsupported("PROBT with a non-zero nc (noncentral t)", if (is.null(.at)) NULL else .at[1])
+  }
+  out <- stats::pt(x, df)
+  n <- max(length(out), length(nc))
+  out <- rep_len(out, n)
+  out[is.na(rep_len(nc, n))] <- NA_real_ # a missing nc gives a missing result
+  out
+}
 #' @export
 sas_f_probchi <- function(x, df, nc = 0) stats::pchisq(x, df, nc)
 #' @export
