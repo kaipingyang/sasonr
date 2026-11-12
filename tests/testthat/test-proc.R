@@ -24,6 +24,32 @@ proc sort data=d; by v; run;
   expect_equal(res$work$d$g, c("a", "b", "a", "b", "a", ""))
 })
 
+test_that("PROC SORT: special missing values sort before . and any number", {
+  # SAS numeric order is ._ < . < .A < .B < ... < .Z < every non-missing number,
+  # and DESCENDING reverses it exactly.
+  code <- "
+data m;
+  x = .;      output;
+  x = .A;     output;
+  x = ._;     output;
+  x = -1e300; output;
+  x = 1;      output;
+run;
+proc sort data=m out=u; by x; run;
+proc sort data=m out=d; by descending x; run;
+"
+  res <- sas_run(code)
+  lab <- function(x) {
+    k <- sas_miss_code(x)
+    ifelse(is.na(k), format(x, trim = TRUE),
+           ifelse(k == 1L, ".", paste0(".", miss_label(k))))
+  }
+  expect_identical(lab(res$work$u$x)[1:3], c("._", ".", ".A"))
+  expect_identical(res$work$u$x[4:5], c(-1e300, 1))
+  expect_identical(lab(res$work$d$x)[3:5], c(".A", ".", "._"))
+  expect_identical(res$work$d$x[1:2], c(1, -1e300))
+})
+
 test_that("PROC SORT NODUPKEY keeps the first observation of each key; WHERE filters", {
   code <- "
 data d; input id x; datalines;
