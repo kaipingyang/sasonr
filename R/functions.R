@@ -1849,6 +1849,7 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
 fn_table <- utils::modifyList(fn_table, list(
   substrn = fn_spec("char", 2, 3, "arg"), char = fn_spec("char", 2, 2, 1L), first = fn_spec("char", 1, 1, 1L),
   compbl = fn_spec("char", 1, 1, "arg"), compress = fn_spec("char", 1, 3, "arg"),
+  exist = fn_spec("num", 1, 2),
   find = fn_spec("num", 2, 4), findc = fn_spec("num", 2, 4), findw = fn_spec("num", 2, 5),
   indexw = fn_spec("num", 2, 3), verify = fn_spec("num", 2, Inf), count = fn_spec("num", 2, 3),
   countc = fn_spec("num", 2, 3), countw = fn_spec("num", 1, 3), scan = fn_spec("char", 2, 4, "arg"),
