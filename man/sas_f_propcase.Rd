@@ -19,7 +19,7 @@ Converts to proper case. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 
 \section{Verification}{
- verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

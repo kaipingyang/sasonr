@@ -17,7 +17,7 @@ Removes matching quotation marks. See the \href{https://documentation.sas.com/do
 }
 
 \section{Verification}{
- verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

@@ -349,10 +349,35 @@ sql_eval_lowered <- function(low, ctx, rows = NULL) {
   n <- nrow(d)
   for (id in names(d)) assign(id, d[[id]], envir = env)
   assign(".sql_n", n, envir = env)
+  saved <- list(err = rt$err, notes = rt$notes, math = rt$math, mv = rt$mv)
+  rt$err <- FALSE
+  rt$notes <- character()
   v <- eval(parse(text = code, keep.source = FALSE), env)
+  sql_function_notes(rt$notes, ctx)
+  rt$err <- saved$err
+  rt$notes <- saved$notes
+  rt$math <- saved$math
+  rt$mv <- saved$mv
   if (length(v) == 1 && n != 1) v <- rep(v, n)
   if (length(v) != n) v <- rep_len(v, n)
   v
+}
+
+# Data-error NOTEs of functions evaluated by PROC SQL.  SAS 9.4 writes
+# "NOTE: Invalid argument to function MDY. Missing values may be generated."
+# (no arguments, no line) where the DATA step writes "NOTE: Invalid argument to
+# function MDY(2,30,2024) at line ..."; other NOTEs, and several failing calls
+# or rows, are not verified in PROC SQL: fail loud instead of dropping them.
+sql_function_notes <- function(notes, ctx) {
+  if (!length(notes)) return(invisible())
+  m <- regmatches(notes, regexec("^NOTE: Invalid argument to function ([A-Z0-9_]+)\\(", notes))
+  fn <- vapply(m, function(x) if (length(x) == 2L) x[2] else NA_character_, "")
+  if (anyNA(fn) || length(notes) > 1L) {
+    abort_unsupported(paste0("a function data-error NOTE in PROC SQL (", sub("^NOTE: ", "", notes[1]),
+                             if (length(notes) > 1L) paste0(" and ", length(notes) - 1L, " more"), ")"))
+  }
+  sql_note(ctx$eng, sprintf("NOTE: Invalid argument to function %s. Missing values may be generated.", fn))
+  invisible()
 }
 
 sql_eval <- function(e, ctx) sql_eval_lowered(sql_lower(e, ctx), ctx)

@@ -161,8 +161,8 @@ affected_cases <- function(base = "origin/main", roots = "tests/conformance") {
     sel <- rep(FALSE, length(cases))
     if (matrices) sel <- sel | area %in% c("fn_matrix", "fmt_matrix")
     if (formats) sel <- sel | area %in% c("fmt_matrix", "rounding") |
-      (area %in% c("fn_matrix", "functions", "fn_examples") & toupper(feat) %in% c("PUT", "PUTN", "PUTC", "INPUT", "INPUTN", "INPUTC"))
-    sel <- sel | (area %in% c("fn_matrix", "functions", "fn_examples") & toupper(feat) %in% toupper(fns))
+      (area %in% c("fn_matrix", "functions", "fn_examples", "fn_where") & toupper(feat) %in% c("PUT", "PUTN", "PUTC", "INPUT", "INPUTN", "INPUTC"))
+    sel <- sel | (area %in% c("fn_matrix", "functions", "fn_examples", "fn_where") & toupper(feat) %in% toupper(fns))
     if (sql) sel <- sel | vapply(seq_along(cases), function(i) {
       area[i] == "fn_matrix" && any(utils::read.csv(file.path(cases[i], "cases.csv"), colClasses = "character")$context == "sql")
     }, logical(1))

@@ -21,7 +21,7 @@ Position of the first difference (signed). See the \href{https://documentation.s
 }
 
 \section{Verification}{
- verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

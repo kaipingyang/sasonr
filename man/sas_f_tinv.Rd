@@ -21,7 +21,7 @@ Quantile of the t distribution. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- approximate (22 of 39 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 3.6e-11; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (22 of 39 SAS 9.4 cases agree bit for bit; 12 case(s) differ in the last bits (largest relative difference 3.6e-11; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

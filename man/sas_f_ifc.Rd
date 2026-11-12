@@ -23,7 +23,7 @@ Character value chosen by a condition. See the \href{https://documentation.sas.c
 }
 
 \section{Verification}{
- verified (41 of 41 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (41 of 41 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

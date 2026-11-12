@@ -207,17 +207,18 @@ fmt_e <- function(v, w, d) {
       m <- if (kk > 0) paste0("0.", strrep("0", kk)) else "0"
       ex <- 0L
     } else {
-      g <- sig15(abs(v))
-      ex <- g$ex
       if (k >= 13L) {
-        keep <- substr(g$digits, 1L, 14L)
-      } else {
-        keep <- substr(g$digits, 1L, kk + 1L)
-        if (as.integer(substr(g$digits, kk + 2L, kk + 2L)) >= 5L) keep <- incr_decimal(keep)
-        if (nchar(keep) > kk + 1L) {
-          keep <- substr(keep, 1L, kk + 1L)
+        g <- sig15(abs(v))
+        ex <- g$ex
+        keep <- e14_digits(g, v)
+        if (nchar(keep) > 14L) {
+          keep <- substr(keep, 1L, 14L)
           ex <- ex + 1L
         }
+      } else {
+        g <- sci_dec_text(v, kk)
+        ex <- g$ex
+        keep <- gsub(".", "", g$mant, fixed = TRUE)
       }
       m <- if (nchar(keep) > 1L) paste0(substr(keep, 1L, 1L), ".", substring(keep, 2L)) else keep
     }
@@ -229,6 +230,21 @@ fmt_e <- function(v, w, d) {
     if (k <= 0L) return(stars(w))
     k <- k - 1L
   }
+}
+
+# 14 significant digits of an E form with 13 or more mantissa decimals
+# (Ew., BESTw. above 16 columns, w.d written in E notation): the first 14
+# digits of the display value.  Gold (round-13 scans, fn_matrix BEST32.): a
+# rest up to 0.888 of the 14th digit is truncated (0.75, 0.822, 0.888 seen);
+# above it SAS rounds up or truncates with no order (0.890 and 0.945 rounded
+# up, 0.931 truncated): fail loud.
+e14_digits <- function(g, v) {
+  keep <- substr(g$digits, 1L, 14L)
+  if (g$rest > 0.8885) {
+    abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with 14 significant digits: whether SAS 9.4 ",
+                             "rounds up the 14th digit is not determined by the gold standard"))
+  }
+  keep
 }
 
 # PERCENTw.d: the number (x * 100, written as w.d would write it in w - 3

@@ -2,6 +2,7 @@
 
     python -I tools/gen_matrix.py functions [NAME ...]   # tests/conformance/fn_matrix/<FN>/
     python -I tools/gen_matrix.py formats [NAME ...]     # tests/conformance/fmt_matrix/<FMT>/
+    python -I tools/gen_matrix.py where [NAME ...]       # tests/conformance/fn_where/<FN>/ (WHERE context)
 
 Layout (case_format.md, "matrix layout"): per function or format one directory
 with program.sas (all cases), cases.csv (case id, context, SAS expression,
@@ -48,6 +49,7 @@ ROOT = os.path.dirname(HERE)
 INV = os.path.join(ROOT, "..", "sasonr-conformance", "data", "inventory")
 FN_OUT = os.path.join(ROOT, "tests", "conformance", "fn_matrix")
 FMT_OUT = os.path.join(ROOT, "tests", "conformance", "fmt_matrix")
+WHERE_OUT = os.path.join(ROOT, "tests", "conformance", "fn_where")
 
 L200 = "length s $200; s = repeat('ab', 99);"
 L32K = "length s $32767; s = repeat('x', 32766);"
@@ -258,6 +260,30 @@ def case_block(cid, ctx, expr, setup, rtype):
     out = ["%%put @@BEGIN %s %s;" % (cid, ctx)]
     if ctx == "sysfunc":
         out += ["%%let __r=%s;" % expr, "%%put @@M %s [&__r];" % cid]
+    elif ctx == "where":
+        # the DATA step value of the call is the reference; the WHERE step keeps the
+        # one row when the WHERE value equals it (missing values compare equal only to
+        # the same missing value), so the case's member has one row (r = the value)
+        # or none, and the NOTEs of the WHERE evaluation are attributed to the case
+        # the arguments of the call are variables of the input row, so that SAS
+        # evaluates the function per observation (a call with constant arguments is
+        # folded into a constant when the WHERE clause is compiled)
+        out.append("data work.w_%s;" % ds)
+        if setup:
+            out.append("  " + setup)
+        wexpr = expr
+        pc = split_call(expr)
+        if pc and pc[1] and pc[0].lower() not in ("put", "input") and not any(re.match(r"(?i)^of\s", a) for a in pc[1]):
+            vars_ = []
+            for k, a in enumerate(pc[1], 1):
+                if not a or re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", a):
+                    vars_.append(a)
+                else:
+                    out.append("  w%d = %s;" % (k, a))
+                    vars_.append("w%d" % k)
+            wexpr = "%s(%s)" % (pc[0].lower(), ", ".join(vars_))
+        out += ["  __ref = %s;" % expr, "run;", "data work.%s;" % ds, "  set work.w_%s;" % ds,
+                "  where %s = __ref;" % wexpr, "  r = __ref;", "  keep r;", "run;"]
     elif ctx == "sql":
         out += ["data work.one; x = 1; run;", "proc sql;",
                 "  create table work.%s as select %s as r from work.one;" % (ds, expr), "quit;",
@@ -539,6 +565,63 @@ def fmt_expr(kind, char, base, val, ws):
     return "input(%s, %s%s)" % (sas_str(val), mod, f)
 
 
+def pilot_cases(fn):
+    """DATA step calls of the function pilot (tests/conformance/functions/<FN>/<case>/program.sas)."""
+    d = os.path.join(ROOT, "tests", "conformance", "functions", fn)
+    out = []
+    if not os.path.isdir(d):
+        return out
+    for c in sorted(os.listdir(d)):
+        p = os.path.join(d, c, "program.sas")
+        if not os.path.exists(p):
+            continue
+        lines = open(p, encoding="latin-1").read().split("\n")
+        try:
+            i = next(k for k, l in enumerate(lines) if re.match(r"^data work\.%s;" % re.escape(c), l, re.I))
+        except StopIteration:
+            continue
+        setup = []
+        for l in lines[i + 1:]:
+            m = re.match(r"^  r = (.*);$", l)
+            if m:
+                out.append(("where", m.group(1).strip(), " ".join(setup), "function pilot %s" % c))
+                break
+            if l.startswith("  file ") or l.startswith("run;"):
+                break
+            setup.append(l.strip())
+    return out
+
+
+def gen_where(names):
+    """fn_where/<FN>/: every DATA step case of the function matrix again inside a WHERE statement."""
+    inv = read_inventory()
+    INV_TYPES.update({k: v["fnctype"] for k, v in inv.items()})
+    ex = parse_examples(os.path.join(HERE, "fn_examples.txt"))
+    mx = parse_matrix(os.path.join(HERE, "fn_matrix.txt"))
+    total = 0
+    pilots = sorted(os.listdir(os.path.join(ROOT, "tests", "conformance", "functions")))
+    for fn in sorted(set(mx) | set(pilots)):
+        if names and fn not in names:
+            continue
+        if fn not in mx:
+            mx[fn] = {"env": False, "ret": None, "glob": [], "extra": [], "key": set(), "base": None, "nogeneric": True}
+        if mx[fn].get("env"):
+            continue  # clock-dependent: the DATA step and WHERE values are taken at different times
+        info = inv.get(fn)
+        rtype = mx[fn]["ret"] or (info["fnctype"] if info else "N")
+        cases = [("where", c, setup, note) for ctx, c, setup, note in function_cases(fn, ex.get(fn), mx[fn], inv)
+                 if ctx == "data"]
+        cases += pilot_cases(fn)
+        if not cases:
+            continue
+        glob = (ex.get(fn) or {}).get("glob", []) + mx[fn]["glob"]
+        n = write_cases(WHERE_OUT, fn, cases, rtype, "SAS 9.4 Functions and CALL Routines, %s Function (in a WHERE statement)" % fn,
+                        ["function", fn.lower(), "fn_where", "where"], glob, "fn_where", None)
+        total += n
+        print("%-10s %4d" % (fn, n))
+    print("total", total)
+
+
 def gen_formats(names):
     spec = parse_fmt_matrix(os.path.join(HERE, "fmt_matrix.txt"))
     total = 0
@@ -570,7 +653,7 @@ def gen_formats(names):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ("functions", "formats"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("functions", "formats", "where"):
         raise SystemExit(__doc__)
     sel = {a.upper() for a in sys.argv[2:]}
-    (gen_functions if sys.argv[1] == "functions" else gen_formats)(sel)
+    {"functions": gen_functions, "formats": gen_formats, "where": gen_where}[sys.argv[1]](sel)

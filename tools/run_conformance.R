@@ -90,7 +90,7 @@ if (nzchar(status_sel)) {
   fm_kind <- vapply(fm, `[`, "", 2L)
   hit_f <- f$name[f$status %in% st]
   hit_m <- fm_dir[paste(fm_sas, fm_kind) %in% paste(m$name, m$kind)[m$status %in% st]]
-  sel_dirs <- c(file.path("fn_matrix", hit_f), file.path("functions", hit_f), file.path("fmt_matrix", hit_m))
+  sel_dirs <- c(file.path("fn_matrix", hit_f), file.path("functions", hit_f), file.path("fn_where", hit_f), file.path("fmt_matrix", hit_m))
 }
 affected <- NULL
 if (nzchar(since)) {

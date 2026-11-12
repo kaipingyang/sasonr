@@ -266,7 +266,15 @@ where_text <- function(e) {
           paste0(w(x$lhs), x$op, w(x$rhs))
         }
       },
-      compare = paste0(w(x$lhs), if (x$op == "^=") " not = " else x$op, if (isTRUE(x$colon)) ":" else "", w(x$rhs)),
+      compare = {
+        # SAS writes a comparison of a variable with a function call variable first
+        # (fn_where gold: "where abs(w1) = __ref" is echoed "WHERE __ref=ABS(w1);")
+        if (identical(x$rhs$node, "var") && identical(x$lhs$node, "call") && !isTRUE(x$colon)) {
+          flip <- c("<" = ">", ">" = "<", "<=" = ">=", ">=" = "<=")
+          x <- list(node = "compare", op = if (x$op %in% names(flip)) flip[[x$op]] else x$op, lhs = x$rhs, rhs = x$lhs)
+        }
+        paste0(w(x$lhs), if (x$op == "^=") " not = " else x$op, if (isTRUE(x$colon)) ":" else "", w(x$rhs))
+      },
       chain = paste(vapply(x$args, w, ""), collapse = " "),
       "in" = paste0(w(x$lhs), if (isTRUE(x$negate)) " not in (" else " in (",
                     paste(vapply(x$items, function(it) if (it$node == "range") paste0(it$from, ":", it$to) else w(it), ""),
@@ -283,7 +291,12 @@ where_text <- function(e) {
       },
       contains = paste0(w(x$lhs), if (isTRUE(x$negate)) " not contains " else " contains ", w(x$rhs)),
       is_missing = paste0(w(x$lhs), if (isTRUE(x$negate)) " is not null" else " is null"),
-      call = if (x$name == "sqllike") paste0(w(x$args[[1]]), " like ", w(x$args[[2]])) else paste0(toupper(x$name), "(", paste(vapply(x$args, function(a) if (a$node == "of") "of" else w(a), ""), collapse = ", "), ")"),
+      call = if (x$name != "sqllike" && length(x$args) && all(vapply(x$args, function(a) a$node %in% c("num", "str", "missing"), logical(1)))) {
+        # SAS evaluates a call with constant arguments when it compiles the WHERE
+        # clause and prints the value ("contains trim('smith')" is echoed
+        # "contains 'smith'"); that folding is not implemented
+        abort_unsupported(paste0("the WHERE note of ", toupper(x$name), "() with constant arguments (SAS prints the folded value)"))
+      } else if (x$name == "sqllike") paste0(w(x$args[[1]]), " like ", w(x$args[[2]])) else paste0(toupper(x$name), "(", paste(vapply(x$args, function(a) if (a$node == "of") "of" else w(a), ""), collapse = ", "), ")"),
       "?"
     )
   }

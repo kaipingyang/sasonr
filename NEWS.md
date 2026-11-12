@@ -1,5 +1,39 @@
 # sasonr (development version)
 
+## Round 13 (2026-11-12): display rounding scans, WHERE matrix, CONSTANT and MDY
+
+New ulp-by-ulp real-SAS scans of numeric display rounding (about 45,000
+points) showed that the round-7 rule for `w.d` formats ("up to 2.25E-16 below
+a half point rounds up") was wrong in both directions for values one to three
+ulps below a half point, and that SAS shows at most 15 significant digits
+where sasonr printed the exact binary digits. Both gave silent wrong text.
+
+* **Display rounding rebuilt on the scan results.** SAS formats the display
+  value `fl(|x| * (1 + 2^-52))`: BESTw. above 16 columns and `w.d` beyond 15
+  significant digits show its first 15 digits truncated (this settles the
+  former BEST32. carry window exactly); rounding to 0 decimals is half away
+  from zero on it. With decimals, a value at or above the half point rounds
+  up, the double nearest to the half point rounds up, and a value 3 ulps or
+  more below it rounds down. In between SAS's choice depends on the binary
+  exponent, not on the distance, and sasonr now **fails loud** instead of
+  guessing; so do the 16th significant digit, values below 1 shown with 15 or
+  more decimals and 14-digit E mantissas with a large rest. Integers are
+  written with their exact digits.
+* **WHERE context matrix.** Every DATA step case of the function matrix runs
+  again inside a WHERE statement (`tests/conformance/fn_where/`, one program
+  per function, the call's arguments as variables of a one-row input).
+  Functions whose WHERE cases all agree gain `where` in `contexts_verified`.
+  A WHERE expression now raises SAS's "Function F requires a numeric
+  (character) expression as argument n" ERROR instead of converting, and the
+  WHERE line of the NOTE writes a variable compared with a function call
+  first, as SAS does.
+* **CONSTANT('EXACTINT', 1E300)** reproduces SAS's exception (two
+  "An exception has been encountered" blocks, the step stops with 0
+  observations) in a step that runs once; elsewhere it fails loud.
+* **MDY**: the %SYSFUNC NOTE is wrapped at LINESIZE; PROC SQL writes
+  "Invalid argument to function MDY. Missing values may be generated." (other
+  function data-error NOTEs in PROC SQL fail loud instead of being dropped).
+
 ## Round 12.1 (2026-11-12): review of round 12
 
 An independent review of round 12 found places where the new moment kernel

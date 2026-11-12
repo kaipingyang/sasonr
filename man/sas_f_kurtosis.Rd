@@ -17,7 +17,7 @@ Kurtosis. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 }
 
 \section{Verification}{
- approximate (281 of 970 SAS 9.4 cases agree bit for bit; 537 case(s) differ in the last bits (largest relative difference 2.3e-14; different algorithm); 152 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (720 of 970 SAS 9.4 cases agree bit for bit; 31 case(s) differ in the last bits; 219 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

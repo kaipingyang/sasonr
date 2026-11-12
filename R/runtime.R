@@ -670,34 +670,18 @@ sas_lag_vec <- function(x, n = 1L) {
 
 strip_zeros <- function(s) ifelse(grepl(".", s, fixed = TRUE), sub("\\.?0+$", "", s), s)
 
-# 15 digits of v (a leading "0" counts as a digit), truncated unless the
-# value is within the display fuzz of the next 15-digit decimal.
-#
-# The rule comes from the SAS 9.4 gold of the function matrices (every
-# BEST32. value written in fn_matrix/*/results.txt, 10 rows below): with
-# r = (distance to the next 15-digit decimal) / |v|, SAS rounds up every value
-# with r below 1.9588575719195922E-16 (the smallest r SAS truncates:
-# 4.56388888888888, hex 4012416C16C16C17) and truncates every value with r
-# above 2.7538013767845717E-16 (the largest r SAS rounds up: 3.0725874871931,
-# hex 400894A8BF9CBED5).  In between SAS does both (7 rounded up, 3
-# truncated): the rule is not settled and the value fails loud.
-best_fuzz_lo <- 1.9588575719195922e-16
-best_fuzz_hi <- 2.7538013767845717e-16
+# 15 digits of v (a leading "0" counts as a digit): the first 15 digits of
+# the display value fl(|v| * (1 + 2^-52)), truncated.  Round-13 scans
+# (172 BEST32. values, rounding_100.md): this explains every value of the
+# former fail-loud window (r between 1.96E-16 and 2.75E-16 below the next
+# 15-digit decimal: SAS rounds up exactly when the display value reaches it).
 best_digits15 <- function(v, w) {
   a <- abs(v)
   intd <- if (a < 1) 1L else nchar(sprintf("%.0f", floor(a)))
   dd <- max(15L - intd, 0L)
-  s <- sprintf("%.*f", dd + 25L, a)
+  s <- sprintf("%.*f", dd + 25L, display_value(a))
   dot <- regexpr(".", s, fixed = TRUE)
   keep <- paste0(substr(s, 1L, dot - 1L), substr(s, dot + 1L, dot + dd))
-  f <- as.numeric(paste0("0.", substring(s, dot + dd + 1L)))
-  r <- (1 - f) * 10^-dd / a
-  if (r >= best_fuzz_lo && r <= best_fuzz_hi) {
-    abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), ": whether SAS 9.4 rounds up or truncates the ",
-                             "15th digit of this value at widths above 16 is not settled"))
-  }
-  fuzz <- r < best_fuzz_lo
-  if (fuzz) keep <- incr_decimal(keep)
   r <- as.numeric(paste0(substr(keep, 1L, nchar(keep) - dd), ".", substring(keep, nchar(keep) - dd + 1L)))
   if (v < 0) -r else r
 }
@@ -745,7 +729,10 @@ sas_fmt_best <- function(x, w = 12L) {
     if (is.na(s)) {
       for (d in seq(min(w - 1L, dmax), 0L)) {
         # SAS rounds half away from zero (sprintf rounds half to even)
-        cand <- strip_zeros(sprintf("%.*f", d, if (d <= 10L) display_round(v, d) else v))
+        # skip widths that cannot fit before rounding (rounding adds at most one digit)
+        if (nchar(sprintf("%.0f", trunc(abs(v)))) + (d > 0) + d + (v < 0) > w) next
+        # above 16 columns v already holds SAS's 15 digits (best_digits15): printed as they are
+        cand <- strip_zeros(sprintf("%.*f", d, if (w > 16L) v else display_round(v, d)))
         if (nchar(cand) <= w) {
           if (cand %in% c("0", "-0") && v != 0) break
           s <- cand
@@ -760,7 +747,12 @@ sas_fmt_best <- function(x, w = 12L) {
     } else if ((is.na(s) || abs(v) < 1e-5) && w > 15L) {
       # wide widths: at most 14 significant digits, truncated (sig15)
       g <- sig15(abs(v))
-      m <- sub("0+$", "", substr(g$digits, 1L, 14L))
+      m <- e14_digits(g, v)
+      if (nchar(m) > 14L) {
+        m <- substr(m, 1L, 14L)
+        g$ex <- g$ex + 1L
+      }
+      m <- sub("0+$", "", m)
       m <- if (nchar(m) > 1L) paste0(substr(m, 1L, 1L), ".", substring(m, 2L)) else m
       sci <- paste0(if (v < 0) "-", m, "E", if (g$ex < 0) "-", abs(g$ex))
     } else if (is.na(s) || (v != 0 && abs(v) < 1e-5)) {

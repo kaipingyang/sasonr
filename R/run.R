@@ -133,7 +133,9 @@ engine_exec_steps <- function(eng, text, line) {
     if (!eng$execute) next
     vec <- step$type == "data" && tr$level %in% c("L1", "L2")
     eng$phase <- if (step$type == "data") "execute_data" else "execute"
-    env <- engine_eval(eng, tr$code, stage = vec)
+    env <- tryCatch(engine_eval(eng, tr$code, stage = vec),
+                    sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e))
+    if (!is.environment(env)) next
     if (vec && (rt$err || isTRUE(rt$mv_rerun))) {
       # A data error in vectorised code: re-run the step row by row (L3) so
       # that _ERROR_, the NOTEs and the PDV dump follow SAS exactly.

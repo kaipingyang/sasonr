@@ -17,7 +17,7 @@ Standard error of the mean. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- partial (789 of 940 SAS 9.4 cases agree bit for bit; 151 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 10 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (721 of 940 SAS 9.4 cases agree bit for bit; 219 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

@@ -230,7 +230,10 @@ fn_policy <- list(
   constant = fpol(dom = function(a) {
     nm <- tolower(strip_both(as_sas_chr(a[[1]])))
     p <- dom_n(a, 2)
-    dom_or(code_if(length(a) > 1 & nm == "exactint" & abs(p) >= 1e15, "?"),
+    # SAS 9.4 crashes for EXACTINT with an argument of 1E300 or more in magnitude
+    # ("ERROR:  An exception has been encountered.", the step stops): "exc"
+    dom_or(code_if(length(a) > 1 & nm == "exactint" & abs(p) >= 1e300, "exc"),
+           code_if(length(a) > 1 & nm == "exactint" & abs(p) >= 1e15, "?"),
            code_if(length(a) > 1 & !is.na(p) & nm != "exactint" & nm %in% c("big", "e", "euler", "logbig", "logmaceps",
                                                                             "logsmall", "maceps", "pi", "small", "sqrtbig",
                                                                             "sqrtmaceps", "sqrtsmall"), "math"),
@@ -474,6 +477,7 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   }
   dom <- if (is.null(p$dom)) rep("ok", n) else rep_len(p$dom(args), n)
   if (p$miss != "none") dom[miss] <- "ok"
+  if (any(dom == "exc")) sas_step_exception(.at)
   if (any(dom == "?")) {
     abort_unsupported(sprintf("%s with these arguments (SAS 9.4 behaviour not verified)", toupper(.name)),
                       .at[1] %||% NULL)

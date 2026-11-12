@@ -36,10 +36,10 @@ test_that("HIGH 2: a log-only difference is a mismatch; partial needs passing ca
 
 test_that("HIGH 2: functions whose log differed from SAS (MDY, PRXCHANGE, PRXMATCH) no longer run silently", {
   fn <- sas_feature_registry("functions")
-  # MDY: log NOTEs in %SYSFUNC and PROC SQL still differ -> mismatch, gated
-  expect_identical(fn$status[fn$name == "MDY"], "mismatch")
+  # MDY: the %SYSFUNC and PROC SQL NOTEs agree with SAS since round 13 -> verified, runs
+  expect_identical(fn$status[fn$name == "MDY"], "verified")
   withr::with_options(list(sasonr.strict = TRUE),
-                      expect_error(sas_run("data a; d = mdy(1, 2, 2020); run;"), class = "sasonr_not_verified"))
+                      expect_identical(sas_run("data a; d = mdy(1, 2, 2020); run;")$work$a$d, 21916))
   # PRXMATCH / PRXCHANGE: an invalid pattern (SAS writes the Perl diagnostic) now fails loud
   expect_error(sas_f_prxmatch("/[/", "abc"), class = "sasonr_unsupported")
   expect_error(sas_f_prxchange("s/[/x/", 1, "a"), class = "sasonr_unsupported")
@@ -107,15 +107,13 @@ test_that("HIGH 5: PUTN and INPUTN check the format named at run time", {
   if (length(ok)) expect_identical(sas_f_putn(0, "date9."), "01JAN1960")
 })
 
-test_that("HIGH 5: BESTw. above 16 fails loud where SAS both rounds up and truncates", {
-  # SAS 9.4 gold (fn_matrix results.txt): 4.56388888888888 is truncated although
-  # values farther from the next decimal are rounded up: in that window the rule
-  # is not settled
+test_that("HIGH 5: BESTw. above 16 shows the first 15 digits of the display value", {
+  # SAS 9.4 gold (fn_matrix results.txt): the former undetermined window is settled by
+  # the round-13 scans: 4.56388888888888 is truncated, LOG(3) rounded up
   v <- readBin(as.raw(c(0x40, 0x12, 0x41, 0x6C, 0x16, 0xC1, 0x6C, 0x17)), "double", endian = "big")
-  expect_error(sas_fmt_best(v, 32L), class = "sasonr_unsupported")
-  # outside the window the gold decides: COS(1) truncated, 0.7 a decimal
+  expect_identical(trimws(sas_fmt_best(v, 32L)), "4.56388888888888")
   expect_identical(trimws(sas_fmt_best(cos(1), 32L)), "0.54030230586813")
-  expect_error(sas_fmt_best(log(3), 32L), class = "sasonr_unsupported") # rounded up by SAS, inside the window
+  expect_identical(trimws(sas_fmt_best(log(3), 32L)), "1.09861228866811")
   expect_identical(trimws(sas_fmt_best(0.7, 32L)), "0.7")
   expect_identical(trimws(sas_fmt_best(cos(1), 12L)), "0.5403023059")
 })

@@ -361,6 +361,7 @@ an_call <- function(e, st) {
       abort_unsupported(paste0("function ", toupper(e$name), "()"), e$line)
     }
     if (!isTRUE(e$construct)) feature_check("function", e$name, e$line, st$context)
+    if (identical(st$context, "where") && !isTRUE(e$construct)) where_arg_types(e, st)
     nargs <- sum(vapply(e$args, function(a) if (a$node == "of") 2L else 1L, integer(1)))
     # argument counts SAS 9.4 accepts (feature registry, from the SAS inventory): more or fewer is a compile-time ERROR
     sas_n <- registry_arg_counts(e$name)

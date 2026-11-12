@@ -12,6 +12,7 @@
 \alias{sas_div}
 \alias{sas_epoch}
 \alias{sas_eq}
+\alias{sas_exception_lines}
 \alias{sas_function_inventory}
 \alias{sas_ge}
 \alias{sas_gt}
@@ -33,6 +34,7 @@
 \alias{sas_return}
 \alias{sas_rtrim}
 \alias{sas_select_error}
+\alias{sas_step_exception}
 \alias{sas_stop_step}
 \alias{sas_tiny}
 \title{Runtime helpers used by translated code}

@@ -256,8 +256,8 @@ mac_sysfunc <- function(text, line = NULL) {
       rt$math <- old$math
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
-        rt$on_note(c("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution. The result of the operations",
-                     "      have been set to a missing value."))
+        rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
+                                  "The result of the operations have been set to a missing value.")))
       }
       r
     } else {

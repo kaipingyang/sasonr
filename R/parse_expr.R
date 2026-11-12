@@ -132,6 +132,7 @@ peek_infix <- function(p) {
         abort_unsupported("the >< operator in a WHERE expression", tk_line(p))
       } else infix("binary", "min", 7L, right = TRUE),
       "<>" = if (p$where_ctx) infix("cmp", "^=", 3L) else infix("binary", "max", 7L, right = TRUE),
+      "?" = if (p$where_ctx) infix("contains", "contains", 3L) else NULL, # WHERE: ? is CONTAINS
       NULL
     ))
   }

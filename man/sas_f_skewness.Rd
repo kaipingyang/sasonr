@@ -17,7 +17,7 @@ Skewness. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 }
 
 \section{Verification}{
- approximate (323 of 970 SAS 9.4 cases agree bit for bit; 496 case(s) differ in the last bits (largest relative difference 7.3e-15; different algorithm); 151 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (748 of 970 SAS 9.4 cases agree bit for bit; 222 case(s) fail loud (sasonr_unsupported)). Verified domain: at most 9 non-missing arguments, of magnitude 0 or 1E-140..1E140; results below 1E-12 in magnitude (other than 0) fail loud (guard: SAS returns 0 for many symmetric lists, fn_probe/SKEWNESS); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
 }
 
 \examples{

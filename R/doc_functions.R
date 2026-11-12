@@ -449,7 +449,7 @@ NULL
 #' @param ... Numeric or character values. A numeric value counts as missing if it is `.` or a special missing value; a character value counts if it is blank.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: partial (37 of 39 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: %SYSFUNC(CMISS); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (37 of 39 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: %SYSFUNC(CMISS); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_cmiss.R
 #' @family descriptive functions
 #' @name sas_f_cmiss
@@ -462,7 +462,7 @@ NULL
 #' @param ... Numeric values; the first one that is not `.` or a special missing value is returned. If all are missing the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_coalesce.R
 #' @family numeric functions
 #' @name sas_f_coalesce
@@ -475,7 +475,7 @@ NULL
 #' @param ... Character values; the first one that is not blank is returned. If all are blank the result is blank.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (24 of 24 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (24 of 24 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_coalescec.R
 #' @family character functions
 #' @name sas_f_coalescec
@@ -519,7 +519,7 @@ NULL
 #' @param mods Optional modifier string, default none. i ignores case; l removes leading blanks before comparing; n treats both strings as SAS name literals (quotes and n removed, case ignored); : truncates the longer string to the length of the shorter one.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_compare.R
 #' @family character functions
 #' @name sas_f_compare
@@ -532,7 +532,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Each run of two or more blanks is replaced by one blank.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_compbl.R
 #' @family character functions
 #' @name sas_f_compbl
@@ -561,7 +561,7 @@ NULL
 #' @param p Optional numeric parameter, used only by 'EXACTINT': the number of bytes (integer from 3 to 8); without it 'EXACTINT' refers to 8 bytes.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: mismatch (2 case(s) differ (values, display, log or errors)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (34 of 34 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_constant.R
 #' @family numeric functions
 #' @name sas_f_constant
@@ -604,7 +604,7 @@ NULL
 #' @param mods Optional modifier string, default none. i ignores case; t trims trailing blanks from `x` and `sub`.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_count.R
 #' @family character functions
 #' @name sas_f_count
@@ -619,7 +619,7 @@ NULL
 #' @param mods Optional modifier string. i ignores case; k or v counts characters NOT in the list; t trims trailing blanks; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the list.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (31 of 31 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_countc.R
 #' @family character functions
 #' @name sas_f_countc
@@ -634,7 +634,7 @@ NULL
 #' @param mods Optional modifier string. m makes every delimiter separate words, so adjacent delimiters enclose an empty word; q ignores delimiters inside quoted substrings; b counts words from the end; i ignores case; k makes the delimiters all characters NOT listed; a, d, l, u, s, p, n, f, x, c, h add letters, digits, lowercase, uppercase, whitespace, punctuation, name characters, name-start characters, hexadecimal digits, control characters or tabs to the delimiters.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_countw.R
 #' @family character functions
 #' @name sas_f_countw
@@ -780,7 +780,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. If it starts with a quotation mark, the quoted part is returned with doubled quotes undoubled and the rest discarded; otherwise it is returned unchanged.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_dequote.R
 #' @family character functions
 #' @name sas_f_dequote
@@ -810,7 +810,7 @@ NULL
 #' @param b Numeric divisor (SAS y). Division by 0 gives the special missing value .I for a positive dividend, .M for a negative one, and . for 0/0, without a log note.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_divide.R
 #' @family numeric functions
 #' @name sas_f_divide
@@ -887,7 +887,7 @@ NULL
 #' @param a5 Start position (numeric), used when `a4` holds modifiers. A positive value searches rightwards from that position; a negative value searches leftwards from position |start|. Default 1.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: partial (33 of 37 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: FINDW with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (33 of 37 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: FINDW with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_findw.R
 #' @family character functions
 #' @name sas_f_findw
@@ -916,7 +916,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Its first character is returned, even if it is a blank.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_first.R
 #' @family character functions
 #' @name sas_f_first
@@ -1039,7 +1039,7 @@ NULL
 #' @param m Optional character value returned when the condition is missing; when omitted, `b` is returned.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (41 of 41 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (41 of 41 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_ifc.R
 #' @family character functions
 #' @name sas_f_ifc
@@ -1055,7 +1055,7 @@ NULL
 #' @param m Optional numeric value returned when the condition is missing; when omitted, `b` is returned.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (47 of 47 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (47 of 47 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_ifn.R
 #' @family numeric functions
 #' @name sas_f_ifn
@@ -1069,7 +1069,7 @@ NULL
 #' @param s Character excerpt to find, including its trailing blanks. The result is the start position of the first occurrence, or 0.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: partial (23 of 25 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: SASHELP tables; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sysfunc. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (23 of 25 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: SASHELP tables; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sysfunc, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_index.R
 #' @family character functions
 #' @name sas_f_index
@@ -1083,7 +1083,7 @@ NULL
 #' @param ... One or more character excerpts; each character of any excerpt is a search target. The search is case sensitive.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (32 of 32 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (32 of 32 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_indexc.R
 #' @family character functions
 #' @name sas_f_indexc
@@ -1098,7 +1098,7 @@ NULL
 #' @param dlm Optional delimiter characters, default blank.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: partial (25 of 27 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: INDEXW with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (25 of 27 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: INDEXW with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_indexw.R
 #' @family character functions
 #' @name sas_f_indexw
@@ -1245,7 +1245,7 @@ NULL
 #' @param ... Four or more numeric values. Missing values are ignored; with fewer than 4 nonmissing values or zero variance the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: approximate (717 of 970 SAS 9.4 cases agree bit for bit; 31 case(s) differ in the last bits; 222 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (720 of 970 SAS 9.4 cases agree bit for bit; 31 case(s) differ in the last bits; 219 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_kurtosis.R
 #' @family descriptive functions
 #' @name sas_f_kurtosis
@@ -1285,7 +1285,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Leading blanks are moved to the end; the length is unchanged.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_left.R
 #' @family character functions
 #' @name sas_f_left
@@ -1298,7 +1298,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 1 for a blank string.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_length.R
 #' @family character functions
 #' @name sas_f_length
@@ -1311,7 +1311,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result includes trailing blanks.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (13 of 13 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (13 of 13 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_lengthc.R
 #' @family character functions
 #' @name sas_f_lengthc
@@ -1324,7 +1324,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result is the number of bytes allocated, including trailing blanks.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (14 of 14 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (14 of 14 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_lengthm.R
 #' @family character functions
 #' @name sas_f_lengthm
@@ -1337,7 +1337,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 0 for a blank string.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (16 of 16 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (16 of 16 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_lengthn.R
 #' @family character functions
 #' @name sas_f_lengthn
@@ -1364,7 +1364,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: partial (616 of 617 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: BEST32. of 1.0986122886681098: whether SAS 9.4 rounds up or truncates the 15th digit of this value at widths above 16 is not settled; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (617 of 617 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_log.R
 #' @family numeric functions
 #' @name sas_f_log
@@ -1421,7 +1421,7 @@ NULL
 #' @param ... Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: approximate (24 of 39 SAS 9.4 cases agree bit for bit; 9 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (25 of 39 SAS 9.4 cases agree bit for bit; 9 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_logcdf.R
 #' @family probability functions
 #' @name sas_f_logcdf
@@ -1451,7 +1451,7 @@ NULL
 #' @param ... Distribution parameters in the order SAS 9.4 defines: NORMAL location and scale (default 0, 1); T df <, nc>; CHISQ df <, nc>; F ndf, ddf <, nc>; BINOMIAL p, n; POISSON mean; UNIFORM left, right (default 0, 1); EXPONENTIAL scale (default 1); BETA a, b; GAMMA shape <, scale>; LOGNORMAL location, scale (default 0, 1).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: approximate (22 of 32 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 1.4e-15; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (23 of 32 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 1.4e-15; different algorithm); 4 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_logsdf.R
 #' @family probability functions
 #' @name sas_f_logsdf
@@ -1464,7 +1464,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: partial (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: LOWCASE with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: LOWCASE with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_lowcase.R
 #' @family character functions
 #' @name sas_f_lowcase
@@ -1493,7 +1493,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: mismatch (2 case(s) differ (values, display, log or errors)). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (52 of 52 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_mdy.R
 #' @family datetime functions
 #' @name sas_f_mdy
@@ -1519,7 +1519,7 @@ NULL
 #' @param ... One or more numeric values (constants, variables or `OF` lists). Missing values, including special missing values, are ignored; if all are missing the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: verified (43 of 43 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (43 of 43 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_median.R
 #' @family descriptive functions
 #' @name sas_f_median
@@ -1558,7 +1558,7 @@ NULL
 #' @param x Numeric or character value. A number is missing if it is `.` or a special missing value (`.A` to `.Z`, `._`); a character value is missing if it is blank.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Blank character values and special missing values (.A-.Z, ._) are missing; `is.na()` knows neither.
-#' @section Verification: verified (22 of 22 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (22 of 22 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_missing.R
 #' @family special functions
 #' @name sas_f_missing
@@ -1588,7 +1588,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: partial (613 of 628 SAS 9.4 cases agree bit for bit; 15 case(s) fail loud (sasonr_unsupported)). Verified domain: argument magnitudes 0 or 1E-140..1E140, and a / b not an integer unless the remainder is exactly 0; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (614 of 628 SAS 9.4 cases agree bit for bit; 14 case(s) fail loud (sasonr_unsupported)). Verified domain: argument magnitudes 0 or 1E-140..1E140, and a / b not an integer unless the remainder is exactly 0; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_modz.R
 #' @family numeric functions
 #' @name sas_f_modz
@@ -1614,7 +1614,7 @@ NULL
 #' @param ... Numeric values. `.` and special missing values are not counted.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_n.R
 #' @family descriptive functions
 #' @name sas_f_n
@@ -1627,7 +1627,7 @@ NULL
 #' @param ... Numeric values. `.` and special missing values such as `.A` are counted as missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments are ignored; the result is missing only when no argument is non-missing. R summary functions return NA unless `na.rm = TRUE`.
-#' @section Verification: verified (36 of 36 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (36 of 36 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_nmiss.R
 #' @family descriptive functions
 #' @name sas_f_nmiss
@@ -1869,7 +1869,7 @@ NULL
 #' @param p Numeric probability strictly between 0 and 1. A missing value gives a missing result.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: approximate (20 of 24 SAS 9.4 cases agree bit for bit; 3 case(s) differ in the last bits (largest relative difference 2.3e-16; different algorithm); 1 case(s) fail loud (sasonr_unsupported)). Contexts where every case agrees: sysfunc. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (20 of 24 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 2.3e-16; different algorithm)). Contexts where every case agrees: sysfunc. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_probit.R
 #' @family probability functions
 #' @name sas_f_probit
@@ -1897,7 +1897,7 @@ NULL
 #' @param nc Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: approximate (15 of 38 SAS 9.4 cases agree bit for bit; 15 case(s) differ in the last bits (largest relative difference 3.0e-10; different algorithm); 8 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (15 of 38 SAS 9.4 cases agree bit for bit; 17 case(s) differ in the last bits (largest relative difference 3.0e-10; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_probt.R
 #' @family probability functions
 #' @name sas_f_probt
@@ -1911,7 +1911,7 @@ NULL
 #' @param dlm Optional characters that start a new word, replacing the default set: blank, slash, hyphen, open parenthesis, period and tab.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (26 of 26 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_propcase.R
 #' @family character functions
 #' @name sas_f_propcase
@@ -1942,7 +1942,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
-#' @section Verification: partial (18 of 21 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: PRXMATCH() of an invalid regular expression (SAS writes the Perl diagnostic, not reproduced); regular expression without delimiters: ; regular expression without delimiters: xyz; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (18 of 21 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: PRXMATCH() of an invalid regular expression (SAS writes the Perl diagnostic, not reproduced); regular expression without delimiters: ; regular expression without delimiters: xyz; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_prxmatch.R
 #' @family special functions
 #' @name sas_f_prxmatch
@@ -2070,7 +2070,7 @@ NULL
 #' @param x Character value; the ASCII code (0 to 255) of its first character is returned.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_rank.R
 #' @family character functions
 #' @name sas_f_rank
@@ -2097,7 +2097,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks become leading blanks.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_reverse.R
 #' @family character functions
 #' @name sas_f_reverse
@@ -2110,7 +2110,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are moved to the front; the length is unchanged.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_right.R
 #' @family character functions
 #' @name sas_f_right
@@ -2241,7 +2241,7 @@ NULL
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: approximate (356 of 419 SAS 9.4 cases agree bit for bit; 62 case(s) differ in the last bits; 1 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (356 of 419 SAS 9.4 cases agree bit for bit; 63 case(s) differ in the last bits (largest relative difference 1.2e-16; different algorithm)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_sinh.R
 #' @family numeric functions
 #' @name sas_f_sinh
@@ -2395,7 +2395,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Leading and trailing blanks are removed; an all-blank value gives a zero-length string.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (19 of 19 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_strip.R
 #' @family character functions
 #' @name sas_f_strip
@@ -2522,7 +2522,7 @@ NULL
 #' @param nc Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Arguments and parameterisation follow SAS (order of arguments, noncentrality), not R's d/p/q/r functions.
-#' @section Verification: approximate (22 of 39 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 3.6e-11; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: approximate (22 of 39 SAS 9.4 cases agree bit for bit; 12 case(s) differ in the last bits (largest relative difference 3.6e-11; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_tinv.R
 #' @family probability functions
 #' @name sas_f_tinv
@@ -2548,7 +2548,7 @@ NULL
 #' @param ... Pairs of character arguments to, from: each character of from is replaced by the character at the same position in to (blank if to is shorter). Several pairs may be given.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (29 of 29 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_translate.R
 #' @family character functions
 #' @name sas_f_translate
@@ -2563,7 +2563,7 @@ NULL
 #' @param to Replacement string; may be zero-length (e.g. `TRIMN('')`), which deletes the target.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (24 of 24 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (24 of 24 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_transtrn.R
 #' @family character functions
 #' @name sas_f_transtrn
@@ -2578,7 +2578,7 @@ NULL
 #' @param to Replacement string. A blank literal is one blank, so the target cannot be deleted; use TRANSTRN with TRIMN for that.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (28 of 28 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_tranwrd.R
 #' @family character functions
 #' @name sas_f_tranwrd
@@ -2591,7 +2591,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are removed; an all-blank value gives one blank.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_trim.R
 #' @family character functions
 #' @name sas_f_trim
@@ -2604,7 +2604,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. Trailing blanks are removed; an all-blank value gives a zero-length string.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_trimn.R
 #' @family character functions
 #' @name sas_f_trimn
@@ -2617,7 +2617,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: partial (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: UPCASE with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sysfunc, sql. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (18 of 19 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: UPCASE with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, sysfunc, sql, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_upcase.R
 #' @family character functions
 #' @name sas_f_upcase
@@ -2657,7 +2657,7 @@ NULL
 #' @param ... One or more character excerpts; the result is the position of the first character of `x` that is in none of them, or 0.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (27 of 27 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (27 of 27 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_verify.R
 #' @family character functions
 #' @name sas_f_verify
@@ -2698,7 +2698,7 @@ NULL
 #' @param ... Character values; the result is the index of the first one equal to `x`, or 0.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
-#' @section Verification: verified (25 of 25 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (25 of 25 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_whichc.R
 #' @family character functions
 #' @name sas_f_whichc
@@ -2712,7 +2712,7 @@ NULL
 #' @param ... Numeric values; the result is the index of the first one equal to `x`, or 0.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
-#' @section Verification: verified (42 of 42 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: verified (42 of 42 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_whichn.R
 #' @family numeric functions
 #' @name sas_f_whichn
@@ -2740,7 +2740,7 @@ NULL
 #' @param basis Optional basis: 'AGE' (default) gives the age in completed years plus a fraction; 'ACT/ACT' divides actual days in each calendar year by 365 or 366; '30/360' uses 30-day months and 360-day years; 'ACT/360' and 'ACT/365' divide actual days by 360 or 365.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS dates count days and SAS datetimes count seconds from 1960-01-01; R's Date and POSIXct start at 1970-01-01.
-#' @section Verification: partial (927 of 1551 SAS 9.4 cases agree bit for bit; 624 case(s) fail loud (sasonr_unsupported)). Verified domain: bases 30/360, ACT/365 and ACT/360; AGE only for dates a whole number of years apart; ACT/ACT only within one calendar year or between two 1 January dates; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
+#' @section Verification: partial (928 of 1551 SAS 9.4 cases agree bit for bit; 623 case(s) fail loud (sasonr_unsupported)). Verified domain: bases 30/360, ACT/365 and ACT/360; AGE only for dates a whole number of years apart; ACT/ACT only within one calendar year or between two 1 January dates; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-12.
 #' @example inst/examples/sas_f_yrdif.R
 #' @family datetime functions
 #' @name sas_f_yrdif

@@ -52,12 +52,15 @@ test_that("INT/FLOOR/CEIL: absolute fuzz 1.5e-12; signs of zero as in SAS", {
   expect_identical(sas_f_int(1e15), 1e15)
 })
 
-test_that("w.d rounds the exact binary value half away from zero with a 1-ulp fuzz", {
+test_that("w.d: at or above the half point up, the double nearest to it up, 3 ulps below down", {
   f <- function(x, fmt) sas_f_putn(x, fmt)
   expect_equal(f(1.005, "4.2"), "1.01")
   expect_equal(f(2.675, "8.2"), "    2.68")
-  expect_equal(f(1.0049999999999997, "4.2"), "1.00")
+  # SAS 9.4 writes 1.00 here but 4.8 for 4.749999999999999 (also 1 to 2 ulps
+  # below the half point) in 32.1: not a function of the distance, fail loud
+  expect_error(f(1.0049999999999997, "4.2"), class = "sasonr_unsupported")
   expect_error(f(2.6749999999999994, "4.2"), class = "sasonr_unsupported")
+  expect_equal(f(1.0049999999999992, "4.2"), "1.00")
 })
 
 test_that("w.d: minus sign for negatives that round to zero, missing in the units column", {

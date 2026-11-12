@@ -34,7 +34,7 @@
 # outside it), unsupported (every case fails loud), not_comparable (depends on
 # the session clock), unverified (no case).  Everything except verified,
 # partial and not_comparable fails loud with sasonr.strict = TRUE.
-# contexts_verified: the contexts (data, sql, sysfunc; where has no cases yet)
+# contexts_verified: the contexts (data, sql, sysfunc, where: tests/conformance/fn_where)
 # in which the feature's cases pass (partial: pass or fail loud); a function
 # used in any other context fails loud with sasonr.strict = TRUE.
 
@@ -54,7 +54,7 @@ known_status <- c("pass", "both_error", "unsupported", "fail", "error", "lenient
                   "sas_error_rerror", "no_gold", "no_program")
 if (any(!res$status %in% known_status)) stop("unknown case status: ", paste(setdiff(res$status, known_status), collapse = ", "))
 res$class <- conf$conf_case_class(res$status, res$fails, res$tol)
-res$feature <- sub("^(fn_matrix|fmt_matrix|functions)/([^/]+)/.*$", "\\2", res$case)
+res$feature <- sub("^(fn_matrix|fmt_matrix|functions|fn_where)/([^/]+)/.*$", "\\2", res$case)
 res$area <- sub("/.*$", "", res$case)
 
 # Targeted probes (tests/conformance/fn_probe/<PROBE>/: random inputs, one data
@@ -205,6 +205,11 @@ fn_rows <- lapply(docs$name, function(nm) {
     if (s$status == "not_comparable") return(nrow(r) > 0)
     nrow(r) > 0 && any(r$class == "pass") && all(r$class %in% c("pass", "unsupported"))
   }, logical(1))
+  # WHERE context: the fn_where matrix (every DATA step case again inside a
+  # WHERE statement); it decides only whether "where" is a verified context
+  wrows <- res[res$area == "fn_where" & res$feature == NM, , drop = FALSE]
+  ok_where <- s$status %in% c("verified", "partial") && nrow(wrows) > 0 && any(wrows$class == "pass") &&
+    all(wrows$class %in% c("pass", "unsupported"))
   len <- if (is.null(spec)) NA else if (spec$type == "num") "8 (numeric)" else if (identical(spec$len, "arg")) "length of argument 1" else
     if (identical(spec$len, "fmt")) "format width" else as.character(spec$len)
   data.frame(
@@ -215,7 +220,7 @@ fn_rows <- lapply(docs$name, function(nm) {
     returns = if (is.null(spec)) (if (is.null(inv)) NA else c(N = "num", C = "char")[[inv$fnctype]]) else spec$type,
     result_length = len,
     sasonr_args = if (is.null(spec)) NA else sprintf("%s-%s", spec$min, if (is.infinite(spec$max)) "any" else spec$max),
-    contexts_verified = paste(c(data = "data", sysfunc = "sysfunc", sql = "sql")[ok_ctx], collapse = " "),
+    contexts_verified = paste(c(c(data = "data", sysfunc = "sysfunc", sql = "sql")[ok_ctx], if (ok_where) "where"), collapse = " "),
     impl = paste0("sas_f_", nm), status = s$status, cases = s$cases, pass = s$pass, approximate = s$approximate,
     unsupported = s$unsupported, mismatch = s$mismatch, note = s$note,
     domain = if (s$status != "partial") "" else if (NM %in% fn_domains$name) fn_domains$domain[fn_domains$name == NM][1] else
