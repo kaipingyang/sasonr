@@ -471,6 +471,10 @@ sql_select <- function(q, eng, outer) {
     } else if (ty$type == "char" && is.null(it$length) && const_args && identical(fn_table[[e$name]]$len, 200L) &&
                e$name %in% sql_200_fns) {
       col$len <- 200L
+    } else if (ty$type == "char" && is.null(it$length) && e$node == "call" && e$name %in% sql_200_fixed) {
+      # the CAT family keeps its DATA step 200 length in SQL even though the
+      #
+      col$len <- 200L
     } else if (ty$type == "char" && is.null(it$length) && e$node == "call" && identical(fn_table[[e$name]]$len, 200L)) {
       col$len <- max(1L, nchar(sas_rtrim(v)))
     }
@@ -696,5 +700,7 @@ sql_outer_union <- function(a, b, q, eng) {
 
 #
 # matrix): the value's length, or the DATA step default of 200
-sql_fold_fns <- c("cat", "strip", "trim", "compbl")
+sql_fold_fns <- c("cat", "strip", "trim", "compbl", "compress", "scan", "substr")
 sql_200_fns <- c("tranwrd")
+#
+sql_200_fixed <- c("cat", "cats", "catt", "catx")
