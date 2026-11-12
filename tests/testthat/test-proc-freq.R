@@ -142,6 +142,11 @@ test_that("listing of statistics and fail-loud surfaces", {
                class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt; output out=o binomial; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp; exact jt; run;")), class = "sasonr_unsupported")
+  # only the default COLUMN=1 confidence-limit tables are implemented
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk(cl=(wald) column=2); weight n; run;")),
+               class = "sasonr_unsupported")
+  expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / riskdiff(cl=(wald) column=2); weight n; run;")),
+               class = "sasonr_unsupported")
 })
 
 test_that("PROC FREQ RISKDIFF / RELRISK print the risk estimates and the OR/RR table", {
