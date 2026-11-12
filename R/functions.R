@@ -1111,29 +1111,28 @@ mills_corr <- function(x) {
 # (about -120 at the mode), which quantises the result at ulp(120) ~ 3e-14;
 # pgamma() and dnorm() both return small probabilities with full relative
 # accuracy, so the by-parts integrand keeps its last bits.
-pnt_tail <- function(t, v, d, n = 8001) {
+pnt_tail <- function(t, v, d, n = 8001, ng = 4001) {
   at <- abs(t)
-  g <- function(s) at * stats::pgamma(v * s * s / 2, v / 2) * stats::dnorm(t * s - d)
-
   # the normal factor peaks at s = -d/t; the gamma factor rises around 1
   s_peak <- max(0, -d / t)
   smax <- s_peak + (1 + 10 / sqrt(v)) + 14 / at
   # substitute s = u^2: for v < 2 the integrand behaves like s^v at 0, which
   # becomes u^(2v+1) and is smooth enough for Simpson
-  gu <- function(u) g(u * u) * 2 * u
   umax <- sqrt(smax)
-  grid <- seq(0, umax, length.out = 4001)
-  vals <- vapply(grid, gu, 0)
-  m <- max(vals)
+  ug <- seq(0, umax, length.out = ng)
+  vg <- at * stats::pgamma(v * ug^4 / 2, v / 2) * stats::dnorm(t * ug^2 - d) * 2 * ug
+  m <- max(vg)
   if (!is.finite(m) || m <= 0) return(0)
-  keep <- which(vals > m * 1e-20)
-  right <- grid[min(length(grid), max(keep) + 1L)]
+  keep <- which(vg > m * 1e-20)
+  right <- ug[min(ng, max(keep) + 1L)]
 
-  z <- seq(0, right, length.out = n)
-  gz <- vapply(z, gu, 0)
-  if (!any(gz > 0)) return(0)
+  # vectorised: one pgamma/dnorm call for all nodes (about 6x faster than a
+  # vapply loop, with identical results)
+  u <- seq(0, right, length.out = n)
+  s <- u * u
+  g <- at * stats::pgamma(v * s * s / 2, v / 2) * stats::dnorm(t * s - d) * 2 * u
   wts <- c(1, rep(c(4, 2), (n - 3) / 2), 4, 1) * right / (3 * (n - 1))
-  sum(wts * gz)
+  sum(wts * g)
 }
 #' @export
 sas_f_probchi <- function(x, df, nc = 0) stats::pchisq(x, df, nc)
