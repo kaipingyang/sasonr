@@ -198,7 +198,7 @@ sas_f_intz <- function(x) {
 #
 # Returns the absolute value with exactly `d` decimals (digits, ".", no
 # sign), or NA when |v| >= 1e17.
-display_round_text <- function(v, d, edge = "abort", down_at = -2.6e-16, exact = FALSE) {
+display_round_text <- function(v, d, edge = "abort", down_at = -2.6e-16, exact = FALSE, up_at = -2.25e-16) {
   a <- abs(v)
   if (!is.finite(a) || a >= 1e17) return(NA_character_)
   if (a == 0) return(formatC(0, format = "f", digits = d))
@@ -212,7 +212,7 @@ display_round_text <- function(v, d, edge = "abort", down_at = -2.6e-16, exact =
   # distance of the tail from one half, in units of 10^-d, then relative to a
   f <- as.numeric(paste0("0.", tail))
   rel <- (f - 0.5) * 10^-d / a
-  up <- if (f >= 0.5) TRUE else if (exact) FALSE else if (rel >= -2.25e-16) TRUE else if (rel <= down_at) FALSE else if (edge == "up") TRUE else if (edge == "down") FALSE else {
+  up <- if (f >= 0.5) TRUE else if (exact) FALSE else if (rel >= up_at) TRUE else if (rel <= down_at) FALSE else if (edge == "up") TRUE else if (edge == "down") FALSE else {
     abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " to ", d,
                              " decimals: the value lies at the edge of the SAS fuzz (not determined by the gold standard)"))
   }
@@ -241,10 +241,10 @@ incr_decimal <- function(s) {
 }
 
 # Display rounding as a number (for PROC listings that format with sprintf).
-display_round <- function(v, d, exact = FALSE) {
+display_round <- function(v, d, exact = FALSE, up_at = -2.25e-16, down_at = -2.6e-16) {
   vapply(v, function(x) {
     if (is.na(x)) return(NA_real_)
-    t <- display_round_text(x, d, exact = exact)
+    t <- display_round_text(x, d, exact = exact, up_at = up_at, down_at = down_at)
     if (is.na(t)) return(x)
     r <- as.numeric(t)
     if (x < 0) -r else r
@@ -255,7 +255,7 @@ display_round <- function(v, d, exact = FALSE) {
 # COMMA, DOLLAR fall back to these; BESTw. chooses among them):
 #   sci_dec_text(v, k)  "-1.23E6", "5E-4"   (k mantissa decimals, exact digits,
 #                                             half away from zero with the fuzz)
-sci_dec_text <- function(v, k, edge = "abort", down_at = -2.6e-16) {
+sci_dec_text <- function(v, k, edge = "abort", down_at = -2.6e-16, up_at = -2.25e-16) {
   a <- abs(v)
   s <- sprintf("%.*e", k + 30L, a)
   ex <- as.integer(sub("^.*e", "", s))
@@ -263,7 +263,7 @@ sci_dec_text <- function(v, k, edge = "abort", down_at = -2.6e-16) {
   keep <- substr(dg, 1L, k + 1L)
   f <- as.numeric(paste0("0.", substring(dg, k + 2L)))
   rel <- (f - 0.5) * 10^(ex - k) / a
-  up <- if (f >= 0.5) TRUE else if (rel >= -2.25e-16) TRUE else if (rel <= down_at) FALSE else if (edge == "up") TRUE else if (edge == "down") FALSE else {
+  up <- if (f >= 0.5) TRUE else if (rel >= up_at) TRUE else if (rel <= down_at) FALSE else if (edge == "up") TRUE else if (edge == "down") FALSE else {
     abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " in E notation: the value lies at the edge of the SAS fuzz"))
   }
   if (up) keep <- incr_decimal(keep)

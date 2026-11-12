@@ -842,9 +842,12 @@ means_num_text <- function(v, w, maxdec) {
   if (!is.null(maxdec)) {
     # too wide: fewer decimals first (12345678.500 with MAXDEC=4), then BEST
     for (dd in seq(maxdec, 0L)) {
-      # MAXDEC= rounds the exact binary value half up, without the format fuzz
-      # (gold: a mean of 1.2249999999999999 shows as 1.22)
-      s <- sprintf("%.*f", dd, display_round(v, dd, exact = TRUE))
+      # MAXDEC= has its own display fuzz: a value within 1e-16 (relative) of
+      # the decimal half point rounds away from zero, narrower than the format
+      # engine's 2.25e-16 window.  Gold (84-case rounding/proc grid): a MIN of
+      # 0.34999999999999997 shows 0.4, and 1.2249999999999999 is 1.22 here but
+      # 1.23 under FORMAT 8.2 and under SQL's FORMAT=8.2.
+      s <- sprintf("%.*f", dd, display_round(v, dd, up_at = -1e-16, down_at = -1e-16))
       if (nchar(s) <= w) return(s)
     }
     return(trimws(sas_fmt_best(v, w)))
