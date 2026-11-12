@@ -490,9 +490,12 @@ expr_to_sexpr <- function(e) {
   )
 }
 
-# A numeric constant; values outside the double range are an error in SAS.
+# A numeric constant.  SAS accepts a subnormal literal and keeps the value:
+# 1e-310 is stored as 000012688B70E62B, and 1e-310 + 0, 1e-310 * 1 and
+# 1e-310 / 1e-310 = 1 all behave as ordinary IEEE arithmetic (SAS 9.4 does not
+# run denormals-are-zero).  Only values outside the double range are an error.
 sas_num_literal <- function(v, line = NULL) {
   val <- as.numeric(v)
-  if (is.infinite(val) || (val != 0 && abs(val) < .Machine$double.xmin)) abort_syntax(paste0("Invalid number ", v), line)
+  if (is.infinite(val)) abort_syntax(paste0("Invalid number ", v), line)
   val
 }
