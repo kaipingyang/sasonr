@@ -111,3 +111,21 @@ test_that("%SYSFUNC: COMPRESS with three arguments, INTCK and INTNX", {
   expect_equal(res$macro_vars$b, "1")
   expect_equal(res$macro_vars$c, "59")
 })
+
+test_that("INTCK / INTNX support WEEKDAY, SEMIMONTH and TENDAY (SAS gold)", {
+  res <- sas_run("
+data d;
+  a = intck('weekday', '17JAN2020'd, '20JAN2020'd);
+  b = intck('semimonth', '14JAN2020'd, '16JAN2020'd);
+  c = intck('tenday', '09JAN2020'd, '11JAN2020'd);
+  e = intnx('weekday', '17JAN2020'd, 1);
+  f = intnx('tenday', '15FEB2020'd, 1);
+  g = intnx('semimonth', '20JAN2020'd, 1);
+run;")
+  expect_equal(res$work$d$a, 1)       # Fri -> Mon crosses one weekday
+  expect_equal(res$work$d$b, 1)       # 14th (1-15) -> 16th (16-end)
+  expect_equal(res$work$d$c, 1)       # 9th (1-10) -> 11th (11-20)
+  expect_equal(res$work$d$e, 21934)   # Fri 17 Jan 2020 + 1 weekday = Mon 20 Jan
+  expect_equal(res$work$d$f, 21966)   # 15 Feb -> start of 21-29 block
+  expect_equal(res$work$d$g, 21946)   # 20 Jan -> start of 1-15 block of February
+})

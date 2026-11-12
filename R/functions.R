@@ -1606,7 +1606,9 @@ interval_or_fail <- function(x, fname, .at) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "'"))
   }
   if (is.null(iv)) return(NULL)
-  if (iv$base %in% c("weekday", "tenday", "semimonth")) abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "'"))
+  if (iv$base == "weekday" && (iv$mult != 1 || iv$shift != 1)) {
+    abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (multiplier or shift index)"))
+  }
   # the shift index of YEAR/SEMIYEAR/QTR is in months and of WEEKn (n > 1) in weeks
   if (iv$shift != 1 && (iv$base %in% c("year", "semiyear", "qtr") || (iv$base == "week" && iv$mult > 1))) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (shift index)"))
@@ -1649,6 +1651,16 @@ interval_index <- function(v, iv) {
       p <- civil(d)
       (p$y - 1960) * 2 + (p$m - 1) %/% 6
     },
+    semimonth = {
+      # two blocks per month: days 1-15 and 16-end
+      p <- civil(d)
+      (p$y - 1960) * 24 + (p$m - 1) * 2 + (p$d > 15)
+    },
+    tenday = {
+      # three blocks per month: days 1-10, 11-20, 21-end
+      p <- civil(d)
+      (p$y - 1960) * 36 + (p$m - 1) * 3 + pmin(p$d - 1, 20) %/% 10
+    },
     year = civil(d)$y - 1960
   )
 }
@@ -1664,6 +1676,8 @@ interval_start <- function(k, iv) {
     month = from_ymd(1960 + k %/% 12, k %% 12 + 1, 1),
     qtr = from_ymd(1960 + k %/% 4, (k %% 4) * 3 + 1, 1),
     semiyear = from_ymd(1960 + k %/% 2, (k %% 2) * 6 + 1, 1),
+    semimonth = from_ymd(1960 + k %/% 24, (k %% 24) %/% 2 + 1, if (k %% 2 == 0) 1 else 16),
+    tenday = from_ymd(1960 + k %/% 36, (k %% 36) %/% 3 + 1, ((k %% 3) * 10) + 1),
     year = from_ymd(1960 + k, 1, 1)
   )
   if (iv$dt) d * 86400 else d
@@ -1672,6 +1686,49 @@ interval_start <- function(k, iv) {
 # Multiplier / shift: group base intervals into blocks of `mult` starting at `shift`.
 block_index <- function(k, iv) floor((k - (iv$shift - 1)) / iv$mult)
 block_first <- function(b, iv) b * iv$mult + (iv$shift - 1)
+
+# WEEKDAY is a shift interval: it has no calendar blocks, it counts weekdays.
+# Day 0 (1960-01-01) was a Friday, so (d + 5) %% 7 is 0 = Sunday ... 6 = Saturday.
+date_dow <- function(d) (d + 5) %% 7
+
+weekdays_inclusive <- function(from, to) {
+  n <- to - from + 1
+  cnt <- (n %/% 7) * 5
+  rem <- n %% 7
+  if (rem > 0) {
+    wd <- date_dow(from + seq_len(rem) - 1L)
+    cnt <- cnt + sum(wd >= 1 & wd <= 5)
+  }
+  cnt
+}
+
+# Number of weekdays in (a, b], negative when b < a.
+weekday_intck <- function(a, b) {
+  if (a == b) return(0)
+  if (a < b) weekdays_inclusive(a + 1, b) else -weekdays_inclusive(b + 1, a)
+}
+
+# Move `n` weekdays from date d.  A weekend d steps to the next (n > 0) or
+# previous (n < 0) weekday on the first step.
+weekday_shift <- function(d, n) {
+  wd <- date_dow(d) # 0 Sun ... 6 Sat
+  if (n > 0) {
+    first <- if (wd == 5L) d + 3 else if (wd == 6L) d + 2 else if (wd == 0L) d + 1 else d + 1
+    r <- n - 1
+    if (r == 0) return(first)
+    dow <- date_dow(first) # 1..5
+    return(first + r + 2 * ((r + dow - 1) %/% 5))
+  }
+  if (n == 0) {
+    if (wd >= 1L && wd <= 5L) return(d)
+    abort_unsupported("INTNX with the WEEKDAY interval and an increment of 0 on a weekend (not verified against SAS)")
+  }
+  first <- if (wd == 1L) d - 3 else if (wd == 0L) d - 2 else if (wd == 6L) d - 1 else d - 1
+  r <- -n - 1
+  if (r == 0) return(first)
+  dow <- date_dow(first)
+  first - (r + 2 * ((r + (5 - dow)) %/% 5))
+}
 
 #' @export
 sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
@@ -1686,6 +1743,10 @@ sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
       return(NA_real_)
     }
     if (is.na(a) || is.na(b)) return(NA_real_)
+    if (iv$base == "weekday") {
+      if (substr(mm, 1L, 1L) == "c") abort_unsupported("INTCK with the WEEKDAY interval and the continuous method")
+      return(weekday_intck(a, b))
+    }
     if (substr(mm, 1L, 1L) == "c") {
       if (iv$base %in% c("day", "hour", "minute", "second", "week")) {
         unit <- switch(iv$base, day = if (iv$dt) 86400 else 1, week = if (iv$dt) 7 * 86400 else 7,
@@ -1737,6 +1798,10 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
     if (!date_in_range(s, iv)) {
       note_invalid_arg("intnx", NULL, .at, args)
       return(NA_real_)
+    }
+    if (iv$base == "weekday") {
+      if (al %in% c("m", "e")) abort_unsupported("INTNX with the WEEKDAY interval and ALIGN=")
+      return(weekday_shift(s, k))
     }
     if (abs(k) > 1e7 || !date_in_range(interval_start(block_first(block_index(interval_index(s, iv), iv) + k, iv), iv), iv)) {
       note_invalid_arg("intnx", NULL, .at, args)
