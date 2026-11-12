@@ -1011,7 +1011,13 @@ sas_f_probt <- function(x, df, nc = 0, .at = NULL) {
 # largest relative difference 5.4e-13, median 2.8e-16.
 pnt_cdf <- function(t, v, nc) {
   if (is.na(t) || is.na(v) || is.na(nc) || v <= 0) return(NA_real_)
-  if (nc == 0) return(stats::pt(t, v))
+  if (nc == 0) {
+    # Central t through the incomplete beta: R's pt() loses up to ~2000 ulp
+    # against SAS for large df (pt(-0.5, 10000) for example).
+    y <- v / (v + t * t)
+    iy <- stats::pbeta(y, v / 2, 0.5)
+    return(if (t < 0) 0.5 * iy else 1 - 0.5 * iy)
+  }
   if (is.infinite(t)) return(if (t > 0) 1 else 0)
   if (t == 0) return(stats::pnorm(-nc))
   if (t > 0) {
@@ -1041,13 +1047,42 @@ pnt_series <- function(t, v, d) {
   stats::pnorm(-d) + (init + s) / 2
 }
 
+# log Phi(z).  R's pnorm(log.p = TRUE) is only absolute-accurate in the log:
+# at z = -200 it is off by 1.8e-12, which becomes a relative error of 1.8e-12
+# after exp() - enough to spoil the far tail.  The Mills-ratio asymptotic
+# series below matches a 256-bit reference to the last bit from about z = -10.
+log_pnorm <- function(z) {
+  out <- numeric(length(z))
+  far <- !is.na(z) & z < -8
+  if (any(far)) out[far] <- log_pnorm_neg(-z[far])
+  if (any(!far)) out[!far] <- stats::pnorm(z[!far], log.p = TRUE)
+  out
+}
+
+# log Phi(-x) for x > 0: -x^2/2 - log(x) - log(2*pi)/2 + log(1 - 1/x^2 + 3/x^4 - ...),
+# truncated where the terms stop shrinking (the smallest term bounds the error).
+log_pnorm_neg <- function(x) {
+  x2 <- x * x
+  s <- numeric(length(x))
+  term <- -1 / x2
+  best <- abs(term)
+  k <- 1L
+  repeat {
+    s <- s + term
+    k <- k + 1L
+    term <- term * (-(2 * k - 1)) / x2
+    if (all(abs(term) >= best) || k > 200L) break
+    best <- pmin(best, abs(term))
+  }
+  -x2 / 2 - log(x) - 0.5 * log(2 * pi) + log1p(s)
+}
+
 # P(T <= t) for t < 0, d > 0: integrate exp(log integrand) in w = log s.
-pnt_tail <- function(t, v, d, span = 50, n = 801) {
+pnt_tail <- function(t, v, d, span = 50, n = 4001) {
   logC <- log(2) + (v / 2) * log(v / 2) - v / 2 - lgamma(v / 2)
   lw <- function(w) {
-    e2 <- exp(2 * w)
     v * w - (v / 2) * (expm1(2 * w)) + logC +
-      stats::pnorm(t * exp(w) - d, log.p = TRUE)
+      log_pnorm(t * exp(w) - d)
   }
   wmax <- log(1 + 12 / sqrt(v) + 6 * abs(d) + 6 * abs(t))
   grid <- seq(-30, wmax, length.out = 400)
