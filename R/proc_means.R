@@ -523,8 +523,9 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     sw <- k$W
     val$sumwgt <- sw
     val$sum <- k$sum
+    # the sign of zero: SUM and MEAN are always +0, MIN / MAX keep the sign of
     #
-    # +0, MIN / MAX keep the sign of the first value of the group on ties
+    #
     if (!is.na(val$sum[1]) && val$sum[1] == 0) val$sum <- 0
     val$min <- xv[which(xv == min(xv))[1L]]
     val$max <- xv[which(xv == max(xv))[1L]]
@@ -828,6 +829,8 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 # Default decimals of the printed table with the default FW=12 and no MAXDEC=.
 #
 #
+#
+# outside the display engine's fail-loud domain) is identical line for line.
 means_default_text <- function(v, w) {
   if (v == 0) return("0")
   a <- abs(v)
@@ -894,6 +897,7 @@ means_num_text <- function(v, w, maxdec) {
     # one-observation CLASS groups (155 exactly known doubles,
     #
     #
+    #
     return(means_default_text(v, w))
   }
   if (v != trunc(v) && (abs(v) >= 1e6 || abs(v) < 1e-4)) {
@@ -918,23 +922,43 @@ means_stat_text <- function(s, v, sp) {
   means_num_text(v, sp$fw, sp$maxdec)
 }
 
-means_stat_col <- function(s, cells, sp) {
+means_stat_col <- function(s, cells, sp, by_nw = NULL) {
   parts <- means_stat_heading(s, sp$alpha)
   minw <- max(nchar(parts))
-  #
-  #
-  #
-  #
-  nmin <- if (sas_target_version() == "SAS 9.4") 2L else 1L
-  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else max(c(nmin, nchar(cells)))) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
+  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else means_count_width(cells, by_nw)) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
   list(parts = parts, width = max(vw, minw), right = TRUE, cells = cells)
+}
+
+#
+#
+#
+#
+#
+# and when every analysis variable is non-missing in as many digits as there
+# are observations; otherwise a wider data set fails loud.
+means_count_width <- function(cells, by_nw) {
+  w <- max(c(1L, nchar(cells)))
+  if (is.null(by_nw) || by_nw$w <= w) return(w)
+  if (!by_nw$ok) {
+    abort_unsupported("PROC MEANS N field with BY groups and CLASS variables or missing values (width rule not determined)")
+  }
+  by_nw$w
+}
+
+means_by_count_width <- function(d, sp, k) {
+  if (is.null(sp$by) || !is.null(sp$freq)) return(NULL)
+  w <- nchar(sprintf("%.0f", nrow(d)))
+  nonmiss <- vapply(sp$vars, function(v) sum(!is.na(d[[v]])), 1)
+  list(w = w, ok = k == 0L && all(nchar(sprintf("%.0f", nonmiss)) == w))
 }
 
 # Printed-table geometry ------------------------------------------------------------
 #
 #
-# 4..20, MAXDEC= 0..7, with and without CLASS.  The line is filled left to
-# right as follows.
+#
+#
+#
+# statistics, LINESIZE=132).  The line is filled left to right as follows.
 #
 #  * Every statistic column is a field of FW= columns (default 12), except
 #    N / N Miss (as wide as the printed counts) and t Value / Pr > |t|; a
@@ -1035,6 +1059,7 @@ means_listing <- function(d, sp, cells_by, print_types) {
   out <- character()
   proc_title <- paste0("The ", toupper(sp$pname), " Procedure")
   titled <- FALSE
+  by_nw <- means_by_count_width(d, sp, k)
   for (g in cells_by) {
     if (!is.null(sp$by)) {
       if (length(g$rows) == 0) next
@@ -1084,9 +1109,9 @@ means_listing <- function(d, sp, cells_by, print_types) {
         fixed[[length(fixed) + 1L]] <- list(parts = "Variable", width = max(8L, nchar(var_cells)), right = FALSE, cells = var_cells)
         if (has_label) fixed[[length(fixed) + 1L]] <- list(parts = "Label", width = max(5L, nchar(lab_cells)), right = FALSE, cells = lab_cells)
       }
-      scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp))
+      scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp, by_nw))
       #
-      # experiments behind means_panel_layout()).
+      #
       ls <- rt$ls %||% 132L
       panels <- means_panel_layout(vapply(scols, function(c) as.integer(c$width), 1L),
                                    vapply(fixed, function(c) as.integer(c$width), 1L), ls)
