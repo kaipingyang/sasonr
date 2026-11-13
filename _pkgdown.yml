@@ -291,3 +291,7 @@ reference:
   desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
   contents:
   - sas_f_symget
+- title: SAS file and library functions
+  desc: Implementations used by translated code; each page gives the SAS syntax, the differences from base R and the verification status against SAS 9.4.
+  contents:
+  - sas_f_exist
