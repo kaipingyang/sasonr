@@ -11,7 +11,10 @@
 * `ROUNDE` fails loud up to 2E-6 below a half point once `1.1E-12 * |q|`
   exceeds 1E-6 (its fuzz window is not rescanned yet).
 * Wide `BEST` E forms take their mantissa decimals from the width and fail
-  loud when the text does not fit (`BEST16.` wrote 18 columns).
+  loud when the text does not fit (`BEST16.` wrote 18 columns). The E form of
+  `BEST16.`-`BEST19.` and any E form with 13 mantissa decimals fail loud
+  until SAS 9.4 output exists, except mantissas of at most 4 significant
+  digits (verified: every candidate rule gives the same text).
 * A vectorised DATA step whose untaken IF/SELECT branch fails loud or raises a
   SAS exception is re-run row by row; the failed attempt leaves no PRXPARSE
   ids behind, a SAS exception in a branch that does not run is no longer

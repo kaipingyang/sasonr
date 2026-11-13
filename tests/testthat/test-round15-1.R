@@ -46,12 +46,20 @@ test_that("ROUNDE: the refuted window fails loud from 1.1E-12 |q| > 1E-6 (findin
   expect_equal(sas_f_rounde(1000000.5, 1), 1000000)    # exact tie: even
 })
 
-test_that("wide BEST E form: mantissa decimals from the width (finding 5)", {
-  # 081e9ac wrote 1.2345678901234E-6 (18 columns) in BEST16.
-  s <- trimws(sas_f_putn(1.2345678901234567e-6, "BEST16."))
-  expect_lte(nchar(s), 16L)
-  expect_identical(s, sasonr:::sci_dec_text(1.2345678901234567e-6, 11L)$text)
-  expect_lte(nchar(trimws(sas_f_putn(-1.2345678901234567e-6, "BEST16."))), 16L)
+test_that("wide BEST E form: BEST16.-BEST19. and k = 13 fail loud outside the gold (owner decision)", {
+  # 081e9ac wrote 1.2345678901234E-6 (18 columns) in BEST16.; the width-derived
+  # k (e94d5a0) has no gold: fail loud until gold exists
+  expect_error(sas_f_putn(1.2345678901234567e-6, "BEST16."), class = "sasonr_unsupported")
+  expect_error(sas_f_putn(-1.2345678901234567e-6, "BEST16."), class = "sasonr_unsupported")
+  expect_error(sas_f_putn(1.23456789e-20, "BEST19."), class = "sasonr_unsupported")
+  expect_error(sas_f_putn(1.2345e-7, "BEST17."), class = "sasonr_unsupported")
+  # k = 13 at BEST20. (-1.5E-12: 20 - 1 - 3 - 1 - 2 = 13 mantissa decimals)
+  expect_error(sas_f_putn(-1.2345678901234567e-12, "BEST20."), class = "sasonr_unsupported")
+  # TS1M7 gold fmt_b07 (BEST16.): mantissas of at most 4 significant digits
+  expect_identical(sas_f_putn(c(-1e15, 1e16, -1e16, 1e20, -1e20, 1.234e-7, -1.234e-7, 1e-10, -1e-10), "BEST16."),
+                   formatC(c("-1E15", "1E16", "-1E16", "1E20", "-1E20", "1.234E-7", "-1.234E-7", "1E-10", "-1E-10"), width = 16))
+  # BEST32. (k >= 14) unchanged
+  expect_identical(trimws(sas_f_putn(1.2345678901234567e-6, "BEST32.")), "1.2345678901234E-6")
 })
 
 test_that("an exact tie at the 15th digit fails loud when it decides the E digits (finding 6)", {
