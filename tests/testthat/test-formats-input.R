@@ -250,13 +250,15 @@ run;")
 
 test_that("$HEX informat turns hex digit pairs into bytes", {
   #
-  expect_error(sas_run("data a; r = input('4142', $hex4.); run;"), class = "sasonr_strict_error")
-  withr::local_options(sasonr.strict = FALSE)
-  res <- sas_run("data a; r = input('4142', $hex4.); l = length(r); run;")
-  expect_identical(res$work$a$r, "AB")
-  expect_equal(res$work$a$l, 2)
-  # width 6 gives three bytes
-  res6 <- sas_run("data a; r = input('414243', $hex6.); l = length(r); run;")
-  expect_identical(res6$work$a$r, "ABC")
-  expect_equal(res6$work$a$l, 3)
+  hx <- function(code) toupper(paste(as.character(charToRaw(sas_run(code)$work$a$r)), collapse = ""))
+  expect_identical(hx("data a; r = input('414243', $hex4.); run;"), "4142")     # HEXC_IN_811a08
+  expect_identical(hx("data a; r = input('414243', $hex6.); run;"), "414243")   # HEXC_IN_8df8bd
+  expect_identical(hx("data a; r = input('4', $hex2.); run;"), "40")            # HEXC_IN_cafcdd: odd digit count
+  # invalid hex digits: a blank, _ERROR_ and the INPUT NOTE (HEXC_IN_05b3ab)
+  withr::local_options(sasonr.on_error = "sas")
+  res <- sas_run("data a; r = input('ZZ', $hex2.); e = _error_; run;")
+  expect_identical(sub(" +$", "", res$work$a$r), "")
+  expect_identical(res$work$a$e, 1)
+  expect_true(any(startsWith(res$log, "NOTE: Invalid argument to function INPUT at line 1 column")))
+  expect_false(any(grepl("Mathematical operations", res$log)))
 })

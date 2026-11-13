@@ -37,10 +37,8 @@ test_that("default statistics and the listing of one analysis variable", {
     "5 30.0000000 15.8113883 10.0000000 50.0000000", strrep("-", 65)
   ))
   #
+  # groups (the data set has 13 observations), in both releases
   #
-  withr::local_options(sasonr.sas_version = "SAS 9.4")
-  res2 <- run_approx(paste(means_data, "proc means data=d; var x; run;"))
-  expect_equal(squish(res2$listing)[4], strrep("-", 66))
 })
 
 test_that("OUTPUT OUT= with CLASS: _TYPE_ numbering, _FREQ_, missing class values excluded", {

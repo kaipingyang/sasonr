@@ -1,11 +1,8 @@
 #
-#
-# is in .gitignore, so these tests skip when the export is absent.
+# installation into inst/sashelp/ (R/sashelp.R); that directory is in
+# .gitignore and .Rbuildignore, so these tests skip when the copy is absent.
 
-has_sashelp <- function(member) {
-  d <- system.file("sashelp", package = "sasonr")
-  nzchar(d) && file.exists(file.path(d, paste0(member, ".rds")))
-}
+has_sashelp <- function(member) sasonr:::sashelp_has(member)
 
 test_that("PROC SQL reads a SASHELP member", {
   skip_if_not(has_sashelp("class"), "inst/sashelp not exported")
