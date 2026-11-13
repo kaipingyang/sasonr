@@ -46,8 +46,16 @@ git and of the package build. They run in three tiers:
   of every other area (rounding, semantics, parse stress, PROC statistics,
   ...).
 * `tools/run_conformance.R` is the full check and the one run before a
-  release. `tools/run_conformance.R --since` runs only the cases affected by
-  the changes since a commit (incremental regression during development).
+  release. One run gives the verdicts of both modes (`sasonr.strict = TRUE`
+  and `FALSE`): every case runs once with strict mode off, and the runner
+  records where a strict gate would have stopped it.
+* Every full run is archived per commit under `.claude/results/` (local, not
+  in git) with an impact map: the package functions and registry rows each
+  case directory used. `--baseline <commit>` prints the cases whose verdict
+  differs from the archived run; `--since <commit>` runs only the cases whose
+  recorded functions, registry rows or files changed and keeps the archived
+  verdicts of the others (a runner change, a new R file or a change of
+  top-level or load-time code runs every case).
 * `SASONR_CONFORMANCE=full` makes `devtools::test()` run every case as well;
   `SASONR_CONFORMANCE=none` turns the conformance tests off.
 

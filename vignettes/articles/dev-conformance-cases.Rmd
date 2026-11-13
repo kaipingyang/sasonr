@@ -76,9 +76,33 @@ devtools::test()                       # unit tests + a fixed sample of about 30
 ```
 
 ```bash
-Rscript tools/run_conformance.R          # every case: summary report by area
-Rscript tools/run_conformance.R --since  # only the cases affected by your changes
+Rscript tools/run_conformance.R                     # every case: summary report by area
+Rscript tools/run_conformance.R --since origin/main # only the cases your changes can affect
+Rscript tools/run_conformance.R --baseline HEAD~1   # print the cases whose verdict changed
 ```
+
+One run gives both verdicts. Every case runs once with
+`options(sasonr.strict = FALSE)`; the runner records each strict gate (an
+approximate or unverified feature) instead of stopping there, and derives the
+strict verdict from it: a case without a gate has the same verdict in both
+modes, a case with a gate fails loud in strict mode. Only a gate that sasonr
+itself would catch (error recovery) makes the runner repeat the case in strict
+mode. `--out FILE.csv` writes the strict verdicts and `FILE-strict-false.csv`
+the others; `--strict true|false` runs one mode only.
+
+Every full run is archived locally under `.claude/results/<commit>/` (not in
+git): the per-case results of both modes, the summaries and an impact map that
+lists, per case directory, the package functions that ran and the registry
+rows that were read. `--baseline <commit>` compares a run case by case with
+the archived one and prints only the changed cases. `--since <commit>` diffs
+`R/`, `inst/registry/` and the runner against that commit and runs only the
+case directories whose recorded functions or registry rows changed, or whose
+files changed; the other cases keep their archived verdicts. A change to the
+runner, a new or deleted R file, a top-level statement, code that runs at
+package load, or a name looked up at run time (such as `sas_f_<name>`) runs
+every case. `tools/update_registry.R --archive HEAD` and
+`tools/update_proc_registry.R --archive HEAD` rebuild the registries from the
+archived run instead of running the cases again.
 
 There are three test tiers. `R CMD check` runs the unit tests only (the
 cases are not part of the package build). `devtools::test()` adds a smoke

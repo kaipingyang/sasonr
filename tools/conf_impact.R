@@ -142,7 +142,6 @@ imp_load <- function(pkg = ".") {
     }
     file.copy(cf, file.path(d, "R", f))
   }
-  imp_state$src_hash <- unname(tools::md5sum(file.path(d, "R", imp_r_files(d))))
   suppressMessages(devtools::load_all(d, quiet = TRUE, helpers = FALSE))
   imp_state$hits <- asNamespace("sasonr")[[".imp_env"]]
   keys <- sort(ls(imp_state$hits, all.names = TRUE))
@@ -584,37 +583,33 @@ imp_select <- function(ch, map, units, hashes, fingerprint) {
 }
 
 # Byte-compile the namespace functions (as an installed package is).  The
-# compiled closures of the namespace are cached by the md5 of the instrumented
-# sources (local disk): a cache hit saves about 25 s per R process.
-imp_compile <- function(skip = character()) {
+# compiled closures are cached (local disk) together with their source
+# closures: a function whose body and formals are unchanged reuses its
+# compiled version (a full compile takes about 25 s per R process).
+imp_compile <- function() {
   ns <- asNamespace("sasonr")
   cache <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
-  key <- tools::md5sum(textConnection_file(c(imp_state$src_hash, R.version.string, as.character(utils::packageVersion("compiler")))))
-  cf <- file.path(cache, paste0("compiled_", key, ".rds"))
-  cmp <- if (file.exists(cf)) tryCatch(readRDS(cf), error = function(e) NULL)
-  fresh <- is.null(cmp)
-  if (fresh) cmp <- list()
+  cf <- file.path(cache, paste0("compiled_", gsub("[^A-Za-z0-9.]", "_", R.version.string), ".rds"))
+  old <- if (file.exists(cf)) tryCatch(readRDS(cf), error = function(e) list()) else list()
+  new <- list()
+  changed <- 0L
   for (nm in ls(ns, all.names = TRUE)) {
-    if (nm %in% skip) next
     f <- get(nm, envir = ns, inherits = FALSE)
     if (!is.function(f) || is.primitive(f)) next
     own <- identical(environment(f), ns)
-    g <- if (own && !fresh && !is.null(cmp[[nm]])) cmp[[nm]] else compiler::cmpfun(f)
-    if (own && fresh) cmp[[nm]] <- g
+    o <- old[[nm]]
+    hit <- own && !is.null(o) && identical(body(o$src), body(f)) && identical(formals(o$src), formals(f))
+    g <- if (hit) o$cmp else compiler::cmpfun(f)
+    if (own) new[[nm]] <- list(src = f, cmp = g)
+    if (own && !hit) changed <- changed + 1L
     unlockBinding(nm, ns)
     assign(nm, g, envir = ns)
     lockBinding(nm, ns)
   }
-  if (fresh) {
+  if (changed > 0L) {
     tmp <- tempfile(tmpdir = cache)
-    saveRDS(cmp, tmp)
+    saveRDS(new, tmp)
     file.rename(tmp, cf)
   }
-  invisible()
-}
-
-textConnection_file <- function(x) {
-  f <- tempfile()
-  writeLines(x, f)
-  f
+  invisible(changed)
 }
