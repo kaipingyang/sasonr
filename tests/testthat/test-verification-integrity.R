@@ -36,10 +36,19 @@ test_that("HIGH 2: a log-only difference is a mismatch; partial needs passing ca
 
 test_that("HIGH 2: functions whose log differed from SAS (MDY, PRXCHANGE, PRXMATCH) no longer run silently", {
   fn <- sas_feature_registry("functions")
-  # MDY: log NOTEs in %SYSFUNC and PROC SQL still differ -> mismatch, gated
-  expect_identical(fn$status[fn$name == "MDY"], "mismatch")
-  withr::with_options(list(sasonr.strict = TRUE),
-                      expect_error(sas_run("data a; d = mdy(1, 2, 2020); run;"), class = "sasonr_not_verified"))
+  # MDY: the two matrix cases that differed were the %SYSFUNC and PROC SQL log
+  # NOTEs of an out-of-range argument; both texts are reproduced now (a local
+  # SAS probe of the same calls), so the function is verified in its contexts.
+  expect_identical(fn$status[fn$name == "MDY"], "verified")
+  expect_identical(fn$contexts_verified[fn$name == "MDY"], "data sysfunc sql")
+  r <- sas_run("%let x = %sysfunc(mdy(2, 30, 2024));")
+  expect_true(any(grepl("^WARNING: An argument to the function MDY referenced by the %SYSFUNC or %QSYSFUNC macro function is out of range\\.$",
+                        r$log)))
+  expect_true(any(grepl("^NOTE: Mathematical operations could not be performed during %SYSFUNC function execution", r$log)))
+  r2 <- sas_run("data one; x = 1; run;
+    proc sql; create table t as select mdy(2, 30, 2024) as d from one; quit;")
+  expect_true(any(grepl("^NOTE: Invalid argument to function MDY\\. Missing values may be generated\\.$", r2$log)))
+  expect_true(is.na(r2$work$t$d))
   # PRXMATCH / PRXCHANGE: an invalid pattern (SAS writes the Perl diagnostic) now fails loud
   expect_error(sas_f_prxmatch("/[/", "abc"), class = "sasonr_unsupported")
   expect_error(sas_f_prxchange("s/[/x/", 1, "a"), class = "sasonr_unsupported")

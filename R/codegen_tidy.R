@@ -207,10 +207,14 @@ gen_call <- function(e, cx) {
     return(sprintf("(%s - sas_lag_vec(%s, %dL))", x, x, n))
   }
   if (e$name == "symget") args <- c(".symtab", args)
-  if (e$name %in% names(fn_policy) && !is.null(e$col)) {
-    # missing / invalid arguments: log NOTEs and _ERROR_ as in SAS (fn_policy.R)
-    return(sprintf("sas_fcall(\"%s\", sas_f_%s%s, .at = c(%dL, %dL)%s)", e$name, e$name,
-                   paste0(", ", args, collapse = ""), as.integer(e$line), as.integer(e$col),
+  in_sql <- identical(cx$an$context, "sql")
+  if (e$name %in% names(fn_policy) && (!is.null(e$col) || in_sql)) {
+    # missing / invalid arguments: log NOTEs and _ERROR_ as in SAS (fn_policy.R).
+    # In PROC SQL the expressions carry no line/column; the invalid-argument
+    # NOTE of PROC SQL does not use them either (diag.R).
+    at_arg <- if (!is.null(e$col)) sprintf(", .at = c(%dL, %dL)", as.integer(e$line), as.integer(e$col)) else ""
+    return(sprintf("sas_fcall(\"%s\", sas_f_%s%s%s%s)", e$name, e$name,
+                   paste0(", ", args, collapse = ""), at_arg,
                    if (isTRUE(cx$inexact)) ", .exact = FALSE" else ""))
   }
   at <- if (cx$mode == "row" && e$name %in% err_fns && !is.null(e$col)) at_code(e) else ""

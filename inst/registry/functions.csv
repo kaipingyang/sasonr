@@ -103,7 +103,7 @@
 "LOGSDF","function","2","any","char num num num num num","num","8 (numeric)","2-6","","sas_f_logsdf","approximate",32,22,5,5,0,"5 case(s) differ in the last bits (largest relative difference 1.4e-15; different algorithm); 5 case(s) fail loud (sasonr_unsupported)","","2026-11-12"
 "LOWCASE","function","1","1","char","char","length of argument 1","1-1","data sysfunc sql","sas_f_lowcase","partial",19,18,0,1,0,"1 case(s) fail loud (sasonr_unsupported)","fails loud for: LOWCASE with these arguments (SAS 9.4 behaviour not verified)","2026-11-12"
 "MAX","function","1","any","num","num","8 (numeric)","1-any","data sysfunc sql","sas_f_max","verified",41,41,0,0,0,"","","2026-11-12"
-"MDY","function","3","3","num num num","num","8 (numeric)","3-3","data","sas_f_mdy","mismatch",52,50,0,0,2,"2 case(s) differ (values, display, log or errors)","","2026-11-12"
+"MDY","function","3","3","num num num","num","8 (numeric)","3-3","data sysfunc sql","sas_f_mdy","verified",52,52,0,0,0,"","the 2 matrix cases that differed were the %SYSFUNC and PROC SQL log NOTEs for an out-of-range argument; both texts are now reproduced (SAS TS1M2 probe of the same calls), the values already agreed; hand-updated","2026-11-13"
 "MEAN","function","1","any","num num","num","8 (numeric)","1-any","data sysfunc sql","sas_f_mean","verified",46,46,0,0,0,"","","2026-11-12"
 "MEDIAN","function","1","any","num num","num","8 (numeric)","1-any","data","sas_f_median","verified",43,43,0,0,0,"","","2026-11-12"
 "MIN","function","1","any","num","num","8 (numeric)","1-any","data sysfunc sql","sas_f_min","verified",39,39,0,0,0,"","","2026-11-12"

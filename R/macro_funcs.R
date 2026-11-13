@@ -239,16 +239,33 @@ mac_sysfunc <- function(text, line = NULL) {
     putn = sas_format(vals[[1]], vals[[2]]),
     putc = sas_format(vals[[1]], vals[[2]]),
     if (fname %in% names(fn_policy)) {
-      # invalid arguments: one NOTE for the %SYSFUNC call (SAS 9.4), not the DATA step NOTEs
+      # invalid arguments: one WARNING naming the function, then one NOTE for the
+      # %SYSFUNC call (SAS 9.4), not the DATA step NOTEs
       old <- list(err = rt$err, notes = rt$notes, math = rt$math, mv = rt$mv)
       r <- do.call(sas_fcall, c(list(fname, f), vals))
       bad <- isTRUE(rt$err) && !isTRUE(old$err)
+      new_notes <- rt$notes[seq_along(rt$notes) > length(old$notes)]
       rt$err <- old$err
       rt$notes <- old$notes
       rt$math <- old$math
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
-        rt$on_note(c("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution. The result of the operations",
+        # SAS: "WARNING: Argument N to function X referenced by the %SYSFUNC or
+        # %QSYSFUNC macro function is out of range." when the function reports a
+        # numbered invalid argument (ROUND, SUBSTR, ...), otherwise "An argument
+        # to the function X ... is out of range." (MDY, LOG, SQRT, INTCK, ...).
+        warn <- NULL
+        m <- regmatches(new_notes, regexec("^NOTE: Argument ([0-9]+) to function ", new_notes))
+        hit <- which(lengths(m) == 2L)
+        if (length(hit)) {
+          warn <- sprintf("WARNING: Argument %s to function %s referenced by the %%SYSFUNC or %%QSYSFUNC macro function is out of range.",
+                          m[[hit[1]]][2], toupper(fname))
+        } else if (any(grepl("^NOTE: Invalid argument to function ", new_notes))) {
+          warn <- sprintf("WARNING: An argument to the function %s referenced by the %%SYSFUNC or %%QSYSFUNC macro function is out of range.",
+                          toupper(fname))
+        }
+        rt$on_note(c(if (!is.null(warn)) warn,
+                     "NOTE: Mathematical operations could not be performed during %SYSFUNC function execution. The result of the operations",
                      "      have been set to a missing value."))
       }
       r
