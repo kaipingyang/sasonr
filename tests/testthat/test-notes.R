@@ -48,6 +48,34 @@ test_that("guarded missing-value counts are exact (vectorised steps re-run row b
   expect_true("      2 at 7:36   2 at 7:47  " %in% r1$log)
 })
 
+test_that("missing values generated: only the operation that produced the missing value is a place", {
+  # verified against SAS 9.4 TS1M7 (the local install): a chained expression has
+  # one place, at its first missing-producing operation; division, power and a
+  # unary minus of an already generated missing result are not counted again,
+  # while a unary minus of a missing variable is (at the operand's position)
+  code <- c("data x;",
+            "  a = .; b = .; c = .; d = 2;",
+            "  x1 = a + b;",
+            "  x2 = a + b + c;",
+            "  x3 = (a + b) / 3;",
+            "  x4 = a / 3;",
+            "  x5 = a * d;",
+            "  x6 = a + d;",
+            "  x7 = -a;",
+            "  x8 = a ** 2;",
+            "  x9 = a > d;",
+            "run;")
+  for (lv in c("auto", "L3")) {
+    r <- run_notes(code, lv)
+    expect_equal(r$log, c(
+      "NOTE: Missing values were generated as a result of performing an operation on missing values.",
+      "      Each place is given by: (Number of times) at (Line):(Column).",
+      "      1 at 3:10   1 at 4:10   1 at 5:11   1 at 6:10   1 at 7:10   1 at 8:10   1 at 9:9   1 at 10:10  ",
+      "NOTE: The data set WORK.X has 1 observations and 13 variables."
+    ))
+  }
+})
+
 test_that("uninitialized variables and macro WARNINGs are logged", {
   r <- run_notes(c("data a; x = y + 1; run;", "%put &nope;"))
   expect_equal(r$log[1], "NOTE: Variable y is uninitialized.")
