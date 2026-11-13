@@ -96,6 +96,20 @@ test_that("missing-value places: ** and function results are not generated missi
   }
 })
 
+test_that("missing-value places: inside function arguments every operation records its place", {
+  # SAS 9.4 TS1M7 gold datastep/dev_merge/mv_places_div (and opensas/sdtm_dti_studyday)
+  code <- c("data x;",
+            "  a = .;",
+            "  y1 = (a - 1) / 7;",
+            "  y2 = int((a - 1) / 7);",
+            "  y3 = int(-(a - 1));",
+            "run;")
+  for (lv in c("auto", "L3")) {
+    r <- run_notes(code, lv)
+    expect_equal(r$log[3], "      1 at 3:11   1 at 4:8   1 at 4:15   1 at 4:20   1 at 5:8   2 at 5:16  ", label = lv)
+  }
+})
+
 test_that("uninitialized variables and macro WARNINGs are logged", {
   r <- run_notes(c("data a; x = y + 1; run;", "%put &nope;"))
   expect_equal(r$log[1], "NOTE: Variable y is uninitialized.")

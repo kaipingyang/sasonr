@@ -43,9 +43,12 @@ negate_if <- function(code, negate) if (isTRUE(negate)) paste0("sas_not(", code,
 # Operations whose missing result is a "generated" missing value for the
 # missing-value NOTE: +, -, *, / and the unary minus.  The result of ** is not
 # (SAS records the next operation again: (a ** 2) + 1 has 2 places), nor is a
-# function result (abs(a) + 1: 2 places).  SAS 9.4 TS1M7 gold
-# datastep/dev_merge/mv_places_chain.
-gen_missing_node <- function(x) {
+# function result (abs(a) + 1: 2 places).  Inside the arguments of a function
+# call nothing is skipped: every operation records its place
+# (int((a - 1) / 7): 3 places).  SAS 9.4 TS1M7 gold
+# datastep/dev_merge/mv_places_chain and mv_places_div.
+gen_missing_node <- function(x, cx) {
+  if (isTRUE(cx$fn_arg)) return(FALSE)
   x$node == "binary" && x$op %in% c("+", "-", "*", "/") || x$node == "unary" && identical(x$op, "-")
 }
 
@@ -65,7 +68,7 @@ gen_expr <- function(e, cx) {
         # records the "**" and the minus; SAS 9.4 TS1M7 gold
         # datastep/dev_merge/mv_places_chain)
         at <- if (!is.null(e$arg$col)) at_code(list(line = e$arg$line, col = e$arg$col)) else ""
-        if (gen_missing_node(e$arg)) at <- paste0(at, ", .gen_a = TRUE")
+        if (gen_missing_node(e$arg, cx)) at <- paste0(at, ", .gen_a = TRUE")
         if (isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
         paste0("sas_neg(", g(e$arg), at, ")")
       },
@@ -116,8 +119,8 @@ gen_expr <- function(e, cx) {
       # b missing: 1 place; (a + b) / 3: 1 place).  ** always records its place,
       # also for a generated operand ((a + b) ** 2: 2 places).
       if ((is.na(fun) || fun == "sas_div") && nzchar(at)) {
-        if (gen_missing_node(e$lhs)) at <- paste0(at, ", .gen_a = TRUE")
-        if (gen_missing_node(e$rhs)) at <- paste0(at, ", .gen_b = TRUE")
+        if (gen_missing_node(e$lhs, cx)) at <- paste0(at, ", .gen_a = TRUE")
+        if (gen_missing_node(e$rhs, cx)) at <- paste0(at, ", .gen_b = TRUE")
       }
       if (is.na(fun)) paste0("sas_arith(", a, ", ", b, ", ", r_str(e$op), at, ")") else paste0(fun, "(", a, ", ", b, at, ")")
     },
@@ -192,6 +195,10 @@ gen_var_info <- function(e, cx) {
 }
 
 gen_call <- function(e, cx) {
+  # the arguments are generated in function-argument context (gen_missing_node())
+  old_fn_arg <- cx$fn_arg
+  cx$fn_arg <- TRUE
+  on.exit(cx$fn_arg <- old_fn_arg, add = TRUE)
   if (e$name %in% c("dim", "lbound", "hbound")) {
     arr <- cx$an$arrays[[e$args[[1]]$name]]
     return(switch(e$name, dim = paste0(arr$dim, "L"), lbound = paste0(as.integer(arr$lo), "L"),
