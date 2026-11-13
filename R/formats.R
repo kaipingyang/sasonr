@@ -84,7 +84,8 @@ fmt_known <- function(fmt) {
 
 user_fmt <- function(name, char, kind = "value") {
   if (!nzchar(name)) return(NULL)
-  cat <- sas_rt_active()$formats
+  # outside a submission there is no user format catalog
+  cat <- .active$session$formats
   key <- paste0(if (char) "$", name)
   f <- cat[[paste0(kind, ":", key)]]
   f
@@ -700,8 +701,9 @@ fmt_width <- function(fmt, x_char = fmt$char) {
 #' @keywords internal
 sas_define_format <- function(def) {
   key <- paste0(def$kind, ":", if (def$char) "$", def$name)
-  fmts <- sas_rt_active()$formats
-  fmts[[key]] <- def
+  s <- sas_rt_active()
+  if (is.null(s)) rlang::abort("sas_define_format() registers a format in a SAS session: call it inside sas_run().", class = "sasonr_error")
+  s$formats[[key]] <- def
   invisible(NULL)
 }
 

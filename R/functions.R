@@ -610,16 +610,29 @@ sas_f_symget <- function(symtab, name, .at = NULL) {
 
 # Regular expressions (PRX) ----------------------------------------------------
 
-prx_compile <- function(re) {
-  rt <- rt_diag()
+# The PRXPARSE ids live in the session: `session` (an explicit sas_session())
+# or the session of the running submission.  Outside a submission and without
+# `session` there are no ids (NULL): a pattern text still works, an id fails.
+prx_state <- function(session) {
+  if (!is.null(session)) return(check_session(session)$rt)
+  .active$rt
+}
+
+prx_no_session <- function(fname) {
+  rlang::abort(paste0(fname, "() with a pattern id needs the SAS session that holds the PRXPARSE ids: ",
+                      "pass `session = ` (a sas_session()) outside sas_run()."), class = "sasonr_error")
+}
+
+prx_compile <- function(re, rt = .active$rt, fname = "PRX") {
   if (is.numeric(re)) {
+    if (is.null(rt)) prx_no_session(fname)
     p <- rt$prx[[as.character(re)]]
     if (is.null(p)) abort_runtime("PRX regular-expression id was not created by PRXPARSE")
     return(p)
   }
   re <- strip_both(re)
   key <- paste0("re:", re)
-  if (!is.null(rt$prx_cache[[key]])) return(rt$prx_cache[[key]])
+  if (!is.null(rt) && !is.null(rt$prx_cache[[key]])) return(rt$prx_cache[[key]])
   sub <- FALSE
   if (startsWith(re, "s/") || startsWith(re, "s|")) {
     sub <- TRUE
@@ -663,8 +676,10 @@ prx_compile <- function(re) {
   if (grepl("m", flags, fixed = TRUE)) pat <- paste0("(?m)", pat)
   out <- list(pattern = pat, icase = grepl("i", flags, fixed = TRUE), sub = sub,
               repl = if (sub) gsub("\\$([0-9])", "\\\\\\1", parts[2]) else NULL)
-  if (is.null(rt$prx_cache)) rt$prx_cache <- list()
-  rt$prx_cache[[key]] <- out
+  if (!is.null(rt)) {
+    if (is.null(rt$prx_cache)) rt$prx_cache <- list()
+    rt$prx_cache[[key]] <- out
+  }
   out
 }
 
@@ -677,11 +692,12 @@ prx_invalid_note <- function(fname, args, .at) {
 }
 
 #' @export
-sas_f_prxparse <- function(re, .at = NULL) {
-  rt <- rt_diag()
+sas_f_prxparse <- function(re, .at = NULL, session = NULL) {
+  rt <- prx_state(session)
+  if (is.null(rt)) prx_no_session("PRXPARSE")
   vapply(re, function(r) {
     if (is.null(rt$prx)) rt$prx <- list()
-    p <- prx_compile(r)
+    p <- prx_compile(r, rt, "PRXPARSE")
     if (is.null(p)) {
       prx_invalid_note("prxparse", list(r), .at)
       return(NA_real_)
@@ -693,12 +709,13 @@ sas_f_prxparse <- function(re, .at = NULL) {
 }
 
 #' @export
-sas_f_prxmatch <- function(re, x, .at = NULL) {
+sas_f_prxmatch <- function(re, x, .at = NULL, session = NULL) {
+  rt <- prx_state(session)
   x <- as_sas_chr(x)
   ab <- recycle_n(if (is.numeric(re)) re else re, x)
   vapply(seq_along(ab[[2]]), function(i) {
     if (is.na(ab[[1]][i])) return(NA_real_)
-    p <- prx_compile(ab[[1]][i])
+    p <- prx_compile(ab[[1]][i], rt, "PRXMATCH")
     if (is.null(p)) {
       prx_invalid_note("prxmatch", list(ab[[1]][i], ab[[2]][i]), .at)
       return(NA_real_)
@@ -709,11 +726,12 @@ sas_f_prxmatch <- function(re, x, .at = NULL) {
 }
 
 #' @export
-sas_f_prxchange <- function(re, times, x, .at = NULL) {
+sas_f_prxchange <- function(re, times, x, .at = NULL, session = NULL) {
+  rt <- prx_state(session)
   x <- as_sas_chr(x)
   ab <- recycle_n(re, times, x)
   vapply(seq_along(ab[[3]]), function(i) {
-    p <- prx_compile(ab[[1]][i])
+    p <- prx_compile(ab[[1]][i], rt, "PRXCHANGE")
     if (is.null(p)) {
       prx_invalid_note("prxchange", list(ab[[1]][i], ab[[2]][i], ab[[3]][i]), .at)
       return("")

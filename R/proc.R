@@ -483,7 +483,7 @@ parse_proc_format <- function(p, line) {
     if (kw == "picture") abort_unsupported("PROC FORMAT PICTURE", sline)
     abort_unsupported(paste0("PROC FORMAT statement ", toupper(tk_val(p))), sline)
   }
-  if (fmtlib_opt && length(defs) == 0 && length(ls(sas_rt_active()$formats)) == 0) abort_runtime("Catalog WORK.FORMATS does not exist", line)
+  if (fmtlib_opt && length(defs) == 0 && length(ls(sas_rt_active()$formats %||% emptyenv())) == 0) abort_runtime("Catalog WORK.FORMATS does not exist", line)
   if (fmtlib_opt) abort_unsupported("PROC FORMAT FMTLIB listing", line)
   list(type = "proc", name = "format", line = line, options = list(), stmts = list(), titles = list(), defs = defs)
 }
