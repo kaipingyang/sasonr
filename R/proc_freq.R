@@ -389,7 +389,8 @@ parse_freq_tables <- function(p) {
         next
       }
       if (!k %in% freq_table_opts) abort_unsupported(paste0("TABLES option ", toupper(k)), kl)
-      if (k %in% c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "exact", "relrisk", "riskdiff")) freq_stat_gate(k, kl)
+      if (k %in% c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "exact", "relrisk", "riskdiff",
+                   "expected", "deviation", "cellchi2")) freq_stat_gate(k, kl)
       advance(p)
       if (k == "binomial" && tk_type(p) == "lparen") {
         o$binomial_opts <- parse_freq_binomial_opts(p, kl)
@@ -704,6 +705,8 @@ freq_one_request <- function(db, wt, rq, sp) {
   # two-way and multiway tables in the default crosstabulation cell format; the
   # manual states that they have no effect for one-way frequency tables, so
   #
+  #
+  # is gated by the statistics registry (freq_stat_gate, per SAS release).  The n-way (CROSSLIST-style) cell rows
   # are not printed by sasonr yet, so that case still fails loud.
   if (length(vars) > 2 && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
     abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for an n-way table (only the two-way crosstab layout is supported)", rq$line)
