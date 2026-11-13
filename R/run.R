@@ -347,11 +347,18 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #'   `"abort"` stops with the classed R condition instead. Features sasonr does
 #'   not support (`sasonr_unsupported`) always stop the run: they are not SAS
 #'   errors.
+#' @param session A session from [sas_session()]: the program runs as one more
+#'   submission to it (WORK, macro variables, user formats, options and titles
+#'   of earlier submissions are visible; `work` data sets are added to its
+#'   WORK). `NULL` (the default) runs in a fresh session that is discarded
+#'   afterwards.
 #' @return A `sasonr_result`: `$log` (PUT and %PUT lines), `$listing` (procedure
 #'   output), `$work` (output data sets with trailing blanks removed),
 #'   `$translation`, `$macro_vars` (global macro variables), `$status`
 #'   (`"ok"` or `"error"`), `$errors` (SAS ERROR messages) and `$error_line`
-#'   (SAS line of the first ERROR).
+#'   (SAS line of the first ERROR). With a `session`, `$log`, `$listing`,
+#'   `$translation`, `$status` and `$errors` describe this submission, `$work`
+#'   and `$macro_vars` the whole session.
 #' @examples
 #' res <- sas_run("
 #' data class;
@@ -369,11 +376,16 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #' cat(res$listing, sep = "\n")
 #' @export
 sas_run <- function(code, work = list(), level = c("auto", "L3"),
-                    on_error = getOption("sasonr.on_error", c("sas", "abort"))) {
+                    on_error = getOption("sasonr.on_error", c("sas", "abort")), session = NULL) {
   level <- match.arg(level)
   on_error <- match.arg(on_error, c("sas", "abort"))
-  session <- SasSession$new()
-  on.exit(session$close(), add = TRUE)
+  if (is.null(session)) {
+    # a throw-away session, closed (SQL connection) when the run ends
+    session <- SasSession$new()
+    on.exit(session$close(), add = TRUE)
+  } else {
+    check_session(session)
+  }
   session_add_work(session, work)
   eng <- new_engine(session, level, execute = TRUE)
   eng$on_error <- on_error
