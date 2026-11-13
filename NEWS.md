@@ -1,5 +1,46 @@
 # sasonr (development version)
 
+## Round 15: SAS 9.4's decimal conversion (2026-11-13)
+
+* **One closed form for fixed-point display rounding.** `w.d`, `Z`, `COMMA`,
+  `DOLLAR`, `NEGPAREN`, `PVALUE`, `PERCENT` and the fixed-point forms of `BEST`
+  compute `t = fl(fl(|x| + h) * (1 + 2^-52))` (h the double nearest
+  0.5 * 10^-d) and write the exact binary value of `t` truncated to `d`
+  decimals and at most 15 significant digits (values below 1: at most 14 - E
+  decimals). Derived from ulp-by-ulp SAS 9.4 (TS1M7) scans at every binary
+  exponent of the domain (185,228 points, round 13 and 15); it replaces the
+  fail-loud windows 1 to 3 ulps below a half point, at the 16th significant
+  digit and the conservative PERCENT band. `PERCENT` is the same rule on
+  `fl(100 * |x|)`.
+* **E notation** with up to 12 mantissa decimals: the value rounded to 14
+  significant digits, then half up to the mantissa (a double rounding:
+  6.6464999999999970E-19 in `E10.` is `6.647E-19`). With 13 or more mantissa
+  decimals (`E20.` and wider, wide `BEST` E forms) the 14th digit is
+  truncated or rounded only where the scans show no ambiguity; the band in
+  between fails loud (it used to truncate up to a rest of 0.888, which was
+  wrong for `E20.`).
+* **ROUND**: rounds up exactly when `floor(fl(fl(|q| + 0.5) + W)) > floor(|q|)`
+  with `q = x / unit` and `W = min(1E-12 * |q|, 1E-6)`; the former window
+  (1.1E-12, 2E-6) and its fail-loud edges are gone. From `|x/unit| = 2^49` on,
+  a fractional unit fails loud (SAS's results are not the nearest multiple).
+* `BEST8.` to `BEST12.` write values below 1E-5 in E notation when it shows
+  as many digits, and use an integer mantissa with a negative exponent when
+  the decimal mantissa would show fewer than three digits (`-102E-14`).
+* Integers too long for their decimals keep their exact digits with fewer
+  zeros (`32.15` of 939586291501115008 is `939586291501115008.0000000000000`).
+* Still fail loud, each region bounded by the scans: values below 1 with 15
+  or more decimals (16 below 0.1, 17 below 0.01), non-integers of 1E15 or more
+  with 4 or more decimals, the 14-digit E band, `BEST` at widths up to 7 for
+  values below 1, `ROUNDE`/`ROUNDZ` window edges, PROC MEANS default decimals
+  for field widths other than 12.
+* Verification tooling (review of 37e3ba6): the results archive is keyed by
+  the commit and code taken when the cases are selected (a change during the
+  run stops it); case hashes use file contents (symbolic links and dot files
+  included) and the fingerprint covers BLAS, threads, locale and time zone; a
+  release re-checks an archived run incrementally and pushes exactly the
+  verified commit; the parallel runner schedules the longest cases first and
+  has a development-only `--fail-fast`.
+
 ## Review of the merge (2026-11-13)
 
 * PROC SQL function NOTEs have one path again: several NOTEs, or a NOTE in a

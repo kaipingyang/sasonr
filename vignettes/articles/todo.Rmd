@@ -2,7 +2,7 @@
 title: "To do and future plan"
 ---
 
-*Updated after every development round. Last update: 2026-11-12 (after round 13: display rounding scans, WHERE matrix).*
+*Updated after every development round. Last update: 2026-11-13 (after round 15: SAS's decimal conversion, verification tooling).*
 
 ## Three ways to use sasonr
 
@@ -25,7 +25,7 @@ come later.
 
 | # | Task |
 |---|---|
-| 00 | Display rounding (round 13): SAS's choice for values 1 to 3 ulps below a half point with decimals depends on the binary exponent (fails loud now; needs per-exponent scans), the 16th significant digit, values below 1 with 15 or more decimals, 14-digit E mantissas, BESTw. at widths up to 7 for values below 1, ROUND edges and large values, PROC MEANS default decimals |
+| 00 | Display rounding (round 15): fixed-point formats, PERCENT, E notation up to 12 mantissa decimals and ROUND follow one closed form at every binary exponent scanned; still fail loud: values below 1 with 15 or more decimals, non-integers of 1E15 or more with 4 or more decimals, the 14-digit E band (E20. and wider), BESTw. at widths up to 7 for values below 1, BEST integer mantissas for values of 1 or more, ROUNDE/ROUNDZ window edges, ROUND with a fractional unit from x/unit = 2^49 on, PROC MEANS default decimals for field widths other than 12 |
 | 00a | WHERE context (round 13): WHERE-only SAS errors (floating-point exception, missing arguments, syntax errors of format arguments), remaining WHERE log differences; functions gain `where` only when every WHERE case agrees; `%SYSFUNC` / PROC SQL cases for the functions verified in the DATA step only; macro-time ERROR recovery (fails loud) |
 | 0 | PROC MEANS follow-ups (round 12): SKEWNESS (about 97 % of probe values agree), PRT and confidence limits (SAS's t distribution), SKEWNESS / KURTOSIS with WEIGHT or VARDEF=WDF / WEIGHT, quantiles and MIN / MAX with FREQ or WEIGHT, EXCLNPWGT, the STD cut-off to 0 between 1.1966E-26 and 1.4312E-26 times the squared mean, weighted nearly constant data, DATA step moment functions with 10 or more values (SAS's CSS differs in the last bit), DATA step SKEWNESS of symmetric data (SAS returns 0, rule unknown) |
 | 0a | Remaining `approximate` functions (probability functions, EXP, LOG10, hyperbolic functions, COMB, PERM, GEOMEAN, KURTOSIS): last-bit differences from SAS's math library |

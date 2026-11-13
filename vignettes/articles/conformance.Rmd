@@ -143,7 +143,9 @@ The clinical programs are mainly blocked by ODS statements (12) and `OPTIONS MIS
 
 About 21,000 rounding points generated on SAS 9.4 (ROUND, ROUNDE, ROUNDZ,
 INT/FLOOR/CEIL, `w.d`, BEST, Z, COMMA, DOLLAR, PERCENT, E formats) plus PROC
-display programs. Inputs are exact IEEE-754 bit patterns.
+display programs, and since round 13 dense ulp-by-ulp scans around decimal
+half points at every binary exponent of the domain (185,228 points). Inputs
+are exact IEEE-754 bit patterns.
 
 | Group | Before round 7a | After round 7a |
 |---|---|---|
@@ -151,10 +153,26 @@ display programs. Inputs are exact IEEE-754 bit patterns.
 | ROUNDE, ROUNDZ, INT, FLOOR, CEIL, ... | 95.9% | **99.6%** |
 | Formats | 87.8% | **96.2%** |
 
-The remaining points (edge windows of the ROUND fuzz, half-way edges of
-formats, very narrow BEST widths, PROC MEANS default decimals for very large
-or very small values) stop with `sasonr_unsupported`; none returns a
-different value silently. Target: 100%.
+Round 15 found SAS's decimal conversion: `t = fl(fl(|x| + h) * (1 + 2^-52))`
+with `h` the double nearest half a unit of the last decimal, truncated to the
+requested decimals and 15 significant digits; E notation rounds to 14
+significant digits first; ROUND adds its fuzz to `|x/unit| + 0.5`. On the
+scans:
+
+| Scan | Points | Bit-identical | Fail loud | Silent |
+|---|---:|---:|---:|---:|
+| Round 13: `w.d` (d = 0 to 30), `E32.`, `BEST32.` | 44,854 | 44,189 | 665 | 0 |
+| Round 15: `w.d` (d = 0 to 17, every binary exponent) | 20,284 | 20,074 | 210 | 0 |
+| Round 15: PERCENT | 2,799 | 2,799 | 0 | 0 |
+| Round 15: `Ew.` | 32,785 | 29,839 | 2,946 | 0 |
+| Round 15: BEST1. to BEST12. | 57,516 | 31,807 | 25,709 | 0 |
+| Round 15: ROUND | 26,990 | 26,908 | 82 | 0 |
+
+The remaining points (values below 1 with 15 or more decimals, the 14-digit E
+band, BEST at widths up to 7 for values below 1, ROUND with a fractional unit
+from `|x/unit| = 2^49` on, PROC MEANS default decimals for field widths other
+than 12) stop with `sasonr_unsupported`; none returns a different value
+silently.
 
 ## Offline conformance cases
 
