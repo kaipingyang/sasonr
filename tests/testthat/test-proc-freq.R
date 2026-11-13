@@ -84,6 +84,140 @@ test_that("statistics not yet verified against SAS fail loud by default", {
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq; exact chisq; weight n; run;")), class = "sasonr_unsupported")
 })
 
+test_that("PROC FREQ option combinations outside the verified domain fail loud", {
+  # one guard per audited silent-value risk (see the PROC FREQ registry note)
+  err <- function(code, pattern) {
+    e <- tryCatch(sas_run(code), error = function(e) e)
+    expect_s3_class(e, "sasonr_unsupported")
+    expect_match(conditionMessage(e), pattern, fixed = TRUE)
+  }
+  frac <- "data d; input trt $ resp $ cnt; datalines;
+A Yes 10.5
+A No 4.25
+B Yes 6.75
+B No 12.5
+;
+run;
+proc freq data=d; weight cnt; tables trt*resp / %s; run;"
+  # EXACT CHISQ enumerates integer tables only (like EXACT FISHER)
+  err(sprintf(frac, "chisq; exact chisq"), "EXACT CHISQ with non-integer weights")
+  # SCORES=RANK is verified only for the multiway CMH summary without CHISQ
+  err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / chisq scores=rank; run;"), "SCORES=RANK")
+  err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / cmh chisq scores=rank; run;"), "SCORES=RANK")
+  # table scores of a numeric variable with the MISSING option are not verified
+  miss_num <- "data d; input site $ trt $ sev w; datalines;
+1 A 1 5
+1 A 2 4
+1 B 1 3
+1 B 2 2
+2 A 1 6
+2 A 2 3
+2 B 1 2
+2 B 2 4
+2 A . 3
+;
+run;"
+  err(paste(miss_num, "proc freq data=d; weight w; tables trt*sev / chisq missing; run;"), "numeric table-score")
+  err(paste(miss_num, "proc freq data=d; weight w; tables site*trt*sev / cmh missing; run;"), "numeric table-score")
+  # EXACT CHISQ needs the asymptotic CHISQ option (the exact blocks hang off it)
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp; exact chisq; run;"), "EXACT CHISQ requires the CHISQ option")
+  # MISSPRINT combinations whose missing-value semantics are not verified
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / list missprint; run;"), "MISSPRINT with the LIST option")
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / missprint relrisk; run;"), "MISSPRINT with RELRISK")
+  miss_2x3 <- "data d; input a $ b $ w; datalines;
+X P 3
+X Q 4
+X R 2
+Y P 5
+Y Q 2
+Y R 4
+. P 1
+;
+run;
+proc freq data=d; weight w; tables a*b / chisq missprint; run;"
+  err(miss_2x3, "MISSPRINT with statistics for a table that is not 2x2")
+  # EXACT BINOMIAL enumerates integer tables only
+  err("data d; input trt $ w; datalines;
+A 10.5
+B 12.25
+B 3.5
+;
+run;
+proc freq data=d; weight w; tables trt / binomial; exact binomial; run;",
+      "EXACT BINOMIAL with non-integer weights")
+  # CMH / RELRISK / RISKDIFF are verified with integer weights only
+  frac_cmh <- "data d; input site $ trt $ resp $ cnt; datalines;
+1 A Yes 5.5
+1 A No 2
+1 B Yes 3
+1 B No 4.5
+2 A Yes 3.5
+2 A No 3.5
+2 B Yes 2
+2 B No 5.5
+;
+run;
+proc freq data=d; weight cnt; tables site*trt*resp / %s; run;"
+  err(sprintf(frac_cmh, "cmh"), "CMH statistics with non-integer weights")
+  err(sprintf(frac, "relrisk"), "RELRISK / RISKDIFF with non-integer weights")
+  err(sprintf(frac, "riskdiff"), "RELRISK / RISKDIFF with non-integer weights")
+  # ALPHA= is verified only for the binomial confidence limits
+  err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / cmh alpha=0.1; run;"), "ALPHA= with CMH")
+  # Fisher with fractional frequencies is verified for 2x2 tables only
+  frac_2x3 <- "data d; input trt $ resp $ cnt; datalines;
+A L 3.5
+A M 4.5
+A H 2.5
+B L 5.5
+B M 4
+B H 6.5
+;
+run;
+proc freq data=d; weight cnt; tables trt*resp / fisher; run;"
+  err(frac_2x3, "FISHER with non-integer weights for a table that is not 2x2")
+  # BY groups: only the 2x2 CHISQ / FISHER listing is verified
+  err(paste(freq_data, "proc freq data=d; by s; weight n; tables trt / chisq; run;"), "with BY groups")
+  by_2x3 <- "data d; input site $ a $ b $ w; datalines;
+1 X P 3
+1 X Q 4
+1 X R 2
+1 Y P 5
+1 Y Q 2
+1 Y R 4
+;
+run;
+proc sort data=d; by site; run;
+proc freq data=d; by site; weight w; tables a*b / chisq; run;"
+  err(by_2x3, "only CHISQ / FISHER for a 2x2 table")
+  # negative WEIGHT values (plain frequency table; statistics already aborted)
+  err("data d; input a $ w; datalines;
+A 3
+B -1
+A 2
+;
+run;
+proc freq data=d; weight w; tables a; run;", "negative weights")
+  # two confidence-limit tables in one listing are not verified
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / relrisk(cl=(wald)) riskdiff(cl=(wald)); run;"),
+      "two confidence-limit tables")
+  # EXACT RISKDIFF layout is verified only together with RISKDIFF(CL=)
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / riskdiff; exact riskdiff; run;"),
+      "EXACT RISKDIFF without the RISKDIFF(CL=)")
+  # a zero cell with the RISKDIFF(CL=) table is not verified
+  err("data d; input trt $ resp $ cnt; datalines;
+A Yes 0
+A No 6
+B Yes 5
+B No 4
+;
+run;
+proc freq data=d; weight cnt; tables trt*resp / riskdiff(cl=(wald)); run;",
+      "RISKDIFF CL= with a zero cell")
+  # statistics after a LIST table are not verified
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / list chisq; run;"), "LIST option")
+  err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / list cmh; run;"), "LIST option")
+})
+
 test_that("PROC FREQ fractional weights: CHISQ runs, FISHER is not computed", {
   code <- "data d; input trt $ resp $ cnt; datalines;
 A Yes 10.5

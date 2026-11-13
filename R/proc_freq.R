@@ -453,21 +453,53 @@ translate_proc_freq <- function(step, meta, last) {
     for (v in setdiff(vars_in, c(by$vars, w$var))) requests[[length(requests) + 1L]] <- list(vars = v, opts = list(), line = step$line)
   }
   for (rq in requests) {
-    if (length(rq$vars) > 1 && any(c("binomial") %in% names(rq$opts))) abort_syntax("BINOMIAL is valid only for one-way tables", rq$line)
-    if (length(rq$vars) != 2 && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
+    kv <- length(rq$vars)
+    if (kv > 1 && any(c("binomial") %in% names(rq$opts))) abort_syntax("BINOMIAL is valid only for one-way tables", rq$line)
+    if (kv != 2 && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is verified)", rq$line)
     }
+    # --- option combinations whose listing layout is not verified -----------
+    if (isTRUE(rq$opts$missprint) && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
+      abort_unsupported("MISSPRINT with RELRISK / RISKDIFF (the combination is not verified)", rq$line)
+    }
+    if (kv > 1 && isTRUE(rq$opts$list) &&
+        (any(c("chisq", "fisher", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff", "binomial") %in% names(rq$opts)) ||
+         length(exact) > 0)) {
+      abort_unsupported("PROC FREQ statistics with the LIST option (the statistics layout after a LIST table is not verified)", rq$line)
+    }
+    rd0 <- rq$opts$riskdiff_opts %||% list()
+    rel0 <- rq$opts$relrisk_opts %||% list()
+    if (isTRUE(rq$opts$relrisk) && isTRUE(rq$opts$riskdiff) &&
+        length(rel0$cl) > 0 && length(rd0$cl) > 0) {
+      abort_unsupported("RELRISK(CL=) together with RISKDIFF(CL=) (two confidence-limit tables in one listing are not verified)", rq$line)
+    }
+    if ("riskdiff" %in% exact && isTRUE(rq$opts$riskdiff) && is.null(rd0$cl)) {
+      abort_unsupported("EXACT RISKDIFF without the RISKDIFF(CL=) confidence-limit table (that layout is not verified)", rq$line)
+    }
+    alpha <- rq$opts$alpha
+    if (!is.null(alpha) && abs(alpha - 0.05) > 1e-9 &&
+        any(c("cmh", "cmh1", "cmh2", "relrisk", "riskdiff") %in% names(rq$opts))) {
+      abort_unsupported("TABLES option ALPHA= with CMH / RELRISK / RISKDIFF (only the binomial confidence limits are verified)", rq$line)
+    }
     # SCORES= affects the Mantel-Haenszel chi-square of a two-way table and the
-    # score-based statistics; only the multiway CMH listing is verified
-    if (!is.null(rq$opts$scores) && length(rq$vars) < 3) {
+    # score-based statistics; only the multiway CMH listing with RANK scores is
+    # verified (freq_stats c55, c57)
+    if (!is.null(rq$opts$scores) && kv < 3) {
       abort_unsupported(paste0("TABLES option SCORES=", toupper(rq$opts$scores),
                                " for a one-way or two-way table (only the multiway CMH listing is verified)"), rq$line)
     }
-    if (length(exact) > 0 && length(rq$vars) > 2) {
+    if (identical(rq$opts$scores, "rank") &&
+        (!isTRUE(rq$opts$cmh) || isTRUE(rq$opts$chisq) || isTRUE(rq$opts$fisher))) {
+      abort_unsupported("SCORES=RANK is only verified for the multiway CMH summary without CHISQ / FISHER", rq$line)
+    }
+    if (length(exact) > 0 && kv > 2) {
       abort_unsupported("EXACT statistics for a multiway table (per-stratum exact tests are not verified)", rq$line)
     }
-    if ("chisq" %in% exact && length(rq$vars) != 2) {
+    if ("chisq" %in% exact && kv != 2) {
       abort_unsupported("EXACT CHISQ for a one-way table (only the 2x2 exact enumeration is verified)", rq$line)
+    }
+    if ("chisq" %in% exact && kv == 2 && !isTRUE(rq$opts$chisq)) {
+      abort_unsupported("EXACT CHISQ requires the CHISQ option in the TABLES statement", rq$line)
     }
     if (!is.null(rq$opts$chisq_opts) && !isTRUE(rq$opts$chisq)) {
       abort_unsupported("TESTP= / TESTF= without the CHISQ option", rq$line)
@@ -483,9 +515,14 @@ translate_proc_freq <- function(step, meta, last) {
   stat_opts <- c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff")
   if (!is.null(by) && (length(exact) > 0 ||
                        any(vapply(requests, function(r) any(c("binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff") %in% names(r$opts)), logical(1))))) {
-    # only the per-BY-group CHISQ / FISHER listing is verified (freq_stats
-    # c34_by_group); the other statistics have unverified BY layouts
+    # only the per-BY-group CHISQ / FISHER listing on a 2x2 table is verified
+    # (freq_stats c34_by_group); the other statistics and shapes have
+    # unverified BY layouts
     abort_unsupported("PROC FREQ statistics with BY groups (only CHISQ / FISHER per BY group is verified)", by$line)
+  }
+  if (!is.null(by) &&
+      any(vapply(requests, function(r) length(r$vars) != 2 && any(c("chisq", "fisher") %in% names(r$opts)), logical(1)))) {
+    abort_unsupported("CHISQ / FISHER with BY groups for a table that is not two-way (only the 2x2 table is verified)", by$line)
   }
   outs <- of("output")
   if (length(outs) > 1) abort_unsupported("more than one OUTPUT statement in PROC FREQ", outs[[2]]$line)
@@ -671,9 +708,13 @@ freq_one_request <- function(db, wt, rq, sp) {
     abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for an n-way table (only the two-way crosstab layout is verified)", rq$line)
   }
   if (missprint && length(vars) > 2) abort_unsupported("MISSPRINT for multi-way tables", rq$line)
+  if (missprint && length(vars) > 1 && isTRUE(o$list)) {
+    abort_unsupported("MISSPRINT with the LIST option (the combination is not verified)", rq$line)
+  }
   keep <- if (miss_opt || missprint) rep(TRUE, nrow(db)) else !anymiss
   dd <- db[keep, , drop = FALSE]
   ww <- wt[keep]
+  if (any(ww < 0)) abort_unsupported("negative weights are not verified in PROC FREQ", rq$line)
   lv <- lapply(vars, function(v) freq_levels(dd[[v]], ww, info[[v]], sp$order))
   names(lv) <- vars
   idx <- lapply(vars, function(v) match(lv[[v]]$key, lv[[v]]$keys))
@@ -727,6 +768,11 @@ freq_one_request <- function(db, wt, rq, sp) {
       stat_tab <- tab[!m1, !m2, drop = FALSE]
       stat_lv <- list(freq_lv_subset(lv[[1]], !m1), freq_lv_subset(lv[[2]], !m2))
     }
+  }
+  if (k == 2 && missprint && (nrow(stat_tab) != 2L || ncol(stat_tab) != 2L) &&
+      (isTRUE(o$chisq) || isTRUE(o$fisher) || length(sp$exact) > 0)) {
+    # c18 verifies MISSPRINT statistics for a non-missing 2x2 table only
+    abort_unsupported("MISSPRINT with statistics for a table that is not 2x2 (only the 2x2 layout is verified)", rq$line)
   }
   res$stats <- freq_request_stats(stat_tab, stat_lv, vars, info, o, sp, nmiss)
   res$listing <- c(res$listing, freq_stats_listing(res$stats, tab, vars, info, o, sp))
@@ -1119,6 +1165,13 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
 freq_scores <- function(l) {
   v <- l$values
   if (is.numeric(v) && all(!is.na(v))) as.numeric(v) else seq_along(v)
+}
+
+# TRUE when a numeric level vector contains missing values: with the MISSING
+# option the numeric levels include NA and freq_scores() would silently fall
+# back to the level indices, so the table-score statistics fail loud instead.
+freq_table_score_na <- function(lv) {
+  any(vapply(lv, function(l) is.numeric(l$values) && length(l$values) > 0L && any(is.na(l$values)), TRUE))
 }
 
 freq_chisq <- function(tb, rs, cs) {
@@ -1757,6 +1810,9 @@ freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
     abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is verified)")
   }
   if (any(tb < 0)) abort_unsupported("RELRISK / RISKDIFF with negative weights")
+  if (any(abs(tb - round(tb)) > 1e-9)) {
+    abort_unsupported("RELRISK / RISKDIFF with non-integer weights (the gold standard uses integer weights only)")
+  }
   n <- sum(tb)
   n1 <- sum(tb[1, ])
   n2 <- sum(tb[2, ])
@@ -1805,6 +1861,9 @@ freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
     }
     cls <- rd$cl
     if (!is.null(cls)) {
+      if (any(tb == 0)) {
+        abort_unsupported("RISKDIFF CL= with a zero cell (the confidence-limit table is not verified for this table)")
+      }
       if ("exact" %in% cls && !exact_rd) {
         abort_unsupported("RISKDIFF CL=EXACT without the EXACT RISKDIFF statement")
       }
@@ -1881,6 +1940,10 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   st <- list(n = sum(tab), nmiss = nmiss)
   if (length(want) == 0) return(st)
   if (any(as.numeric(tab) < 0)) abort_unsupported("statistics with negative weights")
+  if (length(sp$by) > 0 && (k != 2L || nrow(tab) != 2L || ncol(tab) != 2L)) {
+    # only the 2x2 CHISQ / FISHER listing per BY group is verified (c34)
+    abort_unsupported("PROC FREQ statistics with BY groups (only CHISQ / FISHER for a 2x2 table are verified)")
+  }
   if ("binomial" %in% want) {
     if (k != 1) abort_syntax("BINOMIAL is valid only for one-way tables")
     bo <- o$binomial_opts %||% list()
@@ -1903,6 +1966,14 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       sel <- hit[1]
     }
     alpha <- bo$alpha %||% o$alpha %||% 0.05
+    if (isTRUE(bo$exact) || "binomial" %in% sp$exact) {
+      n_bin <- sum(cnt_nm)
+      # the exact binomial test enumerates integer tables: a fractional WEIGHT
+      # makes it undefined (and crashed the listing without this guard)
+      if (any(abs(c(cnt_nm, n_bin) - round(c(cnt_nm, n_bin))) > 1e-9)) {
+        abort_unsupported("EXACT BINOMIAL with non-integer weights (the exact test requires integer frequencies)")
+      }
+    }
     st <- c(st, freq_binomial(cnt_nm, alpha, bo$p0 %||% 0.5, sel, bo$cl, isTRUE(bo$correct)))
     st$bin_level <- txt[sel]
     st$bin_var <- vars[1]
@@ -1936,6 +2007,9 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
         abort_unsupported("CHISQ TESTP= / TESTF= for a two-way table (only the one-way goodness-of-fit test is verified)")
       }
       tb <- matrix(as.numeric(tab), nrow = dim(tab)[1])
+      if (freq_table_score_na(lv)) {
+        abort_unsupported("CHISQ with the MISSING option on a numeric table-score variable (the table scores are not verified)")
+      }
       rs <- freq_scores(lv[[1]])
       cs <- freq_scores(lv[[2]])
       keep_r <- rowSums(tb) > 0
@@ -1963,6 +2037,9 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
                          phi = cs2$phi, contgy = cs2$contgy, cramv = cs2$cramv, small = cs2$small))
         if (!is.null(cs2$ajchi)) st <- c(st, list(ajchi = cs2$ajchi, df_ajchi = 1, p_ajchi = cs2$p_ajchi))
         if ("chisq" %in% sp$exact) {
+          if (any(abs(tb - round(tb)) > 1e-9)) {
+            abort_unsupported("EXACT CHISQ with non-integer weights (the exact test is enumerated over integer tables)")
+          }
           if (nrow(tb) != 2L || ncol(tb) != 2L) {
             abort_unsupported("EXACT CHISQ for a table that is not 2x2 (only the 2x2 exact enumeration is verified)")
           }
@@ -1971,10 +2048,13 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       }
       if ("fisher" %in% want || ("chisq" %in% want && nrow(tb) == 2 && ncol(tb) == 2)) {
         if (any(abs(tb - round(tb)) > 1e-9)) {
-          # SAS does not compute Fisher's exact test for a table of fractional
-          # (non-integer) frequencies: the chi-square table is still printed
-          # but has no Fisher block (freq_stats c21, c22)
           if ("fisher" %in% sp$exact) abort_unsupported("EXACT FISHER with non-integer weights")
+          if (nrow(tb) != 2L || ncol(tb) != 2L) {
+            abort_unsupported("FISHER with non-integer weights for a table that is not 2x2 (only the 2x2 behaviour is verified)")
+          }
+          # SAS does not compute Fisher's exact test for a 2x2 table of
+          # fractional (non-integer) frequencies: the chi-square table is still
+          # printed but has no Fisher block (freq_stats c21, c22)
         } else {
           st$fisher <- freq_fisher(tb[keep_r, keep_c, drop = FALSE])
         }
@@ -1986,7 +2066,14 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
     if (k == 2L) {
       abort_unsupported("CMH for a two-way table (only the multiway CMH summary listing is verified; use a multiway table request)")
     }
-    st <- c(st, freq_cmh(tab, lv, if (identical(o$scores, "rank")) "rank" else "table"))
+    if (any(abs(as.numeric(tab) - round(as.numeric(tab))) > 1e-9)) {
+      abort_unsupported("CMH statistics with non-integer weights (the gold standard uses integer weights only)")
+    }
+    scores <- if (identical(o$scores, "rank")) "rank" else "table"
+    if (identical(scores, "table") && freq_table_score_na(lv)) {
+      abort_unsupported("CMH with the MISSING option on a numeric table-score variable (the table scores are not verified)")
+    }
+    st <- c(st, freq_cmh(tab, lv, scores))
     st$cmh_common <- freq_cmh_common(tab, o$alpha %||% 0.05)
   }
   if (any(c("riskdiff", "relrisk") %in% want)) {
