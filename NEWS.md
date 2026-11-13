@@ -1,5 +1,20 @@
 # sasonr (development version)
 
+## Round 15.1: review of round 15 (2026-11-13)
+
+* Integers too long for their decimals (16 or more digits with 4 or more
+  decimals) keep their exact digits only at the scanned SAS 9.4 points; other
+  values fail loud when a fixed-point text could fit. Integers from 1E18 to
+  1E21 without decimals likewise (the field width still chooses E notation).
+* `ROUNDE` and `ROUNDZ` fail loud from `|x/unit| = 2^49` with a fractional
+  unit, as `ROUND` does; only exact multiples are exempt (all three).
+* `ROUNDE` fails loud up to 2E-6 below a half point once `1.1E-12 * |q|`
+  exceeds 1E-6 (its fuzz window is not rescanned yet).
+* Wide `BEST` E forms take their mantissa decimals from the width and fail
+  loud when the text does not fit (`BEST16.` wrote 18 columns).
+* E notation: an exact tie at the 15th significant digit fails loud when its
+  direction decides the digits shown.
+
 ## Round 15: SAS 9.4's decimal conversion (2026-11-13)
 
 * **One closed form for fixed-point display rounding.** `w.d`, `Z`, `COMMA`,

@@ -16,7 +16,8 @@ test_that("PERCENT: rounding down just below a half point fails loud again (find
 test_that("exact integer digits where verified (finding 2; round 15: up to 2^53 with 3 decimals)", {
   drt <- sasonr:::display_round_text
   expect_identical(drt(939586291501115008, 0L), "939586291501115008") # SAS 9.4 gold (32.)
-  expect_identical(drt(1e18, 0L), "1000000000000000000")              # 32. of 2.6745296926266266E19: exact (gold)
+  expect_error(drt(1e18, 0L), class = "sasonr_unsupported")            # 1E18-1E21: gold point only (review_081e9ac 3)
+  expect_identical(drt(26745296926266265600, 0L), "26745296926266265600") # 32. of 2.6745296926266266E19 (gold)
   expect_identical(drt(2^70, 0L), NA_character_)
   expect_identical(drt(1234567890123456, 2L), "1234567890123456.00")  # r15_wd: integers below 2^53, d <= 3
   expect_error(drt(1234567890123456, 4L), class = "sasonr_unsupported")

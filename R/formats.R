@@ -132,6 +132,17 @@ add_commas <- function(s) {
   paste0(ip, rest)
 }
 
+# The SAS 9.4 gold points of integers with decimal zeros beyond the verified
+# domain (exact value, width, decimals, form): COMMA32.4 and DOLLAR32.4 of
+# 1E15 (fmt_matrix COMMA_ec3f12, DOLLAR_ef9d86); 32.15-32.30 of
+# 939586291501115008 and 26745296926266265600 (round-13 scan wd_digits D0172,
+# D0186: as many zeros as fit).
+int_zeros_gold <- function(v, w, d, commas, dollar, zero, swap) {
+  if (v <= 0 || zero || swap || w != 32L) return(FALSE)
+  (v == 1e15 && d == 4L && commas) ||
+    (v %in% c(939586291501115008, 26745296926266265600) && d %in% c(15:18, 20L, 25L, 30L) && !commas && !dollar)
+}
+
 # Fit ladder shared by w.d / Z / COMMA / DOLLAR (from the SAS gold standard):
 # for each number of decimals from d down to 0 try the full form, then
 # without the leading zero, then without thousands separators, then without
@@ -141,7 +152,17 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
   # an integer beyond 2^53 / 10^d: the decimals are zeros (SAS 9.4: COMMA32.4 of 1E15)
   # (and fewer zeros when they do not fit: SAS 9.4, 32.15 of 939586291501115008
   # is 939586291501115008.0000000000000)
-  if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21) {
+  # Verified only where display_round_text is (below 1E15; 3 decimals below
+  # 2^53) and at the gold points themselves; elsewhere fail loud when a
+  # fixed-point text could fit (review_081e9ac finding 1).
+  if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21 &&
+      !(abs(v) < 1e15 || (d <= 3L && abs(v) < 2^53) || int_zeros_gold(v, w, d, commas, dollar, zero, swap)) &&
+      nchar(sprintf("%.0f", abs(v))) + (v < 0) <= w) {
+    abort_unsupported(paste0("format ", w, ".", d, " of the integer ", sprintf("%.0f", v),
+                             ": an integer of 16 or more digits with more than 3 decimals is not verified against SAS"))
+  }
+  if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21 &&
+      (abs(v) < 1e15 || (d <= 3L && abs(v) < 2^53) || int_zeros_gold(v, w, d, commas, dollar, zero, swap))) {
     ip <- sprintf("%.0f", abs(v))
     for (dd in seq(d, 1L)) {
       forms <- c(if (commas && dd == d) paste0(add_commas(ip), ".", strrep("0", dd)), paste0(ip, ".", strrep("0", dd)))

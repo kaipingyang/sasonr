@@ -860,12 +860,24 @@ sas_fmt_best <- function(x, w = 12L) {
                                  sci, "): not verified against SAS"))
       }
     } else if ((is.na(s) || abs(v) < 1e-5) && w > 15L) {
-      # wide widths: at most 14 significant digits, truncated (sig15)
-      g <- e14_digits(NULL, v)
-      m <- g$keep
-      m <- sub("0+$", "", m)
-      m <- if (nchar(m) > 1L) paste0(substr(m, 1L, 1L), ".", substring(m, 2L)) else m
-      sci <- paste0(if (v < 0) "-", m, "E", if (g$ex < 0) "-", abs(g$ex))
+      # wide widths: as many mantissa decimals k as fit in w (at most 14
+      # significant digits): k >= 13 the 14-digit rule (e14_digits, k passed
+      # on), k <= 12 sci_dec_text; a text that still does not fit fails loud
+      ex0 <- as.integer(sub("^.*e", "", sprintf("%.13e", abs(v))))
+      k <- w - (v < 0) - 3L - (ex0 < 0) - nchar(as.character(abs(ex0)))
+      if (k >= 13L) {
+        g <- e14_digits(NULL, v, k)
+        m <- g$keep
+        m <- sub("0+$", "", m)
+        m <- if (nchar(m) > 1L) paste0(substr(m, 1L, 1L), ".", substring(m, 2L)) else m
+        sci <- paste0(if (v < 0) "-", m, "E", if (g$ex < 0) "-", abs(g$ex))
+      } else {
+        sci <- sci_dec_text(v, k)$text
+      }
+      if (nchar(sci) > w) {
+        abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), ": the E form ", sci,
+                                 " does not fit (not verified against SAS)"))
+      }
     } else if (is.na(s) || (v != 0 && abs(v) < 1e-5)) {
       # the E form of w.d (sci_fit): as many mantissa decimals as fit, or an
       # integer mantissa when fewer than three digits fit and it shows more

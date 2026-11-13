@@ -18,9 +18,11 @@
 #    INT(x) = FLOOR(x) for x > 0 and -FLOOR(-x) otherwise; FLOORZ / CEILZ
 #    have no fuzz.
 # Points the gold standard leaves ambiguous fail loud (`sasonr_unsupported`):
-# a quotient within 0.8-1.25 times the fuzz width below a half-integer, a
+# a quotient within 0.8-1.25 times the fuzz width below a half-integer
+# (ROUNDE: also anything up to 2E-6 below it once 1.1E-12 |q| > 1E-6), a
 # fractional unit that is not a power of ten with a non-integer
-# 1e15 <= |x| < 2^53, and a unit that is neither a short decimal nor 1/n.
+# 1e15 <= |x| < 2^53, a fractional unit with a non-integer |x/unit| >= 2^49
+# (ROUND, ROUNDE, ROUNDZ), and a unit that is neither a short decimal nor 1/n.
 
 sas_tiny <- 2.2250738585072014e-308
 
@@ -99,26 +101,30 @@ round_one <- function(x, unit, mode, fname) {
   if (!is.finite(q) || abs(q) >= 2^52) return(x)
   a <- abs(q)
   k <- floor(a)
+  # From |q| = 2^49 on, a fractional unit gives results that are not the
+  # nearest multiple (exact half points rounded down at random: ROUND(
+  # 507561523905906.125, 0.25) is 507561523905906, ROUND(399931701399944.05,
+  # 0.1) rounds down; ROUND(269284231226460.16, 1/3) is not k/3): fail loud
+  # for ROUND, ROUNDE and ROUNDZ (rounding_100.md section 3), as for |x| >=
+  # 1E15 above, unless x/unit is an integer (x is a multiple: ROUND(
+  # 123456789012.5, 1E-4), rounding/values/round_b01).
+  if (unit != floor(unit) && a >= 2^49 && a != k) {
+    abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
+                             "): x/unit of 2^49 or more with a fractional unit is not verified against SAS"))
+  }
   if (mode == "round") {
     # SAS 9.4 (round-15 scan: 26,990 points, q = x/unit at every binary
     # exponent from 2^-2 to 2^52, units 1 10 0.5 0.25 0.1 0.01 0.001 1E-5 1/3):
     # up exactly when floor(fl(fl(|q| + 0.5) + W)) > floor(|q|), W =
     # min(1E-12 |q|, 1E-6) - the fuzz is added to |q| + 0.5 in double precision.
-    # From |q| = 2^49 on, a fractional unit gives results that are not the
-    # nearest multiple (exact half points rounded down at random: ROUND(
-    # 507561523905906.125, 0.25) is 507561523905906, ROUND(399931701399944.05,
-    # 0.1) rounds down; ROUND(269284231226460.16, 1/3) is not k/3): fail loud,
-    # as for |x| >= 1E15 above, unless x/unit is an integer (x is a multiple:
-    # ROUND(123456789012.5, 1E-4), rounding/values/round_b01).
-    if (unit != floor(unit) && a >= 2^49 && x != floor(x) && a != k) {
-      abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
-                               "): x/unit of 2^49 or more with a fractional unit is not verified against SAS"))
-    }
     if (floor((a + 0.5) + min(1e-12 * a, 1e-6)) > k) k <- k + 1
   } else {
     d <- (a - k) - 0.5
     w <- if (mode == "zero") 0 else min(1.1e-12 * a, 2e-6)
-    if (w > 0 && d <= -0.8 * w && d >= -1.25 * w) {
+    # ROUNDE: the round-7 window W = min(1.1E-12 |q|, 2E-6) was refuted for
+    # ROUND by the round-15 scan (cap 1E-6); until ROUNDE is rescanned, every
+    # value up to 2E-6 below a half point fails loud once 1.1E-12 |q| > 1E-6
+    if (w > 0 && ((d <= -0.8 * w && d >= -1.25 * w) || (1.1e-12 * a > 1e-6 && d >= -2e-6 && d < 0))) {
       abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
                                "): the value lies at the edge of the SAS fuzz window (not determined by the gold standard)"))
     }
@@ -262,10 +268,15 @@ display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0
   if (a == floor(a) && a >= 1 && !exact) {
     # integers are written with their exact digits (SAS 9.4: 32. of
     # 9.39586291501115E17 is 939586291501115008)
-    # (no decimals: below 1E21 as for COMMA, the field width decides; 32. of
-    # 2.6745296926266266E19 is 26745296926266265600)
-    if ((d == 0L && a < 1e21) || a < 1e15 || (d <= 3L && a < 2^53)) {
+    # (no decimals: verified below 1E18; from 1E18 to 1E21 only the gold
+    # point 32. of 2.6745296926266266E19 = 26745296926266265600 - owner
+    # decision 2026-11-13: fail loud elsewhere; a width probe gets the digits)
+    if ((d == 0L && a < 1e18) || a < 1e15 || (d <= 3L && a < 2^53) || (d == 0L && a == 26745296926266265600)) {
       return(paste0(sprintf("%.0f", a), if (d > 0L) paste0(".", strrep("0", d))))
+    }
+    if (d == 0L && a < 1e21) {
+      unverified("an integer from 1E18 to 1E21 without decimals is not verified against SAS")
+      return(sprintf("%.0f", a))
     }
     if (a < 1e17) {
       unverified("an integer of 16 or more digits with more than 3 decimals is not verified against SAS")
@@ -380,13 +391,43 @@ sci_dec_text <- function(v, k, edge = "abort") {
   s <- sprintf("%.13e", a)
   ex <- as.integer(sub("^.*e", "", s))
   dg <- gsub(".", "", sub("e.*$", "", s), fixed = TRUE)
-  keep <- substr(dg, 1L, k + 1L)
-  up <- substr(dg, k + 2L, k + 2L) >= "5"
-  if (up) keep <- incr_decimal(keep)
-  if (nchar(keep) > k + 1L) {
-    keep <- substr(keep, 1L, k + 1L)
-    ex <- ex + 1L
+  round_k <- function(dg, ex) {
+    keep <- substr(dg, 1L, k + 1L)
+    if (substr(dg, k + 2L, k + 2L) >= "5") keep <- incr_decimal(keep)
+    if (nchar(keep) > k + 1L) {
+      keep <- substr(keep, 1L, k + 1L)
+      ex <- ex + 1L
+    }
+    list(keep = keep, ex = ex)
   }
+  r <- round_k(dg, ex)
+  # an exact tie at the 15th digit (2^-21 = 4.76837158203125E-7): sprintf
+  # breaks it to even, SAS's direction has no gold - fail loud when the two
+  # directions give different digits
+  s30 <- sprintf("%.30e", a)
+  d30 <- gsub(".", "", sub("e.*$", "", s30), fixed = TRUE)
+  if (substr(d30, 15L, 15L) == "5" && !grepl("[1-9]", substring(d30, 16L)) &&
+      !grepl("[1-9]", sub("^[0-9]\\.[0-9]{14}", "", sub("e.*$", "", sprintf("%.800e", a))))) {
+    ex30 <- as.integer(sub("^.*e", "", s30))
+    lo <- substr(d30, 1L, 14L)
+    hi <- incr_decimal(lo)
+    ehi <- ex30
+    if (nchar(hi) > 14L) {
+      hi <- substr(hi, 1L, 14L)
+      ehi <- ehi + 1L
+    }
+    r_lo <- round_k(lo, ex30)
+    r_hi <- round_k(hi, ehi)
+    if (!identical(r_lo, r_hi)) {
+      if (identical(edge, "abort")) {
+        abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with ", k, " mantissa decimals: an exact tie ",
+                                 "at the 15th significant digit is not determined by the gold standard"))
+      }
+      r <- r_hi
+    }
+  }
+  keep <- r$keep
+  ex <- r$ex
   m <- if (k > 0) paste0(substr(keep, 1L, 1L), ".", substring(keep, 2L)) else keep
   ms <- if (k > 0) sub("\\.$", "", sub("0+$", "", m)) else m
   list(text = paste0(if (v < 0) "-", ms, "E", if (ex < 0) "-", abs(ex)), sig = nchar(gsub(".", "", ms, fixed = TRUE)),
