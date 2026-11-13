@@ -39,17 +39,17 @@ sql_table_rel <- function(src, eng, outer) {
     if (!is.null(sm)) for (i in seq_len(nrow(sm))) m$len[[tolower(sm$name[i])]] <- as.integer(sm$length[i])
     o <- src$options
   } else {
-    if (!is.null(eng$views[[name]])) {
-      res <- sql_query(eng$views[[name]], eng)
+    if (!is.null(eng$session$views[[name]])) {
+      res <- sql_query(eng$session$views[[name]], eng)
       res$cols <- lapply(res$cols, function(c) {
         c$quals <- quals
         c
       })
       return(res)
     }
-    d <- get0(name, envir = eng$wenv, inherits = FALSE)
+    d <- get0(name, envir = eng$session$work, inherits = FALSE)
     if (is.null(d)) abort_runtime(paste0("File WORK.", toupper(name), ".DATA does not exist."), src$line)
-    m <- eng$meta[[name]] %||% meta_from_df(d)
+    m <- eng$session$meta[[name]] %||% meta_from_df(d)
     o <- src$options
   }
   if (!is.null(o$in_var)) abort_unsupported("IN= in PROC SQL", src$line)

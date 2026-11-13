@@ -12,8 +12,8 @@ sql_agg_fns <- c("count", "freq", "n", "sum", "avg", "mean", "min", "max", "nmis
                  "css", "uss", "cv", "stderr", "sumwgt", "t", "prt", "median")
 
 sql_new_id <- function(eng, prefix = ".c") {
-  eng$sql_id <- (eng$sql_id %||% 0L) + 1L
-  paste0(prefix, eng$sql_id)
+  eng$session$sql$id <- (eng$session$sql$id %||% 0L) + 1L
+  paste0(prefix, eng$session$sql$id)
 }
 
 # A summary function call (one argument, COUNT(*), or DISTINCT).
@@ -88,7 +88,7 @@ sql_ctx <- function(eng, rel, outer = NULL, items = NULL, allow_alias = FALSE) {
   ctx$calc_stack <- character()
   ctx$env <- new.env(parent = asNamespace("sasonr"))
   # EXIST() looks up WORK members (codegen: sas_f_exist(..., work))
-  ctx$env$work <- eng$wenv
+  ctx$env$work <- eng$session$work
   ctx$st <- new_state(list())
   ctx$st$context <- "sql"
   for (c in rel$cols) reg_var(ctx$st, c$id, c$type, if (c$type == "char") c$len else NA_integer_, disp = c$disp)
@@ -342,6 +342,7 @@ sql_subq_value <- function(e, res, ctx, row) {
 # Evaluation ------------------------------------------------------------------
 
 sql_eval_lowered <- function(low, ctx, rows = NULL) {
+  rt <- rt_diag()
   low <- an_expr(low, ctx$st)
   cx <- new_cx("vec", as.list(ctx$st))
   code <- gen_expr(low, cx)

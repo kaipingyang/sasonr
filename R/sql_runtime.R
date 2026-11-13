@@ -91,22 +91,28 @@ fn_table <- utils::modifyList(fn_table, list(
 ))
 
 # DuckDB back end ---------------------------------------------------------------
+# The connection belongs to the session (`SasSession$sql`): opened on first use,
+# closed by SasSession$close() (end of a throw-away sas_run() session,
+# sas_session_close() or garbage collection).
 
 sql_duck <- function(eng) {
-  if (is.null(eng$duck)) {
+  sql <- eng$session$sql
+  if (is.null(sql$con)) {
     drv <- suppressMessages(duckdb::duckdb(dbdir = ":memory:"))
-    eng$duck_drv <- drv
-    eng$duck <- DBI::dbConnect(drv)
-    DBI::dbExecute(eng$duck, "SET threads = 1")
+    sql$drv <- drv
+    sql$con <- DBI::dbConnect(drv)
+    DBI::dbExecute(sql$con, "SET threads = 1")
   }
-  eng$duck
+  sql$con
 }
 
-sql_duck_close <- function(eng) {
-  if (!is.null(eng$duck)) {
-    try(DBI::dbDisconnect(eng$duck), silent = TRUE)
-    try(duckdb::duckdb_shutdown(eng$duck_drv), silent = TRUE)
-    eng$duck <- NULL
+# `sql`: the SQL back-end environment of a session.
+sql_duck_close <- function(sql) {
+  if (!is.null(sql$con)) {
+    try(DBI::dbDisconnect(sql$con), silent = TRUE)
+    try(duckdb::duckdb_shutdown(sql$drv), silent = TRUE)
+    sql$con <- NULL
+    sql$drv <- NULL
   }
   invisible()
 }

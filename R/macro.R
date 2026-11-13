@@ -119,11 +119,13 @@ mac_put <- function(ses, line) {
 
 # A macro-time ERROR that does not stop processing (written to the log).
 mac_error_note <- function(msg) {
+  rt <- rt_diag()
   if (is.function(rt$on_error)) rt$on_error(msg)
   invisible()
 }
 
 mac_warn <- function(msg, class = "sasonr_macro_warning") {
+  rt <- rt_diag()
   if (is.function(rt$on_warn)) rt$on_warn(msg)
   cli::cli_warn(msg, class = class)
 }

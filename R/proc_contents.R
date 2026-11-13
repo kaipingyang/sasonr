@@ -440,17 +440,17 @@ dd_named_fmt <- function(f) {
 engine_datasets <- function(eng, step) {
   notes <- character()
   note <- function(x) notes <<- c(notes, x)
-  exists_ds <- function(nm) exists(nm, envir = eng$wenv, inherits = FALSE)
+  exists_ds <- function(nm) exists(nm, envir = eng$session$work, inherits = FALSE)
   drop_ds <- function(nm) {
-    rm(list = nm, envir = eng$wenv)
-    eng$meta[[nm]] <- NULL
+    rm(list = nm, envir = eng$session$work)
+    eng$session$meta[[nm]] <- NULL
   }
   if (isTRUE(step$options$kill)) {
-    for (nm in sort(ls(eng$wenv))) {
+    for (nm in sort(ls(eng$session$work))) {
       note(sprintf("NOTE: Deleting WORK.%s (memtype=DATA).", toupper(nm)))
       drop_ds(nm)
     }
-    rt$catalog <- new.env(parent = emptyenv())
+    eng$session$formats <- new.env(parent = emptyenv())
   }
   cur <- NULL
   modified <- NULL
@@ -477,7 +477,7 @@ engine_datasets <- function(eng, step) {
     switch(s$stmt,
       run = NULL,
       delete = {
-        members <- ls(eng$wenv)
+        members <- ls(eng$session$work)
         for (it in s$items) {
           nms <- switch(it$kind,
             name = it$name,
@@ -502,8 +502,8 @@ engine_datasets <- function(eng, step) {
           new <- s$pairs[[old]]
           if (!exists_ds(old)) abort_runtime(sprintf("The file WORK.%s (memtype=DATA) was not found, but appears on a CHANGE statement.", toupper(old)), s$line)
           if (exists_ds(new)) abort_runtime(sprintf("Cannot rename WORK.%s to WORK.%s because WORK.%s already exists.", toupper(old), toupper(new), toupper(new)), s$line)
-          assign(new, get(old, envir = eng$wenv), envir = eng$wenv)
-          eng$meta[[new]] <- eng$meta[[old]]
+          assign(new, get(old, envir = eng$session$work), envir = eng$session$work)
+          eng$session$meta[[new]] <- eng$session$meta[[old]]
           drop_ds(old)
           note(sprintf("NOTE: Changing the name WORK.%s to WORK.%s (memtype=DATA).", toupper(old), toupper(new)))
         }
@@ -512,32 +512,32 @@ engine_datasets <- function(eng, step) {
         if (!exists_ds(s$name)) abort_runtime(sprintf("File WORK.%s.DATA does not exist.", toupper(s$name)), s$line)
         cur <- s$name
         modified <- s$name
-        if (!is.null(s$label)) eng$meta[[cur]]$memlabel <- s$label
-        eng$meta[[cur]]$sortedby <- eng$meta[[cur]]$sortedby
+        if (!is.null(s$label)) eng$session$meta[[cur]]$memlabel <- s$label
+        eng$session$meta[[cur]]$sortedby <- eng$session$meta[[cur]]$sortedby
       },
       length_ignored = note("NOTE: The LENGTH attribute cannot be changed and is therefore being ignored."),
       format = ,
       informat = {
         if (is.null(cur)) abort_syntax(paste(toupper(s$stmt), "statement without a preceding MODIFY"), s$line)
         slot <- if (s$stmt == "format") "formats" else "informats"
-        m <- eng$meta[[cur]]
+        m <- eng$session$meta[[cur]]
         for (sp in s$specs) {
           for (v in resolve_vars(sp$vars, m, s$line)) m[[slot]][[v]] <- dd_named_fmt(sp$fmt)
         }
-        eng$meta[[cur]] <- m
+        eng$session$meta[[cur]] <- m
       },
       label = {
         if (is.null(cur)) abort_syntax("LABEL statement without a preceding MODIFY", s$line)
-        m <- eng$meta[[cur]]
+        m <- eng$session$meta[[cur]]
         for (v in names(s$labels)) {
           if (!v %in% m$vars) abort_runtime(paste0("Variable ", toupper(v), " not found."), s$line)
           m$labels[[v]] <- if (nzchar(s$labels[[v]])) s$labels[[v]] else NULL
         }
-        eng$meta[[cur]] <- m
+        eng$session$meta[[cur]] <- m
       },
       attrib = {
         if (is.null(cur)) abort_syntax("ATTRIB statement without a preceding MODIFY", s$line)
-        m <- eng$meta[[cur]]
+        m <- eng$session$meta[[cur]]
         for (g in s$groups) {
           for (v in resolve_vars(g$vars, m, s$line)) {
             for (k in names(g$set)) {
@@ -551,12 +551,12 @@ engine_datasets <- function(eng, step) {
             }
           }
         }
-        eng$meta[[cur]] <- m
+        eng$session$meta[[cur]] <- m
       },
       rename = {
         if (is.null(cur)) abort_syntax("RENAME statement without a preceding MODIFY", s$line)
-        m <- eng$meta[[cur]]
-        d <- get(cur, envir = eng$wenv)
+        m <- eng$session$meta[[cur]]
+        d <- get(cur, envir = eng$session$work)
         for (old in names(s$pairs)) {
           new <- s$pairs[[old]]
           if (!old %in% m$vars) abort_runtime(paste0("Variable ", toupper(old), " is not on file WORK.", toupper(cur), "."), s$line)
@@ -571,20 +571,20 @@ engine_datasets <- function(eng, step) {
           names(d)[names(d) == old] <- new
           note(sprintf("NOTE: Renaming variable %s to %s.", old, new))
         }
-        assign(cur, d, envir = eng$wenv)
-        eng$meta[[cur]] <- m
+        assign(cur, d, envir = eng$session$work)
+        eng$session$meta[[cur]] <- m
       },
       contents = {
         o <- s$opts
-        ref <- o$data %||% (if (!is.null(cur)) list(name = cur, options = list())) %||% list(name = eng$last, options = list())
-        m <- eng$meta[[ref$name]]
+        ref <- o$data %||% (if (!is.null(cur)) list(name = cur, options = list())) %||% list(name = eng$session$last, options = list())
+        m <- eng$session$meta[[ref$name]]
         if (is.null(m)) abort_runtime(paste0("File WORK.", toupper(ref$name), ".DATA does not exist."), s$line)
         sp <- Filter(Negate(is.null), o[c("noprint", "varnum", "short", "position", "order", "out")])
         sp$proc <- "DATASETS"
-        r <- sas_proc_contents(eng$wenv, ref$name, m, sp)
-        if (length(r$listing) > 0) lst <- c(lst, if (length(lst) == 0) eng$titles, if (length(lst) == 0 && length(eng$titles)) "", r$listing)
-        eng$meta[names(r$out)] <- sas_proc_store(eng$wenv, r$out)
-        for (nm in names(r$out)) notes <- c(notes, dataset_note(nm, get(nm, envir = eng$wenv)))
+        r <- sas_proc_contents(eng$session$work, ref$name, m, sp)
+        if (length(r$listing) > 0) lst <- c(lst, if (length(lst) == 0) eng$session$titles, if (length(lst) == 0 && length(eng$session$titles)) "", r$listing)
+        eng$session$meta[names(r$out)] <- sas_proc_store(eng$session$work, r$out)
+        for (nm in names(r$out)) notes <- c(notes, dataset_note(nm, get(nm, envir = eng$session$work)))
       },
       append = {
         r <- datasets_append(eng, s)
@@ -594,7 +594,7 @@ engine_datasets <- function(eng, step) {
     )
   }
   end_modify()
-  if (isTRUE(rt$notes_on) && eng$step_notes) eng$log <- c(eng$log, notes)
+  if (rt_notes_on() && eng$step_notes) eng$log <- c(eng$log, notes)
   eng$listing <- c(eng$listing, lst)
   invisible()
 }
@@ -607,19 +607,19 @@ datasets_append <- function(eng, s) {
   bn <- s$base$name
   dn <- s$data$name
   if (length(s$base$options) > 0 || length(s$data$options) > 0) abort_unsupported("data set options in APPEND", s$line)
-  if (!exists(dn, envir = eng$wenv, inherits = FALSE)) abort_runtime(sprintf("File WORK.%s.DATA does not exist.", toupper(dn)), s$line)
-  dd <- get(dn, envir = eng$wenv)
-  dm <- eng$meta[[dn]]
+  if (!exists(dn, envir = eng$session$work, inherits = FALSE)) abort_runtime(sprintf("File WORK.%s.DATA does not exist.", toupper(dn)), s$line)
+  dd <- get(dn, envir = eng$session$work)
+  dm <- eng$session$meta[[dn]]
   notes <- sprintf("NOTE: Appending WORK.%s to WORK.%s.", toupper(dn), toupper(bn))
-  if (!exists(bn, envir = eng$wenv, inherits = FALSE)) {
-    assign(bn, dd, envir = eng$wenv)
-    eng$meta[[bn]] <- dm[setdiff(names(dm), c("sortedby", "memlabel"))]
+  if (!exists(bn, envir = eng$session$work, inherits = FALSE)) {
+    assign(bn, dd, envir = eng$session$work)
+    eng$session$meta[[bn]] <- dm[setdiff(names(dm), c("sortedby", "memlabel"))]
     return(c(notes, sprintf("NOTE: BASE data set does not exist. DATA file is being copied to BASE file."),
              sprintf("NOTE: There were %d observations read from the data set WORK.%s.", nrow(dd), toupper(dn)),
              dataset_note(bn, dd)))
   }
-  bd <- get(bn, envir = eng$wenv)
-  bm <- eng$meta[[bn]]
+  bd <- get(bn, envir = eng$session$work)
+  bm <- eng$session$meta[[bn]]
   extra <- setdiff(dm$vars, bm$vars)
   missing_in_data <- setdiff(bm$vars, dm$vars)
   for (v in intersect(bm$vars, dm$vars)) {
@@ -637,9 +637,9 @@ datasets_append <- function(eng, s) {
   add <- add[bm$vars]
   for (v in bm$vars) if (identical(bm$type[[v]], "char")) add[[v]] <- sas_char(add[[v]], bm$len[[v]])
   out <- dplyr::bind_rows(bd, add)
-  assign(bn, tibble::as_tibble(out), envir = eng$wenv)
+  assign(bn, tibble::as_tibble(out), envir = eng$session$work)
   bm$sortedby <- NULL
-  eng$meta[[bn]] <- bm
+  eng$session$meta[[bn]] <- bm
   c(notes, sprintf("NOTE: There were %d observations read from the data set WORK.%s.", nrow(dd), toupper(dn)),
     sprintf("NOTE: %d observations added.", nrow(dd)),
     sprintf("NOTE: The data set WORK.%s has %d observations and %d variables.", toupper(bn), nrow(out), ncol(out)))

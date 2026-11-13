@@ -302,6 +302,7 @@ translate_proc <- function(step, meta, last = NULL) {
 #' @export
 #' @keywords internal
 sas_sort_df <- function(d, by, descending = rep(FALSE, length(by)), nodupkey = FALSE, noduprecs = FALSE) {
+  rt <- rt_diag()
   d <- d[sas_order(d, by, descending), , drop = FALSE]
   if (nodupkey && nrow(d) > 0) {
     n0 <- nrow(d)
@@ -464,7 +465,7 @@ parse_proc_format <- function(p, line) {
     if (kw == "picture") abort_unsupported("PROC FORMAT PICTURE", sline)
     abort_unsupported(paste0("PROC FORMAT statement ", toupper(tk_val(p))), sline)
   }
-  if (fmtlib_opt && length(defs) == 0 && length(ls(rt$catalog)) == 0) abort_runtime("Catalog WORK.FORMATS does not exist", line)
+  if (fmtlib_opt && length(defs) == 0 && length(ls(sas_rt_active()$formats)) == 0) abort_runtime("Catalog WORK.FORMATS does not exist", line)
   if (fmtlib_opt) abort_unsupported("PROC FORMAT FMTLIB listing", line)
   list(type = "proc", name = "format", line = line, options = list(), stmts = list(), titles = list(), defs = defs)
 }

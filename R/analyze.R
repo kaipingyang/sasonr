@@ -511,7 +511,7 @@ file_target <- function(stmts) {
     d <- s$dest
     if (d$kind == "print") abort_unsupported("FILE PRINT", s$line)
     if (d$kind == "fileref") {
-      path <- rt$filerefs[[d$ref]]
+      path <- sas_rt_active()$filerefs[[d$ref]]
       if (is.null(path)) abort_unsupported(paste0("FILE fileref ", toupper(d$ref), " (no FILENAME statement)"), s$line)
       d <- list(kind = "path", path = path)
     }
@@ -678,7 +678,7 @@ an_stmt <- function(s, st) {
     infile = {
       if (!is.null(st$infile)) abort_unsupported("more than one INFILE statement in a step", line)
       if (identical(s$source$kind, "fileref")) {
-        path <- rt$filerefs[[s$source$ref]]
+        path <- sas_rt_active()$filerefs[[s$source$ref]]
         if (is.null(path)) abort_unsupported(paste0("INFILE fileref ", toupper(s$source$ref), " (no FILENAME statement)"), line)
         s$source <- list(kind = "file", path = path)
       }

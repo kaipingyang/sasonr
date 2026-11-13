@@ -1,34 +1,20 @@
 # Run-time diagnostics: _ERROR_, data-error NOTEs and the PDV dump.
 #
-# Run-time helpers flag data errors through the package-level state `rt`
-# (invalid function arguments, division by zero, overflow, invalid data).
+# Run-time helpers flag data errors through the run-time diagnostic state of
+# the active session (`rt_diag()`, session.R): invalid function arguments,
+# division by zero, overflow, invalid data.
 # L3 code copies the flag into `_ERROR_` after each statement that can raise
 # one (sas_err_sync) and writes the SAS-style PDV dump at the end of the
 # iteration (sas_iter_dump). Vectorised (L1/L2) code only needs to know that
 # an error happened at all: the engine then re-runs the step as L3.
 #
-# Package-global mutable state (inventory for the SasSession R6 refactor,
-# CLAUDE.md §3; no new fields are added until then -- new per-run state goes
-# into the engine `eng`):
-#   rt (this file)  per run: catalog (PROC FORMAT), filerefs, prx, prx_cache,
-#                   ls (LINESIZE), notes_on (NOTES/NONOTES), on_warn, on_error,
-#                   on_note (log callbacks of the engine); per step evaluation
-#                   (rt_reset()): err, stop_step, notes, mv, math, mv_rerun,
-#                   reads, proc_notes, flow_note
-#   ct (notes.R)    per step translation (ct_reset()): notes, mv, conv
-#   registry_cache (registry.R)  read-once cache of inst/registry/*.csv and
-#                   the SAS function inventory (not run state)
-#   options()       sasonr.strict, sasonr.on_error, sasonr.step_notes, sasonr.sas_version
+# Fields of the run-time state (`SasSession$rt`): per submission prx,
+# prx_cache (PRXPARSE ids) and on_warn, on_error, on_note (log callbacks of
+# the engine); per step evaluation (rt_reset()): err, stop_step, notes, mv,
+# math, mv_rerun, reads, proc_notes, flow_note.  The format catalog, filerefs
+# and the LINESIZE/NOTES options are separate session components.
 
-rt <- new.env(parent = emptyenv())
-rt$err <- FALSE
-rt$notes <- character()
-rt$catalog <- new.env(parent = emptyenv())
-
-rt$notes_on <- TRUE
-rt$ls <- 132L # log line size (OPTIONS LINESIZE=)
-
-rt_reset <- function() {
+rt_reset <- function(rt = rt_diag()) {
   rt$err <- FALSE
   rt$stop_step <- FALSE
   rt$notes <- character()
@@ -43,6 +29,7 @@ rt_reset <- function() {
 
 # Flag a data error; `note` (if any) is queued for the log.
 rt_error <- function(note = NULL) {
+  rt <- rt_diag()
   rt$err <- TRUE
   if (!is.null(note) && length(rt$notes) < 1000L) rt$notes <- c(rt$notes, note)
   invisible()
@@ -96,6 +83,7 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
 
 # Overflow and similar: counted per place, reported at the end of the step.
 note_math <- function(.at = NULL, n = 1L) {
+  rt <- rt_diag()
   rt$err <- TRUE
   rt_count("math", .at, n)
 }
@@ -106,10 +94,11 @@ note_math <- function(.at = NULL, n = 1L) {
 #' @export
 #' @keywords internal
 sas_err_sync <- function(pdv) {
+  rt <- rt_diag()
   if (!rt$err && length(rt$notes) == 0) return(pdv)
   env <- parent.frame()
   if (length(rt$notes) > 0) {
-    if (isTRUE(rt$notes_on)) env$.log <- c(env$.log, rt$notes)
+    if (rt_notes_on()) env$.log <- c(env$.log, rt$notes)
     rt$notes <- character()
   }
   if (rt$err) pdv[["_error_"]] <- 1
@@ -158,7 +147,7 @@ sas_iter_dump <- function(pdv, spec, inf = NULL) {
     paste0(spec$names[k], "=", dump_value(pdv[[v]], spec$fmts[[v]]))
   }, "")
   items <- c(vals, paste0("_ERROR_=", dump_value(err, NULL)), paste0("_N_=", dump_value(pdv[["_n_"]], NULL)))
-  c(out, dump_wrap(items, rt$ls %||% 132L))
+  c(out, dump_wrap(items, rt_linesize()))
 }
 
 # Pack `var=value` items into log lines of at most `ls` columns.  An item that

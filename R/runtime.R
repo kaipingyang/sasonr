@@ -431,6 +431,7 @@ sas_f_catt <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lap
 sas_f_cat <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lapply(list(...), cat_item, trim = identity)), .len)
 #' @export
 sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
+  rt <- rt_diag()
   args <- list(...)
   # numeric items: BEST32. without blanks (missing values are written, not
   # skipped: '.', 'A'); only blank character items are skipped
@@ -955,7 +956,7 @@ sas_put_named <- function(name, value, fmt = NULL) {
 #' Assemble one PUT line per row
 #' @export
 #' @keywords internal
-sas_put_line <- function(..., .lit = NULL, .ls = rt$ls %||% 132L) {
+sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize()) {
   parts <- list(...)
   if (length(parts) == 0) return("")
   if (any(lengths(parts) == 0)) return(character())

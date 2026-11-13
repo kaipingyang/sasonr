@@ -191,6 +191,7 @@ mac_parse_format <- function(text, line = NULL) {
 }
 
 mac_sysfunc <- function(text, line = NULL) {
+  rt <- rt_diag()
   cp <- utf8ToInt(text)
   lp <- match(40L, cp)
   if (is.na(lp)) abort_syntax("%SYSFUNC requires a function call", line)

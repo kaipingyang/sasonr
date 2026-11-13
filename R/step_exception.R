@@ -43,7 +43,7 @@ engine_step_exception <- function(eng, step, tr, e) {
   eng$log <- c(eng$log, sas_exception_lines(), "NOTE: The SAS System stopped processing this step because of errors.")
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
-    old <- get0(nm, envir = eng$wenv, inherits = FALSE)
+    old <- get0(nm, envir = eng$session$work, inherits = FALSE)
     eng$log <- c(eng$log, sprintf(
       "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and %d variables.",
       toupper(nm), length(m$vars %||% character())))

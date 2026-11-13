@@ -105,6 +105,7 @@ transpose_valid_name <- function(s) {
 #' @export
 #' @keywords internal
 sas_proc_transpose <- function(d, sp) {
+  rt <- rt_diag()
   info <- sp$info
   vars <- sp$vars
   groups <- if (length(sp$by) > 0) proc_by_groups(d, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(d)))

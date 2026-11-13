@@ -112,6 +112,7 @@ field_text <- function(inf, a, b) {
 # Reached the end of the record while values are still needed: returns TRUE
 # when the caller should give up (missing value), FALSE after moving on.
 end_of_record <- function(inf) {
+  rt <- rt_diag()
   switch(inf$mode,
     missover = , truncover = TRUE,
     stopover = abort_runtime("INPUT statement exceeded record length. INFILE OPTION STOPOVER specified"),

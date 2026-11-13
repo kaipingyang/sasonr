@@ -12,6 +12,7 @@ Imports:
     DBI,
     dplyr (>= 1.1.0),
     duckdb,
+    R6,
     rlang,
     tibble,
     vctrs
