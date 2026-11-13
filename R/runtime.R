@@ -188,8 +188,16 @@ sas_and <- function(a, b) as.numeric(sas_true(a) & sas_true(b))
 sas_or <- function(a, b) as.numeric(sas_true(a) | sas_true(b))
 
 #' @export
-sas_div <- function(a, b, .at = NULL, .exact = TRUE) {
-  if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
+sas_div <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
+  if (anyNA(a) || anyNA(b)) {
+    n <- max(length(a), length(b))
+    ma <- rep_len(is.na(a), n)
+    mb <- rep_len(is.na(b), n)
+    # rows where a missing operand is the missing result of an earlier operation
+    # are not counted (the place of that operation was already recorded)
+    cnt <- (ma | mb) & !(.gen_a & ma) & !(.gen_b & mb)
+    if (any(cnt)) sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
+  }
   zero <- !is.na(b) & b == 0
   if (any(zero & !is.na(a))) rt_error(paste0("NOTE: Division by zero detected", at_text(.at), "."))
   bb <- rep_len(b, max(length(a), length(b)))
@@ -199,11 +207,32 @@ sas_div <- function(a, b, .at = NULL, .exact = TRUE) {
 }
 
 #' @export
-sas_pow <- function(a, b, .at = NULL, .exact = TRUE) {
-  if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
+sas_pow <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
+  if (anyNA(a) || anyNA(b)) {
+    n <- max(length(a), length(b))
+    ma <- rep_len(is.na(a), n)
+    mb <- rep_len(is.na(b), n)
+    cnt <- (ma | mb) & !(.gen_a & ma) & !(.gen_b & mb)
+    if (any(cnt)) sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
+  }
   out <- sas_num(a^b, .at)
   out[is.na(a) | is.na(b) | (a == 0 & b <= 0)] <- NA_real_ # 0**0 and 0**-n are missing in SAS
   out
+}
+
+# Unary minus: SAS records the place at the operand's position, and only when the
+# operand is missing but not the missing result of an earlier operation
+# (-(a + b) records the "+", not the minus).
+#' @export
+#' @keywords internal
+sas_neg <- function(x, .at = NULL, .exact = TRUE, .gen_a = FALSE) {
+  if (anyNA(x)) {
+    n <- length(x)
+    ma <- rep_len(is.na(x), n)
+    cnt <- ma & !(.gen_a & ma)
+    if (any(cnt)) sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
+  }
+  sas_num(-x, .at)
 }
 
 #' MIN (><) and MAX (<>) operators

@@ -49,7 +49,16 @@ gen_expr <- function(e, cx) {
     var = var_ref(e$name, cx),
     array_ref = gen_array_ref(e, cx),
     unary = switch(e$op,
-      "-" = paste0("sas_num(-", g(e$arg), ")"),
+      "-" = {
+        # SAS records the place of a unary minus at the operand's position; the
+        # minus itself is not recorded when the operand is the missing result of
+        # an arithmetic operation (-(a + b) records the "+")
+        at <- if (!is.null(e$arg$col)) at_code(list(line = e$arg$line, col = e$arg$col)) else ""
+        is_arith_arg <- e$arg$node == "binary" && e$arg$op %in% c("+", "-", "*", "/", "**")
+        if (is_arith_arg && nzchar(at)) at <- paste0(at, ", .gen_a = TRUE")
+        if (isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
+        paste0("sas_neg(", g(e$arg), at, ")")
+      },
       "+" = g(e$arg),
       not = paste0("sas_not(", g(e$arg), ")")
     ),
@@ -93,9 +102,11 @@ gen_expr <- function(e, cx) {
       # missing-value counts there are not exact (the engine re-runs as L3)
       if (arith && isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
       # an operand that is itself an arithmetic result: its missing values were already
-      # counted, SAS does not count this operation again (a + b + c with b missing: 1 place)
+      # counted, SAS does not count this operation again (a + b + c with b missing: 1 place).
+      # Division and exponentiation need the flags as well: (a + b) / 3 is one place,
+      # the division is not counted again.
       is_arith <- function(x) x$node == "binary" && x$op %in% c("+", "-", "*", "/", "**")
-      if (is.na(fun) && nzchar(at)) {
+      if ((is.na(fun) || fun %in% c("sas_div", "sas_pow")) && nzchar(at)) {
         if (is_arith(e$lhs)) at <- paste0(at, ", .gen_a = TRUE")
         if (is_arith(e$rhs)) at <- paste0(at, ", .gen_b = TRUE")
       }

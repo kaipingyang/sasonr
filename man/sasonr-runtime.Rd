@@ -15,6 +15,7 @@
 \alias{sas_lt}
 \alias{sas_max_op}
 \alias{sas_ne}
+\alias{sas_neg}
 \alias{sas_not}
 \alias{sas_or}
 \alias{sas_pow}
