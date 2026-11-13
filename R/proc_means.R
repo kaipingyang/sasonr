@@ -523,8 +523,9 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     sw <- k$W
     val$sumwgt <- sw
     val$sum <- k$sum
-    # the sign of zero (cases/ts1m2/proc/zero_sign): SUM and MEAN are always
-    # +0, MIN / MAX keep the sign of the first value of the group on ties
+    # the sign of zero: SUM and MEAN are always +0, MIN / MAX keep the sign of
+    # the first value of the group on ties (gold in both releases:
+    # proc_stats/means_zero_sign TS1M7, cases/ts1m2/proc/zero_sign TS1M2)
     if (!is.na(val$sum[1]) && val$sum[1] == 0) val$sum <- 0
     val$min <- xv[which(xv == min(xv))[1L]]
     val$max <- xv[which(xv == max(xv))[1L]]
@@ -828,6 +829,8 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 # Default decimals of the printed table with the default FW=12 and no MAXDEC=.
 # [gold]: measured on TS1M2 (155 exactly known doubles, MIN/MAX of
 # one-observation CLASS groups); docs/conformance/means_default_decimals_rule.md.
+# TS1M7: the same program (proc_stats/means_default_decimals_b, the 150 values
+# outside the display engine's fail-loud domain) is identical line for line.
 means_default_text <- function(v, w) {
   if (v == 0) return("0")
   a <- abs(v)
@@ -892,7 +895,8 @@ means_num_text <- function(v, w, maxdec) {
     # The default decimals of the printed table (FW=12, no MAXDEC=) are
     # [gold]: no manual sentence covers them.  Measured on TS1M2 with MIN/MAX of
     # one-observation CLASS groups (155 exactly known doubles,
-    # cases/ts1m2/rounding/means_default_decimals); the rule is recorded in
+    # cases/ts1m2/rounding/means_default_decimals) and confirmed on TS1M7
+    # (proc_stats/means_default_decimals_b); the rule is recorded in
     # docs/conformance/means_default_decimals_rule.md.
     return(means_default_text(v, w))
   }
@@ -918,23 +922,43 @@ means_stat_text <- function(s, v, sp) {
   means_num_text(v, sp$fw, sp$maxdec)
 }
 
-means_stat_col <- function(s, cells, sp) {
+means_stat_col <- function(s, cells, sp, by_nw = NULL) {
   parts <- means_stat_heading(s, sp$alpha)
   minw <- max(nchar(parts))
-  # N / N Miss: as wide as the printed counts.  TS1M2 never prints that field
-  # narrower than two columns (cases/ts1m2/proc/zero_sign has single-digit
-  # counts and a 2-column N field); TS1M7 prints single-digit counts in one
-  # column (opensas/means_class_order and 20 more internal cases).
-  nmin <- if (sas_target_version() == "TS1M2") 2L else 1L
-  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else max(c(nmin, nchar(cells)))) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
+  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else means_count_width(cells, by_nw)) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
   list(parts = parts, width = max(vw, minw), right = TRUE, cells = cells)
+}
+
+# N / N Miss: as wide as the printed counts (TS1M7: opensas/means_class_order
+# and 20 more internal cases).  With BY groups SAS sizes the field for the
+# whole data set, not for the counts of the group: proc_stats/means_zero_sign
+# (TS1M7) and cases/ts1m2/proc/zero_sign (TS1M2) have 13 observations in
+# single-digit BY groups and a 2-column field.  That is verified without CLASS
+# and when every analysis variable is non-missing in as many digits as there
+# are observations; otherwise a wider data set fails loud.
+means_count_width <- function(cells, by_nw) {
+  w <- max(c(1L, nchar(cells)))
+  if (is.null(by_nw) || by_nw$w <= w) return(w)
+  if (!by_nw$ok) {
+    abort_unsupported("PROC MEANS N field with BY groups and CLASS variables or missing values (width rule not determined)")
+  }
+  by_nw$w
+}
+
+means_by_count_width <- function(d, sp, k) {
+  if (is.null(sp$by) || !is.null(sp$freq)) return(NULL)
+  w <- nchar(sprintf("%.0f", nrow(d)))
+  nonmiss <- vapply(sp$vars, function(v) sum(!is.na(d[[v]])), 1)
+  list(w = w, ok = k == 0L && all(nchar(sprintf("%.0f", nonmiss)) == w))
 }
 
 # Printed-table geometry ------------------------------------------------------------
 #
 # Measured on SAS 9.4 TS1M2 with LINESIZE= 72..200, 3 to 22 statistics, FW=
-# 4..20, MAXDEC= 0..7, with and without CLASS.  The line is filled left to
-# right as follows.
+# 4..20, MAXDEC= 0..7, with and without CLASS.  TS1M7 gold:
+# proc_stats/means_panel_ls* (LINESIZE= 64..200, 5 to 18 statistics, FW=12 and
+# 16, with and without CLASS) and the rounding/proc/means_* cases (12
+# statistics, LINESIZE=132).  The line is filled left to right as follows.
 #
 #  * Every statistic column is a field of FW= columns (default 12), except
 #    N / N Miss (as wide as the printed counts) and t Value / Pr > |t|; a
@@ -1035,6 +1059,7 @@ means_listing <- function(d, sp, cells_by, print_types) {
   out <- character()
   proc_title <- paste0("The ", toupper(sp$pname), " Procedure")
   titled <- FALSE
+  by_nw <- means_by_count_width(d, sp, k)
   for (g in cells_by) {
     if (!is.null(sp$by)) {
       if (length(g$rows) == 0) next
@@ -1084,9 +1109,9 @@ means_listing <- function(d, sp, cells_by, print_types) {
         fixed[[length(fixed) + 1L]] <- list(parts = "Variable", width = max(8L, nchar(var_cells)), right = FALSE, cells = var_cells)
         if (has_label) fixed[[length(fixed) + 1L]] <- list(parts = "Label", width = max(5L, nchar(lab_cells)), right = FALSE, cells = lab_cells)
       }
-      scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp))
-      # Panel layout (measured on SAS 9.4 TS1M2, rounding/proc/means_* and the
-      # experiments behind means_panel_layout()).
+      scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp, by_nw))
+      # Panel layout (means_panel_layout(): TS1M2 measurements, TS1M7 gold
+      # proc_stats/means_panel_ls* and rounding/proc/means_*).
       ls <- rt$ls %||% 132L
       panels <- means_panel_layout(vapply(scols, function(c) as.integer(c$width), 1L),
                                    vapply(fixed, function(c) as.integer(c$width), 1L), ls)
