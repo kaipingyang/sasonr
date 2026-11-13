@@ -70,6 +70,8 @@ reference:
   contents:
   - sas_run
   - sas_translate
+  - sas_session
+  - sas_session_accessors
   - sas_export_work
   - sasonr_strict
   - sasonr_sas_version

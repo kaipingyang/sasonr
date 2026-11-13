@@ -8,7 +8,8 @@ sas_run(
   code,
   work = list(),
   level = c("auto", "L3"),
-  on_error = getOption("sasonr.on_error", c("sas", "abort"))
+  on_error = getOption("sasonr.on_error", c("sas", "abort")),
+  session = NULL
 )
 }
 \arguments{
@@ -28,13 +29,21 @@ macro language still are), \code{SYSERR}/\code{SYSCC} are set and the result has
 \code{"abort"} stops with the classed R condition instead. Features sasonr does
 not support (\code{sasonr_unsupported}) always stop the run: they are not SAS
 errors.}
+
+\item{session}{A session from \code{\link[=sas_session]{sas_session()}}: the program runs as one more
+submission to it (WORK, macro variables, user formats, options and titles
+of earlier submissions are visible; \code{work} data sets are added to its
+WORK). \code{NULL} (the default) runs in a fresh session that is discarded
+afterwards.}
 }
 \value{
 A \code{sasonr_result}: \verb{$log} (PUT and \%PUT lines), \verb{$listing} (procedure
 output), \verb{$work} (output data sets with trailing blanks removed),
 \verb{$translation}, \verb{$macro_vars} (global macro variables), \verb{$status}
 (\code{"ok"} or \code{"error"}), \verb{$errors} (SAS ERROR messages) and \verb{$error_line}
-(SAS line of the first ERROR).
+(SAS line of the first ERROR). With a \code{session}, \verb{$log}, \verb{$listing},
+\verb{$translation}, \verb{$status} and \verb{$errors} describe this submission, \verb{$work}
+and \verb{$macro_vars} the whole session.
 }
 \description{
 The macro processor hands complete steps to the executor one at a time
