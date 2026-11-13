@@ -5,28 +5,30 @@ hexd <- function(h) readBin(as.raw(strtoi(substring(h, seq(1, 15, 2), seq(2, 16,
 test_that("PERCENT: rounding down just below a half point fails loud again (finding 1)", {
   f <- function(x, fmt) sas_f_putn(x, fmt)
   expect_equal(trimws(f(1.0049999999999997, "PERCENT8.")), "101%") # SAS 9.4 gold
-  # x * 100 lies 3 to 5 ulps below 100.5: w.d rounds it down, PERCENT is not verified there
-  expect_error(f(1.005 - 2 * 2^-52, "PERCENT8."), class = "sasonr_unsupported")
+  # round 15: PERCENT is the w.d rule on fl(100 |x|) (r15_pct, 2,799 points)
+  expect_equal(trimws(f(-0.0049999999999999975, "PERCENT12.0")), "(        1%)") # SAS 9.4 gold (r15_pct)
   expect_false("down_at" %in% names(formals(sasonr:::fixed_body)))
   expect_false("down_at" %in% names(formals(sasonr:::fit_number)))
   expect_false("down_at" %in% names(formals(sasonr:::sci_dec_text)))
   expect_false("down_at" %in% names(formals(sasonr:::display_round_text)))
 })
 
-test_that("exact integer digits only where verified; 1E17 and beyond keep the E form (finding 2)", {
+test_that("exact integer digits where verified (finding 2; round 15: up to 2^53 with 3 decimals)", {
   drt <- sasonr:::display_round_text
   expect_identical(drt(939586291501115008, 0L), "939586291501115008") # SAS 9.4 gold (32.)
-  expect_identical(drt(1e18, 0L), NA_character_)                     # E form, as before round 13
+  expect_identical(drt(1e18, 0L), "1000000000000000000")              # 32. of 2.6745296926266266E19: exact (gold)
   expect_identical(drt(2^70, 0L), NA_character_)
-  expect_error(drt(1234567890123456, 2L), class = "sasonr_unsupported")
+  expect_identical(drt(1234567890123456, 2L), "1234567890123456.00")  # r15_wd: integers below 2^53, d <= 3
+  expect_error(drt(1234567890123456, 4L), class = "sasonr_unsupported")
   expect_identical(drt(123456789012345, 2L), "123456789012345.00")
-  expect_identical(trimws(sas_f_putn(1e18, "32.")), "1E18")
+  expect_identical(trimws(sas_f_putn(26745296926266265600, "32.")), "26745296926266265600") # SAS 9.4 gold
 })
 
 test_that("BESTw. narrow E form and HOURw.d go through the display engine (finding 3)", {
   # BEST8. of a value just below the half point of its 3-digit mantissa:
-  # sprintf("%.2E") rounded it silently; the engine fails loud
-  expect_error(sas_f_putn(1.2345e-6, "BEST8."), class = "sasonr_unsupported") # 81624eb: 1.234E-6
+  # round 15: 14 significant digits, then half up (r15_best, SAS 9.4 gold)
+  expect_identical(trimws(sas_f_putn(1.2599999999999998e-6, "BEST10.")), "1.26E-6")
+  expect_identical(trimws(sas_f_putn(-1.0240438392976625e-12, "BEST8.")), "-102E-14")
   expect_identical(trimws(sas_f_putn(1.25e-6, "BEST8.")), trimws(sasonr:::sci_dec_text(1.25e-6, 2L)$text))
   # HOUR4.1 of 900 seconds (0.25 hours, an exact half) rounds as 4.1 does
   expect_identical(trimws(sas_f_putn(900, "HOUR4.1")), trimws(sas_f_putn(0.25, "4.1")))

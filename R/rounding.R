@@ -99,15 +99,28 @@ round_one <- function(x, unit, mode, fname) {
   if (!is.finite(q) || abs(q) >= 2^52) return(x)
   a <- abs(q)
   k <- floor(a)
-  d <- (a - k) - 0.5
-  w <- if (mode == "zero") 0 else min(1.1e-12 * a, 2e-6)
-  if (w > 0 && d <= -0.8 * w && d >= -1.25 * w) {
-    abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
-                             "): the value lies at the edge of the SAS fuzz window (not determined by the gold standard)"))
-  }
   if (mode == "round") {
-    if (d >= -w) k <- k + 1
+    # SAS 9.4 (round-15 scan: 26,990 points, q = x/unit at every binary
+    # exponent from 2^-2 to 2^52, units 1 10 0.5 0.25 0.1 0.01 0.001 1E-5 1/3):
+    # up exactly when floor(fl(fl(|q| + 0.5) + W)) > floor(|q|), W =
+    # min(1E-12 |q|, 1E-6) - the fuzz is added to |q| + 0.5 in double precision.
+    # From |q| = 2^49 on, a fractional unit gives results that are not the
+    # nearest multiple (exact half points rounded down at random: ROUND(
+    # 507561523905906.125, 0.25) is 507561523905906, ROUND(399931701399944.05,
+    # 0.1) rounds down; ROUND(269284231226460.16, 1/3) is not k/3): fail loud,
+    # as for |x| >= 1E15 above.
+    if (unit != floor(unit) && a >= 2^49 && x != floor(x)) {
+      abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
+                               "): x/unit of 2^49 or more with a fractional unit is not verified against SAS"))
+    }
+    if (floor((a + 0.5) + min(1e-12 * a, 1e-6)) > k) k <- k + 1
   } else {
+    d <- (a - k) - 0.5
+    w <- if (mode == "zero") 0 else min(1.1e-12 * a, 2e-6)
+    if (w > 0 && d <= -0.8 * w && d >= -1.25 * w) {
+      abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
+                               "): the value lies at the edge of the SAS fuzz window (not determined by the gold standard)"))
+    }
     if (abs(d) <= w) {
       if (k %% 2 != 0) k <- k + 1
     } else if (d > 0) {
@@ -196,124 +209,100 @@ sas_f_intz <- function(x) {
 }
 
 # Display rounding of w.d-type formats (w.d, Z, COMMA, DOLLAR, PERCENT, ...)
-# and BESTw., from the round-13 ulp-by-ulp SAS 9.4 scans
-# (sasonr-conformance/docs/conformance/rounding_100.md):
-#  * SAS works with the display value a' = fl(|x| * (1 + 2^-52)): BESTw. at
-#    widths above 16 and w.d at more than 15 significant digits show the
-#    first 15 digits of a' truncated;
-#  * 0 decimals: a' rounded half away from zero (exact on a');
-#  * d >= 1 decimals: |x| at or above the decimal half point rounds up, and so
-#    does the double nearest to the half point; at least 3 ulps of |x| below
-#    the half point (5 ulps when the result is 0) rounds down; in between
-#    SAS's choice is not a function of the distance alone (it depends on the
-#    binary exponent: the scans show both directions at equal distances), so
-#    the value fails loud (edge = "abort");
-#  * 16 significant digits: rounding at the 16th digit and truncating to 15
-#    gives the SAS text unless the two readings below disagree (fail loud);
-#    17 or more: the rounded value of a' truncated to 15 digits.  Integers
-#    are written with their exact digits where verified (below 1E18 without
-#    decimals, below 1E15 with decimals); other integers of 1E15 or more with
-#    decimals, non-integers with 16 or more integer digits and values below 1
-#    with 15 or more decimals fail loud.
+# and BESTw.: SAS 9.4's decimal conversion, derived from the round-13 and
+# round-15 ulp scans (sasonr-conformance/docs/conformance/rounding_100.md):
+#
+#   t = fl( fl(|x| + h) * (1 + 2^-52) ),  h = the double nearest 0.5 * 10^-d
+#
+# (two double operations, in this order), then the exact binary value of t
+# truncated to d decimals - but to at most 15 significant digits for
+# |x| >= 1 (the integer digits always) and at most 14 - E decimals for
+# |x| < 1 (E = the decimal exponent; 14 for 0.1 <= |x| < 1), the rest
+# written as zeros.  This one closed form reproduces every scanned point:
+# 41,605 points of the round-13 scans (d = 0..30) and 20,284 of round 15
+# (every binary exponent from 2^-61 to 2^53, d = 0..17, 1 in 4 negative),
+# PERCENT (fl(100 |x|), 2,799 points).  Integers are written with their exact
+# digits (32. of 9.39586291501115E17 is 939586291501115008).
+#
+# Verified domain (outside it: fail loud, or NA for the E form):
+#  * |x| >= 1, non-integer, below 1E15: every d; 1E15 or more: d <= 3;
+#  * integers: no decimals below 1E18, d <= 3 below 2^53, any d below 1E15;
+#  * |x| < 1: d <= 14, and d <= 16 when |x| < 0.01 (decimal exponent <= -3).
+#    At 0.01 <= |x| < 0.1 with d >= 15 and 0.1 <= |x| < 1 with d >= 16 SAS
+#    drops the last digits in a way that depends on the binary exponent
+#    (0.0711077156197605 in 32.15 keeps 14 decimals, 0.0703075513494065 in
+#    32.16 keeps 13), and values with more decimals are only sparsely scanned.
 #
 # Returns the absolute value with exactly `d` decimals (digits, ".", no
 # sign), or NA when |v| >= 1e17 (the callers write the E form).  `exact =
 # TRUE`: half away from zero on the exact binary value without the display
-# adjustment (PROC MEANS MAXDEC=).  `down_rel` (PERCENTw.d): a value below a
-# half point by less than `down_rel` relative that the rules above round down
-# fails loud instead (gold: PERCENT rounds 1.0049999999999997 up to 101%,
-# where w.d rounds down; PERCENT has not been scanned ulp by ulp).
+# adjustment (PROC MEANS MAXDEC=).  `edge` ("abort", "up", "down"): what an
+# unverified rounding does - fail loud, or (width probes) give a text of the
+# same length.  `down_rel` is accepted for compatibility and ignored (PERCENT
+# follows the same rule on fl(100 |x|)).
 display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0) {
   a <- abs(v)
   if (!is.finite(a)) return(NA_character_)
   if (a == 0) return(paste0("0", if (d > 0L) paste0(".", strrep("0", d))))
-  if (a == floor(a) && a >= 1 && !exact) {
-    # integers are written with their exact digits (SAS 9.4: 32. of
-    # 9.39586291501115E17 is 939586291501115008); verified without decimals
-    # below 1E18, and with decimals while the integer has at most 15 digits
-    if (d == 0L && a < 1e18) return(sprintf("%.0f", a))
-    if (d > 0L && a < 1e15) return(paste0(sprintf("%.0f", a), ".", strrep("0", d)))
-    if (a < 1e17) {
-      # every reading has the same width: a width probe (edge "up"/"down") gets the exact digits
-      if (!identical(edge, "abort")) return(paste0(sprintf("%.0f", a), ".", strrep("0", d)))
-      abort_unsupported(paste0("format rounding of the integer ", sprintf("%.0f", v), " to ", d,
-                               " decimals: an integer of 16 or more digits with decimals is not verified against SAS"))
-    }
+  unverified <- function(why) {
+    if (!identical(edge, "abort")) return(TRUE)
+    abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " to ", d, " decimals: ", why))
   }
-  if (a >= 1e17) return(NA_character_)
   fmt_d <- function(keep) {
     if (d > 0) paste0(substr(keep, 1L, nchar(keep) - d), ".", substr(keep, nchar(keep) - d + 1L, nchar(keep))) else keep
   }
-  split <- function(x) {
-    s <- sprintf("%.*f", d + 30L, x) # glibc prints the exact binary value
+  # exact decimal digits of a double: integer part and fraction digits
+  digits_of <- function(x, nd) {
+    s <- sprintf("%.*f", nd, x) # glibc prints the exact binary value
     dot <- regexpr(".", s, fixed = TRUE)
-    fr <- substr(s, dot + 1L, nchar(s))
-    list(keep = paste0(substr(s, 1L, dot - 1L), substr(fr, 1L, d)), f = as.numeric(paste0("0.", substr(fr, d + 1L, nchar(fr)))))
+    if (dot < 0) return(list(ip = s, fr = ""))
+    list(ip = substr(s, 1L, dot - 1L), fr = substr(s, dot + 1L, nchar(s)))
   }
-  edge_fail <- function(why) {
-    if (identical(edge, "up")) return(TRUE)
-    if (identical(edge, "down")) return(FALSE)
-    abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " to ", d, " decimals: ", why))
+  if (a == floor(a) && a >= 1 && !exact) {
+    # integers are written with their exact digits (SAS 9.4: 32. of
+    # 9.39586291501115E17 is 939586291501115008)
+    # (no decimals: below 1E21 as for COMMA, the field width decides; 32. of
+    # 2.6745296926266266E19 is 26745296926266265600)
+    if ((d == 0L && a < 1e21) || a < 1e15 || (d <= 3L && a < 2^53)) {
+      return(paste0(sprintf("%.0f", a), if (d > 0L) paste0(".", strrep("0", d))))
+    }
+    if (a < 1e17) {
+      unverified("an integer of 16 or more digits with more than 3 decimals is not verified against SAS")
+      return(paste0(sprintf("%.0f", a), ".", strrep("0", d)))
+    }
   }
-  # PERCENT: rounding down within down_rel below a half point is not verified
-  down_ok <- function(f) {
-    if (down_rel <= 0 || (0.5 - f) * 10^-d / a > down_rel) return(FALSE)
-    edge_fail("PERCENT rounding just below a half point is not determined by the gold standard")
-  }
+  if (a >= 1e17) return(NA_character_)
   if (exact) {
-    p <- split(a)
-    return(fmt_d(if (p$f >= 0.5) incr_decimal(p$keep) else p$keep))
+    p <- digits_of(a, d + 30L)
+    keep <- paste0(p$ip, substr(p$fr, 1L, d))
+    f <- as.numeric(paste0("0.", substring(p$fr, d + 1L)))
+    return(fmt_d(if (f >= 0.5) incr_decimal(keep) else keep))
   }
-  ab <- display_value(a)
-  ni <- if (a >= 1) nchar(sprintf("%.0f", floor(a))) else 0L
-  if (ni >= 16L) {
-    abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " to ", d,
-                             " decimals: a non-integer with 16 or more integer digits is not verified against SAS"))
+  if (a >= 1e15 && d > 3L) {
+    unverified("a non-integer of 1E15 or more with more than 3 decimals is not verified against SAS")
   }
-  if (a < 1 && d >= 15L) {
-    abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " to ", d,
-                             " decimals: the 15-digit limit for values below 1 is not verified against SAS"))
-  }
-  if (ni + d >= 16L) {
-    if (down_rel > 0) {
-      abort_unsupported(paste0("PERCENT rounding of ", format(v, digits = 17), " to ", d,
-                               " decimals: more than 15 significant digits are not verified against SAS"))
+  if (a < 1) {
+    ea <- floor(log10(a))
+    if (10^(ea + 1) <= a) ea <- ea + 1 # log10 rounding at a power of ten
+    if (d >= 15L && !(d <= 16L && ea <= -3L)) {
+      unverified("15 or more decimals of a value below 0.01 in magnitude (16 or more below 1) are not verified against SAS")
     }
-    # SAS shows 15 significant digits: from 17 digits on, the first 15 digits
-    # of the display value (rounding at the last decimal does not carry into
-    # them: 2922024225.7520895 in 32.7 is 2922024225.7520800)
-    p <- split(ab)
-    if (ni + d >= 17L) return(fmt_d(digits15(p$keep)))
-    r1 <- digits15(if (p$f >= 0.5) incr_decimal(p$keep) else p$keep)
-    if (ni + d == 16L) {
-      # SAS either truncates or rounds the 16th digit (both seen in the scans)
-      r0 <- digits15(p$keep)
-      k15 <- substr(p$keep, 1L, nchar(p$keep) - 1L)
-      if (substr(p$keep, nchar(p$keep), nchar(p$keep)) >= "5") k15 <- incr_decimal(k15)
-      r2 <- digits15(paste0(k15, "0"))
-      if (r1 != r0 || r2 != r0) {
-        r1 <- if (edge_fail("rounding at the 16th significant digit is not determined by the gold standard")) r2 else r0
-      }
-    }
-    return(fmt_d(r1))
   }
-  p <- split(a)
-  up <- if (p$f >= 0.5) {
-    TRUE
-  } else if (d == 0L) {
-    split(ab)$f >= 0.5 || down_ok(p$f)
+  h <- as.numeric(paste0("5e-", d + 1L))
+  t <- (a + h) * (1 + .Machine$double.eps)
+  if (!is.finite(t)) t <- a + h # the largest doubles (never with decimals)
+  p <- digits_of(t, d + 30L)
+  ip <- p$ip
+  if (a >= 1 || t >= 1) {
+    keep_dec <- max(0L, 15L - nchar(ip))
   } else {
-    hdec <- paste0(substr(p$keep, 1L, nchar(p$keep) - d), ".", substring(p$keep, nchar(p$keep) - d + 1L), "5")
-    if (as.numeric(hdec) == a) {
-      TRUE # the double nearest to the half point
-    } else {
-      ulp <- 2^(floor(log2(a)) - 52)
-      dist <- (0.5 - p$f) * 10^-d / ulp
-      lim <- if (grepl("^0*$", p$keep)) 5 else 3
-      if (dist >= lim) down_ok(p$f) else edge_fail("the value lies within a few ulps below the half point, where SAS's choice is not determined by the gold standard")
-    }
+    et <- -attr(regexpr("^0*", p$fr), "match.length") - 1L
+    keep_dec <- if (et == -1L) 14L else 14L - et
+    if (et <= -2L && d >= 15L && et > -3L) unverified("the decimal exponent changes when the value is rounded")
   }
-  fmt_d(if (up) incr_decimal(p$keep) else p$keep)
+  k <- min(d, keep_dec)
+  fr <- paste0(substr(p$fr, 1L, k), strrep("0", d - k))
+  fmt_d(paste0(ip, fr))
 }
 
 # The value SAS 9.4 formats: |x| * (1 + 2^-52) rounded to a double (the
@@ -368,33 +357,30 @@ display_fixed <- function(v, d, edge = "abort", exact = FALSE) {
 
 # Scientific forms used when a number does not fit its width (w.d, Z,
 # COMMA, DOLLAR fall back to these; BESTw. chooses among them):
-#   sci_dec_text(v, k)  "-1.23E6", "5E-4"   (k mantissa decimals, exact digits,
-#                                             half away from zero with the fuzz)
+#   sci_dec_text(v, k)  "-1.23E6", "5E-4"   (k mantissa decimals: 14 significant
+#                                             digits, then half up to k decimals)
 sci_dec_text <- function(v, k, edge = "abort") {
   a <- abs(v)
   if (k >= 13L) {
     # at most 14 significant digits (SAS 9.4: 32. of the largest double is 1.7976931348623E308)
-    g <- sig15(a)
-    keep <- e14_digits(g, v)
+    g <- e14_digits(NULL, v, k)
     ex <- g$ex
-    keep <- paste0(keep, strrep("0", k - 13L))
+    keep <- paste0(g$keep, strrep("0", k - 13L))
     m <- paste0(substr(keep, 1L, 1L), ".", substring(keep, 2L))
     ms <- sub("\\.$", "", sub("0+$", "", m))
     return(list(text = paste0(if (v < 0) "-", ms, "E", if (ex < 0) "-", abs(ex)), sig = nchar(gsub(".", "", ms, fixed = TRUE)),
                 mant = m, ex = ex))
   }
-  s <- sprintf("%.*e", k + 30L, a)
+  # SAS 9.4 (round-15 scan, Ew. w = 7..19 at every binary exponent from 2^-61
+  # to 2^60, 19,308 points): the value rounded to 14 significant digits
+  # (correctly, from its exact binary value), then those digits rounded half
+  # up to k mantissa decimals - a double rounding: 6.6464999999999970E-19 is
+  # 6.6465000000000E-19 at 14 digits and 6.647E-19 in E10.
+  s <- sprintf("%.13e", a)
   ex <- as.integer(sub("^.*e", "", s))
   dg <- gsub(".", "", sub("e.*$", "", s), fixed = TRUE)
   keep <- substr(dg, 1L, k + 1L)
-  f <- as.numeric(paste0("0.", substring(dg, k + 2L)))
-  # as in fixed notation (display_round_text): at or above the half point up,
-  # 3 ulps or more below it down, in between not determined (fail loud)
-  dist <- (0.5 - f) * 10^(ex - k) / 2^(floor(log2(a)) - 52)
-  up <- if (f >= 0.5) TRUE else if (dist >= 3) FALSE else if (edge == "up") TRUE else if (edge == "down") FALSE else {
-    abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " in E notation: the value lies within a few ulps ",
-                             "below the half point, where SAS's choice is not determined by the gold standard"))
-  }
+  up <- substr(dg, k + 2L, k + 2L) >= "5"
   if (up) keep <- incr_decimal(keep)
   if (nchar(keep) > k + 1L) {
     keep <- substr(keep, 1L, k + 1L)

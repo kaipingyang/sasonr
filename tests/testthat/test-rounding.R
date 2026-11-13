@@ -50,7 +50,11 @@ test_that("a subnormal literal: an ERROR in TS1M7, kept as-is in TS1M2", {
 })
 
 test_that("ROUND fails loud where the gold standard does not determine the result", {
-  expect_error(sas_f_round(99999.13279499998, 1e-5), class = "sasonr_unsupported")
+  # round 15: floor(fl(fl(|q| + 0.5) + min(1E-12 |q|, 1E-6))) (r15_rnd, SAS 9.4 gold)
+  expect_identical(sas_f_round(1267.7744999989193, 0.001), 1267.774)
+  expect_identical(sas_f_round(0.03499999999996535, 0.01), 0.04)     # 0.99E-12 |q| below the half point: up
+  expect_identical(sas_f_round(-0.034999999999964386, 0.01), -0.03)  # 1.02E-12 |q| below: down
+  expect_error(sas_f_round(507561523905906.125, 0.25), class = "sasonr_unsupported") # |x/unit| >= 2^49
   expect_error(sas_f_round(1e15 + 0.5, 0.2), class = "sasonr_unsupported")
 })
 
@@ -79,10 +83,9 @@ test_that("w.d: at or above the half point up, the double nearest to it up, 3 ul
   f <- function(x, fmt) sas_f_putn(x, fmt)
   expect_equal(f(1.005, "4.2"), "1.01")
   expect_equal(f(2.675, "8.2"), "    2.68")
-  # SAS 9.4 writes 1.00 here but 4.8 for 4.749999999999999 (also 1 to 2 ulps
-  # below the half point) in 32.1: not a function of the distance, fail loud
-  expect_error(f(1.0049999999999997, "4.2"), class = "sasonr_unsupported")
-  expect_error(f(2.6749999999999994, "4.2"), class = "sasonr_unsupported")
+  # SAS 9.4 writes 1.00 here (round 15: (1.0049999999999997 + 0.005) (1 + 2^-52)
+  # stays below 1.01)
+  expect_equal(f(1.0049999999999997, "4.2"), "1.00")
   expect_equal(f(1.0049999999999992, "4.2"), "1.00")
 })
 

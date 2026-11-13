@@ -139,13 +139,17 @@ add_commas <- function(s) {
 # the edge of the display fuzz only fails loud when the text would fit.
 fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, swap = FALSE, down_rel = 0) {
   # an integer beyond 2^53 / 10^d: the decimals are zeros (SAS 9.4: COMMA32.4 of 1E15)
+  # (and fewer zeros when they do not fit: SAS 9.4, 32.15 of 939586291501115008
+  # is 939586291501115008.0000000000000)
   if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21) {
     ip <- sprintf("%.0f", abs(v))
-    forms <- c(if (commas) paste0(add_commas(ip), ".", strrep("0", d)), paste0(ip, ".", strrep("0", d)))
-    for (s in forms) {
-      if (swap) s <- chartr(",.", ".,", s)
-      s <- paste0(if (dollar) "$", if (v < 0) "-", s)
-      if (nchar(s) <= w) return(if (zero) just_right(s, w) else just_right(s, w))
+    for (dd in seq(d, 1L)) {
+      forms <- c(if (commas && dd == d) paste0(add_commas(ip), ".", strrep("0", dd)), paste0(ip, ".", strrep("0", dd)))
+      for (s in forms) {
+        if (swap) s <- chartr(",.", ".,", s)
+        s <- paste0(if (dollar && dd == d) "$", if (v < 0) "-", s)
+        if (nchar(s) <= w) return(just_right(s, w))
+      }
     }
   }
   build <- function(dd, cm, dl, lead0 = TRUE, edge = "abort") {
@@ -208,9 +212,9 @@ fmt_e <- function(v, w, d) {
       ex <- 0L
     } else {
       if (k >= 13L) {
-        g <- sig15(abs(v))
+        g <- e14_digits(NULL, v, k)
         ex <- g$ex
-        keep <- e14_digits(g, v)
+        keep <- g$keep
       } else {
         g <- sci_dec_text(v, kk)
         ex <- g$ex
@@ -229,18 +233,41 @@ fmt_e <- function(v, w, d) {
 }
 
 # 14 significant digits of an E form with 13 or more mantissa decimals
-# (Ew., BESTw. above 16 columns, w.d written in E notation): the first 14
-# digits of the display value.  Gold (round-13 scans, fn_matrix BEST32.): a
-# rest up to 0.888 of the 14th digit is truncated (0.75, 0.822, 0.888 seen);
-# above it SAS rounds up or truncates with no order (0.890 and 0.945 rounded
-# up, 0.931 truncated): fail loud.
-e14_digits <- function(g, v) {
-  keep <- substr(g$digits, 1L, 14L)
-  if (g$rest > 0.8885) {
-    abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with 14 significant digits: whether SAS 9.4 ",
-                             "rounds up the 14th digit is not determined by the gold standard"))
+# (Ew. from E20., BESTw. above 16 columns, w.d written in E notation), from
+# the exact binary value: list(keep = 14 digits, ex = decimal exponent).
+# Round-15 scan (E20.-E32., 19,700 points at every binary exponent from 2^-61
+# to 2^60): SAS's 14th digit carries when the rest r (the digits after the
+# 14th, as a fraction of it) plus a fuzz of about 1E-15 relative reaches the
+# carry point - at 13 mantissa decimals (E20.) the half point, at 14 or more
+# the next digit (truncation).  The fuzz grows with the mantissa (a rest of
+# 0.97 carries for 1.x, 0.84 for 9.x) and is not a function of r and the
+# mantissa alone, so: 13 decimals - r < 0.30 truncated, r >= 0.55 rounded up;
+# 14 or more - r < 0.80 truncated (no carry below 0.839 in the scan); the
+# band between fails loud.
+e14_digits <- function(g, v, k = 14L) {
+  a <- abs(v)
+  s <- sprintf("%.*e", 40L, a)
+  ex <- as.integer(sub("^.*e", "", s))
+  dg <- gsub(".", "", sub("e.*$", "", s), fixed = TRUE)
+  keep <- substr(dg, 1L, 14L)
+  r <- as.numeric(paste0("0.", substring(dg, 15L)))
+  up <- if (k == 13L) {
+    if (r < 0.30) FALSE else if (r >= 0.55) TRUE else NA
+  } else {
+    if (r < 0.80) FALSE else NA
   }
-  keep
+  if (is.na(up)) {
+    abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with 14 significant digits: whether SAS 9.4 ",
+                             "carries into the 14th digit (rest ", format(r, digits = 3), ") is not determined by the gold standard"))
+  }
+  if (up) {
+    keep <- incr_decimal(keep)
+    if (nchar(keep) > 14L) {
+      keep <- substr(keep, 1L, 14L)
+      ex <- ex + 1L
+    }
+  }
+  list(keep = keep, ex = ex)
 }
 
 # PERCENTw.d: the number (x * 100, written as w.d would write it in w - 3
@@ -248,10 +275,9 @@ e14_digits <- function(g, v) {
 # negative value.
 fmt_percent <- function(v, w, d) {
   if (w < 4L) return(stars(w))
-  # PERCENT rounds values just below a half differently from w.d (gold:
-  # 1.0049999999999997 -> 101%): rounding down within 6E-16 (relative) below
-  # a half point fails loud (display_round_text down_rel)
-  num <- trimws(fit_number(abs(v) * 100, w - 3L, d, down_rel = 6e-16))
+  # the w.d rule on fl(100 |x|) (round-15 scan: 2,799 points, PERCENTw.d
+  # d = 0..4, values from 2^-31 to 2^29)
+  num <- trimws(fit_number(abs(v) * 100, w - 3L, d))
   if (v < 0) return(paste0("(", formatC(num, width = w - 3L), "%)"))
   paste0(" ", formatC(num, width = w - 3L), "% ")
 }

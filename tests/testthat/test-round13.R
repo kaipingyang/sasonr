@@ -10,11 +10,11 @@ test_that("0 decimals: half away from zero on fl(|x| * (1 + 2^-52))", {
   expect_equal(f(hexd("4011FFFFFFFFFFFE")), "4") # 4.5 - 2 ulps: SAS 9.4 4
 })
 
-test_that("decimals: values 1 to 2 ulps below a half point fail loud (former silent results)", {
+test_that("decimals: values 1 to 2 ulps below a half point (round 15: t = fl(fl(|x| + h) (1 + 2^-52)))", {
   f <- function(x, fmt) sas_f_putn(x, fmt)
-  # SAS 9.4 writes 4.7 (the former rule wrote 4.8) and 0.1 for 0.049999999999999975 (former 0.0)
-  expect_error(f(hexd("4012FFFFFFFFFFFF"), "32.1"), class = "sasonr_unsupported")
-  expect_error(f(hexd("3FA9999999999996"), "32.1"), class = "sasonr_unsupported")
+  # SAS 9.4 writes 4.7 (the round-7 rule wrote 4.8) and 0.1 for 0.049999999999999975 (round 7: 0.0)
+  expect_equal(trimws(f(hexd("4012FFFFFFFFFFFF"), "32.1")), "4.7")
+  expect_equal(trimws(f(hexd("3FA9999999999996"), "32.1")), "0.1")
   expect_equal(trimws(f(hexd("4013000000000000"), "32.1")), "4.8")   # 4.75: SAS 9.4 4.8
   expect_equal(trimws(f(0.15, "32.1")), "0.2")                       # the double nearest to 0.15: SAS 9.4 0.2
   expect_equal(trimws(f(hexd("4012FFFFFFFFFFFC"), "32.1")), "4.7")   # 4.75 - 4 ulps: SAS 9.4 4.7
@@ -26,7 +26,9 @@ test_that("w.d shows at most 15 significant digits (former exact digits)", {
   expect_equal(f(hexd("3FF0147AE147AE14"), "32.30"), "1.005000000000000000000000000000") # 1.005: SAS 9.4
   expect_equal(f(hexd("3FF0147AE147AE12"), "32.16"), "              1.0049999999999900")
   expect_equal(trimws(f(2922024225.7520895, "32.7")), "2922024225.7520800")
-  expect_error(f(0.285, "32.30"), class = "sasonr_unsupported") # below 1: the digit limit is not verified
+  expect_error(f(0.285, "32.30"), class = "sasonr_unsupported") # below 1 with 16+ decimals: not verified
+  expect_equal(trimws(f(hexd("3FBD70A3D70A3D6E"), "32.2")), "0.11")   # 0.115 - 3 ulps: SAS 9.4 (r15_wd)
+  expect_equal(trimws(f(hexd("3FBD70A3D70A3D6F"), "32.2")), "0.12")   # 0.115 - 2 ulps: SAS 9.4 (r15_wd)
   expect_equal(trimws(f(939586291501115008, "32.")), "939586291501115008") # integers: exact digits
   expect_equal(trimws(f(.Machine$double.xmax, "32.")), "1.7976931348623E308")
 })

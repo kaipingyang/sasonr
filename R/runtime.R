@@ -861,33 +861,50 @@ sas_fmt_best <- function(x, w = 12L) {
       }
     } else if ((is.na(s) || abs(v) < 1e-5) && w > 15L) {
       # wide widths: at most 14 significant digits, truncated (sig15)
-      g <- sig15(abs(v))
-      m <- e14_digits(g, v)
-      if (nchar(m) > 14L) {
-        m <- substr(m, 1L, 14L)
-        g$ex <- g$ex + 1L
-      }
+      g <- e14_digits(NULL, v)
+      m <- g$keep
       m <- sub("0+$", "", m)
       m <- if (nchar(m) > 1L) paste0(substr(m, 1L, 1L), ".", substring(m, 2L)) else m
       sci <- paste0(if (v < 0) "-", m, "E", if (g$ex < 0) "-", abs(g$ex))
     } else if (is.na(s) || (v != 0 && abs(v) < 1e-5)) {
-      # (at most 12 decimals: a 14-digit mantissa that fits in 15 columns ends
-      # in zeros and is written as with 12)
-      for (d in seq(min(max(w - 2L, 0L), 12L), 0L)) {
-        # the E form of the one display engine (sci_dec_text); the width is
-        # probed with both roundings first, so that only the text written can
-        # fail loud at a half point
-        if (nchar(sci_dec_text(v, d, edge = "up")$text) > w && nchar(sci_dec_text(v, d, edge = "down")$text) > w) next
-        cand <- sci_dec_text(v, d)$text
-        if (nchar(cand) <= w) {
-          sci <- cand
-          break
+      # the E form of w.d (sci_fit): as many mantissa decimals as fit, or an
+      # integer mantissa when fewer than three digits fit and it shows more
+      # (round-15 scan, BEST8.: -1.0240438392976625E-12 is -102E-14,
+      # -1.5996737032134217E-12 is -16E-13)
+      sci <- sci_fit(v, w)
+      if (!is.na(sci) && abs(v) < 1) {
+        # below 1 (round-15 scan, BEST8.-BEST12.): when the decimal mantissa
+        # has room for fewer than three digits (trailing zeros counted), an
+        # integer mantissa with a negative exponent that shows more digits, or
+        # as many in fewer columns, is written instead (-102E-14, -16E-13)
+        kfit <- -1L
+        for (k in seq(min(w - 2L, 12L), 0L)) {
+          e <- sci_dec_text(v, k)
+          if ((v < 0) + (k + 1L) + (k > 0) + 1L + nchar(as.character(e$ex)) <= w) {
+            kfit <- k
+            break
+          }
         }
+        alt <- NA_character_
+        if (kfit >= 0L && kfit + 1L < 3L) {
+          for (nd in 2:min(13L, w)) {
+            e <- sci_dec_text(v, nd - 1L)
+            digits <- gsub(".", "", e$mant, fixed = TRUE)
+            d2 <- sub("0+$", "", digits)
+            t <- paste0(if (v < 0) "-", d2, "E", e$ex - (nchar(d2) - 1L))
+            if (nchar(t) > w || nchar(d2) < sig(sci)) next
+            if (nchar(d2) > sig(sci) || nchar(t) < nchar(sci)) {
+              if (is.na(alt) || sig(t) > sig(alt) || (sig(t) == sig(alt) && nchar(t) < nchar(alt))) alt <- t
+            }
+          }
+        }
+        if (!is.na(alt)) sci <- alt
       }
     }
     # tiny values: E notation when it shows at least as many significant digits
-    # (SAS 9.4: BEST12. of 1E-6 is 1E-6; at widths above 15 a value below 1E-5 is written in E notation)
-    if (!is.na(sci) && (is.na(s) || sig(sci) > sig(s) || (abs(v) <= 1e-6 && sig(sci) >= sig(s)) ||
+    # (SAS 9.4: BEST12. of 1E-6 is 1E-6; below 1E-5 the E form wins a tie - round-15 scan, BEST8.-BEST12.;
+    # at widths above 15 a value below 1E-5 is written in E notation)
+    if (!is.na(sci) && (is.na(s) || sig(sci) > sig(s) || (abs(v) < 1e-5 && sig(sci) >= sig(s)) ||
                         (w > 15L && abs(v) < 1e-5))) s <- sci
     out[i] <- if (is.na(s)) strrep("*", w) else s
   }
