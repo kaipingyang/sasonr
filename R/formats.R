@@ -242,8 +242,9 @@ fmt_e <- function(v, w, d) {
 # the next digit (truncation).  The fuzz grows with the mantissa (a rest of
 # 0.97 carries for 1.x, 0.84 for 9.x) and is not a function of r and the
 # mantissa alone, so: 13 decimals - r < 0.30 truncated, r >= 0.55 rounded up;
-# 14 or more - r < 0.80 truncated (no carry below 0.839 in the scan); the
-# band between fails loud.
+# 14 or more - truncated below the smallest rest that carried for the same
+# leading digit (0.965 for 1.x down to 0.838 for 9.x); the band above fails
+# loud (SAS truncated 9.9999999999999998E149, rest 0.998, in BEST32.).
 e14_digits <- function(g, v, k = 14L) {
   a <- abs(v)
   s <- sprintf("%.*e", 40L, a)
@@ -254,7 +255,10 @@ e14_digits <- function(g, v, k = 14L) {
   up <- if (k == 13L) {
     if (r < 0.30) FALSE else if (r >= 0.55) TRUE else NA
   } else {
-    if (r < 0.80) FALSE else NA
+    # the smallest rest that carried in the scan, per leading digit (less
+    # 0.001): every rest below it was truncated
+    lim <- c(0.965, 0.954, 0.927, 0.920, 0.895, 0.880, 0.849, 0.846, 0.838)[as.integer(substr(dg, 1L, 1L))]
+    if (r < lim) FALSE else NA
   }
   if (is.na(up)) {
     abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with 14 significant digits: whether SAS 9.4 ",
