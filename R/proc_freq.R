@@ -708,6 +708,10 @@ freq_one_request <- function(db, wt, rq, sp) {
   # TS1M7, cases/ts1m2/freq_stats/oneway_expected TS1M2).  The request itself
   # is gated by the statistics registry (freq_stat_gate, per SAS release).  The n-way (CROSSLIST-style) cell rows
   # are not printed by sasonr yet, so that case still fails loud.
+  if (length(vars) == 2 && sas_target_version() == "TS1M2" && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
+    # TS1M2 gold covers only the one-way case (registry domain)
+    abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 cell rows for SAS 9.4 TS1M2 (only one-way tables are verified there)", rq$line)
+  }
   if (length(vars) > 2 && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
     abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for an n-way table (only the two-way crosstab layout is verified)", rq$line)
   }

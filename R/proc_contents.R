@@ -483,7 +483,9 @@ engine_datasets <- function(eng, step) {
             name = it$name,
             prefix = members[startsWith(members, it$prefix)],
             range = expand_numbered_range(it$from, it$to, s$line),
-            special = if (it$name == "_all_") members else abort_unsupported("DELETE list form", s$line),
+            # DELETE _ALL_: SAS 9.4 TS1M7 keeps every member, without a NOTE or
+            # WARNING (opensas/datasets_delete_all); the rule is not known
+            special = abort_unsupported(paste0("DELETE ", toupper(it$name), " in PROC DATASETS (SAS 9.4 keeps the members; not determined)"), s$line),
             abort_unsupported("DELETE list form", s$line))
           for (nm in nms) {
             if (exists_ds(nm)) {

@@ -1823,8 +1823,9 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
       note_invalid_arg("intnx", 1L, .at, args, numbered = TRUE)
       return(NA_real_)
     }
-    if (iv$base %in% interval_narrow && has_al) {
-      abort_unsupported(paste0("INTNX with the ", toupper(iv$base), " interval and an alignment argument (only the default is verified)"))
+    # an explicit 'B' is the default (opensas/sd_intnx_allintervals: SEMIMONTH, 'b')
+    if (iv$base %in% interval_narrow && has_al && !tolower(strip_both(al)) %in% c("b", "beginning")) {
+      abort_unsupported(paste0("INTNX with the ", toupper(iv$base), " interval and an alignment other than the default (not verified)"))
     }
     al <- tolower(strip_both(al))
     al <- c(b = "b", beginning = "b", m = "m", middle = "m", e = "e", end = "e", s = "s", same = "s", sameday = "s")[al]

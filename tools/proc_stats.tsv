@@ -238,9 +238,9 @@ TS1M2	FREQ	RELRISK	default			no SAS 9.4 TS1M2 gold
 TS1M2	FREQ	RISKDIFF	default			no SAS 9.4 TS1M2 gold
 TS1M2	FREQ	EXACT_RISKDIFF	default			no SAS 9.4 TS1M2 gold
 TS1M2	FREQ	EXACT_RELRISK	default			no SAS 9.4 TS1M2 gold
-TS1M2	FREQ	EXPECTED	default			no SAS 9.4 TS1M2 gold
-TS1M2	FREQ	DEVIATION	default			no SAS 9.4 TS1M2 gold
-TS1M2	FREQ	CELLCHI2	default			no SAS 9.4 TS1M2 gold
+TS1M2	FREQ	EXPECTED	default	freq_stats/oneway_expected	one-way tables (accepted and ignored); the two-way cell rows fail loud on TS1M2	SAS 9.4 TS1M2 gold (cases/ts1m2 of the private repository)
+TS1M2	FREQ	DEVIATION	default	freq_stats/oneway_expected	one-way tables (accepted and ignored); the two-way cell rows fail loud on TS1M2	SAS 9.4 TS1M2 gold (cases/ts1m2 of the private repository)
+TS1M2	FREQ	CELLCHI2	default	freq_stats/oneway_expected	one-way tables (accepted and ignored); the two-way cell rows fail loud on TS1M2	SAS 9.4 TS1M2 gold (cases/ts1m2 of the private repository)
 TS1M2	FREQ	EXACT_CHISQ	default			no SAS 9.4 TS1M2 gold
 TS1M2	FREQ	TESTP	default			no SAS 9.4 TS1M2 gold
 TS1M2	FREQ	TESTF	default			no SAS 9.4 TS1M2 gold

@@ -25,9 +25,10 @@ y q
 y q
 ;
 proc freq data=d; tables a*b / %s; run;"
+  # TS1M2: only the one-way case has gold (cases/ts1m2/freq_stats/oneway_expected)
   withr::local_options(sasonr.sas_version = "TS1M2")
   for (o in c("expected", "deviation", "cellchi2")) {
-    expect_error(sas_run(sprintf(code, o)), class = "sasonr_not_verified")
+    expect_error(sas_run(sprintf(code, o)), class = "sasonr_unsupported")
   }
   # TS1M7: verified (freq_stats/c03, c25, c31; one-way tables c58_oneway_expected)
   withr::local_options(sasonr.sas_version = "TS1M7")
@@ -98,10 +99,12 @@ test_that("finding 4: WEEKDAY / TENDAY / SEMIMONTH run only in their gold-covere
 run;")
   # SAS 9.4 TS1M7: functions/INTCK/INTCK_014, _016, _017, INTNX_016, _019
   expect_identical(unlist(ok$work$d), c(a = 1, b = 1, c = 1, e = 21934, f = 21966))
+  # an explicit default alignment 'b' (opensas/sd_intnx_allintervals: 16MAR2020)
+  expect_identical(sas_run("data d; r = put(intnx('semimonth', mdy(3, 15, 2020), 1, 'b'), date9.); run;")$work$d$r, "16MAR2020")
   bad <- c("intck('tenday2', '09JAN2020'd, '11FEB2020'd)", "intck('semimonth.2', '09JAN2020'd, '11FEB2020'd)",
            "intck('dtweekday', '09JAN2020:0:0'dt, '11FEB2020:0:0'dt)", "intck('tenday', '09JAN2020'd, '11FEB2020'd, 'c')",
            "intck('weekday', '09JAN2020'd, '11FEB2020'd, 'd')", "intnx('semimonth', '20JAN2020'd, 1, 'e')",
-           "intnx('tenday', '20JAN2020'd, 1, 'b')", "intnx('weekday2', '20JAN2020'd, 1)")
+           "intnx('tenday', '20JAN2020'd, 1, 'm')", "intnx('weekday2', '20JAN2020'd, 1)")
   for (b in bad) expect_error(sas_run(paste0("data d; r = ", b, "; run;")), class = "sasonr_unsupported", info = b)
 })
 
@@ -134,4 +137,10 @@ test_that("SASHELP: a .sas7bdat copy needs its column attributes, else fails lou
   expect_identical(res$meta$w$len$name, 8L)
   expect_identical(res$meta$w$len$sex, 1L)
   expect_identical(sub(" +$", "", res$work$w$name[1]), "Alfred")
+})
+
+test_that("PROC DATASETS DELETE _ALL_ fails loud (SAS 9.4 TS1M7 keeps the members)", {
+  # opensas/datasets_delete_all: after DELETE _ALL_ every member still exists
+  expect_error(sas_run("data a; v = 1; run; proc datasets library=work nolist; delete _all_; run; quit;"),
+               class = "sasonr_unsupported")
 })
