@@ -39,10 +39,13 @@ Machine-specific paths (R, Python, local SAS installation and its start-up
 options, local clone locations, helper scripts) are kept out of this public
 repository: see `docs/dev_machines.md` in the private conformance repository.
 
-The conformance repository stores `cases/own/**` with **TS1M7** provenance and
-`cases/ts1m2/**` with **TS1M2** gold produced on this machine. Local SAS is
-TS1M2, so it can only produce the latter. Never overwrite `cases/own`; new
-local gold goes under `cases/ts1m2` with the same case id.
+The conformance repository stores `cases/own/**` with **TS1M7** provenance (the
+gold environment), `cases/ts1m2/**` with the historical **TS1M2** gold from this
+machine's previous installation, and `cases/ts1m7/**` with **TS1M7** gold
+produced on this machine. The local SAS was upgraded from TS1M2 to TS1M7 on
+2026-11-13, so new local gold goes under `cases/ts1m7` with the same case id;
+TS1M2 behaviour can no longer be re-run here. Never overwrite `cases/own` or
+`cases/ts1m2`.
 
 ## Commands
 
@@ -101,7 +104,7 @@ the verification reports. Clone/pull it before starting work on a feature.
 | `docs/conformance/` | reports: `case_format.md`, `function_verification.md`, `rounding_gold.md`, `semantics_registry.md`, `sasonr_corpus.md` |
 | `docs/sas_reference/` | structured extracts of the official SAS 9.4 manuals: the documented semantics, the rules that are gold-only, and how to fetch the pages |
 | `harness/`, `tools/` | case generators and probe generators |
-| `cases/` | `own/` (TS1M7 gold) and `ts1m2/` (local TS1M2 gold) |
+| `cases/` | `own/` (TS1M7 gold), `ts1m2/` (historical TS1M2 gold) and `ts1m7/` (local TS1M7 gold) |
 
 **Read the owning spec before implementing.** Each spec states the SAS
 semantics with sources, the current state with numbers, the design, the
@@ -116,10 +119,12 @@ engine (§4.3); the gold environment's session encoding is **utf-8** and gold is
 produced for utf-8 and latin1 (§4.8); `sas_put()`/`sas_input()` are the exported
 format API (D5).
 
-The local SAS here is TS1M2 and runs **WLATIN1 / latin1**, so local gold is
-`encoding: latin1` while the gold environment of the spec is utf-8. Do not mix
-the two: a behaviour verified under one encoding is not verified under the
-other.
+The local SAS here is **TS1M7** (SAS 9.4M7) and runs **WLATIN1 / latin1** under
+the English config that the helpers pass, so local gold is `encoding: latin1`
+while the gold environment of the spec is utf-8. Do not mix the two: a behaviour
+verified under one encoding is not verified under the other. The deployment
+default is `zh_CN` + UTF-8; it is the English config that gives `EN_US` +
+`WLATIN1`.
 
 `docs/conformance/case_format.md` defines `gold_version: 2` (2026-11-12):
 `log_notes` now also records SAS error-handling messages, the epilogue leaves
@@ -153,8 +158,9 @@ acceptable **only** when a real SAS-verified case backs it — say so in the
 3. Sanitise the log output with `tools/sanitize.py` — SAS logs name the site
    and licence and must never be committed raw.
 4. Store `program.sas`, `meta.yaml` (`sas_version`, `program_sha256`,
-   `encoding: latin1`) and `expected/` (datasets, `attrs.csv`, `log_notes.txt`,
-   `put.txt`, `files/`).
+   `encoding: latin1` for an English-config run, `utf-8` for a `-encoding utf-8`
+   run) and `expected/` (datasets, `attrs.csv`, `log_notes.txt`, `put.txt`,
+   `files/`).
 5. Compare bit for bit: data sets, column attributes, log notes, listing,
    `put` text and written files. There is no tolerance.
 
