@@ -62,9 +62,8 @@ Everything a SAS program can change lives in one session object
 | WORK | data sets (tibbles), their metadata (types, lengths, formats, labels), PROC SQL views, `_LAST_` |
 | Format catalog | user formats and informats from PROC FORMAT |
 | Macro | global symbol table, local frames, macro definitions, automatic macro variables (`SYSCC`, `SYSERR`, `SQLOBS`, ...) |
-| Options | `LINESIZE`, `NOTES`, `SYNTAXCHECK`, the SAS 9.4 release, and the fixed values sasonr implements (`YEARCUTOFF=1940`, `ERRORS=20`, `MISSING=.`, UTF-8) |
+| Options | `LINESIZE`, `NOTES`, `SYNTAXCHECK`, the listing layout (`CENTER`, `DATE`, `NUMBER`, `PAGESIZE`, `FORMDLIM`) and the SAS 9.4 release; options whose only implemented value is the SAS default (`YEARCUTOFF=1940`, `ERRORS=20`, `MISSING=.`) are not stored, other values fail loud |
 | Titles, filerefs | `TITLE` lines, `FILENAME` assignments |
-| ODS | destinations and OUTPUT/SELECT/EXCLUDE requests (reserved for the clinical procedures) |
 | SQL back end | the DuckDB connection, opened on first use and closed with the session |
 | Sinks | the cumulative log and listing of all submissions |
 | Diagnostics | compile-time NOTEs of the step being translated; run-time state of the step being run (`_ERROR_` flag, data-error NOTEs, missing-value and math-error counters, observations read, PRXPARSE ids) |
@@ -81,7 +80,31 @@ binding on exit; the run-time helpers that generated code calls
 (`sas_err_sync()`, `sas_put_line()`, the functions and formats) read the
 bound session. Two sessions used alternately therefore never see each
 other's state, and a `sas_run()` nested inside a running step gets its own
-session without disturbing the outer one. Function-layer calls made outside
+session without disturbing the outer one; a nested submission to the
+*same* session is refused (it would rebind the running submission's log and
+macro executor).
+
+The listing is the one SAS writes under `NOCENTER NODATE NONUMBER
+FORMDLIM=' ' PAGESIZE=MAX`, the options of the SAS gold runs. A procedure
+that writes output while `CENTER`, `DATE` or `NUMBER` is set, while
+`FORMDLIM=` is not a blank (from the second page on), or with more lines
+than fit on one page of a finite `PAGESIZE=` fails loud.
+
+### Semantics across submissions (provisional)
+
+How SAS carries some state from one submission to the next in an
+interactive session has no SAS gold yet. sasonr's current choices are
+provisional, documented here, and will be checked against an interactive
+SAS 9.4 (TS1M7) session:
+
+| State | sasonr today | Interactive SAS (to be confirmed) |
+|---|---|---|
+| Syntax-check mode after an ERROR | reset at the start of each submission | applies to batch; interactive SAS is believed not to enter it |
+| PRXPARSE ids | numbered from 1 in each submission | probably per DATA step |
+| Log line numbers | start at 1 in each submission | accumulate over the session |
+| PROC SQL without `QUIT;` | closed at the end of the submission | stays open for the next submission |
+| PROC SQL options (`NUMBER`, `NOPRINT`, ...) | reset with each submission | kept while PROC SQL stays open |
+ Function-layer calls made outside
 any run (`sas_f_round()` in your own code) use a separate default session.
 
 Parsed programs, translations and results are plain S3 values; the function,

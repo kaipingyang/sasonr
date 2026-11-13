@@ -35,6 +35,8 @@ come later.
 | 2 | Internal refactor: session state in one object (R6), replacing scattered engine state; no new features, regression must be unchanged |
 | 3 | DATA step specification first: control flow (`RETURN`, `LINK`, `GOTO`, `STOP`, `ABORT`), execution model (multiple `SET`, `UPDATE`, `MODIFY`, `POINT=`, `END=`), PDV details, `INPUT` edge cases, hash objects |
 | 4 | Rounding and formats: close the remaining edge cases to reach 100% |
+| 5 | Semantics across submissions of one session (needs SAS evidence, to be produced on an interactive SAS 9.4 TS1M7 session): syntax-check mode after an ERROR, PRXPARSE id numbering, cumulative log line numbers, PROC SQL left open without `QUIT;` and its options; sasonr's current choices are provisional (architecture article) |
+| 6 | Listing layout under `CENTER`, `DATE`, `NUMBER`, `FORMDLIM=` and paging with a finite `PAGESIZE=` (fail loud today) |
 
 ## Following
 
