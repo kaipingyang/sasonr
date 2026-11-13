@@ -256,6 +256,13 @@ mac_sysfunc <- function(text, line = NULL) {
       rt$math <- old$math
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
+        #
+        #
+        #
+        if (sas_target_version() != "SAS 9.4") {
+          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") for SAS 9.4 ",
+                                   sas_target_version(), " (not in its expected results)"), line)
+        }
         rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
                                   "The result of the operations have been set to a missing value.")))
       }

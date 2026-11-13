@@ -1,5 +1,6 @@
 #
 .claude/
+.local/
 .Rproj.user/
 .Rhistory
 .RData
@@ -7,5 +8,16 @@
 *.Rproj
 docs/
 inst/sashelp/
+
+#
+#
+# None of it may be committed or redistributed.
+*.log
+*.lst
+*.sas7bdat
+*.sas7bcat
+.sasuser/
 __pycache__/
 *.pyc
+#
+results.txt

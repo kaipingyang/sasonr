@@ -37,9 +37,11 @@ registry_cache <- new.env(parent = emptyenv())
 #' @return A data frame, one row per function, per format/informat or per
 #'
 #'   SAS 9.4.
+#' @param sas_version The SAS 9.4 release whose rows are returned (default:
+#'   the selected release, see [sasonr_sas_version]); `NULL` returns every row.
 #' @keywords internal
 #' @export
-sas_feature_registry <- function(kind = c("functions", "formats", "semantics")) {
+sas_feature_registry <- function(kind = c("functions", "formats", "semantics"), sas_version = sas_target_version()) {
   kind <- match.arg(kind)
   if (is.null(registry_cache[[kind]])) {
     f <- system.file("registry", paste0(kind, ".csv"), package = "sasonr")
@@ -49,7 +51,55 @@ sas_feature_registry <- function(kind = c("functions", "formats", "semantics")) 
       data.frame(name = character(), kind = character(), status = character(), stringsAsFactors = FALSE)
     }
   }
-  registry_cache[[kind]]
+  registry_version_rows(registry_cache[[kind]], sas_version)
+}
+
+#'
+#'
+#'
+#' the registries ([sas_feature_registry()]) have one block of rows per
+#'
+#'
+#' function, format and procedure statistic by its status for that release,
+#' and the code paths whose SAS behaviour differs between the releases (for
+#' example the PROC MEANS moment arithmetic) follow it. Nothing is carried
+#' over from one release to the other; a feature without evidence for the
+#'
+#'
+#' @name sasonr_sas_version
+#' @aliases sasonr.sas_version
+#' @examples
+#'
+#' getOption("sasonr.sas_version")
+#' options(old)
+NULL
+
+#
+#
+# Verification is recorded per SAS release (registries: column `sas_version`).
+#
+#
+# features (strict mode), and the code paths whose SAS behaviour differs
+# between the releases follow it.  Nothing is carried over from one release to
+# the other: a feature without evidence for the selected release is
+#
+sas_versions <- c("SAS 9.4", "SAS 9.4")
+
+sas_target_version <- function() {
+  v <- getOption("sasonr.sas_version", "SAS 9.4")
+  if (!is.character(v) || length(v) != 1L || !toupper(v) %in% sas_versions) {
+    sasonr_abort(paste0("Unsupported: option sasonr.sas_version = ", format(v)[1], " (supported: ",
+                        paste(sas_versions, collapse = ", "), ")"), "sasonr_unsupported")
+  }
+  toupper(v)
+}
+
+# The rows of a registry for one SAS release (NULL: every row).  A registry
+#
+registry_version_rows <- function(reg, sas_version) {
+  if (is.null(sas_version)) return(reg)
+  if (is.null(reg$sas_version)) return(if (identical(sas_version, "SAS 9.4")) reg else reg[0, , drop = FALSE])
+  reg[reg$sas_version == sas_version, , drop = FALSE]
 }
 
 #
@@ -84,12 +134,13 @@ feature_context_label <- function(context) {
 }
 
 feature_status_text <- function(status) {
-  if (is.na(status)) return("is not in the feature registry (not supported)")
+  v <- paste0("SAS 9.4 (", sas_target_version(), ")")
+  if (is.na(status)) return(paste0("is not in the feature registry (not supported against ", v, ")"))
   switch(status,
-    approximate = "is approximate (some results differ in the last bits)",
-    unsupported = "is not supported (no test cases)",
-    mismatch = "has results that differ",
-    unsupported = "fails loud in every test case",
+    approximate = paste0("is approximate (some results differ from ", v, " in the last bits)"),
+    unsupported = paste0("is not supported against ", v, " (no test cases)"),
+    mismatch = paste0("has results that differ from ", v),
+    unsupported = paste0("fails loud in every ", v, " test case"),
     paste("has status", status)
   )
 }
@@ -133,7 +184,7 @@ feature_check <- function(kind, name, line = NULL, context = "data") {
   if (feature_gated(st)) {
     what <- sprintf("%s %s %s", kind, toupper(name), feature_status_text(st))
   } else if (kind == "function" && !context %in% (ctx <- feature_contexts(name))) {
-    what <- sprintf("function %s is not supported in %s (supported in: %s)", toupper(name),
+    what <- sprintf("function %s is not supported (%s) in %s (supported in: %s)", toupper(name), sas_target_version(),
                     feature_context_label(context), if (length(ctx)) paste(vapply(ctx, feature_context_label, ""), collapse = ", ") else "no context")
   } else {
     return(invisible())
