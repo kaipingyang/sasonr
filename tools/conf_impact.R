@@ -119,6 +119,21 @@ imp_instrument_text <- function(lines, file) {
   lines
 }
 
+# Persistent cache directory for the instrumented sources, the meta.yaml facts
+# and the compiled closures.  On POSIX machines it lives under /tmp (fast,
+# ephemeral); Windows has no /tmp and a session tempdir would not survive between
+# runs, so the per-user R cache directory is used there.  SASONR_IMP_CACHE
+# overrides both (e.g. a faster local disk).
+imp_cache_dir <- function() {
+  d <- Sys.getenv("SASONR_IMP_CACHE", unset = "")
+  if (nzchar(d)) return(d)
+  if (.Platform$OS.type == "windows") {
+    file.path(tools::R_user_dir("sasonr", "cache"), "imp")
+  } else {
+    file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
+  }
+}
+
 # Load the package instrumented: a copy of DESCRIPTION, NAMESPACE and the
 # instrumented R/ (inst/ linked) loaded with devtools::load_all().  Returns the
 # keys of the functions that ran at load time.
@@ -126,11 +141,19 @@ imp_load <- function(pkg = ".") {
   d <- file.path(tempfile("sasonr_imp_"), "sasonr")
   dir.create(file.path(d, "R"), recursive = TRUE)
   file.copy(file.path(pkg, c("DESCRIPTION", "NAMESPACE")), d)
-  file.symlink(normalizePath(file.path(pkg, "inst")), file.path(d, "inst"))
+  # a symlink saves the copy of inst/; creating one needs a privilege Windows
+  # users usually do not have, so Windows gets a plain copy (inst/ is small)
+  inst_src <- normalizePath(file.path(pkg, "inst"))
+  inst_dst <- file.path(d, "inst")
+  if (.Platform$OS.type == "windows") {
+    file.copy(inst_src, d, recursive = TRUE)
+  } else {
+    file.symlink(inst_src, inst_dst)
+  }
   writeLines(".imp_env <- new.env(parent = emptyenv())", file.path(d, "R", "0000_imp_env.R"))
   # instrumented files are cached by the md5 of their source (local disk)
-  cache <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
-  dir.create(cache, showWarnings = FALSE)
+  cache <- imp_cache_dir()
+  dir.create(cache, recursive = TRUE, showWarnings = FALSE)
   for (f in imp_r_files(pkg)) {
     src <- file.path(pkg, "R", f)
     cf <- file.path(cache, paste0(tools::md5sum(src), "_", f))
@@ -245,39 +268,60 @@ imp_collect <- function() {
 # are cached on local disk by (path, size, mtime, ctime) - a content change
 # always changes the ctime, which no copy or `touch` can set back - and only
 # new or changed files are read.
+#
+# Windows (local port): there is no POSIX `find`, `xargs` or `md5sum`, and R's
+# system() runs through cmd.exe, so the same index is built with list.files() /
+# file.info() / tools::md5sum(); the cache directory comes from imp_cache_dir().
 imp_index_cache <- new.env(parent = emptyenv())
-imp_md5_cache_file <- function() file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")), "md5_index.rds")
+imp_md5_cache_file <- function() file.path(imp_cache_dir(), "md5_index.rds")
 imp_root_index <- function(root) {
   root <- normalizePath(root)
   if (!is.null(imp_index_cache[[root]])) return(imp_index_cache[[root]])
-  w <- tempfile("sasonr_idx_")
-  dir.create(w)
-  on.exit(unlink(w, recursive = TRUE))
-  fmt <- shQuote("%p\\t%s\\t%T@\\t%C@\\n")
-  sh <- paste0(
-    "cd ", shQuote(root), " && find -L . -maxdepth 2 -type f -printf ", fmt, " > ", shQuote(file.path(w, "top")),
-    " && find -L . -mindepth 2 -maxdepth 2 -type d -print0 | xargs -0 -r -P 16 -n 8 sh -c ",
-    shQuote(paste0("for d; do find -L \"$d\" -mindepth 1 -type f -printf ", fmt, "; done > ", w, "/part_$$"), type = "sh"), " _")
-  if (system(sh) != 0) stop("conf_impact: indexing ", root, " failed")
-  x <- unlist(lapply(list.files(w, full.names = TRUE), readLines, warn = FALSE, encoding = "UTF-8"))
-  p <- strsplit(x, "\t", fixed = TRUE)
-  ix <- data.frame(path = sub("^\\./", "", vapply(p, `[`, "", 1L)), size = vapply(p, `[`, "", 2L),
-                   mtime = vapply(p, `[`, "", 3L), ctime = vapply(p, `[`, "", 4L), stringsAsFactors = FALSE)
-  ix <- ix[!duplicated(ix$path), , drop = FALSE]
+  if (.Platform$OS.type == "windows") {
+    # no POSIX find/xargs: same index from base R; ctime is used only as a
+    # cache signature, so whole-second resolution is enough
+    rel <- list.files(root, recursive = TRUE, all.files = TRUE, no.. = TRUE,
+                      include.dirs = FALSE, full.names = FALSE)
+    info <- file.info(file.path(root, rel))
+    ix <- data.frame(path = rel, size = as.character(info$size),
+                     mtime = as.character(as.integer(info$mtime)),
+                     ctime = as.character(as.integer(info$ctime)),
+                     stringsAsFactors = FALSE)
+    ix <- ix[!is.na(ix$mtime), , drop = FALSE]
+  } else {
+    w <- tempfile("sasonr_idx_")
+    dir.create(w)
+    on.exit(unlink(w, recursive = TRUE))
+    fmt <- shQuote("%p\\t%s\\t%T@\\t%C@\\n")
+    sh <- paste0(
+      "cd ", shQuote(root), " && find -L . -maxdepth 2 -type f -printf ", fmt, " > ", shQuote(file.path(w, "top")),
+      " && find -L . -mindepth 2 -maxdepth 2 -type d -print0 | xargs -0 -r -P 16 -n 8 sh -c ",
+      shQuote(paste0("for d; do find -L \"$d\" -mindepth 1 -type f -printf ", fmt, "; done > ", w, "/part_$$"), type = "sh"), " _")
+    if (system(sh) != 0) stop("conf_impact: indexing ", root, " failed")
+    x <- unlist(lapply(list.files(w, full.names = TRUE), readLines, warn = FALSE, encoding = "UTF-8"))
+    p <- strsplit(x, "\t", fixed = TRUE)
+    ix <- data.frame(path = sub("^\\./", "", vapply(p, `[`, "", 1L)), size = vapply(p, `[`, "", 2L),
+                     mtime = vapply(p, `[`, "", 3L), ctime = vapply(p, `[`, "", 4L), stringsAsFactors = FALSE)
+    ix <- ix[!duplicated(ix$path), , drop = FALSE]
+  }
   ix <- ix[order(ix$path, method = "radix"), , drop = FALSE]
   # content hashes, cached by signature
   cf <- imp_md5_cache_file()
-  dir.create(dirname(cf), showWarnings = FALSE)
+  dir.create(dirname(cf), recursive = TRUE, showWarnings = FALSE)
   cache <- if (file.exists(cf)) tryCatch(readRDS(cf), error = function(e) character()) else character()
   sig <- paste(root, ix$path, ix$size, ix$mtime, ix$ctime, sep = "\t")
   md5 <- unname(cache[sig])
   miss <- which(is.na(md5))
   if (length(miss)) {
-    lst <- file.path(w, "md5_list")
-    writeBin(unlist(lapply(ix$path[miss], function(p) c(charToRaw(p), as.raw(0L)))), lst)
-    out <- system(paste0("cd ", shQuote(root), " && xargs -0 -r -P 8 -n 200 md5sum -- < ", shQuote(lst)), intern = TRUE)
-    h <- stats::setNames(substr(out, 1L, 32L), sub("^[0-9a-f]{32}  ", "", out))
-    md5[miss] <- unname(h[ix$path[miss]])
+    if (.Platform$OS.type == "windows") {
+      md5[miss] <- unname(tools::md5sum(file.path(root, ix$path[miss])))
+    } else {
+      lst <- file.path(w, "md5_list")
+      writeBin(unlist(lapply(ix$path[miss], function(p) c(charToRaw(p), as.raw(0L)))), lst)
+      out <- system(paste0("cd ", shQuote(root), " && xargs -0 -r -P 8 -n 200 md5sum -- < ", shQuote(lst)), intern = TRUE)
+      h <- stats::setNames(substr(out, 1L, 32L), sub("^[0-9a-f]{32}  ", "", out))
+      md5[miss] <- unname(h[ix$path[miss]])
+    }
     if (anyNA(md5)) stop("conf_impact: md5 of ", sum(is.na(md5)), " file(s) under ", root, " failed")
     cache[sig[miss]] <- md5[miss]
     tmp <- tempfile(tmpdir = dirname(cf))
@@ -300,7 +344,7 @@ imp_list_cases <- function(root) {
 # time (reading thousands of small files on the shared file system is slow).
 imp_meta_cache <- new.env(parent = emptyenv())
 imp_meta_info <- function(case, sig) {
-  ck <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")), "meta_info.rds")
+  ck <- file.path(imp_cache_dir(), "meta_info.rds")
   if (is.null(imp_meta_cache$tab)) {
     imp_meta_cache$tab <- if (file.exists(ck)) tryCatch(readRDS(ck), error = function(e) list()) else list()
     imp_meta_cache$dirty <- FALSE
@@ -317,8 +361,8 @@ imp_meta_info <- function(case, sig) {
 }
 imp_meta_save <- function() {
   if (!isTRUE(imp_meta_cache$dirty)) return(invisible())
-  d <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
-  dir.create(d, showWarnings = FALSE)
+  d <- imp_cache_dir()
+  dir.create(d, recursive = TRUE, showWarnings = FALSE)
   tmp <- tempfile(tmpdir = d)
   saveRDS(imp_meta_cache$tab, tmp)
   file.rename(tmp, file.path(d, "meta_info.rds"))
@@ -660,7 +704,7 @@ imp_compile_cache_file <- function(ns, cache, namespace_file = file.path(getName
 
 imp_compile <- function() {
   ns <- asNamespace("sasonr")
-  cache <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
+  cache <- imp_cache_dir()
   cf <- imp_compile_cache_file(ns, cache)
   old <- if (file.exists(cf)) tryCatch(readRDS(cf), error = function(e) list()) else list()
   new <- list()
