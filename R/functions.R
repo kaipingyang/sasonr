@@ -1623,6 +1623,10 @@ parse_interval <- function(x) {
   list(base = base, mult = mult, shift = shift, dt = dt)
 }
 
+# intervals verified only in their plain form, with the default INTCK method
+# and the default INTNX alignment
+interval_narrow <- c("weekday", "tenday", "semimonth")
+
 interval_or_fail <- function(x, fname, .at) {
   iv <- parse_interval(x)
   nm <- sub("[0-9.]+$", "", tolower(strip_both(x)))
@@ -1636,8 +1640,11 @@ interval_or_fail <- function(x, fname, .at) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (weekend days)"))
   }
   if (is.null(iv)) return(NULL)
-  if (iv$base == "weekday" && (iv$mult != 1 || iv$shift != 1)) {
-    abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (multiplier or shift index)"))
+  # WEEKDAY / TENDAY / SEMIMONTH: SAS 9.4 (TS1M7) gold covers only the plain
+  # date interval (functions/INTCK/INTCK_014, _016, _017, INTNX_016, _019):
+  # multipliers, shift indexes and the DT forms fail loud (review_dc6d010 4)
+  if (iv$base %in% interval_narrow && (iv$mult != 1 || iv$shift != 1 || iv$dt)) {
+    abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (multiplier, shift index or DT form)"))
   }
   # the shift index of YEAR/SEMIYEAR/QTR is in months and of WEEKn (n > 1) in weeks
   if (iv$shift != 1 && (iv$base %in% c("year", "semiyear", "qtr") || (iv$base == "week" && iv$mult > 1))) {
@@ -1772,11 +1779,11 @@ sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
       note_invalid_arg("intck", NULL, .at, c(list(ivt, a, b), if (has_m) list(m)))
       return(NA_real_)
     }
-    if (is.na(a) || is.na(b)) return(NA_real_)
-    if (iv$base == "weekday") {
-      if (substr(mm, 1L, 1L) == "c") abort_unsupported("INTCK with the WEEKDAY interval and the continuous method")
-      return(weekday_intck(a, b))
+    if (iv$base %in% interval_narrow && has_m) {
+      abort_unsupported(paste0("INTCK with the ", toupper(iv$base), " interval and an explicit method (only the default is verified)"))
     }
+    if (is.na(a) || is.na(b)) return(NA_real_)
+    if (iv$base == "weekday") return(weekday_intck(a, b))
     if (substr(mm, 1L, 1L) == "c") {
       if (iv$base %in% c("day", "hour", "minute", "second", "week")) {
         unit <- switch(iv$base, day = if (iv$dt) 86400 else 1, week = if (iv$dt) 7 * 86400 else 7,
@@ -1816,6 +1823,9 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
       note_invalid_arg("intnx", 1L, .at, args, numbered = TRUE)
       return(NA_real_)
     }
+    if (iv$base %in% interval_narrow && has_al) {
+      abort_unsupported(paste0("INTNX with the ", toupper(iv$base), " interval and an alignment argument (only the default is verified)"))
+    }
     al <- tolower(strip_both(al))
     al <- c(b = "b", beginning = "b", m = "m", middle = "m", e = "e", end = "e", s = "s", same = "s", sameday = "s")[al]
     if (is.na(al)) {
@@ -1829,10 +1839,7 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
       note_invalid_arg("intnx", NULL, .at, args)
       return(NA_real_)
     }
-    if (iv$base == "weekday") {
-      if (al %in% c("m", "e")) abort_unsupported("INTNX with the WEEKDAY interval and ALIGN=")
-      return(weekday_shift(s, k))
-    }
+    if (iv$base == "weekday") return(weekday_shift(s, k))
     if (abs(k) > 1e7 || !date_in_range(interval_start(block_first(block_index(interval_index(s, iv), iv) + k, iv), iv), iv)) {
       note_invalid_arg("intnx", NULL, .at, args)
       return(NA_real_)
