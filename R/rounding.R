@@ -108,8 +108,9 @@ round_one <- function(x, unit, mode, fname) {
     # nearest multiple (exact half points rounded down at random: ROUND(
     # 507561523905906.125, 0.25) is 507561523905906, ROUND(399931701399944.05,
     # 0.1) rounds down; ROUND(269284231226460.16, 1/3) is not k/3): fail loud,
-    # as for |x| >= 1E15 above.
-    if (unit != floor(unit) && a >= 2^49 && x != floor(x)) {
+    # as for |x| >= 1E15 above, unless x/unit is an integer (x is a multiple:
+    #
+    if (unit != floor(unit) && a >= 2^49 && x != floor(x) && a != k) {
       abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
                                "): x/unit of 2^49 or more with a fractional unit is not supported"))
     }
