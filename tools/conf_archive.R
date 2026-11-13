@@ -53,15 +53,46 @@ arc_root_name <- function(root, pkg = ".") {
   gsub("[^A-Za-z0-9_.-]", "_", basename(root))
 }
 
-# Environment the verdicts depend on besides the code and the cases.
+# Environment the verdicts depend on besides the code and the cases: R and
+# package versions, BLAS/LAPACK, thread count, locale and time zone, the
+# SASHELP copy and the books root (path; the book programs themselves are part
+# of the case hashes, conf_impact.R imp_unit_hash()).
 arc_fingerprint <- function(pkg = ".") {
   pk <- c("dplyr", "tibble", "rlang", "cli", "purrr", "vctrs", "DBI", "duckdb", "R6", "haven")
   ver <- vapply(pk, function(p) tryCatch(as.character(utils::packageVersion(p)), error = function(e) "-"), "")
   sh <- list.files(file.path(pkg, "inst", "sashelp"), recursive = TRUE, full.names = TRUE)
   fi <- file.info(sh, extra_cols = FALSE)
+  br <- Sys.getenv("SASONR_BOOKS_ROOT")
   list(R = R.version.string, packages = paste(names(ver), ver, collapse = " "),
        sashelp = paste(length(sh), sum(fi$size), max(c(0, as.integer(fi$mtime)))),
-       books_root = nzchar(Sys.getenv("SASONR_BOOKS_ROOT")))
+       books_root = if (nzchar(br)) normalizePath(br, mustWork = FALSE) else "",
+       blas = paste(extSoftVersion()[["BLAS"]], La_library(), La_version()),
+       threads = Sys.getenv("OPENBLAS_NUM_THREADS"),
+       locale = Sys.getlocale(), tz = paste(Sys.timezone(), Sys.getenv("TZ")))
+}
+
+# Content hash of the code the verdicts depend on (what arc_key() calls
+# "dirty"): R/, inst/ (without the SASHELP copy, part of the fingerprint), the
+# runner (tools/run_conformance.R, tools/conf_*.R), the conformance helper,
+# DESCRIPTION and NAMESPACE.  Taken when the cases are selected and when each
+# worker loads the package; finalize stops when they differ (the archive key
+# names the code that ran).
+arc_code_files <- function(pkg = ".") {
+  pkg <- normalizePath(pkg)
+  fs <- c(list.files(file.path(pkg, "R"), recursive = TRUE, full.names = TRUE, all.files = TRUE),
+          list.files(file.path(pkg, "inst"), recursive = TRUE, full.names = TRUE, all.files = TRUE),
+          file.path(pkg, c("tools/run_conformance.R", "tests/testthat/helper-conformance.R", "DESCRIPTION", "NAMESPACE")),
+          list.files(file.path(pkg, "tools"), pattern = "^conf_.*\\.R$", full.names = TRUE))
+  fs <- fs[!startsWith(fs, file.path(pkg, "inst", "sashelp", ""))]
+  sort(unique(fs[file.exists(fs)]), method = "radix")
+}
+arc_code_hash <- function(pkg = ".") {
+  fs <- arc_code_files(pkg)
+  rel <- substring(fs, nchar(normalizePath(pkg)) + 2L)
+  tf <- tempfile()
+  on.exit(unlink(tf))
+  writeLines(paste(rel, unname(tools::md5sum(fs))), tf)
+  unname(tools::md5sum(tf))
 }
 
 arc_path <- function(key, root_name, strict, version, pkg = ".") {
@@ -72,14 +103,15 @@ arc_path <- function(key, root_name, strict, version, pkg = ".") {
 arc_write <- function(key, root_name, res, map, info, summary, pkg = ".", extra = list()) {
   d <- file.path(arc_dir(pkg), key)
   dir.create(d, recursive = TRUE, showWarnings = FALSE)
+  # every earlier result of this root (both modes, summaries, impact map,
+  # extras): a run in one mode must not leave the other mode's older verdicts
+  old <- list.files(d, full.names = TRUE)
+  old <- old[grepl(paste0("^", gsub(".", "\\.", root_name, fixed = TRUE), "(-|\\.)"), basename(old))]
+  unlink(old)
   for (mode in names(res)) {
     df <- res[[mode]]
     if (is.null(df)) next
     strict <- mode == "strict"
-    old <- list.files(d, pattern = sprintf("^%s%s-[A-Za-z0-9]+\\.csv$", root_name, if (strict) "" else "-strict-false"),
-                      full.names = TRUE)
-    if (!strict) old <- old[grepl("-strict-false-", old)] else old <- old[!grepl("-strict-false-", old)]
-    unlink(old)
     v <- df$sas_version
     v[is.na(v)] <- "unknown"
     for (ver in unique(v)) utils::write.csv(df[v == ver, , drop = FALSE], arc_path(key, root_name, strict, ver, pkg), row.names = FALSE)
@@ -89,7 +121,13 @@ arc_write <- function(key, root_name, res, map, info, summary, pkg = ".", extra 
   }
   for (nm in names(extra)) utils::write.csv(extra[[nm]], file.path(d, sprintf("%s-%s.csv", root_name, nm)), row.names = FALSE)
   if (!is.null(map)) saveRDS(map, file.path(d, paste0(root_name, "-impact.rds")))
-  writeLines(info, file.path(d, "info.txt"))
+  # info.txt: one block per root (a second root of the same run appends)
+  inf <- file.path(d, "info.txt")
+  keep <- if (file.exists(inf)) readLines(inf, warn = FALSE) else character()
+  blk <- cumsum(grepl("^\\[", keep))
+  hd <- grepl("^\\[", keep)
+  own <- blk %in% blk[hd & keep == paste0("[", root_name, "]")]
+  writeLines(c(keep[!own], paste0("[", root_name, "]"), info), inf)
   invisible(d)
 }
 

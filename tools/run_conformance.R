@@ -35,6 +35,19 @@
 #   --baseline C      compare the verdicts case by case with the archived run
 #                     of commit C (both modes) and print the changed cases
 #   --no-archive      do not write the results archive
+#   --fail-fast       development only (never for a release): stop at the first
+#                     silent error (strict L-DS fail or lenient) or the first
+#                     verdict that differs from the archived run of --baseline
+#                     (default: the --since base); implies --no-archive.  With
+#                     --stop-file F (conf_parallel.sh) the reason is written to F
+#                     and every worker stops before its next case directory.
+#   --queue DIR       (conf_parallel.sh) dynamic scheduling: every worker gets
+#                     the whole unit list (longest recorded run time first) and
+#                     claims each case directory atomically in DIR before running
+#                     it, so the heaviest cases start first and no worker idles
+#                     while another holds a queue of long cases
+#   --root-origins A,B  the original paths of local root copies (results archive
+#                     info: the repository state of each root)
 #   --list-units F    (conf_parallel.sh) write the selected case directories
 #                     to F and stop;  --units F  run only the directories in F;
 #                     --root-names A,B  archive names of the ROOTs (local copies);
@@ -88,6 +101,11 @@ status_sel <- opt("--status", "")
 since <- opt("--since", "", flag_value = "origin/main")
 baseline <- opt("--baseline", "")
 no_archive <- flag("--no-archive")
+fail_fast <- flag("--fail-fast")
+stop_file <- opt("--stop-file", "")
+queue_dir <- opt("--queue", "")
+root_origins <- opt("--root-origins", "")
+if (fail_fast) no_archive <- TRUE
 list_units <- opt("--list-units", "")
 units_file <- opt("--units", "")
 shard_out <- opt("--shard-out", "")
@@ -113,9 +131,13 @@ sys.source("tests/testthat/helper-conformance.R", envir = sel_env)
 
 # rows of a units file: root (path), root_name, rel
 read_units <- function(f) {
-  if (!file.exists(f) || !length(readLines(f, warn = FALSE))) return(data.frame(root = character(), root_name = character(), rel = character()))
-  utils::read.delim(f, header = FALSE, col.names = c("root", "root_name", "rel", "secs"), colClasses = "character",
-                    quote = "")[, 1:3]
+  if (!file.exists(f) || !length(readLines(f, warn = FALSE))) {
+    return(data.frame(root = character(), root_name = character(), rel = character(), secs = numeric()))
+  }
+  u <- utils::read.delim(f, header = FALSE, col.names = c("root", "root_name", "rel", "secs"), colClasses = "character",
+                         quote = "")
+  u$secs <- suppressWarnings(as.numeric(u$secs))
+  u
 }
 
 # Selection for every root: list(root, root_name, rels (to run), incremental info)
@@ -128,12 +150,14 @@ select_roots <- function() {
   }
   fp <- arc_fingerprint(pkg)
   rnames <- if (nzchar(root_names)) strsplit(root_names, ",", fixed = TRUE)[[1]] else character()
+  rorig <- if (nzchar(root_origins)) strsplit(root_origins, ",", fixed = TRUE)[[1]] else character()
   for (i in seq_along(roots)) {
     root <- normalizePath(roots[i])
     rn <- if (length(rnames) >= i) rnames[i] else arc_root_name(root, pkg)
     cases <- imp_list_cases(root)
     rels <- substring(cases, nchar(root) + 2L)
-    s <- list(root = root, root_name = rn, rels = rels, all = rels, inc = NULL, full = TRUE)
+    s <- list(root = root, root_name = rn, rels = rels, all = rels, inc = NULL, full = TRUE,
+              origin = if (length(rorig) >= i) rorig[i] else root)
     if (nzchar(status_sel)) {
       st <- strsplit(status_sel, ",", fixed = TRUE)[[1]]
       reg_f <- utils::read.csv("inst/registry/functions.csv", colClasses = "character")
@@ -193,10 +217,17 @@ if (merge) {
 } else if (nzchar(units_file)) {
   u <- read_units(units_file)
   selection <- lapply(split(u, factor(u$root_name, levels = unique(u$root_name))), function(x) {
-    list(root = normalizePath(x$root[1]), root_name = x$root_name[1], rels = x$rel, full = FALSE)
+    list(root = normalizePath(x$root[1]), root_name = x$root_name[1], rels = x$rel, secs = x$secs, full = FALSE)
   })
 } else {
+  # the archive key and the code are taken now, when the cases are selected:
+  # finalize() stops when the code that ran (each worker records its own at
+  # load time) or the working tree at the end differ from it
+  sel_key <- arc_key(pkg)
+  sel_code <- arc_code_hash(pkg)
   selection <- select_roots()
+  attr(selection, "key") <- sel_key
+  attr(selection, "code") <- sel_code
   imp_meta_save()
 }
 
@@ -245,8 +276,12 @@ row_of <- function(root_name, area, rel, r, meta, env) {
 }
 
 run_selection <- function(selection) {
-  # the package with instrumented code (impact map) and recorded registry reads
+  # the package with instrumented code (impact map) and recorded registry reads;
+  # the content hash of the code before and after loading it (a change while
+  # the sources are read would mix two versions)
+  code0 <- arc_code_hash(pkg)
   load_keys <- imp_load(".")
+  if (!identical(arc_code_hash(pkg), code0)) stop("the package code changed while it was loaded; run again")
   # devtools::load_all() leaves the package functions uncompiled: R's JIT then
   # compiles every closure created at run time (the lexer's local helpers, the
   # macro sink, lapply() bodies ...) again in every sas_run().  Byte-compile the
@@ -257,26 +292,8 @@ run_selection <- function(selection) {
   ns <- asNamespace("sasonr")
   # strict gates: record every gate of a case (as strict mode would abort there)
   gate <- new.env(parent = emptyenv())
-  gate_catch <- c("error", "condition", "sasonr_unsupported", "sasonr_not_verified", "sasonr_error", "rlang_error",
-                  "simpleError")
-  gate_caught <- function() {
-    calls <- sys.calls()
-    parents <- sys.parents()
-    nm <- vapply(calls, function(cl) if (is.symbol(cl[[1]])) as.character(cl[[1]]) else "", "")
-    b <- which(nm %in% c("sas_run", "engine_run_partial"))
-    if (!length(b)) return(TRUE)
-    b <- b[1]
-    for (i in seq_along(calls)) {
-      if (i <= b) next
-      if (nm[i] %in% c("try", "try_fetch", "safely", "possibly", "quietly")) return(TRUE)
-      if (nm[i] %in% c("tryCatch", "withCallingHandlers")) {
-        h <- setdiff(names(calls[[i]]), c("", "expr", "finally"))
-        if (nm[b] == "engine_run_partial" && parents[i] == b) next
-        if (any(h %in% gate_catch)) return(TRUE)
-      }
-    }
-    FALSE
-  }
+  # caught inside sasonr (error recovery)?  tools/conf_impact.R imp_gate_caught()
+  gate_caught <- function() imp_gate_caught(sys.calls(), sys.parents())
   for (gn in c("feature_check", "proc_stat_check")) local({
     orig <- get(gn, envir = ns)
     w <- function(...) {
@@ -365,7 +382,11 @@ run_selection <- function(selection) {
         k <- which(bl$begin <= g$line & bl$end >= g$line)
         if (length(k) == 1L) k else NA_integer_
       }, 1L)
-      if (anyNA(blk) || !all(names(rn) %in% bl$ids)) {
+      # a block with effects on the later blocks (macro variables, options,
+      # formats, data sets ...): strict mode runs the blocks after a gated one
+      # in a new session without those effects -> run the program in strict mode
+      pure <- vapply(seq_along(bl$ids), function(k) imp_block_pure(lines[bl$begin[k]:bl$end[k]]), TRUE)
+      if (anyNA(blk) || !all(names(rn) %in% bl$ids) || !all(pure)) {
         rerun <- TRUE
       } else {
         s_log <- env$conf_matrix_split(env$conf_lines(file.path(case, "expected", "log_notes.txt")))
@@ -389,77 +410,132 @@ run_selection <- function(selection) {
 
   t0 <- Sys.time()
   done <- 0L
-  out <- list()
-  for (s in selection) {
-    root <- s$root
-    rows <- list(strict = list(), nonstrict = list())
-    units <- list()
-    copies <- list()
-    cases <- file.path(root, s$rels)
-    for (k in seq_along(cases)) {
-      case <- cases[k]
-      rel <- s$rels[k]
-      area <- sub("/.*$", "", rel)
-      meta <- env$conf_read_meta(file.path(case, "meta.yaml"))
-      only <- NULL
-      if (identical(meta$layout, "matrix")) {
-        if (!grepl(pattern, case, perl = TRUE)) {
-          ids <- utils::read.csv(file.path(case, "cases.csv"), colClasses = "character")$case
-          only <- ids[grepl(pattern, file.path(rel, ids), perl = TRUE)]
-          if (!length(only)) next
+  # every case directory of every root, in one list: in the given order, or
+  # (--queue) heaviest first by the recorded run time, claimed one by one
+  plan <- do.call(rbind, lapply(seq_along(selection), function(i) {
+    s <- selection[[i]]
+    if (!length(s$rels)) return(NULL)
+    data.frame(si = i, k = seq_along(s$rels), secs = if (is.null(s$secs)) NA_real_ else s$secs)
+  }))
+  if (is.null(plan)) plan <- data.frame(si = integer(), k = integer(), secs = numeric())
+  if (nzchar(queue_dir)) plan <- plan[order(-ifelse(is.na(plan$secs), Inf, plan$secs), plan$si, plan$k), , drop = FALSE]
+  claim <- function(rn, rel) dir.create(file.path(queue_dir, paste0(rn, "__", gsub("/", "%2F", rel, fixed = TRUE))),
+                                        showWarnings = FALSE)
+  acc <- lapply(selection, function(s) list(rows = list(strict = list(), nonstrict = list()), units = list(), copies = list(),
+                                             n = 0L))
+  # --fail-fast: the verdicts of the baseline run (--baseline, else the --since base)
+  ff_base <- list()
+  if (fail_fast) {
+    bk <- if (nzchar(baseline)) arc_resolve(pkg, baseline) else if (nzchar(since)) arc_resolve(pkg, since) else ""
+    for (s in selection) for (m in c("strict", "nonstrict")) {
+      old <- if (nzchar(bk)) arc_read(bk, s$root_name, strict = m == "strict", pkg)
+      if (!is.null(old)) ff_base[[paste(s$root_name, m)]] <- stats::setNames(paste(old$status, old$failed_layers %|NA|% ""), old$case)
+    }
+  }
+  ff_stop <- function(msg) {
+    cat("FAIL-FAST: ", msg, "\n", sep = "")
+    if (nzchar(stop_file) && !file.exists(stop_file)) writeLines(msg, stop_file)
+    quit(save = "no", status = 3)
+  }
+  ff_check <- function(rn, new_rows) {
+    for (m in names(new_rows)) {
+      for (r in new_rows[[m]]) {
+        if (m == "strict" && (r$status == "lenient" || (r$status == "fail" && isFALSE(r$ds)))) {
+          ff_stop(sprintf("%s %s: silent error (%s %s)", rn, r$case, r$status, r$failed_layers))
         }
-      } else if (!grepl(pattern, case, perl = TRUE)) next
-      rc <- NULL
-      if (!identical(meta$layout, "matrix") && identical(meta$cwd, "_root")) {
-        if (is.null(copies[[area]])) {
-          d <- tempfile("sasonr_root_")
-          dir.create(d)
-          file.copy(list.files(file.path(root, area, "_root"), full.names = TRUE, all.files = TRUE, no.. = TRUE), d,
-                    recursive = TRUE)
-          copies[[area]] <- d
+        b <- ff_base[[paste(rn, m)]]
+        if (!is.null(b) && !is.na(b[r$case])) {
+          now <- paste(r$status, r$failed_layers %|NA|% "")
+          if (!identical(unname(b[r$case]), now)) {
+            ff_stop(sprintf("%s %s (%s): %s -> %s", rn, r$case, if (m == "strict") "strict" else "strict=false",
+                            trimws(b[r$case]), trimws(now)))
+          }
         }
-        rc <- copies[[area]]
-      }
-      imp_reset()
-      tu <- Sys.time()
-      ev_cols <- evidence[[rel]]
-      res <- run_unit(case, meta, rc, if (nzchar(keep_dir)) file.path(keep_dir, rel), only, work = !is.null(ev_cols))
-      cols <- NULL
-      if (!is.null(ev_cols) && !is.null(res$nonstrict)) {
-        # PROC statistics evidence (tools/proc_stats.tsv): sasonr's column against SAS's, strict = FALSE
-        w <- res$nonstrict$work
-        cols <- do.call(rbind, lapply(ev_cols, function(dc) {
-          r <- env$conf_col_check(case, w, dc[1], dc[2])
-          data.frame(case = rel, dataset = dc[1], column = dc[2], compared = r[["compared"]], same = r[["same"]])
-        }))
-        res$nonstrict$work <- NULL
-      }
-      secs <- as.numeric(difftime(Sys.time(), tu, units = "secs"))
-      imp <- imp_collect()
-      units[[rel]] <- list(keys = imp$keys, reg = imp$reg, hash = imp_unit_hash(case, root), secs = secs, proc_cols = cols)
-      for (m in names(res)) {
-        r <- res[[m]]
-        if (identical(meta$layout, "matrix")) {
-          for (id in names(r)) rows[[m]][[length(rows[[m]]) + 1L]] <- row_of(s$root_name, area, file.path(rel, id), r[[id]], meta, env)
-        } else {
-          rows[[m]][[length(rows[[m]]) + 1L]] <- row_of(s$root_name, area, rel, r, meta, env)
-        }
-      }
-      done <- done + if (identical(meta$layout, "matrix")) length(res[[1]]) else 1L
-      if (k %% 50 == 0) {
-        cat(sprintf("%s: %d/%d  (%d cases)  %.0fs\n", s$root_name, k, length(cases), done,
-                    as.numeric(difftime(Sys.time(), t0, units = "secs"))))
-        invisible(gc())
       }
     }
-    for (d in copies) unlink(d, recursive = TRUE)
-    out[[s$root_name]] <- list(
+  }
+  for (j in seq_len(nrow(plan))) {
+    if (nzchar(stop_file) && file.exists(stop_file)) {
+      cat("stop file found: stopping\n")
+      quit(save = "no", status = 3)
+    }
+    si <- plan$si[j]
+    k <- plan$k[j]
+    s <- selection[[si]]
+    root <- s$root
+    rel <- s$rels[k]
+    case <- file.path(root, rel)
+    if (nzchar(queue_dir) && !claim(s$root_name, rel)) next
+    area <- sub("/.*$", "", rel)
+    meta <- env$conf_read_meta(file.path(case, "meta.yaml"))
+    only <- NULL
+    if (identical(meta$layout, "matrix")) {
+      if (!grepl(pattern, case, perl = TRUE)) {
+        ids <- utils::read.csv(file.path(case, "cases.csv"), colClasses = "character")$case
+        only <- ids[grepl(pattern, file.path(rel, ids), perl = TRUE)]
+        if (!length(only)) next
+      }
+    } else if (!grepl(pattern, case, perl = TRUE)) next
+    rc <- NULL
+    if (!identical(meta$layout, "matrix") && identical(meta$cwd, "_root")) {
+      if (is.null(acc[[si]]$copies[[area]])) {
+        d <- tempfile("sasonr_root_")
+        dir.create(d)
+        file.copy(list.files(file.path(root, area, "_root"), full.names = TRUE, all.files = TRUE, no.. = TRUE), d,
+                  recursive = TRUE)
+        acc[[si]]$copies[[area]] <- d
+      }
+      rc <- acc[[si]]$copies[[area]]
+    }
+    imp_reset()
+    tu <- Sys.time()
+    ev_cols <- evidence[[rel]]
+    res <- run_unit(case, meta, rc, if (nzchar(keep_dir)) file.path(keep_dir, rel), only, work = !is.null(ev_cols))
+    cols <- NULL
+    if (!is.null(ev_cols) && !is.null(res$nonstrict)) {
+      # PROC statistics evidence (tools/proc_stats.tsv): sasonr's column against SAS's, strict = FALSE
+      w <- res$nonstrict$work
+      cols <- do.call(rbind, lapply(ev_cols, function(dc) {
+        r <- env$conf_col_check(case, w, dc[1], dc[2])
+        data.frame(case = rel, dataset = dc[1], column = dc[2], compared = r[["compared"]], same = r[["same"]])
+      }))
+      res$nonstrict$work <- NULL
+    }
+    secs <- as.numeric(difftime(Sys.time(), tu, units = "secs"))
+    imp <- imp_collect()
+    acc[[si]]$units[[rel]] <- list(keys = imp$keys, reg = imp$reg, hash = imp_unit_hash(case, root), secs = secs,
+                                   proc_cols = cols)
+    new_rows <- list()
+    for (m in names(res)) {
+      r <- res[[m]]
+      nr <- if (identical(meta$layout, "matrix")) {
+        lapply(names(r), function(id) row_of(s$root_name, area, file.path(rel, id), r[[id]], meta, env))
+      } else {
+        list(row_of(s$root_name, area, rel, r, meta, env))
+      }
+      new_rows[[m]] <- nr
+      acc[[si]]$rows[[m]] <- c(acc[[si]]$rows[[m]], nr)
+    }
+    if (fail_fast) ff_check(s$root_name, new_rows)
+    acc[[si]]$n <- acc[[si]]$n + 1L
+    done <- done + if (identical(meta$layout, "matrix")) length(res[[1]]) else 1L
+    if (j %% 50 == 0) {
+      cat(sprintf("%d/%d case dirs  (%d cases)  %.0fs\n", j, nrow(plan), done,
+                  as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+      invisible(gc())
+    }
+  }
+  out <- list()
+  for (si in seq_along(selection)) {
+    for (d in acc[[si]]$copies) unlink(d, recursive = TRUE)
+    rows <- acc[[si]]$rows
+    out[[selection[[si]]$root_name]] <- list(
       strict = if (length(rows$strict)) do.call(rbind, rows$strict),
       nonstrict = if (length(rows$nonstrict)) do.call(rbind, rows$nonstrict),
-      units = units)
+      units = acc[[si]]$units)
   }
   imp_meta_save()
-  list(roots = out, load_keys = load_keys, fingerprint = arc_fingerprint(pkg), mode = mode)
+  list(roots = out, load_keys = load_keys, fingerprint = arc_fingerprint(pkg), mode = mode, code = code0)
 }
 
 # ---- finalize: inherit, print, archive, compare ------------------------------------------
@@ -472,9 +548,23 @@ empty_res <- function() {
 }
 
 finalize <- function(selection, shards) {
-  modes <- if (shards[[1]]$mode == "both") c("nonstrict", "strict") else shards[[1]]$mode
+  # the archive key and code of the selection (not of the moment the run ends)
+  key <- attr(selection, "key") %||% arc_key(pkg)
+  code <- attr(selection, "code") %||% arc_code_hash(pkg)
+  for (sh in shards) {
+    if (!identical(sh$code, code)) {
+      stop("the package code changed between the case selection and a worker's start (", substr(code, 1, 8), " -> ",
+           substr(sh$code %||% "?", 1, 8), "): the verdicts are not those of ", key, "; run again")
+    }
+  }
+  if (!identical(arc_code_hash(pkg), code)) {
+    stop("the package code changed during the run: the verdicts are not those of ", key, "; run again")
+  }
+  # an incremental run with nothing to run has no shards: mode from the
+  # options, the load-time keys and the fingerprint of the base run / now
+  run_mode <- if (length(shards)) shards[[1]]$mode else mode
+  modes <- if (run_mode == "both") c("nonstrict", "strict") else run_mode
   all <- list(strict = list(), nonstrict = list())
-  key <- arc_key(pkg)
   for (s in selection) {
     rn <- s$root_name
     res <- list()
@@ -514,9 +604,30 @@ finalize <- function(selection, shards) {
       all[[m]][[rn]] <- res[[m]]
     }
     if (isTRUE(s$full) && !no_archive && !nzchar(units_file)) {
-      map <- list(units = units, load_keys = shards[[1]]$load_keys, fingerprint = shards[[1]]$fingerprint, commit = key)
-      info <- c(paste("commit:", key), paste("date:", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
-                paste("mode:", shards[[1]]$mode), paste("shards:", length(shards)),
+      if (length(shards)) {
+        lk <- shards[[1]]$load_keys
+        fp <- shards[[1]]$fingerprint
+      } else {
+        km <- s$inc$keymap
+        lk <- s$inc$map$load_keys
+        lk <- sort(unique(ifelse(lk %in% names(km), km[lk], lk)))
+        fp <- arc_fingerprint(pkg)
+      }
+      map <- list(units = units, load_keys = lk, fingerprint = fp, commit = key)
+      # what the verdicts were made from: the root's content (md5 of every
+      # file), its repository state and the environment (release.sh reuses an
+      # archived run only through an incremental run that checks all of it)
+      ix <- imp_root_index(s$root)
+      tf <- tempfile()
+      writeLines(paste(ix$path, ix$md5), tf)
+      origin <- s$origin %||% s$root
+      repo <- arc_git(origin, "rev-parse", "HEAD")
+      st <- arc_git(origin, "status", "--porcelain", "--", ".")
+      info <- c(paste("commit:", key), paste("code:", code), paste("date:", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+                paste("root:", origin), paste("root_content:", unname(tools::md5sum(tf)), nrow(ix), "files"),
+                paste("root_repo:", if (length(repo)) repo else "-", if (length(st)) paste(length(st), "uncommitted") else "clean"),
+                paste0("fingerprint: ", names(fp), "=", unlist(fp)),
+                paste("mode:", run_mode), paste("shards:", length(shards)),
                 paste("incremental:", if (is.null(s$inc)) "no" else paste("since", s$inc$base, "-", length(units) - length(s$inc$keep), "case dirs run,", length(s$inc$keep), "inherited")),
                 paste("elapsed:", sprintf("%.0fs", as.numeric(difftime(Sys.time(), t_start, units = "secs")))))
       summ <- lapply(stats::setNames(modes, modes), function(m) arc_summary(res[[m]], m == "strict"))

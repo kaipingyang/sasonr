@@ -238,31 +238,53 @@ imp_collect <- function() {
 
 # ---- case directory fingerprint ---------------------------------------------------------
 
-# Files a case directory's verdict depends on besides the code: the directory
-# itself (program, meta.yaml, expected/, data/), a program_ref program and its
-# data/, the area's _root/.  Size and modification time of every file.
-# Every file under a root: relative path, size, modification time.  The file
-# times are slow to read on the shared file system (latency-bound), so the
-# root is read by parallel `find` processes, one per second-level directory.
+# Every file under a root: relative path, size and the md5 of its content
+# (symbolic links followed, dot files included).  The file list and times are
+# slow to read on the shared file system (latency-bound), so the root is read
+# by parallel `find` processes, one per second-level directory; the md5 sums
+# are cached on local disk by (path, size, mtime, ctime) - a content change
+# always changes the ctime, which no copy or `touch` can set back - and only
+# new or changed files are read.
 imp_index_cache <- new.env(parent = emptyenv())
+imp_md5_cache_file <- function() file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")), "md5_index.rds")
 imp_root_index <- function(root) {
   root <- normalizePath(root)
   if (!is.null(imp_index_cache[[root]])) return(imp_index_cache[[root]])
   w <- tempfile("sasonr_idx_")
   dir.create(w)
   on.exit(unlink(w, recursive = TRUE))
-  fmt <- shQuote("%p\\t%s\\t%T@\\n")
+  fmt <- shQuote("%p\\t%s\\t%T@\\t%C@\\n")
   sh <- paste0(
-    "cd ", shQuote(root), " && find . -maxdepth 2 -type f -printf ", fmt, " > ", shQuote(file.path(w, "top")),
-    " && find . -mindepth 2 -maxdepth 2 -type d -print0 | xargs -0 -r -P 16 -n 8 sh -c ",
-    shQuote(paste0("for d; do find \"$d\" -type f -printf ", fmt, "; done > ", w, "/part_$$"), type = "sh"), " _")
+    "cd ", shQuote(root), " && find -L . -maxdepth 2 -type f -printf ", fmt, " > ", shQuote(file.path(w, "top")),
+    " && find -L . -mindepth 2 -maxdepth 2 -type d -print0 | xargs -0 -r -P 16 -n 8 sh -c ",
+    shQuote(paste0("for d; do find -L \"$d\" -mindepth 1 -type f -printf ", fmt, "; done > ", w, "/part_$$"), type = "sh"), " _")
   if (system(sh) != 0) stop("conf_impact: indexing ", root, " failed")
   x <- unlist(lapply(list.files(w, full.names = TRUE), readLines, warn = FALSE, encoding = "UTF-8"))
   p <- strsplit(x, "\t", fixed = TRUE)
   ix <- data.frame(path = sub("^\\./", "", vapply(p, `[`, "", 1L)), size = vapply(p, `[`, "", 2L),
-                   mtime = sub("\\..*$", "", vapply(p, `[`, "", 3L)), stringsAsFactors = FALSE)
-  ix <- ix[!grepl("(^|/)\\.", ix$path) & !duplicated(ix$path), , drop = FALSE]
+                   mtime = vapply(p, `[`, "", 3L), ctime = vapply(p, `[`, "", 4L), stringsAsFactors = FALSE)
+  ix <- ix[!duplicated(ix$path), , drop = FALSE]
   ix <- ix[order(ix$path, method = "radix"), , drop = FALSE]
+  # content hashes, cached by signature
+  cf <- imp_md5_cache_file()
+  dir.create(dirname(cf), showWarnings = FALSE)
+  cache <- if (file.exists(cf)) tryCatch(readRDS(cf), error = function(e) character()) else character()
+  sig <- paste(root, ix$path, ix$size, ix$mtime, ix$ctime, sep = "\t")
+  md5 <- unname(cache[sig])
+  miss <- which(is.na(md5))
+  if (length(miss)) {
+    lst <- file.path(w, "md5_list")
+    writeBin(unlist(lapply(ix$path[miss], function(p) c(charToRaw(p), as.raw(0L)))), lst)
+    out <- system(paste0("cd ", shQuote(root), " && xargs -0 -r -P 8 -n 200 md5sum -- < ", shQuote(lst)), intern = TRUE)
+    h <- stats::setNames(substr(out, 1L, 32L), sub("^[0-9a-f]{32}  ", "", out))
+    md5[miss] <- unname(h[ix$path[miss]])
+    if (anyNA(md5)) stop("conf_impact: md5 of ", sum(is.na(md5)), " file(s) under ", root, " failed")
+    cache[sig[miss]] <- md5[miss]
+    tmp <- tempfile(tmpdir = dirname(cf))
+    saveRDS(cache, tmp)
+    file.rename(tmp, cf)
+  }
+  ix$md5 <- md5
   assign(root, ix, envir = imp_index_cache)
   ix
 }
@@ -305,30 +327,31 @@ imp_meta_save <- function() {
 
 # Files a case directory's verdict depends on besides the code: the directory
 # itself (program, meta.yaml, expected/, data/), a program_ref program and its
-# data/, the area's _root/.  Signature: path, size and modification time of each.
+# data/ (with the books root), the area's _root/.  Signature: path and content md5 of each.
 imp_unit_hash <- function(case, root) {
   root <- normalizePath(root)
   ix <- imp_root_index(root)
   rel <- substring(case, nchar(root) + 2L)
   sel <- startsWith(ix$path, paste0(rel, "/"))
-  lines <- paste(ix$path[sel], ix$size[sel], ix$mtime[sel], sep = "\t")
+  lines <- paste(ix$path[sel], ix$md5[sel], sep = "\t")
   mi <- match(paste0(rel, "/meta.yaml"), ix$path)
-  info <- if (is.na(mi)) list(ref = "", root = FALSE) else imp_meta_info(case, paste(ix$size[mi], ix$mtime[mi]))
+  info <- if (is.na(mi)) list(ref = "", root = FALSE) else imp_meta_info(case, ix$md5[mi])
   if (nzchar(info$ref)) {
     br <- Sys.getenv("SASONR_BOOKS_ROOT")
     if (!nzchar(br)) {
       lines <- c(lines, "<no books root>")
     } else {
       pd <- file.path(br, info$ref)
-      fs <- c(file.path(pd, "program.sas"), list.files(file.path(pd, "data"), recursive = TRUE, full.names = TRUE))
-      fi <- file.info(fs, extra_cols = FALSE)
-      lines <- c(lines, paste(substring(fs, nchar(br) + 2L), fi$size, as.integer(fi$mtime), sep = "\t"))
+      fs <- c(file.path(pd, "program.sas"), list.files(file.path(pd, "data"), recursive = TRUE, full.names = TRUE,
+                                                       all.files = TRUE))
+      md <- ifelse(file.exists(fs), unname(tools::md5sum(fs)), "<missing>")
+      lines <- c(lines, paste(normalizePath(br), substring(fs, nchar(br) + 2L), md, sep = "\t"))
     }
   }
   if (isTRUE(info$root)) {
     rd <- paste0(sub("/.*$", "", rel), "/_root/")
     s2 <- startsWith(ix$path, rd)
-    lines <- c(lines, paste(ix$path[s2], ix$size[s2], ix$mtime[s2], sep = "\t"))
+    lines <- c(lines, paste(ix$path[s2], ix$md5[s2], sep = "\t"))
   }
   paste(lines, collapse = "\n")
 }
@@ -622,10 +645,23 @@ imp_select <- function(ch, map, units, hashes, fingerprint) {
 # closures: a function whose body and formals are unchanged reuses its
 # compiled version (a full compile takes about 25 s per R process; sources are
 # compared without srcrefs).
+# Cache file of the compiled closures: per R version, NAMESPACE (imports
+# change what a name resolves to, and the compiler inlines base functions) and
+# the set of names in the namespace (a new definition named like a base
+# function changes the inlining of every caller).
+imp_compile_cache_file <- function(ns, cache, namespace_file = file.path(getNamespaceInfo(ns, "path"), "NAMESPACE")) {
+  nsf <- if (file.exists(namespace_file)) unname(tools::md5sum(namespace_file)) else "-"
+  tf <- tempfile()
+  on.exit(unlink(tf))
+  writeLines(sort(ls(ns, all.names = TRUE), method = "radix"), tf)
+  file.path(cache, paste0("compiled_", gsub("[^A-Za-z0-9.]", "_", R.version.string), "_", substr(nsf, 1L, 12L), "_",
+                          substr(unname(tools::md5sum(tf)), 1L, 12L), ".rds"))
+}
+
 imp_compile <- function() {
   ns <- asNamespace("sasonr")
   cache <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
-  cf <- file.path(cache, paste0("compiled_", gsub("[^A-Za-z0-9.]", "_", R.version.string), ".rds"))
+  cf <- imp_compile_cache_file(ns, cache)
   old <- if (file.exists(cf)) tryCatch(readRDS(cf), error = function(e) list()) else list()
   new <- list()
   changed <- 0L
@@ -649,4 +685,61 @@ imp_compile <- function() {
     file.rename(tmp, cf)
   }
   invisible(changed)
+}
+
+# ---- strict-gate derivation helpers (tools/run_conformance.R) ----------------------------
+
+# Is a strict gate caught by sasonr itself (error recovery), given the call
+# stack at the gate?  `calls`, `parents`: sys.calls() / sys.parents() at the
+# gate.  Frames below sas_run / engine_run_partial whose call is a known
+# catcher (also namespace-qualified: base::tryCatch, rlang::try_fetch) with an
+# error handler, a call through do.call / exec / Recall, or a call whose head
+# is not a name (an anonymous function, f()(), x[["f"]]()) count as caught:
+# the runner then reruns the case in strict mode instead of deriving its
+# verdict.
+imp_gate_catch <- c("error", "condition", "sasonr_unsupported", "sasonr_not_verified", "sasonr_error", "rlang_error",
+                    "simpleError")
+imp_gate_caught <- function(calls, parents) {
+  # the function name of a call head: f, pkg::f, pkg:::f, obj$f; NA for any
+  # other head (an anonymous function, f()(), x[["f"]](), ...)
+  head_name <- function(h) {
+    if (is.symbol(h)) return(as.character(h))
+    if (is.call(h) && length(h) == 3L && is.symbol(h[[1]]) && as.character(h[[1]]) %in% c("::", ":::", "$", "@") &&
+        is.symbol(h[[3]])) return(as.character(h[[3]]))
+    NA_character_
+  }
+  nm <- vapply(calls, function(cl) head_name(cl[[1]]), "")
+  b <- which(nm %in% c("sas_run", "engine_run_partial"))
+  if (!length(b)) return(TRUE)
+  b <- b[1]
+  for (i in seq_along(calls)) {
+    if (i <= b) next
+    if (is.na(nm[i])) return(TRUE)
+    if (nm[i] %in% c("try", "try_fetch", "safely", "possibly", "quietly", "do.call", "Recall", "exec", "inject")) return(TRUE)
+    if (nm[i] %in% c("tryCatch", "withCallingHandlers")) {
+      h <- setdiff(names(calls[[i]]), c("", "expr", "finally"))
+      if (nm[b] == "engine_run_partial" && parents[i] == b) next
+      if (any(h %in% imp_gate_catch)) return(TRUE)
+    }
+  }
+  FALSE
+}
+
+# Is a matrix block free of effects on the later blocks?  A block is one DATA
+# step whose only output is its own data set; anything else (macro
+# statements, CALL SYMPUT/EXECUTE, OPTIONS, PROC steps, LIBNAME/FILENAME,
+# TITLE/FOOTNOTE, ODS, a SET/MERGE/UPDATE/MODIFY of another data set, ...) can
+# change what the later blocks see.  In strict mode a gated block ends its
+# segment and the next block starts a new SAS session, so a verdict derived
+# from the strict = FALSE run of the whole program is only valid when every
+# block is free of such effects.
+imp_block_pure <- function(lines) {
+  x <- tolower(trimws(lines))
+  x <- x[nzchar(x) & !grepl("^%put @@(begin|end) ", x)]
+  if (!length(x) || !grepl("^data\\s", x[1]) || !any(grepl("^run;", x))) return(FALSE)
+  bad <- c("^%", "%let\\b", "%global\\b", "%sysexec\\b", "call\\s+(symput|symputx|symputn|execute)\\b",
+           "^options\\b", "^proc\\b", "^libname\\b", "^filename\\b", "^title", "^footnote", "^ods\\b", "^x\\s",
+           "^dm\\s", "^(set|merge|update|modify)\\b", ";\\s*(set|merge|update|modify)\\b", "^%include\\b",
+           "^data\\s.*;.*\\bdata\\s")
+  !any(vapply(bad, function(p) any(grepl(p, x, perl = TRUE)), TRUE))
 }
