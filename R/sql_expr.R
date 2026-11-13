@@ -87,6 +87,8 @@ sql_ctx <- function(eng, rel, outer = NULL, items = NULL, allow_alias = FALSE) {
   ctx$qt$used_outer <- FALSE
   ctx$calc_stack <- character()
   ctx$env <- new.env(parent = asNamespace("sasonr"))
+  # EXIST() looks up WORK members (codegen: sas_f_exist(..., work))
+  ctx$env$work <- eng$wenv
   ctx$st <- new_state(list())
   ctx$st$context <- "sql"
   for (c in rel$cols) reg_var(ctx$st, c$id, c$type, if (c$type == "char") c$len else NA_integer_, disp = c$disp)

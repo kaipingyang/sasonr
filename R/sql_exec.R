@@ -33,6 +33,10 @@ sql_table_rel <- function(src, eng, outer) {
     # committed); a missing member fails loud inside sashelp_member()
     d <- sashelp_member(name, src$line)
     m <- meta_from_df(d)
+    sm <- attr(d, "sashelp_meta")
+    # the declared lengths of the SASHELP columns (DICTIONARY.COLUMNS), not
+    # the longest value
+    if (!is.null(sm)) for (i in seq_len(nrow(sm))) m$len[[tolower(sm$name[i])]] <- as.integer(sm$length[i])
     o <- src$options
   } else {
     if (!is.null(eng$views[[name]])) {
