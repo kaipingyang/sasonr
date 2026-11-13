@@ -1035,18 +1035,28 @@ read_char_field <- function(s, fmt, keep_lead = FALSE) {
   out
 }
 
-# $HEXw.: two hex digits per byte, so w gives w/2 bytes of output.  An odd or
-# non-hex field is invalid data, as in SAS.
-read_hex_field <- function(s, fmt) {
+# $HEXw.: two hex digits per byte, so w gives w/2 bytes of output; an odd
+# number of digits is completed with 0.  A non-hex field is invalid data: the
+# INPUT function gives a blank, _ERROR_ and "Invalid argument to function
+# INPUT" without the mathematical-operations NOTE (SAS 9.4 TS1M7 gold:
+# fmt_matrix/HEXC_IN).  list(v, ok).
+hex_field <- function(s, fmt) {
   w <- fmt$w
   if (is.na(w)) w <- nchar(strip_both(s))
   t <- substr(sub("^ +", "", s), 1L, w)
   if (nchar(t) %% 2L == 1L) t <- paste0(t, "0")
-  if (!grepl("^[0-9A-Fa-f]*$", t)) return("")
-  if (!nzchar(t)) return("")
+  if (!grepl("^[0-9A-Fa-f]*$", t)) return(list(v = "", ok = FALSE))
+  if (!nzchar(t)) return(list(v = "", ok = TRUE))
   hi <- strtoi(substring(t, seq(1L, nchar(t), by = 2L), seq(2L, nchar(t), by = 2L)), 16L)
-  out <- rawToChar(as.raw(hi))
-  out
+  list(v = rawToChar(as.raw(hi)), ok = TRUE)
+}
+
+# the INPUT statement: invalid $HEX data is not verified there (only the
+# INPUT function is), so it fails loud
+read_hex_field <- function(s, fmt) {
+  r <- hex_field(s, fmt)
+  if (!r$ok) abort_unsupported("invalid data for the $HEX informat in an INPUT statement (not verified against SAS)")
+  r$v
 }
 
 apply_user_invalue <- function(s, uf) {
@@ -1091,6 +1101,7 @@ apply_user_invalue <- function(s, uf) {
 sas_informat_read <- function(s, fmt, keep_lead = FALSE) {
   uf <- user_fmt(fmt$name, fmt$char, "invalue")
   if (!is.null(uf)) return(apply_user_invalue(s, uf))
+  if (fmt$char && fmt$name == "hex") return(hex_field(s, fmt))
   if (fmt$char) return(list(v = read_char_field(s, fmt, keep_lead), ok = TRUE))
   read_num_field(s, fmt)
 }
@@ -1149,7 +1160,8 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
   if (bad && qq != "??") {
     rt_error(if (qq == "?") NULL else paste0("NOTE: Invalid argument to function INPUT", at_text(.at), "."))
     # SAS also lists the call in the "Mathematical operations could not be performed" NOTE
-    if (qq == "" && !is.null(.at)) rt_count("math", .at)
+    # (not for a character informat: $HEX, fmt_matrix/HEXC_IN)
+    if (qq == "" && !is.null(.at) && !is_char) rt_count("math", .at)
   }
   if (is_char && !is.na(w)) vals <- sas_char(vals, w)
   vals

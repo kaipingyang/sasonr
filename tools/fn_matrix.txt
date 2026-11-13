@@ -418,6 +418,24 @@ divide(.A, 2)
 divide(1, .)
 divide(.A, 0)
 
+## EXIST nogeneric
+glob: data work.present; x = 1; run;
+exist('work.present')
+exist('work.absent')
+exist('present')
+exist('WORK.PRESENT')
+exist('work.present ')
+exist('work.present', 'DATA')
+exist('work.present', 'data')
+exist('work.absent', 'DATA')
+exist('work.present', 'ANY')
+exist('sashelp.class')
+exist('sashelp.class', 'DATA')
+exist(s) ;; length s $20; s = 'work.present';
+exist(s) ;; length s $20; s = '  work.present';
+sql: exist('work.present')
+sysfunc: %sysfunc(exist(work.present))
+
 ## EXP
 exp(709)
 exp(710)

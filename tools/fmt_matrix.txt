@@ -365,6 +365,10 @@ widths: 10
 values: 3FF0000000000000 | 4059000000000000 | FF | XYZ
 widths: 16 2 8
 
+## HEXC_IN informat C $HEX
+values: 414243 | 6162 | 41 | 4 | ZZ | 4G | \s41
+widths: _ 2 4 6 8
+
 ## DATE_IN informat N DATE
 values: 15MAR2024 | 15mar24 | 1MAR2024 | 32MAR2024 | 15MAR1959 | 15-MAR-2024 | 29FEB2023 | abc
 widths: _ 9 11

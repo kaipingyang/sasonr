@@ -559,7 +559,7 @@ sas_exist_one <- function(nm, type, .work, .at) {
   if (lib == "sashelp") {
     # a member missing from the local SASHELP export may still exist in SAS:
     # not knowable here, so only an exported member answers (1)
-    if (file.exists(file.path(sashelp_dir(), paste0(mem, ".rds")))) return(1)
+    if (sashelp_has(mem)) return(1)
     abort_unsupported(paste0("EXIST('SASHELP.", toupper(mem), "'): the member is not in the local SASHELP export ",
                              "(whether SAS has it is not known here)"))
   }

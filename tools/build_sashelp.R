@@ -1,4 +1,5 @@
-# Build the local SASHELP store used at run time.
+# Build the local SASHELP store used at run time (optional: sasonr also reads
+# <member>.sas7bdat + <member>_meta.csv directly, R/sashelp.R).
 #
 # The SAS data sets are exported from the local SAS installation into
 # inst/sashelp/ (that directory is in .gitignore: the members belong to the SAS
@@ -19,35 +20,18 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 dir <- if (length(args)) args[1] else file.path("inst", "sashelp")
-if (!requireNamespace("haven", quietly = TRUE)) stop("build_sashelp needs haven")
-
-read_meta <- function(path) {
-  m <- utils::read.csv(path, stringsAsFactors = FALSE, colClasses = "character")
-  m$length <- as.integer(m$length)
-  m
-}
+suppressMessages(devtools::load_all(".", quiet = TRUE, helpers = FALSE))
+read_member <- get("sashelp_read_sas7bdat", asNamespace("sasonr"))
 
 for (ds in list.files(dir, pattern = "\\.sas7bdat$", full.names = TRUE)) {
   member <- tolower(sub("\\.sas7bdat$", "", basename(ds)))
   meta_file <- file.path(dir, paste0(member, "_meta.csv"))
-  d <- haven::read_sas(ds)
-  names(d) <- tolower(names(d)) # SAS names are case insensitive
-  if (file.exists(meta_file)) {
-    m <- read_meta(meta_file)
-    m <- m[tolower(m$name) %in% tolower(names(d)), , drop = FALSE]
-    # SAS pads character values to the declared length; restore the padding so
-    # that LENGTH()/SUBSTR()/comparisons behave as in SAS
-    for (i in seq_len(nrow(m))) {
-      v <- tolower(m$name[i])
-      if (m$type[i] != "char") next
-      x <- d[[v]]
-      pad <- pmax(0L, m$length[i] - nchar(x))
-      d[[v]] <- ifelse(is.na(x), NA_character_,
-                       paste0(x, vapply(pad, function(k) strrep(" ", k), "")))
-    }
-    names(d) <- tolower(names(d))
-    attr(d, "sashelp_meta") <- m
+  # without the column attributes the declared lengths are unknown: skip
+  if (!file.exists(meta_file)) {
+    cat(sprintf("%-14s skipped (no %s)\n", member, basename(meta_file)))
+    next
   }
+  d <- read_member(ds, meta_file, member)
   out <- file.path(dir, paste0(member, ".rds"))
   saveRDS(d, out, version = 2)
   cat(sprintf("%-14s %4d rows  -> %s\n", member, nrow(d), basename(out)))
