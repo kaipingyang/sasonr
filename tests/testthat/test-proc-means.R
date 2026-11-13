@@ -36,11 +36,9 @@ test_that("default statistics and the listing of one analysis variable", {
     "N Mean Std Dev Minimum Maximum", strrep("-", 65),
     "5 30.0000000 15.8113883 10.0000000 50.0000000", strrep("-", 65)
   ))
-  # TS1M2 never prints the N field narrower than two columns
-  # (cases/ts1m2/proc/zero_sign): a 66-column table
-  withr::local_options(sasonr.sas_version = "TS1M2")
-  res2 <- run_approx(paste(means_data, "proc means data=d; var x; run;"))
-  expect_equal(squish(res2$listing)[4], strrep("-", 66))
+  # the 2-column N field of cases/ts1m2/proc/zero_sign comes from its BY
+  # groups (the data set has 13 observations), in both releases
+  # (test-review-dc6d010.R)
 })
 
 test_that("OUTPUT OUT= with CLASS: _TYPE_ numbering, _FREQ_, missing class values excluded", {

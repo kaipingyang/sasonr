@@ -1,11 +1,8 @@
-# SASHELP members in PROC SQL.  The data are exported from the local SAS
-# installation into inst/sashelp/ (see tools/build_sashelp.R); that directory
-# is in .gitignore, so these tests skip when the export is absent.
+# SASHELP members in PROC SQL.  The data are copied from the local SAS
+# installation into inst/sashelp/ (R/sashelp.R); that directory is in
+# .gitignore and .Rbuildignore, so these tests skip when the copy is absent.
 
-has_sashelp <- function(member) {
-  d <- system.file("sashelp", package = "sasonr")
-  nzchar(d) && file.exists(file.path(d, paste0(member, ".rds")))
-}
+has_sashelp <- function(member) sasonr:::sashelp_has(member)
 
 test_that("PROC SQL reads a SASHELP member", {
   skip_if_not(has_sashelp("class"), "inst/sashelp not exported")

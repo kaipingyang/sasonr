@@ -52,8 +52,8 @@ test_that("HIGH 2: functions whose log differed from SAS (MDY, PRXCHANGE, PRXMAT
   withr::with_options(list(sasonr.sas_version = "TS1M2"),
                       expect_error(sas_run("%let x = %sysfunc(mdy(2, 30, 2024));", on_error = "abort"),
                                    class = "sasonr_unsupported"))
-  r2 <- sas_run("data one; x = 1; run;
-    proc sql; create table t as select mdy(2, 30, 2024) as d from one; quit;")
+  r2 <- withr::with_options(list(sasonr.step_notes = TRUE), sas_run("data one; x = 1; run;
+    proc sql; create table t as select mdy(2, 30, 2024) as d from one; quit;"))
   expect_true(any(grepl("^NOTE: Invalid argument to function MDY\\. Missing values may be generated\\.$", r2$log)))
   expect_true(is.na(r2$work$t$d))
   # PRXMATCH / PRXCHANGE: an invalid pattern (SAS writes the Perl diagnostic) now fails loud

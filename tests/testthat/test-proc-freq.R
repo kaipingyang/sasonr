@@ -450,37 +450,54 @@ proc freq data=z; weight w / zeros; tables a*b / chisq; run;")
   expect_false(any(grepl("^Chi-Square ", res$listing)))
 })
 
-test_that("CHISQ, FISHER, CMH and BINOMIAL agree with reference computations", {
-  # CMH and BINOMIAL are unverified against SAS: strict off, their warnings expected
-  withr::local_options(sasonr.strict = FALSE)
-  res <- withCallingHandlers(sas_run(paste(freq_data, "proc freq data=d noprint; tables trt*resp / chisq; weight n;
-    output out=c chisq; run;
-    proc freq data=d noprint; tables s*trt*resp / cmh; weight n; output out=m cmh; run;")),
-    sasonr_unverified = function(w) invokeRestart("muffleWarning"))
-  tb <- matrix(c(13, 20, 19, 9), 2, dimnames = list(c("A", "B"), c("N", "Y")))
-  ref <- suppressWarnings(stats::chisq.test(tb, correct = FALSE))
-  ref_aj <- stats::chisq.test(tb, correct = TRUE)
-  c1 <- res$work$c
-  expect_equal(c1$`_pchi_`, unname(ref$statistic))
-  expect_equal(c1$p_pchi, ref$p.value)
-  expect_equal(c1$`_ajchi_`, unname(ref_aj$statistic))
-  e <- outer(rowSums(tb), colSums(tb)) / sum(tb)
-  expect_equal(c1$`_lrchi_`, 2 * sum(tb * log(tb / e)))
-  expect_equal(c1$`_mhchi_`, (sum(tb) - 1) / sum(tb) * unname(ref$statistic))
-  expect_equal(abs(c1$`_phi_`), sqrt(unname(ref$statistic) / sum(tb)))
-  arr <- array(c(12, 6, 5, 9, 7, 3, 8, 11), c(2, 2, 2))
-  mh <- stats::mantelhaen.test(arr, correct = FALSE)
-  expect_equal(res$work$m$`_cmhga_`, unname(mh$statistic))
-  expect_equal(res$work$m$`_cmhcor_`, unname(mh$statistic))
-  st <- sasonr:::freq_fisher(tb)
-  expect_equal(st$xp2, stats::fisher.test(tb)$p.value)
-  expect_equal(st$xpl, stats::fisher.test(tb, alternative = "less")$p.value)
-  b <- sasonr:::freq_binomial(c(7, 13))
-  ci <- stats::binom.test(7, 20)$conf.int
-  expect_equal(as.numeric(b$cl$exact), as.numeric(ci))
-  expect_equal(b$bin, 0.35)
-  half <- 1.959963984540054 * sqrt(0.35 * 0.65 / 20)
-  expect_equal(as.numeric(b$cl$wald), c(0.35 - half, 0.35 + half))
+test_that("CHISQ, FISHER, CMH and BINOMIAL print the SAS 9.4 (TS1M7) values", {
+  # the printed lines below are copied from the SAS gold listings of
+  # freq_stats/c01_w22_chisq, c51_cmh_2x2x3 and c41_bin_exact (strict mode:
+  # the statistics are verified in the TS1M7 registry)
+  # (compared with runs of blanks squished, as the conformance listing layer does)
+  has <- function(res, lines) for (l in lines) expect_true(squish(l) %in% squish(res$listing), info = l)
+  r1 <- sas_run("data d; input trt $ resp $ cnt; datalines;
+A Yes 12
+A No 5
+B Yes 7
+B No 15
+;
+proc freq data=d; weight cnt; tables trt*resp / chisq; run;")
+  has(r1, c("Chi-Square                     1      5.7696    0.0163",
+            "Likelihood Ratio Chi-Square    1      5.9211    0.0150",
+            "Continuity Adj. Chi-Square     1      4.3221    0.0376",
+            "Mantel-Haenszel Chi-Square     1      5.6217    0.0177",
+            "Phi Coefficient                      -0.3846",
+            "Left-sided Pr <= F          0.0182",
+            "Two-sided Pr <= P           0.0248"))
+  r2 <- sas_run("data d; input site $ trt $ resp $ cnt; datalines;
+S1 A Yes 10
+S1 A No 5
+S1 B Yes 6
+S1 B No 9
+S2 A Yes 7
+S2 A No 7
+S2 B Yes 4
+S2 B No 11
+S3 A Yes 12
+S3 A No 3
+S3 B Yes 9
+S3 B No 6
+;
+proc freq data=d; weight cnt; tables site*trt*resp / cmh; run;")
+  has(r2, c("1        Nonzero Correlation        1      5.0567    0.0245",
+            "3        General Association        1      5.0567    0.0245",
+            "Odds Ratio                  Mantel-Haenszel        0.3557        0.1450        0.8730",
+            "Chi-Square          0.0121"))
+  r3 <- sas_run("data d; input resp $ cnt; datalines;
+Yes 13
+No 27
+;
+proc freq data=d; weight cnt; tables resp / binomial(p=0.3 level='Yes'); exact binomial; run;")
+  has(r3, c("Proportion (P)               0.3250",
+            "95% Lower Conf Limit         0.1857",
+            "Z                            0.3450",
+            "Two-sided = 2 * One-sided    0.8456"))
 })
 
 test_that("listing of statistics and fail-loud surfaces", {

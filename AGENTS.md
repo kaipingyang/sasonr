@@ -54,9 +54,11 @@ local gold goes under `cases/ts1m2` with the same case id.
 # load and test (one R process at a time)
 & 'D:\R\R-4.4.2\bin\Rscript.exe' -e "pkgload::load_all('E:/dsh/sasonr'); testthat::test_dir('E:/dsh/sasonr/tests/testthat')"
 
-# the whole suite in parallel worker processes (one test file per worker batch)
-& 'D:\R\R-4.4.2\bin\Rscript.exe' 'tools/run_tests.R'
-& 'D:\R\R-4.4.2\bin\Rscript.exe' 'tools/run_tests.R' --jobs 4 --filter means
+# NOT for the shared Linux development machine (one R process at a time,
+# see "Working with other agents"): tools/run_tests.R starts up to 6 PSOCK
+# worker processes.  Use it only on a machine where several R processes are
+# allowed; it is not part of testthat, R CMD check or CI.
+# & 'D:\R\R-4.4.2\bin\Rscript.exe' 'tools/run_tests.R' --jobs 4 --filter means
 
 # single test file
 & 'D:\R\R-4.4.2\bin\Rscript.exe' -e "pkgload::load_all('E:/dsh/sasonr'); testthat::test_file('E:/dsh/sasonr/tests/testthat/test-proc.R')"

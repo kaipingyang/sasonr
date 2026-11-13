@@ -1,4 +1,6 @@
 # Run the testthat suite in parallel worker processes.
+# Not for the shared Linux development machine (one R process at a time):
+# it starts several worker processes.  Not part of testthat, R CMD check or CI.
 #
 # The test files are independent, so they can run in separate R sessions.  Each
 # worker loads the package once and then runs its whole batch of files in a

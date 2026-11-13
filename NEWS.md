@@ -1,5 +1,29 @@
 # sasonr (development version)
 
+## Review of the merge (2026-11-13)
+
+* PROC SQL function NOTEs have one path again: several NOTEs, or a NOTE in a
+  form not verified for PROC SQL, fail loud instead of being rewritten.
+* PROC FREQ `EXPECTED`, `DEVIATION` and `CELLCHI2` go through the statistics
+  registry of the selected SAS release (TS1M2: not verified, fail loud).
+* New TS1M7 gold for rules first measured on TS1M2: PROC MEANS default
+  decimals, the sign of zero in SUM/MEAN/MIN/MAX and the panel layout at
+  LINESIZE= 64 to 200. The N field of a PROC MEANS table with BY groups is as
+  wide as the number of observations of the data set (both releases); with
+  CLASS variables or missing values that case fails loud.
+* `INTCK`/`INTNX` with `WEEKDAY`, `TENDAY` and `SEMIMONTH` run only in their
+  verified form (no multiplier, shift index, DT prefix, method or alignment
+  argument); other forms fail loud.
+* The `SUBSTR` statement (left of `=`) is gated by the feature registry as its
+  own context of `SUBSTR`.
+* `EXIST()` and the `$HEX` informat have TS1M7 verification matrices; `$HEX`
+  writes the INPUT NOTE and sets `_ERROR_` for invalid hexadecimal data, and
+  `EXIST()` works in PROC SQL.
+* SASHELP members are read from the local copy (`<member>.sas7bdat` with its
+  column attributes in `<member>_meta.csv`, or a built `.rds`) in a
+  development tree or from `options(sasonr.sashelp_dir)`; a member without its
+  column attributes fails loud.
+
 ## Merge of the `dev` line (2026-11-13): two SAS releases
 
 The two development lines are merged. Their gold standards come from two
@@ -17,8 +41,7 @@ follows the one selected with `options(sasonr.sas_version = "TS1M7")`
   PROC MEANS moments use fused multiply-adds in TS1M7 and plain arithmetic in
   TS1M2 (CSS, USS ...; the TS1M2 kernel is verified without WEIGHT/FREQ and
   fails loud elsewhere); a subnormal numeric literal is an ERROR in TS1M7 and
-  a value in TS1M2; the PROC MEANS N field is at least two columns wide in
-  TS1M2 only; %SYSFUNC with an invalid argument writes no WARNING in TS1M7.
+  a value in TS1M2; %SYSFUNC with an invalid argument writes no WARNING in TS1M7.
   PROC FREQ RELRISK / RISKDIFF print other labels and exact limits in TS1M2:
   only the TS1M7 listing is implemented, TS1M2 fails loud.
 * **MAXDEC=** uses the w.d display engine (as the TS1M2 probe showed): the

@@ -120,41 +120,32 @@ data d;
   c = intck('tenday', '09JAN2020'd, '11JAN2020'd);
   e = intnx('weekday', '17JAN2020'd, 1);
   f = intnx('tenday', '15FEB2020'd, 1);
-  g = intnx('semimonth', '20JAN2020'd, 1);
 run;")
   expect_equal(res$work$d$a, 1)       # Fri -> Mon crosses one weekday
   expect_equal(res$work$d$b, 1)       # 14th (1-15) -> 16th (16-end)
   expect_equal(res$work$d$c, 1)       # 9th (1-10) -> 11th (11-20)
   expect_equal(res$work$d$e, 21934)   # Fri 17 Jan 2020 + 1 weekday = Mon 20 Jan
   expect_equal(res$work$d$f, 21966)   # 15 Feb -> start of 21-29 block
-  expect_equal(res$work$d$g, 21946)   # 20 Jan -> start of 1-15 block of February
 })
-test_that("EXIST() reports WORK and SASHELP members", {
-  # no verification matrix yet: gated in strict mode
-  expect_error(sas_run("data a; e = exist('work.a'); run;"), class = "sasonr_not_verified")
-  withr::local_options(sasonr.strict = FALSE)
+test_that("EXIST() reports WORK and SASHELP members (SAS 9.4 TS1M7 gold)", {
+  # fn_matrix/EXIST and semantics/exist_function: 1 / 0 as SAS returns them
   res <- sas_run("data work.present; x = 1; run;
 data work.check;
   e1 = exist('work.present');
   e2 = exist('work.absent');
   e3 = exist('present');
   e4 = exist('work.present', 'DATA');
+  e5 = exist('WORK.PRESENT');
+  e6 = exist('work.present', 'ANY');
 run;")
-  expect_equal(res$work$check$e1, 1)
-  expect_equal(res$work$check$e2, 0)
-  expect_equal(res$work$check$e3, 1)
-  expect_equal(res$work$check$e4, 1)
-  # a member of SASHELP (inst/sashelp) and an absent one
-  # a member missing from the local export fails loud (SAS may have it)
+  expect_identical(unlist(res$work$check), c(e1 = 1, e2 = 0, e3 = 1, e4 = 1, e5 = 1, e6 = 0))
+  # PROC SQL (EXIST_e51cd6)
+  r2 <- sas_run("data work.present; x = 1; run; proc sql; create table t as select exist('work.present') as e from present; quit;")
+  expect_identical(r2$work$t$e, 1)
+  # SASHELP members answer only from the local store (EXIST_4b3ce7 where it is present)
+  if (sasonr:::sashelp_has("class")) expect_identical(sas_run("data c; e = exist('sashelp.class'); run;")$work$c$e, 1)
+  # a member missing from the local store fails loud (SAS may have it)
   expect_error(sas_run("data c; f = exist('sashelp.nope'); run;", on_error = "abort"), class = "sasonr_unsupported")
-  if (file.exists(file.path(sasonr:::sashelp_dir(), "class.rds"))) {
-    res2 <- sas_run("data c; e = exist('sashelp.class'); run;")
-    expect_equal(res2$work$c$e, 1)
-  }
-  # SAS: an explicit TYPE='ANY' is not a valid member type and returns 0
-  res3 <- sas_run("data c; e = exist('work.present', 'ANY'); f = exist('work.absent', 'ANY'); run;")
-  expect_equal(res3$work$c$e, 0)
-  expect_equal(res3$work$c$f, 0)
   # unverified shapes fail loud instead of guessing
   expect_error(sas_run("data c; e = exist('other.ds'); run;"), class = "sasonr_unsupported")
   expect_error(sas_run("data c; e = exist('work.x', 'VIEW'); run;"), class = "sasonr_unsupported")
