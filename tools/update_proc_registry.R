@@ -43,6 +43,11 @@ run_prog <- function(case) {
   code <- readLines(file.path(dir, "program.sas"), warn = FALSE, encoding = "latin1")
   tryCatch(suppressWarnings(sas_run(code)), error = function(e) e)
 }
+# every evidence case must carry gold of the release being rebuilt
+for (cs in cases) {
+  cv <- env$conf_meta_version(env$conf_read_meta(file.path(root, cs, "meta.yaml")))
+  if (cv != sas_version) stop(cs, " has SAS ", cv, " gold, not ", sas_version)
+}
 results <- list()
 whole <- list()
 for (cs in cases) {

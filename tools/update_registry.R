@@ -99,6 +99,9 @@ probe_rows <- list()
 for (pr in names(probe_calls)) {
   f <- file.path(root, "fn_probe", pr, "expected", "datasets", "p.sas7bdat")
   if (!file.exists(f)) next
+  # the probe's gold must come from the release being rebuilt
+  pv <- conf$conf_meta_version(conf$conf_read_meta(file.path(root, "fn_probe", pr, "meta.yaml")))
+  if (pv != sas_version) stop("fn_probe/", pr, " has SAS ", pv, " gold, not ", sas_version)
   P <- as.data.frame(haven::read_sas(f))
   for (col in names(probe_calls[[pr]])) {
     call <- probe_calls[[pr]][[col]]
@@ -204,7 +207,15 @@ fn_rows <- lapply(docs$name, function(nm) {
       f <- file.path(root, cs, "meta.yaml")
       if (!file.exists(f)) return("data")
       tg <- grep("^tags:", readLines(f, warn = FALSE), value = TRUE)
-      if (grepl("sysfunc", tg)) "sysfunc" else if (grepl("\\bsql\\b", tg)) "sql" else "data"
+      if (grepl("sysfunc", tg)) return("sysfunc")
+      if (grepl("\\bsql\\b", tg)) return("sql")
+      # the SUBSTR statement (left of =) in the setup of a SUBSTR pilot case
+      # (SUBSTR_033..035) is its own context ("statement", analyze.R)
+      if (NM == "SUBSTR") {
+        prog <- readLines(file.path(root, cs, "program.sas"), warn = FALSE, encoding = "latin1")
+        if (any(grepl(";\\s*substr\\([^;]*\\)\\s*=", prog, ignore.case = TRUE))) return("statement")
+      }
+      "data"
     }, "")
     rows$context[pil] <- tags
   }
@@ -213,13 +224,14 @@ fn_rows <- lapply(docs$name, function(nm) {
   n_data <- sum(rows$context %in% c("data", "datastep") & rows$area %in% c("fn_matrix", "functions"))
   rows$context[rows$context %in% c("datastep", "ce")] <- "data"
   s <- summarise(rows)
-  if (NM %in% env_fns) {
+  if (NM %in% env_fns && nrow(rows) > 0) {
+    # clock functions without any case of this release stay unverified
     s$status <- "not_comparable"
     s$note <- "the value depends on the session clock; only its type and range are compared"
   }
   # a context is verified when its cases pass (partial: pass or fail loud at the
   # runtime guard); clock-dependent functions: the contexts that have cases
-  ok_ctx <- vapply(c("data", "sysfunc", "sql"), function(k) {
+  ok_ctx <- vapply(c("data", "sysfunc", "sql", "statement"), function(k) {
     r <- rows[rows$context == k, , drop = FALSE]
     if (s$status == "not_comparable") return(nrow(r) > 0)
     nrow(r) > 0 && any(r$class == "pass") && all(r$class %in% c("pass", "unsupported"))
@@ -242,7 +254,7 @@ fn_rows <- lapply(docs$name, function(nm) {
     returns = if (is.null(spec)) (if (is.null(inv)) NA else c(N = "num", C = "char")[[inv$fnctype]]) else spec$type,
     result_length = len,
     sasonr_args = if (is.null(spec)) NA else sprintf("%s-%s", spec$min, if (is.infinite(spec$max)) "any" else spec$max),
-    contexts_verified = paste(c(c(data = "data", sysfunc = "sysfunc", sql = "sql")[ok_ctx], if (ok_where) "where"), collapse = " "),
+    contexts_verified = paste(c(c(data = "data", sysfunc = "sysfunc", sql = "sql", statement = "statement")[ok_ctx], if (ok_where) "where"), collapse = " "),
     impl = paste0("sas_f_", nm), status = s$status, cases = s$cases, pass = s$pass, approximate = s$approximate,
     unsupported = s$unsupported, mismatch = s$mismatch, note = s$note,
     domain = if (s$status != "partial") "" else if (NM %in% fn_domains$name) fn_domains$domain[fn_domains$name == NM][1] else
