@@ -324,8 +324,10 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
   session_add_work(session, work)
   on.exit(session$close(), add = TRUE)
   eng <- new_engine(session, level, execute = FALSE)
-  old <- sas_rt_active(session)
+  # restore the binding first, then bind (an interrupt in between leaves nothing bound)
+  old <- .active$session
   on.exit(sas_rt_active(old), add = TRUE)
+  sas_rt_active(session)
   engine_program(eng, code)
   structure(list(steps = eng$steps), class = "sasonr_translation")
 }
@@ -386,13 +388,18 @@ sas_run <- function(code, work = list(), level = c("auto", "L3"),
   } else {
     check_session(session)
   }
+  # a nested submission to the same session fails here, before anything changes
+  session_enter(session)
+  on.exit(session_leave(session), add = TRUE)
   session_add_work(session, work)
   eng <- new_engine(session, level, execute = TRUE)
   eng$on_error <- on_error
   eng$status <- "ok"
-  # bind the session for the generated code and the run-time helpers
-  old <- sas_rt_active(session)
+  # bind the session for the generated code and the run-time helpers (the
+  # restore is registered first: an interrupt in between leaves nothing bound)
+  old <- .active$session
   on.exit(sas_rt_active(old), add = TRUE)
+  sas_rt_active(session)
   on.exit(engine_flush(eng), add = TRUE)
   if (on_error == "sas") {
     # step ERRORs are handled by engine_exec(); a condition that reaches this
@@ -424,8 +431,9 @@ engine_run_partial <- function(code) {
   eng <- new_engine(session, "auto", execute = TRUE)
   eng$on_error <- "abort"
   eng$status <- "ok"
-  old <- sas_rt_active(session)
+  old <- .active$session
   on.exit(sas_rt_active(old), add = TRUE)
+  sas_rt_active(session)
   err <- tryCatch({
     engine_program(eng, code)
     NULL

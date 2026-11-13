@@ -68,6 +68,8 @@ SasSession <- R6::R6Class("SasSession",
     rt = NULL,
     # ct: Compile-time diagnostics of the step being translated.
     ct = NULL,
+    # busy: TRUE while a submission runs (a nested submission to the same session is refused).
+    busy = FALSE,
 
     # A new session with an empty WORK library and SAS default options.
     # `sas_version`: The SAS 9.4 release the session targets.
@@ -196,6 +198,35 @@ rt_linesize <- function() sas_rt_active()$options$linesize %||% 132L
 
 # The current NOTES/NONOTES setting.
 rt_notes_on <- function() isTRUE(sas_rt_active()$options$notes)
+
+# Start a submission on `session`.  A submission rebinds the session's macro
+# executor, line counter, PRXPARSE ids and log callbacks to its own engine, so
+# a second submission to the same session while one runs (sas_run() called
+# from code the first one runs) would write into the inner engine and leave
+# the outer one corrupted: it is refused before anything is changed.
+session_enter <- function(session) {
+  if (isTRUE(session$busy)) {
+    rlang::abort("A SAS session cannot run a submission while another submission to it is running.",
+                 class = "sasonr_error")
+  }
+  session$busy <- TRUE
+  invisible(session)
+}
+
+# End a submission: drop the per-submission closures (they hold the engine of
+# the submission) and release the session.
+session_leave <- function(session) {
+  m <- session$macro
+  m$exec <- NULL
+  m$on_put <- NULL
+  m$frames <- list()
+  rt <- session$rt
+  rt$on_warn <- NULL
+  rt$on_error <- NULL
+  rt$on_note <- NULL
+  session$busy <- FALSE
+  invisible(session)
+}
 
 # Add data frames to a session's WORK library (names lower-cased, character
 # columns padded; the metadata keeps the original variable-name case).
