@@ -1,5 +1,25 @@
 # sasonr (development version)
 
+## Round 16.1: review of round 16 (2026-11-13)
+
+* A submission to a session that is already running one (a `sas_run()` called
+  from code the first submission runs) is refused instead of corrupting it.
+* No default session: function-layer calls outside `sas_run()` keep no
+  hidden state. PRXPARSE ids need `session =` (`sas_f_prxparse(re,
+  session = s)`); pattern texts work without one.
+* `OPTIONS CENTER`, `DATE`, `NUMBER`, `FORMDLIM=` and a finite `PAGESIZE=`
+  are kept in the session; procedure output written under a layout other
+  than SAS's `NOCENTER NODATE NONUMBER FORMDLIM=' ' PAGESIZE=MAX` listing
+  fails loud.
+* Explicit exports: the user API (211 functions) plus the run-time helpers
+  translated code calls (internal); other helpers are no longer exported.
+* Missing-value NOTE places follow SAS 9.4 for `/`, `**` and the unary
+  minus: `**` and function results are not treated as generated missing
+  values.
+* Cross-submission behaviour without SAS evidence yet (syntax-check mode,
+  PRXPARSE numbering, log line numbers, PROC SQL left open) is documented as
+  provisional.
+
 ## Round 16: the SAS session object (2026-11-13)
 
 * **`sas_session()`**: a persistent SAS session. Successive
@@ -15,7 +35,7 @@
   before (every conformance verdict unchanged).
 * A run no longer leaves state behind for later function-layer calls (for
   example `OPTIONS LINESIZE=` or PRXPARSE ids of the last run); calls outside
-  a run use their own default session.
+  a run use their own default session (removed in round 16.1).
 
 ## Round 15.1: review of round 15 (2026-11-13)
 
