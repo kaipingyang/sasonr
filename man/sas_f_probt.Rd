@@ -9,6 +9,8 @@
 \item{df}{Degrees of freedom, a positive number.}
 
 \item{nc}{Optional noncentrality parameter, default 0 (central distribution); must be nonnegative.}
+
+\item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -21,7 +23,7 @@ t cumulative probability. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- approximate (15 of 38 SAS 9.4 cases agree bit for bit; 17 case(s) differ in the last bits (largest relative difference 3.0e-10; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (19 of 38 SAS 9.4 cases agree bit for bit; 13 case(s) differ in the last bits (largest relative difference 1.5e-15; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

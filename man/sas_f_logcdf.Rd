@@ -21,7 +21,7 @@ Logarithm of the CDF. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- approximate (25 of 39 SAS 9.4 cases agree bit for bit; 9 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (25 of 39 SAS 9.4 cases agree bit for bit; 9 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

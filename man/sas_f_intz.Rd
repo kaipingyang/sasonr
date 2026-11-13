@@ -17,7 +17,7 @@ Integer part, without fuzz. See the \href{https://documentation.sas.com/doc/en/l
 }
 
 \section{Verification}{
- verified (20 of 20 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (20 of 20 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

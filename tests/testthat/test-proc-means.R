@@ -1,8 +1,9 @@
 # These tests check the PROC MEANS computations and layouts.  Strict mode
-# stays on; the tests that request statistics which are `approximate` in the
-# PROC statistics registry (STD, VAR, CSS ...) run them through run_approx():
-# strict off for that one program, only its `sasonr_unverified` warnings
-# muffled (the gate itself is tested in test-stats-exact.R).
+# stays on; the tests that request statistics which are `approximate` or not
+# verified in the PROC statistics registry (SKEWNESS, quantile layouts ...) run
+# them through run_approx(): strict off for that one program, only its
+# `sasonr_unverified` warnings muffled (the gate itself is tested in
+# test-stats-exact.R).
 run_approx <- function(code, ...) {
   withr::with_options(list(sasonr.strict = FALSE), withCallingHandlers(
     sas_run(code, ...),
@@ -27,12 +28,19 @@ run;
 "
 
 test_that("default statistics and the listing of one analysis variable", {
-  res <- run_approx(paste(means_data, "proc means data=d; var x; run;"))
+  res <- sas_run(paste(means_data, "proc means data=d; var x; run;"))
+  # TS1M7: a single-digit count prints in a one-column N field (internal
+  # corpus, e.g. opensas/means_class_order)
   expect_equal(squish(res$listing), c(
     "The MEANS Procedure", "Analysis Variable : x",
     "N Mean Std Dev Minimum Maximum", strrep("-", 65),
     "5 30.0000000 15.8113883 10.0000000 50.0000000", strrep("-", 65)
   ))
+  # TS1M2 never prints the N field narrower than two columns
+  # (cases/ts1m2/proc/zero_sign): a 66-column table
+  withr::local_options(sasonr.sas_version = "TS1M2")
+  res2 <- run_approx(paste(means_data, "proc means data=d; var x; run;"))
+  expect_equal(squish(res2$listing)[4], strrep("-", 66))
 })
 
 test_that("OUTPUT OUT= with CLASS: _TYPE_ numbering, _FREQ_, missing class values excluded", {
@@ -59,7 +67,7 @@ test_that("CLASS / MISSING, NWAY, TYPES and WAYS select the combinations", {
 })
 
 test_that("FREQ and WEIGHT: weighted SUM / MEAN / VAR, frequencies count in N", {
-  res <- run_approx(paste(means_data, "proc means data=d noprint; var x; freq f;
+  res <- sas_run(paste(means_data, "proc means data=d noprint; var x; freq f;
     output out=a n=n sum=s mean=m; run;
     proc means data=d noprint; var x; weight w; output out=b n=n sum=s mean=m var=v sumwgt=sw stderr=se; run;"))
   expect_equal(unlist(res$work$a[c("_freq_", "n", "s", "m")]), c(`_freq_` = 8, n = 8, s = 240, m = 30))
@@ -83,7 +91,7 @@ test_that("quantiles follow QNTLDEF (default 5) and weighted percentiles", {
 })
 
 test_that("default OUT= is the _STAT_ long form; AUTONAME and empty names", {
-  res <- run_approx(paste(means_data, "proc means data=d noprint; var x w; output out=o; run;
+  res <- sas_run(paste(means_data, "proc means data=d noprint; var x w; output out=o; run;
     proc means data=d noprint; var x; output out=a mean= max= / autoname; run;
     proc means data=d noprint; var x w; output out=b mean=; run;"))
   expect_equal(res$work$o$`_stat_`, c("N", "MIN", "MAX", "MEAN", "STD"))
@@ -93,9 +101,9 @@ test_that("default OUT= is the _STAT_ long form; AUTONAME and empty names", {
 })
 
 test_that("BY groups must be sorted; ID keeps the group maximum", {
-  expect_error(run_approx(paste(means_data, "proc means data=d noprint; by g; var x; output out=o; run;")),
+  expect_error(sas_run(paste(means_data, "proc means data=d noprint; by g; var x; output out=o; run;")),
                class = "sasonr_runtime_error")
-  res <- run_approx("data d; input id g $ x; datalines;
+  res <- sas_run("data d; input id g $ x; datalines;
 1 A 10
 2 A 20
 4 B 40
@@ -115,9 +123,112 @@ test_that("confidence limits, t and p values; MAXDEC in the listing", {
 
 test_that("PROC SUMMARY needs PRINT or OUTPUT; unsupported options fail loud", {
   d <- "data a; x = 1; run;"
-  expect_error(run_approx(paste(d, "proc summary data=a; var x; run;")), class = "sasonr_runtime_error")
-  expect_equal(squish(run_approx(paste(d, "proc summary data=a print; var x; run;"))$listing)[1], "The SUMMARY Procedure")
-  expect_error(run_approx(paste(d, "proc means data=a completetypes; var x; run;")), class = "sasonr_unsupported")
-  expect_error(run_approx(paste(d, "proc means data=a; var x; output out=o mean=m / levels; run;")), class = "sasonr_unsupported")
-  expect_error(run_approx(paste(d, "proc means data=a; zzz x; run;")), class = "sasonr_syntax_error")
+  expect_error(sas_run(paste(d, "proc summary data=a; var x; run;")), class = "sasonr_runtime_error")
+  expect_equal(squish(sas_run(paste(d, "proc summary data=a print; var x; run;"))$listing)[1], "The SUMMARY Procedure")
+  expect_error(sas_run(paste(d, "proc means data=a completetypes; var x; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(d, "proc means data=a; var x; output out=o mean=m / levels; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(d, "proc means data=a; zzz x; run;")), class = "sasonr_syntax_error")
+})
+
+# Printed-table geometry: every value field is FW= columns wide whatever the
+# value looks like, panels hold as many statistics as fit and the dashed rule is
+# exactly the table width.  All expected values below are SAS 9.4 TS1M2 output
+# for these exact programs (24 observations, so N prints in two columns).
+panel_data <- "
+data p;
+  length g $8;
+  do i = 1 to 24;
+    x = i / 7 + 0.125;
+    g = 'A'; if i > 12 then g = 'B';
+    output;
+  end;
+  drop i;
+run;
+"
+twelve <- "n mean std stderr min max median q1 q3 sum var cv"
+rules_of <- function(res) {
+  l <- squish(res$listing)
+  l[grepl("^-+$", l)]
+}
+# heading lines: everything except the dashed rules and the data rows (a value
+# row starts with a digit, '.' or '-' -- or with one of the two CLASS levels)
+heads_of <- function(res) {
+  l <- squish(res$listing)
+  l[!grepl("^[0-9.<-]", l) & !grepl("^[AB] ", l)]
+}
+
+test_that("twelve statistics print in two panels of 10 + 2 at LINESIZE=132", {
+  res <- sas_run(paste(panel_data, "proc means data=p", twelve, "; var x; run;"))
+  expect_equal(heads_of(res), c(
+    "The MEANS Procedure", "Analysis Variable : x", "Lower Upper",
+    "N Mean Std Dev Std Error Minimum Maximum Median Quartile Quartile Sum",
+    "Analysis Variable : x", "Coeff of", "Variance Variation"
+  ))
+  expect_equal(rules_of(res), c(rep(strrep("-", 128), 2L), rep(strrep("-", 28), 2L)))
+})
+
+test_that("MAXDEC= does not change the table geometry", {
+  res <- sas_run(paste(panel_data, "proc means data=p maxdec=0", twelve, "; var x; run;"))
+  expect_equal(rules_of(res), c(rep(strrep("-", 128), 2L), rep(strrep("-", 28), 2L)))
+  res4 <- sas_run(paste(panel_data, "proc means data=p maxdec=4", twelve, "; var x; run;"))
+  expect_equal(rules_of(res4), rules_of(res))
+})
+
+test_that("fewer statistics use wider gaps (16 columns apart, one panel)", {
+  res <- sas_run(paste(panel_data, "proc means data=p n mean std min max; var x; run;"))
+  expect_equal(rules_of(res), rep(strrep("-", 66), 2L))
+  res9 <- sas_run(paste(panel_data, "options linesize=200; proc means data=p", twelve, "; var x; run;"))
+  expect_equal(rules_of(res9), rep(strrep("-", 178), 2L))
+})
+
+test_that("LINESIZE= sets the panel width", {
+  res <- sas_run(paste(panel_data, "options linesize=100; proc means data=p", twelve, "; var x; run;"))
+  expect_equal(rules_of(res), c(rep(strrep("-", 100), 2L), rep(strrep("-", 60), 2L)))
+  expect_equal(heads_of(res), c(
+    "The MEANS Procedure", "Analysis Variable : x", "Lower",
+    "N Mean Std Dev Std Error Minimum Maximum Median Quartile",
+    "Analysis Variable : x", "Upper Coeff of", "Quartile Sum Variance Variation"
+  ))
+})
+
+test_that("CLASS tables repeat the fixed columns in every panel", {
+  res <- sas_run(paste(panel_data, "proc means data=p", twelve, "; class g; var x; run;"))
+  expect_equal(heads_of(res), c(
+    "The MEANS Procedure", "Analysis Variable : x", "N Lower Upper",
+    "g Obs N Mean Std Dev Std Error Minimum Maximum Median Quartile Quartile",
+    "Analysis Variable : x", "N Coeff of", "g Obs Sum Variance Variation"
+  ))
+  expect_equal(rules_of(res), c(rep(strrep("-", 129), 2L), rep(strrep("-", 59), 2L)))
+})
+
+test_that("undetermined panel layouts fail loud instead of printing a wrong rule", {
+  expect_error(sas_run(paste(panel_data, "proc means data=p fw=8 n mean std min max; var x; run;")),
+               class = "sasonr_unsupported")
+  # a CLASS column keeps its declared length; SAS narrows one that does not fit
+  expect_error(sas_run("data q; length c $200; do i = 1 to 10; c = 'A'; x = i; output; end; drop i; run;
+    proc means data=q n mean std stderr min max median q1 q3 sum var cv; class c; var x; run;"),
+               class = "sasonr_unsupported")
+})
+
+
+test_that("default decimals of the printed table (FW=12, no MAXDEC) follow the measured rule", {
+  # [gold] measured on TS1M2 (155 exactly known doubles):
+  # cases/ts1m2/rounding/means_default_decimals and
+  # docs/conformance/means_default_decimals_rule.md
+  n <- means_num_text
+  expect_identical(n(42, 12L, NULL), "42.0000000")
+  expect_identical(n(1.5, 12L, NULL), "1.5000000")
+  expect_identical(n(0, 12L, NULL), "0")
+  expect_identical(n(-1000.5, 12L, NULL), "-1000.50")
+  expect_identical(n(999.99999995, 12L, NULL), "1000.00")
+  expect_identical(n(12345.678, 12L, NULL), "12345.68")
+  expect_identical(n(99999999.9, 12L, NULL), "99999999.90")
+  expect_identical(n(999999999.9, 12L, NULL), "1000000000")
+  expect_identical(n(123456789012.9, 12L, NULL), "123456789013")
+  expect_identical(n(-123456789012.9, 12L, NULL), "-1.234568E11")
+  expect_identical(n(0.000123456, 12L, NULL), "0.000123456")
+  expect_identical(n(0.0009999999999, 12L, NULL), "0.001000000")
+  expect_identical(n(9.9999e-6, 12L, NULL), "9.9999E-6")
+  expect_identical(n(1e-10, 12L, NULL), "1E-10")
+  expect_identical(n(1.23456789e-100, 12L, NULL), "1.23457E-100")
 })

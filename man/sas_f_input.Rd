@@ -23,7 +23,7 @@ Reads a value with an informat. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- partial (40 of 43 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: informat $hex4.; SASHELP tables; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (41 of 43 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: SASHELP.CLASS (export it from SAS into inst/sashelp/); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{
@@ -55,6 +55,7 @@ Other special functions:
 \code{\link[=sas_f_bor]{sas_f_bor()}},
 \code{\link[=sas_f_brshift]{sas_f_brshift()}},
 \code{\link[=sas_f_bxor]{sas_f_bxor()}},
+\code{\link[=sas_f_exist]{sas_f_exist()}},
 \code{\link[=sas_f_inputc]{sas_f_inputc()}},
 \code{\link[=sas_f_inputn]{sas_f_inputn()}},
 \code{\link[=sas_f_missing]{sas_f_missing()}},

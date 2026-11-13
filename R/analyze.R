@@ -206,7 +206,9 @@ expr_type <- function(e, st) {
             a <- expr_type(e$args[[1]], st)
             w <- if (a$type == "char") a$len else 12L
           }
-          return(list(type = "char", len = as.integer(w)))
+          # $HEXw. yields w/2 bytes, every other character informat keeps w
+          len <- if (identical(e$fmt$name, "hex")) as.integer(w %/% 2L) else as.integer(w)
+          return(list(type = "char", len = len))
         }
         return(num)
       }
@@ -549,6 +551,28 @@ an_stmt <- function(s, st) {
       if (var_type(st, s$target$name) != "num" || expr_type(s$value, st)$type != "num") {
         abort_unsupported("sum statement on character values", line)
       }
+    },
+    substr_assign = {
+      if (is.null(st$info[[s$var]])) {
+        # an undeclared target is created with length 8 when the statement is
+        # compiled (SAS Functions and CALL Routines: "SUBSTR (left of =)");
+        # gold: cases/ts1m2/datastep/substr_undeclared (TS1M2 only)
+        if (sas_target_version() != "TS1M2") {
+          abort_unsupported(paste0("SUBSTR assignment to an undeclared variable for SAS 9.4 ", sas_target_version(),
+                                   " (no gold)"), line)
+        }
+        reg_var(st, s$var, "char", 8L, disp = s$var_text %||% s$var)
+      }
+      if (!identical(var_type(st, s$var), "char")) abort_unsupported("SUBSTR assignment to a numeric variable", line)
+      st$uses <- c(st$uses, s$var)
+      s$pos <- an_expr(s$pos, st)
+      if (!is.null(s$len)) s$len <- an_expr(s$len, st)
+      s$value <- an_expr(s$value, st)
+      if (!identical(expr_type(s$pos, st)$type, "num")) abort_unsupported("SUBSTR position must be numeric", line)
+      if (!is.null(s$len) && !identical(expr_type(s$len, st)$type, "num")) {
+        abort_unsupported("SUBSTR length must be numeric", line)
+      }
+      if (!identical(expr_type(s$value, st)$type, "char")) abort_unsupported("SUBSTR assignment of a numeric value", line)
     },
     "if" = {
       s$cond <- an_expr(s$cond, st)

@@ -125,7 +125,15 @@ round_family <- function(x, unit, mode, fname, .at = NULL, note = TRUE) {
   unit <- rep_len(as.numeric(unit), n)
   # missing arguments (special missing values included) give an ordinary missing
   out <- rep(NA_real_, n)
-  bad <- !is.na(unit) & unit <= 0
+  # SAS also rejects a unit that is not a normal double: ROUND(1, 2.3e-308) is
+  # 1 while ROUND(1, 2.2e-308) is ". " with "Argument 2 ... is invalid",
+  # because 2.2e-308 is subnormal (ROUNDE/ROUNDZ behave the same).
+  sub <- !is.na(unit) & unit > 0 & unit < .Machine$double.xmin
+  if (any(sub) && sas_target_version() != "TS1M2") {
+    # TS1M2 gold only (ROUND_047); TS1M7 rejects subnormal literals, a computed one is not verified
+    abort_unsupported(paste0(toupper(fname), " with a subnormal rounding unit (not verified for SAS 9.4 ", sas_target_version(), ")"))
+  }
+  bad <- !is.na(unit) & (unit <= 0 | sub)
   if (any(bad) && note) {
     # ROUND writes "Argument 2 ... is invalid"; ROUNDE/ROUNDZ only count the place (SAS 9.4)
     if (fname == "round") note_invalid_arg(fname, 2L, .at, list(x, unit), bad, numbered = TRUE) else note_math(.at, sum(bad))

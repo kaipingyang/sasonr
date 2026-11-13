@@ -30,6 +30,23 @@ knitr::kable(reg[, c("entry", "kind", "sas_behaviour", "r_default", "sasonr_stat
              col.names = c("Entry", "Kind", "SAS behaviour", "R default", "sasonr", "Cases", "Pass"))
 ```
 
-The list of entries is based on the semantics registry of the
-[sas2r](https://cran.r-project.org/package=sas2r) package (Apache License
-2.0); descriptions and statuses are maintained by sasonr.
+The list of entries was collected from published SAS 9.4 documentation and R
+documentation; the descriptions, the statuses and the cases behind them are
+sasonr's own.
+
+## Ordering of missing values
+
+The most common silent difference between SAS and R is sort order. SAS sorts
+numeric missing values in a fixed hierarchy that runs *before* every non-missing
+number, and reverses it under `DESCENDING`:
+
+| | ascending | descending |
+|---|---|---|
+| numeric | `._` < `.` < `.A` < … < `.Z` < any number (including `-1e300`) | the exact reverse |
+| character | blank < non-blank, compared byte by byte | the exact reverse |
+
+The character rule is byte collation, not the locale collation that
+`order()`/`sort()` use in R, so a translated sort cannot simply call
+`arrange()`. `PROC SORT`, the `BY` statement and the merge machinery all use
+this order; `tests/testthat/test-proc.R` pins it down.
+

@@ -17,7 +17,7 @@ Reverses a string. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (15 of 15 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

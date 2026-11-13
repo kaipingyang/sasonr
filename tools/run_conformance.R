@@ -17,7 +17,9 @@
 #                     the git commit BASE (default origin/main), see
 #                     tools/affected_cases.R; a change to a shared file (lexer,
 #                     parser, runtime core, runner) selects every case
-# ROOT defaults to tests/conformance.  Prints counts by area:
+# ROOT defaults to tests/conformance.  Each case runs for the SAS release of its
+# gold (meta.yaml `sas_version`: TS1M7, or TS1M2 for cases/ts1m2/ of the
+# private repository), see conf_meta_version().  Prints counts by area:
 #   pass         every compared layer agrees
 #   fail         sasonr ran, some layer differs (columns ds/attr/log/lst/put/files)
 #   unsupported  sasonr_unsupported (SAS ran normally)
@@ -105,7 +107,8 @@ row_of <- function(root, area, rel, r, meta) {
   fails <- names(r$layers)[!r$layers]
   first <- if (length(fails)) r$diffs[[fails[1]]] else r$msg
   data.frame(
-    root = basename(dirname(root)), area = area, case = rel, status = r$status,
+    root = basename(dirname(root)), area = area, case = rel,
+    sas_version = tryCatch(env$conf_meta_version(meta), error = function(e) NA_character_), status = r$status,
     failed_layers = paste(fails, collapse = "+"),
     ds = if ("ds" %in% names(r$layers)) r$layers[["ds"]] else NA,
     attr = if ("attr" %in% names(r$layers)) r$layers[["attr"]] else NA,

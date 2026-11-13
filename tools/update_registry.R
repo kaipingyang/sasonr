@@ -39,7 +39,20 @@
 # used in any other context fails loud with sasonr.strict = TRUE.
 
 args <- commandArgs(trailingOnly = TRUE)
-if (!length(args)) stop("usage: Rscript tools/update_registry.R results.csv [...]")
+# --sas-version V (default TS1M7): the SAS release of the gold the results come
+# from; only that release's rows are rebuilt, the other release's rows are kept.
+# --root DIR (default tests/conformance): the case root the results were run on
+# (TS1M2: the private repository's cases/ts1m2).
+take_opt <- function(name, default) {
+  k <- match(name, args)
+  if (is.na(k)) return(default)
+  v <- args[k + 1L]
+  args <<- args[-c(k, k + 1L)]
+  v
+}
+sas_version <- toupper(take_opt("--sas-version", "TS1M7"))
+root <- take_opt("--root", file.path("tests", "conformance"))
+if (!length(args)) stop("usage: Rscript tools/update_registry.R [--sas-version V] [--root DIR] results.csv [...]")
 suppressMessages(devtools::load_all(".", quiet = TRUE, helpers = FALSE))
 ns <- asNamespace("sasonr")
 # the verdict rules shared with the tests (conf_case_class, conf_feature_status)
@@ -47,7 +60,11 @@ conf <- new.env(parent = ns)
 sys.source("tests/testthat/helper-conformance.R", envir = conf)
 today <- format(Sys.Date())
 
+if (!sas_version %in% get("sas_versions", ns)) stop("unknown SAS release ", sas_version)
 res <- do.call(rbind, lapply(args, utils::read.csv, stringsAsFactors = FALSE))
+if (is.null(res$sas_version) || any(res$sas_version != sas_version)) {
+  stop("the results are not all from SAS ", sas_version, " gold (column sas_version)")
+}
 res <- res[!duplicated(res$case, fromLast = TRUE), ]
 res$fails <- ifelse(is.na(res$failed_layers), "", res$failed_layers)
 known_status <- c("pass", "both_error", "unsupported", "fail", "error", "lenient", "sas_error_unsupported",
@@ -80,7 +97,7 @@ probe_calls <- list(
 )
 probe_rows <- list()
 for (pr in names(probe_calls)) {
-  f <- file.path("tests", "conformance", "fn_probe", pr, "expected", "datasets", "p.sas7bdat")
+  f <- file.path(root, "fn_probe", pr, "expected", "datasets", "p.sas7bdat")
   if (!file.exists(f)) next
   P <- as.data.frame(haven::read_sas(f))
   for (col in names(probe_calls[[pr]])) {
@@ -113,7 +130,7 @@ read_inv <- function(f) {
 }
 
 case_context <- function(area, feature) {
-  f <- file.path("tests", "conformance", area, feature, "cases.csv")
+  f <- file.path(root, area, feature, "cases.csv")
   if (!file.exists(f)) return(NULL)
   x <- utils::read.csv(f, stringsAsFactors = FALSE)
   stats::setNames(x$context, x$case)
@@ -184,7 +201,7 @@ fn_rows <- lapply(docs$name, function(nm) {
   pil <- rows$area == "functions"
   if (any(pil)) {
     tags <- vapply(rows$case[pil], function(cs) {
-      f <- file.path("tests", "conformance", cs, "meta.yaml")
+      f <- file.path(root, cs, "meta.yaml")
       if (!file.exists(f)) return("data")
       tg <- grep("^tags:", readLines(f, warn = FALSE), value = TRUE)
       if (grepl("sysfunc", tg)) "sysfunc" else if (grepl("\\bsql\\b", tg)) "sql" else "data"
@@ -286,9 +303,25 @@ fmts <- do.call(rbind, fmt_rows)
 fmts <- fmts[order(fmts$kind, fmts$name), ]
 
 dir.create(file.path("inst", "registry"), showWarnings = FALSE)
-utils::write.csv(fns, file.path("inst", "registry", "functions.csv"), row.names = FALSE, na = "")
-utils::write.csv(fmts, file.path("inst", "registry", "formats.csv"), row.names = FALSE, na = "")
+# one block of rows per SAS release: replace this release's rows, keep the others
+write_version <- function(new, file) {
+  new$sas_version <- sas_version
+  new <- new[c("sas_version", setdiff(names(new), "sas_version"))]
+  old <- if (file.exists(file)) utils::read.csv(file, stringsAsFactors = FALSE, colClasses = "character") else NULL
+  if (!is.null(old)) {
+    if (is.null(old$sas_version)) old$sas_version <- "TS1M7"
+    old <- old[old$sas_version != sas_version, , drop = FALSE]
+    for (k in setdiff(names(new), names(old))) old[[k]] <- rep(NA, nrow(old))
+    old <- old[names(new)]
+  }
+  out <- rbind(old, new)
+  out <- out[order(match(out$sas_version, get("sas_versions", ns))), , drop = FALSE]
+  utils::write.csv(out, file, row.names = FALSE, na = "")
+}
+write_version(fns, file.path("inst", "registry", "functions.csv"))
+write_version(fmts, file.path("inst", "registry", "formats.csv"))
 tab <- function(x) paste(sprintf("%s %d", names(table(x)), as.integer(table(x))), collapse = ", ")
+cat("SAS", sas_version, "\n")
 cat("functions:", nrow(fns), "-", tab(fns$status), "\n")
 cat("formats/informats:", nrow(fmts), "-", tab(fmts$status), "\n")
 cat("cases:", nrow(res), "-", tab(res$class), "\n")

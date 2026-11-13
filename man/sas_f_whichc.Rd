@@ -19,7 +19,7 @@ Index of the first matching character value. See the \href{https://documentation
 }
 
 \section{Verification}{
- verified (25 of 25 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (25 of 25 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

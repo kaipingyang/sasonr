@@ -23,7 +23,7 @@ Datetime from date, hour, minute and second. See the \href{https://documentation
 }
 
 \section{Verification}{
- partial (46 of 49 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: DHMS with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (46 of 49 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: DHMS with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

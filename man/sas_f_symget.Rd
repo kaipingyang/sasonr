@@ -21,7 +21,7 @@ Value of a macro variable at run time. See the \href{https://documentation.sas.c
 }
 
 \section{Verification}{
- verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

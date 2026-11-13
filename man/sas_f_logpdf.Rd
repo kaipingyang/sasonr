@@ -21,7 +21,7 @@ Logarithm of the density. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- approximate (25 of 38 SAS 9.4 cases agree bit for bit; 8 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (25 of 38 SAS 9.4 cases agree bit for bit; 8 case(s) differ in the last bits (largest relative difference 7.4e-14; different algorithm); 5 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

@@ -57,6 +57,7 @@ day	DAY(date)	datetime	Day of the month.
 dequote	DEQUOTE(string)	character	Removes matching quotation marks.
 dhms	DHMS(date, hour, minute, second)	datetime	Datetime from date, hour, minute and second.
 divide	DIVIDE(x, y)	numeric	Division that returns special missing values for division by zero.
+exist	EXIST(member-name <, member-type>)	special	Whether a SAS library member exists (1) or not (0).
 exp	EXP(argument)	numeric	Exponential function.
 fact	FACT(n)	numeric	Factorial.
 find	FIND(string, substring <, modifiers> <, start>)	character	Position of a substring.

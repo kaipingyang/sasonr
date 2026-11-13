@@ -1,5 +1,6 @@
 # local-only: research, third-party sources, binaries, books, experiments
 .claude/
+.local/
 .Rproj.user/
 .Rhistory
 .RData
@@ -8,5 +9,17 @@
 docs/
 inst/sashelp/
 tests/conformance/
+
+# Batch output of a locally licensed SAS install: logs carry the licensee's
+# site number, listings and .sas7bdat catalogs are SAS-produced artefacts.
+# None of it may be committed or redistributed.
+*.log
+*.lst
+*.sas7bdat
+*.sas7bcat
+.sasuser/
+tools/sas/work/
 __pycache__/
 *.pyc
+# SAS programs in the conformance cases write results.txt into the CWD
+results.txt

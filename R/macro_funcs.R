@@ -256,6 +256,13 @@ mac_sysfunc <- function(text, line = NULL) {
       rt$math <- old$math
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
+        # SAS 9.4 TS1M7 writes this NOTE only (fn_matrix/MDY: no WARNING).
+        # TS1M2 adds a WARNING naming the function (a local probe of the other
+        # machine, not in the committed TS1M2 gold): fail loud there.
+        if (sas_target_version() != "TS1M7") {
+          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") for SAS 9.4 ",
+                                   sas_target_version(), " (not in its gold)"), line)
+        }
         rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
                                   "The result of the operations have been set to a missing value.")))
       }

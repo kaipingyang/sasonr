@@ -186,6 +186,13 @@ gen_call <- function(e, cx) {
                    if (nzchar(e$qq)) paste0(", qq = ", r_str(e$qq)) else "",
                    if (cx$mode == "row" && !is.null(e$col)) at_code(e) else ""))
   }
+  if (e$name == "exist") {
+    # EXIST(member <, type>): the generated DATA step environment carries the
+    # WORK library (`work`, see engine_eval()); SASHELP is read from inst/sashelp
+    a1 <- gen_expr(e$args[[1]], cx)
+    a2 <- if (length(e$args) > 1) gen_expr(e$args[[2]], cx) else "NULL"
+    return(sprintf("sas_f_exist(%s, %s, work)", a1, a2))
+  }
   args <- unlist(lapply(e$args, function(a) {
     if (a$node == "of") vapply(a$vars, var_ref, "", cx = cx) else gen_expr(a, cx)
   }))
@@ -200,10 +207,14 @@ gen_call <- function(e, cx) {
     return(sprintf("(%s - sas_lag_vec(%s, %dL))", x, x, n))
   }
   if (e$name == "symget") args <- c(".symtab", args)
-  if (e$name %in% names(fn_policy) && !is.null(e$col)) {
-    # missing / invalid arguments: log NOTEs and _ERROR_ as in SAS (fn_policy.R)
-    return(sprintf("sas_fcall(\"%s\", sas_f_%s%s, .at = c(%dL, %dL)%s)", e$name, e$name,
-                   paste0(", ", args, collapse = ""), as.integer(e$line), as.integer(e$col),
+  in_sql <- identical(cx$an$context, "sql")
+  if (e$name %in% names(fn_policy) && (!is.null(e$col) || in_sql)) {
+    # missing / invalid arguments: log NOTEs and _ERROR_ as in SAS (fn_policy.R).
+    # In PROC SQL the expressions carry no line/column; the invalid-argument
+    # NOTE of PROC SQL does not use them either (diag.R).
+    at_arg <- if (!is.null(e$col)) sprintf(", .at = c(%dL, %dL)", as.integer(e$line), as.integer(e$col)) else ""
+    return(sprintf("sas_fcall(\"%s\", sas_f_%s%s%s%s)", e$name, e$name,
+                   paste0(", ", args, collapse = ""), at_arg,
                    if (isTRUE(cx$inexact)) ", .exact = FALSE" else ""))
   }
   at <- if (cx$mode == "row" && e$name %in% err_fns && !is.null(e$col)) at_code(e) else ""
@@ -235,7 +246,7 @@ expr_may_error <- function(e) {
 }
 
 stmt_may_error <- function(s) {
-  if (s$stmt == "input") return(TRUE)
+  if (s$stmt %in% c("input", "substr_assign")) return(TRUE)
   any(vapply(Filter(Negate(is.null), stmt_exprs(s)), expr_may_error, logical(1)))
 }
 
@@ -595,6 +606,13 @@ gen_vec_stmt <- function(s, guard, cx) {
         add_stage(cx, "raw", "dplyr::ungroup()")
       }
     },
+    substr_assign = {
+      v <- s$var
+      at <- sprintf(", .at = c(%dL, %dL)", as.integer(s$line), as.integer(s$col %||% NA_integer_))
+      val <- sprintf("sas_substr_assign(%s, %s, %s, %s%s)", r_name(v), gen_expr(s$pos, cx),
+                     if (is.null(s$len)) "NULL" else gen_expr(s$len, cx), gen_expr(s$value, cx), at)
+      add_stage(cx, "mutate", assign_code(v, val, guard))
+    },
     "if" = gen_vec_if(s, guard, cx),
     subset_if = {
       cond <- sprintf("sas_true(%s)", gen_expr(s$cond, cx))
@@ -868,6 +886,11 @@ gen_row_stmt <- function(s, cx) {
     sum = {
       ref <- var_ref(s$target$name, cx)
       sprintf("%s <- sas_f_sum(%s, %s)", ref, ref, g(s$value))
+    },
+    substr_assign = {
+      at <- sprintf(".at = c(%dL, %dL)", as.integer(s$line), as.integer(s$col %||% NA_integer_))
+      sprintf("%s <- sas_substr_assign(%s, %s, %s, %s, %s)", var_ref(s$var, cx), var_ref(s$var, cx),
+              g(s$pos), if (is.null(s$len)) "NULL" else g(s$len), g(s$value), at)
     },
     "if" = {
       rc <- row_cond(s$cond, cx)

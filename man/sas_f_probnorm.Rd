@@ -17,7 +17,7 @@ Standard normal cumulative probability. See the \href{https://documentation.sas.
 }
 
 \section{Verification}{
- approximate (20 of 24 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 7.1e-15; different algorithm)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (20 of 24 SAS 9.4 cases agree bit for bit; 4 case(s) differ in the last bits (largest relative difference 7.1e-15; different algorithm)). Contexts where every case agrees: sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

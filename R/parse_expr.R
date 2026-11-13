@@ -525,9 +525,16 @@ expr_to_sexpr <- function(e) {
   )
 }
 
-# A numeric constant; values outside the double range are an error in SAS.
+# A numeric constant; values outside the double range are an error.  A
+# subnormal literal differs between the releases: SAS 9.4 TS1M7 rejects it
+# ("ERROR: Invalid number '1E-310'", opensas/best_fmt_subnormal), TS1M2
+# accepts it and keeps the value (cases/ts1m2/functions/ROUND/ROUND_044:
+# 1e-310 is 000012688B70E62B, ordinary IEEE arithmetic).
 sas_num_literal <- function(v, line = NULL) {
   val <- as.numeric(v)
-  if (is.infinite(val) || (val != 0 && abs(val) < .Machine$double.xmin)) abort_syntax(paste0("Invalid number ", v), line)
+  if (is.infinite(val)) abort_syntax(paste0("Invalid number ", v), line)
+  if (val != 0 && abs(val) < .Machine$double.xmin && sas_target_version() == "TS1M7") {
+    abort_syntax(paste0("Invalid number ", v), line)
+  }
   val
 }

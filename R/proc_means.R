@@ -336,11 +336,14 @@ translate_proc_means <- function(step, meta, last) {
     abort_runtime("Neither the PRINT option nor a valid output statement has been given.", step$line)
   }
   if (length(stats) == 0) stats <- c("n", "mean", "std", "min", "max")
-  # a printed table with ten or more statistics is split into panels; SAS 9.4
-  # sometimes fits one more column per panel than sasonr (rounding/proc/means_*:
-  # rule not determined), so such listings fail loud
-  if (printing && length(stats) >= 10L) {
-    abort_unsupported("PROC MEANS listing with ten or more statistics (panel layout)", step$line)
+  # The panel layout is implemented in means_listing(); the one part of it that
+  # is not derived from SAS output is the heading split for a narrow FW=: below
+  # the default field width SAS re-splits multi-word headings ("Std Error" ->
+  # "Std"/"Error") and abbreviates single words ("Minimum" -> "Min",
+  # "Coefficient of Variation" -> "Coeff of"/"Variation"), which sasonr does not
+  # reproduce.  Ten or more statistics are split into panels like SAS does.
+  if (printing && !is.null(o$fw) && o$fw < 12L) {
+    abort_unsupported("PROC MEANS listing with FW= below the default 12 (SAS re-splits and abbreviates column headings)", step$line)
   }
   vardef <- o$vardef %||% "df"
   ci_stats <- intersect(stats, c("stderr", "t", "prt", "lclm", "uclm"))
@@ -520,10 +523,14 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     sw <- k$W
     val$sumwgt <- sw
     val$sum <- k$sum
-    val$min <- min(xv)
-    val$max <- max(xv)
+    # the sign of zero (cases/ts1m2/proc/zero_sign): SUM and MEAN are always
+    # +0, MIN / MAX keep the sign of the first value of the group on ties
+    if (!is.na(val$sum[1]) && val$sum[1] == 0) val$sum <- 0
+    val$min <- xv[which(xv == min(xv))[1L]]
+    val$max <- xv[which(xv == max(xv))[1L]]
     val$range <- val$max - val$min
     for (s in c("mean", "css", "uss", "var", "std", "stderr", "cv", "skew", "kurt")) val[[s]] <- k[[s]]
+    if (!is.na(val$mean[1]) && val$mean[1] == 0) val$mean <- 0
     if (!is.na(val$stderr)) {
       df <- n - 1
       # T is capped at +-99999.99 (and PRT is computed from the capped value)
@@ -818,6 +825,51 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 
 # Listing --------------------------------------------------------------------------
 
+# Default decimals of the printed table with the default FW=12 and no MAXDEC=.
+# [gold]: measured on TS1M2 (155 exactly known doubles, MIN/MAX of
+# one-observation CLASS groups); docs/conformance/means_default_decimals_rule.md.
+means_default_text <- function(v, w) {
+  if (v == 0) return("0")
+  a <- abs(v)
+  if (a < .Machine$double.xmin) {
+    # SAS's own output of a subnormal statistic is not part of the 155-point
+    # gold and looks broken ("0.00000E-309" for the smallest subnormal); do not
+    # guess.
+    abort_unsupported("PROC MEANS default display of a subnormal statistic value (not verified against SAS; use MAXDEC=)")
+  }
+  neg <- v < 0
+  sign_txt <- if (neg) "-" else ""
+  e_text <- function(a) {
+    ex <- floor(log10(a))
+    repeat {
+      m <- a / 10^ex
+      expstr <- paste0("E", ex)
+      dec <- 12L - 2L - nchar(expstr) - if (neg) 1L else 0L
+      if (dec < 0L) dec <- 0L
+      # the width probe (edge "up") decides the exponent; only the text written can fail loud
+      if (as.numeric(display_fixed(m, dec, edge = "up")) >= 10) {
+        ex <- ex + 1L
+        next
+      }
+      s <- display_fixed(m, dec)
+      s <- sub("0+$", "", s)
+      s <- sub("\\.$", "", s)
+      return(paste0(sign_txt, s, "E", ex))
+    }
+  }
+  if (a < 1e-5) return(e_text(a))
+  # one display engine (display_fixed); branch decisions probe with edge "up"
+  if (a < 1e-3) return(paste0(sign_txt, display_fixed(a, 9L)))
+  if (a >= 1000 || as.numeric(display_fixed(a, 7L, edge = "up")) >= 1000) {
+    intdigits <- floor(log10(floor(a))) + 1
+    if (intdigits <= 8) return(paste0(sign_txt, display_fixed(a, 2L)))
+    int_txt <- display_fixed(a, 0L)
+    if (nchar(paste0(sign_txt, int_txt)) <= 12L) return(paste0(sign_txt, int_txt))
+    return(e_text(a))
+  }
+  paste0(sign_txt, display_fixed(a, 7L))
+}
+
 # Default (no MAXDEC=) display of a statistic in a field of width w: a fixed
 # number of decimals for values of ordinary magnitude, fewer for large values.
 means_num_text <- function(v, w, maxdec) {
@@ -825,17 +877,28 @@ means_num_text <- function(v, w, maxdec) {
   if (!is.null(maxdec)) {
     # too wide: fewer decimals first (12345678.500 with MAXDEC=4), then BEST
     for (dd in seq(maxdec, 0L)) {
-      # MAXDEC= rounds the exact binary value half up, without the format fuzz
-      # (gold: a mean of 1.2249999999999999 shows as 1.22)
-      s <- display_fixed(v, dd, exact = TRUE)
-      if (nchar(s) <= w) return(s)
+      # MAXDEC= text is the w.d display engine (TS1M2 probe
+      # cases/ts1m2/rounding/means_maxdec_display: MAXDEC=, PUT w.d and PROC
+      # PRINT w.d agree character for character; TS1M7 rounding/proc/means_*:
+      # 0 differences, where half up on the exact binary value differed in 11
+      # cases).  The width is probed first, so only the text written fails loud.
+      s <- display_fixed(v, dd, edge = "up")
+      if (nchar(s) <= w) return(display_fixed(v, dd))
     }
     return(trimws(sas_fmt_best(v, w)))
   }
   if (v == 0) return("0")
+  if (identical(as.integer(w), 12L)) {
+    # The default decimals of the printed table (FW=12, no MAXDEC=) are
+    # [gold]: no manual sentence covers them.  Measured on TS1M2 with MIN/MAX of
+    # one-observation CLASS groups (155 exactly known doubles,
+    # cases/ts1m2/rounding/means_default_decimals); the rule is recorded in
+    # docs/conformance/means_default_decimals_rule.md.
+    return(means_default_text(v, w))
+  }
   if (v != trunc(v) && (abs(v) >= 1e6 || abs(v) < 1e-4)) {
     # the gold standard shows SAS choosing other decimals here (1622403.34,
-    # 0.000012500); the rule is not derived yet
+    # 0.000012500); the rule is not derived yet for other field widths
     abort_unsupported("PROC MEANS default decimals for a non-integer statistic of 1E6 or more or below 1E-4 (not verified against SAS; use MAXDEC=)")
   }
   dec <- max(0L, as.integer(round((w - 2) * 0.7)))
@@ -858,8 +921,108 @@ means_stat_text <- function(s, v, sp) {
 means_stat_col <- function(s, cells, sp) {
   parts <- means_stat_heading(s, sp$alpha)
   minw <- max(nchar(parts))
-  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else max(c(1L, nchar(cells)))) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
+  # N / N Miss: as wide as the printed counts.  TS1M2 never prints that field
+  # narrower than two columns (cases/ts1m2/proc/zero_sign has single-digit
+  # counts and a 2-column N field); TS1M7 prints single-digit counts in one
+  # column (opensas/means_class_order and 20 more internal cases).
+  nmin <- if (sas_target_version() == "TS1M2") 2L else 1L
+  vw <- if (s %in% c("n", "nmiss")) (if (!is.null(sp$freq)) sp$fw else max(c(nmin, nchar(cells)))) else if (s == "t") 7L else if (s == "prt") 6L else sp$fw
   list(parts = parts, width = max(vw, minw), right = TRUE, cells = cells)
+}
+
+# Printed-table geometry ------------------------------------------------------------
+#
+# Measured on SAS 9.4 TS1M2 with LINESIZE= 72..200, 3 to 22 statistics, FW=
+# 4..20, MAXDEC= 0..7, with and without CLASS.  The line is filled left to
+# right as follows.
+#
+#  * Every statistic column is a field of FW= columns (default 12), except
+#    N / N Miss (as wide as the printed counts) and t Value / Pr > |t|; a
+#    column is never narrower than its heading.  The field width does *not*
+#    depend on MAXDEC= or on how many characters a value actually uses: the
+#    same 12-statistic table is 128 + 28 columns wide with MAXDEC=0 and 7.
+#  * The fixed columns (CLASS levels, "N Obs", Variable/Label) and the gap
+#    between the fixed part and the first statistic use the same gap as panel 1
+#    of that table; a CLASS variable keeps its declared length as field width
+#    ("grp $8" prints in 8 columns even though the levels are one character).
+#  * A panel takes as many statistics as fit with two-blank gaps; the gap is
+#    then widened to 4, or 3, if the panel still fits (so consecutive values
+#    are 16, 15 or 14 columns apart).  Remaining statistics go to the next
+#    panel, which repeats the fixed columns.
+#  * The dashes under a table are exactly the table width, so a 12-statistic
+#    table at LINESIZE=132 is 128 + 28 (no CLASS) or 129 + 59 (one CLASS
+#    variable of length 8).
+means_panel_layout <- function(widths, fixed_widths, ls, min_gap = 2L, max_gap = 4L) {
+  n <- length(widths)
+  fixed_width <- function(g) if (length(fixed_widths) > 0) sum(fixed_widths) + g * length(fixed_widths) else 0L
+  fit <- function(from, g, F) {
+    take <- 0L
+    acc <- 0L
+    for (j in seq.int(from, n)) {
+      acc <- acc + widths[j]
+      if (F + acc + (j - from) * g <= ls) take <- j - from + 1L else break
+    }
+    take
+  }
+  # panel 1 also fixes the gap used by the fixed columns
+  best <- NULL
+  for (g in seq.int(max_gap, min_gap)) {
+    F <- fixed_width(g)
+    take <- fit(1L, g, F)
+    if (is.null(best) || take > best$take) best <- list(take = take, gap = g, fixed = F)
+  }
+  g_fixed <- best$gap
+  F0 <- best$fixed
+  if (best$take == 0L) best$take <- 1L
+  panels <- list()
+  pos <- 1L
+  first <- TRUE
+  while (pos <= n) {
+    if (first) {
+      take <- best$take
+      gap <- best$gap
+    } else {
+      take <- fit(pos, min_gap, F0)
+      if (take == 0L) take <- 1L
+      acc <- sum(widths[pos:(pos + take - 1L)])
+      gap <- min_gap
+      for (g in seq.int(max_gap, min_gap)) {
+        if (F0 + acc + (take - 1L) * g <= ls) {
+          gap <- g
+          break
+        }
+      }
+    }
+    acc <- sum(widths[pos:(pos + take - 1L)])
+    panels[[length(panels) + 1L]] <- list(first = pos, last = pos + take - 1L, gap = gap, fixed_gap = g_fixed,
+                                          width = F0 + acc + (take - 1L) * gap)
+    pos <- pos + take
+    first <- FALSE
+  }
+  panels
+}
+
+# render_table() with one gap per column boundary: the fixed part keeps the gap
+# of panel 1, the statistics use each panel's own gap.
+means_render <- function(cols, gaps) {
+  heads <- lapply(cols, function(c) heading_lines(c$parts, c$width))
+  nh <- max(vapply(heads, length, 1L))
+  heads <- lapply(heads, function(h) c(rep("", nh - length(h)), h))
+  widths <- vapply(cols, function(c) as.integer(c$width), 1L)
+  right <- vapply(cols, `[[`, TRUE, "right")
+  join <- function(vals) {
+    cells <- mapply(function(x, w, r) formatC(x, width = if (r) w else -w), vals, widths, right)
+    if (length(cells) == 1L) return(cells)
+    pieces <- character(2L * length(cells) - 1L)
+    pieces[seq.int(1L, 2L * length(cells) - 1L, 2L)] <- cells
+    pieces[seq.int(2L, 2L * length(cells) - 2L, 2L)] <- strrep(" ", gaps)
+    paste(pieces, collapse = "")
+  }
+  hl <- vapply(seq_len(nh), function(j) sas_rtrim(join(vapply(heads, `[`, "", j))), "")
+  n <- length(cols[[1L]]$cells)
+  body <- if (n > 0) vapply(seq_len(n), function(i) sas_rtrim(join(vapply(cols, function(c) c$cells[i], ""))), "") else character()
+  rule <- strrep("-", sum(widths) + sum(gaps))
+  c(hl, rule, body, rule)
 }
 
 means_listing <- function(d, sp, cells_by, print_types) {
@@ -922,20 +1085,36 @@ means_listing <- function(d, sp, cells_by, print_types) {
         if (has_label) fixed[[length(fixed) + 1L]] <- list(parts = "Label", width = max(5L, nchar(lab_cells)), right = FALSE, cells = lab_cells)
       }
       scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp))
-      # panels: as many statistics as fit the line size
-      ls <- 132L
-      pos <- 1L
-      while (pos <= length(scols)) {
-        take <- pos
-        while (take < length(scols) && table_width(c(fixed, scols[pos:(take + 1L)]), 3L) <= ls) take <- take + 1L
-        cols <- c(fixed, scols[pos:take])
-        gap <- if (table_width(cols, 4L) <= ls) 4L else 3L
+      # Panel layout (measured on SAS 9.4 TS1M2, rounding/proc/means_* and the
+      # experiments behind means_panel_layout()).
+      ls <- rt$ls %||% 132L
+      panels <- means_panel_layout(vapply(scols, function(c) as.integer(c$width), 1L),
+                                   vapply(fixed, function(c) as.integer(c$width), 1L), ls)
+      bad <- Filter(function(p) p$width > ls, panels)
+      if (length(bad) > 0) {
+        # SAS squeezes an over-long fixed part (a CLASS variable with a long
+        # length, or a very wide Variable column) by narrowing that column and
+        # redistributing the spare columns; that rule is not determined
+        abort_unsupported("PROC MEANS listing wider than LINESIZE= (SAS narrows the class/fixed columns; rule not determined)")
+      }
+      if (length(fixed) > 0 && (length(panels) >= 3L || ls < 120L)) {
+        # Fixed columns are verified exact for one or two panels at LINESIZE=
+        # 120..200 (CLASS length 1, 4 and 8, one or two CLASS variables, the 38
+        # rounding/proc/means_* gold cases; two analysis variables).  Below
+        # LINESIZE=120 and across three or more statistic panels SAS narrows the
+        # fixed part (the "N Obs" field and the gaps around the CLASS columns)
+        # in a way these measurements do not determine: at LINESIZE=100 a
+        # 12-statistic CLASS table is 92 columns wide where this layout gives 94.
+        abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not determined)")
+      }
+      for (p in panels) {
+        cols <- c(fixed, scols[p$first:p$last])
+        gaps <- c(rep.int(p$fixed_gap, length(fixed)), rep.int(p$gap, p$last - p$first))
         if (!multi) {
           v <- sp$vars[1]
           out <- c(out, paste0("Analysis Variable : ", info[[v]]$disp, " ", info[[v]]$label %||% ""), "")
         }
-        out <- c(out, render_table(cols, gap), "")
-        pos <- take + 1L
+        out <- c(out, means_render(cols, gaps), "")
       }
     }
   }

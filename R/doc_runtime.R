@@ -7,6 +7,6 @@
 #' are exported so that translated code can run on its own; they are not a
 #' stable user interface.
 #' @name sasonr-runtime
-#' @aliases sas_and sas_concat sas_date_ok sas_day_to_greg sas_delete sas_dist_known sas_dist_names sas_div sas_epoch sas_eq sas_exception_lines sas_function_inventory sas_ge sas_gt sas_in sas_is_missing sas_known_format sas_known_function sas_last sas_le sas_lt sas_max_op sas_ne sas_not sas_num_literal sas_or sas_order sas_pow sas_put_named sas_return sas_rtrim sas_select_error sas_step_exception sas_stop_step sas_tiny
+#' @aliases sas_and sas_concat sas_date_ok sas_day_to_greg sas_delete sas_dist_known sas_dist_names sas_div sas_epoch sas_eq sas_exception_lines sas_exist_one sas_function_inventory sas_ge sas_gt sas_in sas_is_missing sas_known_format sas_known_function sas_last sas_le sas_lt sas_max_op sas_ne sas_not sas_num_literal sas_or sas_order sas_pow sas_put_named sas_return sas_rtrim sas_select_error sas_step_exception sas_stop_step sas_substr_assign sas_target_version sas_tiny sas_versions
 #' @keywords internal
 NULL

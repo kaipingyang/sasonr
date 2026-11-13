@@ -17,7 +17,7 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 }
 
 \section{Verification}{
- verified (22 of 22 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (22 of 22 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{
@@ -46,6 +46,7 @@ Other special functions:
 \code{\link[=sas_f_bor]{sas_f_bor()}},
 \code{\link[=sas_f_brshift]{sas_f_brshift()}},
 \code{\link[=sas_f_bxor]{sas_f_bxor()}},
+\code{\link[=sas_f_exist]{sas_f_exist()}},
 \code{\link[=sas_f_input]{sas_f_input()}},
 \code{\link[=sas_f_inputc]{sas_f_inputc()}},
 \code{\link[=sas_f_inputn]{sas_f_inputn()}},

@@ -13,6 +13,7 @@
 \alias{sas_epoch}
 \alias{sas_eq}
 \alias{sas_exception_lines}
+\alias{sas_exist_one}
 \alias{sas_function_inventory}
 \alias{sas_ge}
 \alias{sas_gt}
@@ -36,7 +37,10 @@
 \alias{sas_select_error}
 \alias{sas_step_exception}
 \alias{sas_stop_step}
+\alias{sas_substr_assign}
+\alias{sas_target_version}
 \alias{sas_tiny}
+\alias{sas_versions}
 \title{Runtime helpers used by translated code}
 \description{
 Translated R code calls these helpers to reproduce SAS value semantics

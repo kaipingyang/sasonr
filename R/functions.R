@@ -1062,7 +1062,251 @@ sas_f_probit <- function(p) {
   out
 }
 #' @export
-sas_f_probt <- function(x, df, nc = 0) stats::pt(x, df, nc)
+sas_f_probt <- function(x, df, nc = 0, .at = NULL) {
+  rowwise(pnt_cdf, x, df, nc, type = numeric(1))
+}
+
+# Noncentral t distribution function.  R's pnt() stops at an absolute error of
+# about 1e-13 (pt(-40, 100, 5) is 2.3e-13 where SAS gives 7.5e-88, and
+# pt(-1000, 100, 5) equals pt(-1e6, 1000, 5)), so the function is computed here
+# instead.  Following the structure of Boost's non_central_t:
+#   t >= 0, nc >= 0:  P = Phi(-nc) + S/2, where S is the noncentral beta
+#                     distribution function plus a Poisson-weighted correction
+#                     series (no cancellation: every term is positive);
+#   t < 0,  nc > 0:   P = E[Phi(t s - nc)] with s = sqrt(chi2_df / df), which is
+#                     the small tail; it is integrated in w = log s (Simpson on
+#                     a window 50 nats below the mode of the log integrand), so
+#                     the s^(df-1) singularity at 0 disappears for df < 1 and
+#                     the result keeps its relative accuracy far from 1.
+# Every other sign combination follows from P(T <= t; nc) = 1 - P(T <= -t; -nc).
+# Checked against 528 SAS 9.4 points (t = -40..40, df = 0.5..1e10, nc = 0..5):
+# largest relative difference 5.4e-13, median 2.8e-16.
+pnt_cdf <- function(t, v, nc) {
+  if (is.na(t) || is.na(v) || is.na(nc) || v <= 0) return(NA_real_)
+  if (nc == 0) {
+    # Central t through the incomplete beta: R's pt() loses up to ~2000 ulp
+    # against SAS for large df (pt(-0.5, 10000) for example).
+    y <- v / (v + t * t)
+    iy <- stats::pbeta(y, v / 2, 0.5)
+    return(if (t < 0) 0.5 * iy else 1 - 0.5 * iy)
+  }
+  if (is.infinite(t)) return(if (t > 0) 1 else 0)
+  if (t == 0) return(stats::pnorm(-nc))
+  if (t > 0) {
+    if (nc > 0) return(pnt_series(t, v, nc))
+    return(1 - pnt_tail(-t, v, -nc))
+  }
+  if (nc > 0) return(pnt_tail(t, v, nc))
+  1 - pnt_series(-t, v, -nc)
+}
+
+# Noncentral beta distribution function as a Poisson mixture, plus the
+# correction series for the t case; both summed in log space.
+pnt_series <- function(t, v, d) {
+  x <- t^2 / (v + t^2)
+  d2 <- d^2 / 2
+  k <- 0:ceiling(d2 + 12 * sqrt(d2) + 40)
+  # pbeta() reports underflow to -Inf for large v and x close to 1; the term is
+  # negligible there, so the warnings are noise.
+  linit <- suppressWarnings(stats::dpois(k, d2, log = TRUE) +
+    stats::pbeta(x, 0.5 + k, v / 2, log.p = TRUE))
+  m1 <- max(linit)
+  init <- exp(m1) * sum(exp(linit - m1))
+  lpois <- k * log(d2) - d2 - lgamma(k + 1.5) + log(d / sqrt(2))
+  lterm <- suppressWarnings(lpois + stats::pbeta(x, k + 1, v / 2, log.p = TRUE))
+  m2 <- max(lterm)
+  s <- exp(m2) * sum(exp(lterm - m2))
+  stats::pnorm(-d) + (init + s) / 2
+}
+
+# log Phi(z).  R's pnorm(log.p = TRUE) is only absolute-accurate in the log:
+# at z = -200 it is off by 1.8e-12, which becomes a relative error of 1.8e-12
+# after exp() - enough to spoil the far tail.  The Mills-ratio asymptotic
+# series below matches a 256-bit reference to the last bit from about z = -10.
+log_pnorm <- function(z) {
+  out <- numeric(length(z))
+  far <- !is.na(z) & z < -8
+  if (any(far)) out[far] <- log_pnorm_neg(-z[far])
+  if (any(!far)) out[!far] <- stats::pnorm(z[!far], log.p = TRUE)
+  out
+}
+
+# log Phi(-x) for x > 0: -x^2/2 - log(x) - log(2*pi)/2 + log(1 - 1/x^2 + 3/x^4 - ...),
+# truncated where the terms stop shrinking (the smallest term bounds the error).
+log_pnorm_neg <- function(x) {
+  x2 <- x * x
+  s <- numeric(length(x))
+  term <- -1 / x2
+  best <- abs(term)
+  k <- 1L
+  repeat {
+    s <- s + term
+    k <- k + 1L
+    term <- term * (-(2 * k - 1)) / x2
+    if (all(abs(term) >= best) || k > 200L) break
+    best <- pmin(best, abs(term))
+  }
+  -x2 / 2 - log(x) - 0.5 * log(2 * pi) + log1p(s)
+}
+
+# log Phi(z) - log Phi(z0), for z < z0 < -8: every piece is written as a
+# difference of O(1) quantities, because the two logs themselves are large
+# (about -200) and their difference computed directly would lose 1e-14.
+log_pnorm_diff <- function(dz, zsum, z0) {
+  # dz = z - z0, zsum = z + z0, both formed exactly by the caller
+  -(dz * zsum) / 2 - log1p(dz / z0) + log1p((mills_corr(z0 + dz) - mills_corr(z0)) / mills_corr(z0))
+}
+
+# 1 - 1/x^2 + 3/x^4 - 15/x^6 + ... (the Mills-ratio correction)
+mills_corr <- function(x) {
+  x2 <- x * x
+  s <- 0
+  term <- -1 / x2
+  best <- abs(term)
+  k <- 1L
+  repeat {
+    s <- s + term
+    k <- k + 1L
+    term <- term * (-(2 * k - 1)) / x2
+    if (abs(term) >= best || k > 200L) break
+    best <- min(best, abs(term))
+  }
+  1 + s
+}
+
+# Gauss-Legendre nodes and weights for the composite rule in pnt_tail().
+# Generated here (Newton's method on the Legendre polynomials) rather than
+# transcribed, so the numbers cannot be mistyped; 16 nodes integrate every
+# polynomial of degree 31 exactly, which is enough for a panel that spans a few
+# local scales of a smooth integrand.  Top-level so the work is done once when
+# the package is built, not on every call.
+.pnt_gl <- local({
+  n <- 16L
+  x <- cos(pi * (seq_len(n) - 0.25) / (n + 0.5)) # asymptotic roots as start values
+  for (it in 1:100) {
+    p0 <- 1
+    p1 <- x
+    for (j in 2:n) {
+      p2 <- ((2 * j - 1) * x * p1 - (j - 1) * p0) / j
+      p0 <- p1
+      p1 <- p2
+    }
+    dx <- p1 / (n * (x * p1 - p0) / (x * x - 1))
+    x <- x - dx
+    if (max(abs(dx)) < 1e-16) break
+  }
+  p0 <- 1
+  p1 <- x
+  for (j in 2:n) {
+    p2 <- ((2 * j - 1) * x * p1 - (j - 1) * p0) / j
+    p0 <- p1
+    p1 <- p2
+  }
+  dp <- n * (x * p1 - p0) / (x * x - 1)
+  list(x = x, w = 2 / ((1 - x * x) * dp * dp))
+})
+# multiplicative grids used by pnt_tail(): .pnt_m nodes per search round,
+# fractions (0..1) for the geometric scan, and doubling factors for the
+# search for the point where F(s) = 1
+.pnt_m <- 10L
+.pnt_w <- (0:(.pnt_m - 1L)) / (.pnt_m - 1L)
+.pnt_k <- 0:20
+
+# P(T <= t) for t < 0, d > 0, by parts:
+#
+#   P = E[Phi(t S - d)] = |t| * Integral_0^inf  F(s) * phi(t s - d) ds,
+#   F(s) = P(S <= s) = pgamma(v s^2 / 2, v/2)
+#
+# The density of S = sqrt(chi2_v / v) needs exp() of a large negative number
+# (about -120 at the mode), which quantises the result at ulp(120) ~ 3e-14;
+# pgamma() and dnorm() both return small probabilities with full relative
+# accuracy, so the by-parts integrand keeps its last bits.
+#
+# The integrand is a rising factor F(s) times a falling one phi(|t| s + d), so
+# it is unimodal, but its scale changes by many orders of magnitude with
+# (t, v, d): for large v the chi-square factor turns over inside a window of
+# width 1/sqrt(2v) around s = 1, while the normal factor falls off over
+# 1/|t|.  A uniform Simpson rule therefore needs ~10^4 nodes (the previous
+# version used 12002 and cost 3.5 ms per point), and a uniform Gauss rule
+# misses the mode completely - measured earlier: Gauss-Legendre with 120-300
+# evenly spaced nodes gave only ~1e-7 relative.  So the panels below are graded
+# geometrically *in the distance from the mode*, whose local width is
+# min(s/sqrt(v), 1/(|t|(|t| s + d))) (the chi-square and normal curvatures),
+# and 16-node Gauss rules on those panels reach machine precision with ~250
+# nodes: median 1 ulp, p90 3 ulp, max 14 ulp against a 32001-node Simpson
+# reference on the 150 tail points of the SAS grid where that reference is
+# itself converged (the old 12002-node rule was 0-115 ulp away from it).
+# Beyond the first s with P(S > s) < 1e-19 the chi-square factor is 1 to double
+# precision, so that part is not integrated at all: it is exactly
+# Phi(-(|t| s + d)).  That is what removes the long, slowly decaying normal
+# tail, whose panels were the accuracy bottleneck of an earlier attempt.
+# Against the 459 SAS 9.4 reference points of the accuracy grid this gives
+# median 2 ulp / p90 32 ulp / max 178 ulp, i.e. the same as the 12002-node
+# rule (2 / 35 / 178), at 0.38 instead of 3.5 ms per point on bench.R.
+pnt_tail <- function(t, v, d) {
+  at <- abs(t)
+  al <- v / 2
+  # 1. mode of the integrand, by multiplicative scan + three halvings of the
+  #    bracket (the mode can be far too narrow for a fixed grid to hit: for
+  #    v = 1e10 it is a corner of width 1e-5 relative)
+  # sA solves |t|(|t| s + d) = v/s, i.e. the mode when F is still ~ s^v
+  sA <- (sqrt(d * d + 4 * v) - d) / (2 * at)
+  a <- min(sA, 1) / 4
+  b <- max(sA, 1) * 4
+  g <- a * (b / a)^.pnt_w
+  fv <- at * stats::pgamma(v * g * g / 2, al) * stats::dnorm(t * g - d)
+  for (st in 1:3) {
+    i <- which.max(fv)
+    a <- g[max(1, i - 1L)]
+    b <- g[min(.pnt_m, i + 1L)]
+    g <- a * (b / a)^.pnt_w
+    fv <- at * stats::pgamma(v * g * g / 2, al) * stats::dnorm(t * g - d)
+  }
+  sp <- g[which.max(fv)]
+  if (!is.finite(sp) || sp <= 0) return(0)
+  # 2. local width of the mode in s, converted to the u = sqrt(s) variable:
+  #    min(chi-square curvature, normal curvature)
+  ws <- min(sp / sqrt(v), 1 / (at * (at * sp + d)))
+  us <- sqrt(sp)
+  wu <- ws / (2 * us)
+  if (!is.finite(wu) || wu <= 0) wu <- us / 64
+  # 3. where F(s) = 1 to double precision: above it the integrand is exactly
+  #    |t| phi(|t| s + d), and that tail is Phi(-(|t| s + d)) in closed form
+  sc <- sp * 2^.pnt_k
+  up <- stats::pgamma(al * sc * sc, al, lower.tail = FALSE)
+  hit <- which(up < 1e-19 | at * sc + d > 40)
+  sb <- if (length(hit)) sc[hit[1L]] else Inf
+  pright <- if (is.infinite(sb)) 0 else stats::pnorm(-(at * sb + d))
+  ub <- if (is.infinite(sb)) sqrt(max(0, (40 - d) / at)) else sqrt(sb)
+  if (!is.finite(ub) || ub <= 0) return(pright)
+  # 4. panels: geometric in the distance from the mode on both sides (ratio 2
+  #    near the mode, 4 further out, where the integrand is a plain normal tail)
+  off <- c(2^(-2:6), 2^6 * 4^(1:16))
+  b <- sort(unique(c(0, us - wu * off, us, us + wu * off, ub)))
+  b <- b[b >= 0 & b <= ub]
+  if (length(b) < 2L) return(pright)
+  # The leftmost panel touches s = 0, where F(s) ~ s^v; in u that is the
+  # algebraic u^(2v+1), which a fixed-order Gauss rule cannot integrate to
+  # machine precision when v is small (one panel left ~1e-12 relative error at
+  # v ~ 1).  Subdividing that panel geometrically removes it - the panels that
+  # no longer touch 0 are analytic - but the region is empty (F = 0) whenever v
+  # is large, so it is only subdivided when the integrand there is visible.
+  X <- b[2L]
+  gX <- at * stats::pgamma(v * X^4 / 2, al) * stats::dnorm(t * X^2 - d)
+  if (gX > 1e-18 * max(fv)) {
+    b <- sort(unique(c(b, X / 2^(1:6))))
+    b <- b[b >= 0 & b <= ub]
+  }
+  # substitute s = u^2: for v < 2 the integrand behaves like s^v at 0, which
+  # becomes u^(2v+1) and is smooth there.  One pgamma/dnorm call for all nodes
+  # (about 6x faster than a vapply loop, with identical results).
+  mid <- (b[-1L] + b[-length(b)]) / 2
+  hw <- (b[-1L] - b[-length(b)]) / 2
+  u <- as.vector(outer(hw, .pnt_gl$x) + mid)
+  s <- u * u
+  gv <- at * stats::pgamma(v * s * s / 2, al) * stats::dnorm(t * s - d) * 2 * u
+  pright + sum(as.vector(outer(hw, .pnt_gl$w)) * gv)
+}
 #' @export
 sas_f_probchi <- function(x, df, nc = 0) stats::pchisq(x, df, nc)
 #' @export
@@ -1386,8 +1630,15 @@ interval_or_fail <- function(x, fname, .at) {
                                "r445mon", "r454mon", "r544mon", "week1", "dtweekv", "dtyearv")) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "'"))
   }
+  # WEEKDAYdaysW (weekend days, e.g. WEEKDAY17W) is a valid SAS interval
+  # (cases/ts1m2/probes/intck_intnx): not implemented, so never "invalid"
+  if (is.null(iv) && grepl("^(dt)?weekday[0-9]*w([0-9.]*)$", tolower(strip_both(x)))) {
+    abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (weekend days)"))
+  }
   if (is.null(iv)) return(NULL)
-  if (iv$base %in% c("weekday", "tenday", "semimonth")) abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "'"))
+  if (iv$base == "weekday" && (iv$mult != 1 || iv$shift != 1)) {
+    abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (multiplier or shift index)"))
+  }
   # the shift index of YEAR/SEMIYEAR/QTR is in months and of WEEKn (n > 1) in weeks
   if (iv$shift != 1 && (iv$base %in% c("year", "semiyear", "qtr") || (iv$base == "week" && iv$mult > 1))) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (shift index)"))
@@ -1430,6 +1681,16 @@ interval_index <- function(v, iv) {
       p <- civil(d)
       (p$y - 1960) * 2 + (p$m - 1) %/% 6
     },
+    semimonth = {
+      # two blocks per month: days 1-15 and 16-end
+      p <- civil(d)
+      (p$y - 1960) * 24 + (p$m - 1) * 2 + (p$d > 15)
+    },
+    tenday = {
+      # three blocks per month: days 1-10, 11-20, 21-end
+      p <- civil(d)
+      (p$y - 1960) * 36 + (p$m - 1) * 3 + pmin(p$d - 1, 20) %/% 10
+    },
     year = civil(d)$y - 1960
   )
 }
@@ -1445,6 +1706,8 @@ interval_start <- function(k, iv) {
     month = from_ymd(1960 + k %/% 12, k %% 12 + 1, 1),
     qtr = from_ymd(1960 + k %/% 4, (k %% 4) * 3 + 1, 1),
     semiyear = from_ymd(1960 + k %/% 2, (k %% 2) * 6 + 1, 1),
+    semimonth = from_ymd(1960 + k %/% 24, (k %% 24) %/% 2 + 1, if (k %% 2 == 0) 1 else 16),
+    tenday = from_ymd(1960 + k %/% 36, (k %% 36) %/% 3 + 1, ((k %% 3) * 10) + 1),
     year = from_ymd(1960 + k, 1, 1)
   )
   if (iv$dt) d * 86400 else d
@@ -1453,6 +1716,49 @@ interval_start <- function(k, iv) {
 # Multiplier / shift: group base intervals into blocks of `mult` starting at `shift`.
 block_index <- function(k, iv) floor((k - (iv$shift - 1)) / iv$mult)
 block_first <- function(b, iv) b * iv$mult + (iv$shift - 1)
+
+# WEEKDAY is a shift interval: it has no calendar blocks, it counts weekdays.
+# Day 0 (1960-01-01) was a Friday, so (d + 5) %% 7 is 0 = Sunday ... 6 = Saturday.
+date_dow <- function(d) (d + 5) %% 7
+
+weekdays_inclusive <- function(from, to) {
+  n <- to - from + 1
+  cnt <- (n %/% 7) * 5
+  rem <- n %% 7
+  if (rem > 0) {
+    wd <- date_dow(from + seq_len(rem) - 1L)
+    cnt <- cnt + sum(wd >= 1 & wd <= 5)
+  }
+  cnt
+}
+
+# Number of weekdays in (a, b], negative when b < a.
+weekday_intck <- function(a, b) {
+  if (a == b) return(0)
+  if (a < b) weekdays_inclusive(a + 1, b) else -weekdays_inclusive(b + 1, a)
+}
+
+# Move `n` weekdays from date d.  A weekend d steps to the next (n > 0) or
+# previous (n < 0) weekday on the first step.
+weekday_shift <- function(d, n) {
+  wd <- date_dow(d) # 0 Sun ... 6 Sat
+  if (n > 0) {
+    first <- if (wd == 5L) d + 3 else if (wd == 6L) d + 2 else if (wd == 0L) d + 1 else d + 1
+    r <- n - 1
+    if (r == 0) return(first)
+    dow <- date_dow(first) # 1..5
+    return(first + r + 2 * ((r + dow - 1) %/% 5))
+  }
+  if (n == 0) {
+    if (wd >= 1L && wd <= 5L) return(d)
+    abort_unsupported("INTNX with the WEEKDAY interval and an increment of 0 on a weekend (not verified against SAS)")
+  }
+  first <- if (wd == 1L) d - 3 else if (wd == 0L) d - 2 else if (wd == 6L) d - 1 else d - 1
+  r <- -n - 1
+  if (r == 0) return(first)
+  dow <- date_dow(first)
+  first - (r + 2 * ((r + (5 - dow)) %/% 5))
+}
 
 #' @export
 sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
@@ -1467,6 +1773,10 @@ sas_f_intck <- function(interval, from, to, method = "d", .at = NULL) {
       return(NA_real_)
     }
     if (is.na(a) || is.na(b)) return(NA_real_)
+    if (iv$base == "weekday") {
+      if (substr(mm, 1L, 1L) == "c") abort_unsupported("INTCK with the WEEKDAY interval and the continuous method")
+      return(weekday_intck(a, b))
+    }
     if (substr(mm, 1L, 1L) == "c") {
       if (iv$base %in% c("day", "hour", "minute", "second", "week")) {
         unit <- switch(iv$base, day = if (iv$dt) 86400 else 1, week = if (iv$dt) 7 * 86400 else 7,
@@ -1519,6 +1829,10 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
       note_invalid_arg("intnx", NULL, .at, args)
       return(NA_real_)
     }
+    if (iv$base == "weekday") {
+      if (al %in% c("m", "e")) abort_unsupported("INTNX with the WEEKDAY interval and ALIGN=")
+      return(weekday_shift(s, k))
+    }
     if (abs(k) > 1e7 || !date_in_range(interval_start(block_first(block_index(interval_index(s, iv), iv) + k, iv), iv), iv)) {
       note_invalid_arg("intnx", NULL, .at, args)
       return(NA_real_)
@@ -1559,6 +1873,7 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
 fn_table <- utils::modifyList(fn_table, list(
   substrn = fn_spec("char", 2, 3, "arg"), char = fn_spec("char", 2, 2, 1L), first = fn_spec("char", 1, 1, 1L),
   compbl = fn_spec("char", 1, 1, "arg"), compress = fn_spec("char", 1, 3, "arg"),
+  exist = fn_spec("num", 1, 2),
   find = fn_spec("num", 2, 4), findc = fn_spec("num", 2, 4), findw = fn_spec("num", 2, 5),
   indexw = fn_spec("num", 2, 3), verify = fn_spec("num", 2, Inf), count = fn_spec("num", 2, 3),
   countc = fn_spec("num", 2, 3), countw = fn_spec("num", 1, 3), scan = fn_spec("char", 2, 4, "arg"),

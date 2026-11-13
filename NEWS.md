@@ -1,5 +1,100 @@
 # sasonr (development version)
 
+## Merge of the `dev` line (2026-11-13): two SAS releases
+
+The two development lines are merged. Their gold standards come from two
+maintenance releases of SAS 9.4, and where the releases disagree sasonr now
+follows the one selected with `options(sasonr.sas_version = "TS1M7")`
+(default) or `"TS1M2"` (see `?sasonr_sas_version`).
+
+* **Per-release verification.** The feature registries (`functions.csv`,
+  `formats.csv`, `proc_stats.csv`) have a `sas_version` column and one block
+  of rows per release, each built only from that release's gold. Strict mode
+  gates every function, format and statistic by its status for the selected
+  release; nothing is carried over between releases. The conformance runner
+  runs each case for the release in its `meta.yaml`.
+* **Differences found between the releases** (each with gold on both sides):
+  PROC MEANS moments use fused multiply-adds in TS1M7 and plain arithmetic in
+  TS1M2 (CSS, USS ...; the TS1M2 kernel is verified without WEIGHT/FREQ and
+  fails loud elsewhere); a subnormal numeric literal is an ERROR in TS1M7 and
+  a value in TS1M2; the PROC MEANS N field is at least two columns wide in
+  TS1M2 only; %SYSFUNC with an invalid argument writes no WARNING in TS1M7.
+  PROC FREQ RELRISK / RISKDIFF print other labels and exact limits in TS1M2:
+  only the TS1M7 listing is implemented, TS1M2 fails loud.
+* **MAXDEC=** uses the w.d display engine (as the TS1M2 probe showed): the
+  former half-up rule on the exact binary value differed from the TS1M7 gold
+  in 11 `rounding/proc` cases once the panel layout made them run.
+* Holes closed while merging: CAT-family SQL columns of constant arguments
+  take the value's length again; WEEKDAYdaysW intervals fail loud instead of
+  being treated as invalid; BESTw. with an integer E mantissa fails loud;
+  left-hand SUBSTR of an undeclared variable runs only for TS1M2; display
+  text of the new FREQ and MEANS code goes through the one display engine;
+  `test-proc-means.R` keeps strict mode on. `purrr` is no longer imported.
+
+### From the `dev` line (2026-11-13): PROC FREQ statistics, MEANS moments, display rules
+
+The dev branch merged the upstream `main` (round 11) and continues with the
+clinical procedures and the value runtime.
+
+* **PROC MEANS moments are bit-identical to SAS 9.4 TS1M2** (the TS1M7 kernel of round 12 is kept for TS1M7): CSS, VAR, STD, STDERR,
+  CV and USS are computed with the shifted-sum closed form SAS uses
+  (CSS = sum of squares of the deviations from the reported mean, finalised
+  with the SAS correction term), and USS = CSS + SUM * MEAN.  SKEWNESS and
+  KURTOSIS remain approximate.
+* **The display rules are `[gold]`**: the MAXDEC= display of a printed table,
+  PUT w.d and PROC PRINT w.d share one rounding engine; the default decimals
+  of a printed table (FW=12, no MAXDEC=) follow the rule measured on 155
+  exactly known doubles (E notation below 1E-5, 9 decimals below 1E-3,
+  7 decimals otherwise, the 2-decimal / integer / E branches above 1000, and
+  an E mantissa as wide as the field allows).  Values in the undetermined
+  window of the SAS fuzz and subnormal values fail loud.  The N field of a
+  printed table is never narrower than two columns (TS1M2 only).
+* **PROC FREQ**: one-way tables ignore EXPECTED / DEVIATION / CELLCHI2 (the
+  manual says they have no effect there); RISKDIFF and RELRISK print the risk
+  estimates, the risk differences (Wald, Agresti-Caffo, Hauck-Anderson,
+  Newcombe and the exact unconditional score limits), the odds ratio and
+  relative risk table and the exact confidence limits; multiway tables print
+  the Cochran-Mantel-Haenszel statistics (SCORES=TABLE / RANK), the common
+  odds ratio and relative risks and the Breslow-Day test; the EXACT statement
+  handles the 2x2 EXACT CHISQ; TESTP= / TESTF= print the specified
+  proportions or frequencies; MISSPRINT lists the missing levels of a two-way
+  table; BY groups print one table per group; fractional weights compute
+  CHISQ but not Fisher; a single-row table prints no statistics block.  The
+  exact RELRISK confidence limit that SAS computes with an internal nuisance
+  search (documented algorithm gives 0.08997 where SAS prints 0.0901) stays
+  fail loud.
+* Holes found by an audit of the new PROC FREQ code are closed by guards:
+  EXACT CHISQ with non-integer weights or without the TABLES CHISQ option,
+  EXACT BINOMIAL with non-integer weights, SCORES=RANK combined with CHISQ /
+  FISHER (the per-stratum Mantel-Haenszel rows silently used the table
+  scores), the MISSING option with numeric table scores, MISSPRINT with LIST,
+  statistics after a LIST table, MISSPRINT statistics on a table that is not
+  2x2, RELRISK(CL=) together with RISKDIFF(CL=), EXACT RISKDIFF without the
+  CL= table, RISKDIFF CL= with a zero cell, ALPHA= other than 0.05 outside
+  BINOMIAL, non-integer weights for CMH / RELRISK / RISKDIFF, FISHER with
+  non-integer weights outside 2x2, BY groups outside 2x2 and negative
+  weights all fail loud instead of printing a half-computed result.
+* The PROC SQL NOTE for an out-of-range function argument is reproduced
+  (`NOTE: Invalid argument to function MDY. Missing values may be
+  generated.`). The %SYSFUNC WARNING the dev line added is a TS1M2 behaviour
+  without committed gold (TS1M7 writes no WARNING): TS1M7 keeps the NOTE
+  only, TS1M2 fails loud.
+* **PROC SQL computed character columns** get the lengths SAS gives them
+  (CAT family of column arguments 200, constant arguments the length of the value), and the SQL
+  context of the functions involved is now in the registry.
+* **DATA step**: an assignment to `SUBSTR()` of an undeclared variable
+  (TS1M2; TS1M7 fails loud) creates it as a character variable of length 8, silently truncating an
+  over-long replacement; `EXIST()` reports WORK and SASHELP members (an
+  explicit `TYPE='ANY'` returns 0, as SAS does, because ANY is not a member
+  type); the sign of a zero follows the measured rules in SUM / MEAN / MIN /
+  MAX and in PROC MEANS.
+* **Conformance on the dev line before the merge (own corpus, 758 cases)**: `freq_stats` 56/57,
+  `rounding/proc` 76/84, `functions` 367/370 (23 expected-error cases agree,
+  3 blocked by the upstream `mismatch` status of MDY and CONSTANT),
+  `semantics` 12/13, `fn_examples` 150/184 (the rest are the approximate
+  mathematical functions), `parse_stress` 28/28.  The full test suite is
+  1236 passing with one pre-existing locale failure.
+
 ## Round 13.1 (2026-11-12): review of round 13
 
 An independent review of round 13 found one regression (PERCENT lost its
@@ -134,7 +229,6 @@ open rules.
 * DATA step `SKEWNESS` is bit-identical for up to 10 non-missing arguments
   (`partial`); `KURTOSIS` moved closer (93 % of the probe rows) but stays
   `approximate`.
-
 ## Round 11 (2026-11-12): verification integrity
 
 An independent review of round 10 found ways in which results that do not

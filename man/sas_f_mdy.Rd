@@ -23,7 +23,7 @@ SAS date from month, day and year. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- verified (52 of 52 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (52 of 52 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

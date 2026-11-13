@@ -1,4 +1,4 @@
-entry,kind,sas_behaviour,r_default,sasonr_status,cases,cases_pass,case_ids,note,sas2r_classification
+entry,kind,sas_behaviour,r_default,sasonr_status,cases,cases_pass,case_ids,note,classification
 functions.upcase,function,Upper-cases the fixed-width value; blanks and trailing padding kept,toupper(); NA for missing,verified,1,1,semantics/char_case_strip_length,,adapter_required
 functions.exist,function,"1 if the library member exists, else 0 (DATA by default)",file.exists() tests a different thing,unsupported,1,0,semantics/exist_function,,adapter_required
 functions.lowcase,function,Lower-cases the fixed-width value,tolower(); NA for missing,verified,1,1,semantics/char_case_strip_length,,adapter_required

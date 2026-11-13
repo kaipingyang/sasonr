@@ -99,6 +99,8 @@ ex_text <- function(nm) {
 }
 # the feature registry (tools/update_registry.R) is the primary source
 reg <- if (file.exists("inst/registry/functions.csv")) utils::read.csv("inst/registry/functions.csv", stringsAsFactors = FALSE) else NULL
+# documentation describes the default release (TS1M7)
+if (!is.null(reg) && !is.null(reg$sas_version)) reg <- reg[reg$sas_version == "TS1M7", ]
 # per-function parameter descriptions (SAS semantics), else the generic ones
 fn_params <- if (file.exists("tools/fn_params.tsv")) utils::read.delim("tools/fn_params.tsv", quote = "", colClasses = "character") else NULL
 param_text <- function(nm, p) {

@@ -19,7 +19,7 @@ Logarithm of the beta function. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- approximate (24 of 29 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 1.3e-15; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (24 of 29 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 1.3e-15; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

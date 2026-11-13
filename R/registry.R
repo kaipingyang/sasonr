@@ -37,9 +37,11 @@ registry_cache <- new.env(parent = emptyenv())
 #' @return A data frame, one row per function, per format/informat or per
 #'   semantic entry, as generated from the offline conformance results against
 #'   SAS 9.4.
+#' @param sas_version The SAS 9.4 release whose rows are returned (default:
+#'   the selected release, see [sasonr_sas_version]); `NULL` returns every row.
 #' @keywords internal
 #' @export
-sas_feature_registry <- function(kind = c("functions", "formats", "semantics")) {
+sas_feature_registry <- function(kind = c("functions", "formats", "semantics"), sas_version = sas_target_version()) {
   kind <- match.arg(kind)
   if (is.null(registry_cache[[kind]])) {
     f <- system.file("registry", paste0(kind, ".csv"), package = "sasonr")
@@ -49,7 +51,55 @@ sas_feature_registry <- function(kind = c("functions", "formats", "semantics")) 
       data.frame(name = character(), kind = character(), status = character(), stringsAsFactors = FALSE)
     }
   }
-  registry_cache[[kind]]
+  registry_version_rows(registry_cache[[kind]], sas_version)
+}
+
+#' SAS 9.4 release that sasonr reproduces
+#'
+#' Verification against SAS is recorded per maintenance release of SAS 9.4:
+#' the registries ([sas_feature_registry()]) have one block of rows per
+#' release (column `sas_version`). `options(sasonr.sas_version = "TS1M7")`
+#' (the default) or `"TS1M2"` selects the release: strict mode gates every
+#' function, format and procedure statistic by its status for that release,
+#' and the code paths whose SAS behaviour differs between the releases (for
+#' example the PROC MEANS moment arithmetic) follow it. Nothing is carried
+#' over from one release to the other; a feature without evidence for the
+#' selected release is `unverified` there.
+#'
+#' @name sasonr_sas_version
+#' @aliases sasonr.sas_version
+#' @examples
+#' old <- options(sasonr.sas_version = "TS1M7")
+#' getOption("sasonr.sas_version")
+#' options(old)
+NULL
+
+# ---- SAS version of the gold standard ----------------------------------------------
+#
+# Verification is recorded per SAS release (registries: column `sas_version`).
+# `options(sasonr.sas_version = "TS1M7")` (default) or "TS1M2" selects the
+# release sasonr reproduces: the registry rows of that release gate the
+# features (strict mode), and the code paths whose SAS behaviour differs
+# between the releases follow it.  Nothing is carried over from one release to
+# the other: a feature without evidence for the selected release is
+# `unverified` there.
+sas_versions <- c("TS1M7", "TS1M2")
+
+sas_target_version <- function() {
+  v <- getOption("sasonr.sas_version", "TS1M7")
+  if (!is.character(v) || length(v) != 1L || !toupper(v) %in% sas_versions) {
+    sasonr_abort(paste0("Unsupported: option sasonr.sas_version = ", format(v)[1], " (supported: ",
+                        paste(sas_versions, collapse = ", "), ")"), "sasonr_unsupported")
+  }
+  toupper(v)
+}
+
+# The rows of a registry for one SAS release (NULL: every row).  A registry
+# without the column (semantics.csv) holds TS1M7 evidence only.
+registry_version_rows <- function(reg, sas_version) {
+  if (is.null(sas_version)) return(reg)
+  if (is.null(reg$sas_version)) return(if (identical(sas_version, "TS1M7")) reg else reg[0, , drop = FALSE])
+  reg[reg$sas_version == sas_version, , drop = FALSE]
 }
 
 # Status of one feature: "verified", "partial", "mismatch", "not_comparable",
@@ -84,12 +134,13 @@ feature_context_label <- function(context) {
 }
 
 feature_status_text <- function(status) {
-  if (is.na(status)) return("is not in the feature registry (not verified against SAS 9.4)")
+  v <- paste0("SAS 9.4 (", sas_target_version(), ")")
+  if (is.na(status)) return(paste0("is not in the feature registry (not verified against ", v, ")"))
   switch(status,
-    approximate = "is approximate (some results differ from SAS 9.4 in the last bits)",
-    unverified = "is not verified against SAS 9.4 (no SAS verification cases)",
-    mismatch = "has results that differ from SAS 9.4",
-    unsupported = "fails loud in every SAS 9.4 verification case",
+    approximate = paste0("is approximate (some results differ from ", v, " in the last bits)"),
+    unverified = paste0("is not verified against ", v, " (no SAS verification cases)"),
+    mismatch = paste0("has results that differ from ", v),
+    unsupported = paste0("fails loud in every ", v, " verification case"),
     paste("has status", status)
   )
 }
@@ -133,7 +184,7 @@ feature_check <- function(kind, name, line = NULL, context = "data") {
   if (feature_gated(st)) {
     what <- sprintf("%s %s %s", kind, toupper(name), feature_status_text(st))
   } else if (kind == "function" && !context %in% (ctx <- feature_contexts(name))) {
-    what <- sprintf("function %s is not verified against SAS 9.4 in %s (verified in: %s)", toupper(name),
+    what <- sprintf("function %s is not verified against SAS 9.4 (%s) in %s (verified in: %s)", toupper(name), sas_target_version(),
                     feature_context_label(context), if (length(ctx)) paste(vapply(ctx, feature_context_label, ""), collapse = ", ") else "no context")
   } else {
     return(invisible())

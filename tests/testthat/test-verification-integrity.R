@@ -40,6 +40,22 @@ test_that("HIGH 2: functions whose log differed from SAS (MDY, PRXCHANGE, PRXMAT
   expect_identical(fn$status[fn$name == "MDY"], "verified")
   withr::with_options(list(sasonr.strict = TRUE),
                       expect_identical(sas_run("data a; d = mdy(1, 2, 2020); run;")$work$a$d, 21916))
+  # MDY: the two matrix cases that differed were the %SYSFUNC and PROC SQL log
+  # NOTEs of an out-of-range argument; both texts are reproduced now (a local
+  # SAS probe of the same calls), so the function is verified in its contexts.
+  expect_true(all(c("data", "sysfunc", "sql") %in% strsplit(fn$contexts_verified[fn$name == "MDY"], " ")[[1]]))
+  # SAS 9.4 TS1M7 (fn_matrix/MDY MDY_5ad84f): the NOTE only, no WARNING
+  r <- sas_run("%let x = %sysfunc(mdy(2, 30, 2024));")
+  expect_false(any(grepl("^WARNING", r$log)))
+  expect_true(any(grepl("^NOTE: Mathematical operations could not be performed during %SYSFUNC function execution", r$log)))
+  # TS1M2 writes a WARNING as well, which no committed TS1M2 gold shows: fail loud
+  withr::with_options(list(sasonr.sas_version = "TS1M2"),
+                      expect_error(sas_run("%let x = %sysfunc(mdy(2, 30, 2024));", on_error = "abort"),
+                                   class = "sasonr_unsupported"))
+  r2 <- sas_run("data one; x = 1; run;
+    proc sql; create table t as select mdy(2, 30, 2024) as d from one; quit;")
+  expect_true(any(grepl("^NOTE: Invalid argument to function MDY\\. Missing values may be generated\\.$", r2$log)))
+  expect_true(is.na(r2$work$t$d))
   # PRXMATCH / PRXCHANGE: an invalid pattern (SAS writes the Perl diagnostic) now fails loud
   expect_error(sas_f_prxmatch("/[/", "abc"), class = "sasonr_unsupported")
   expect_error(sas_f_prxchange("s/[/x/", 1, "a"), class = "sasonr_unsupported")
@@ -142,12 +158,16 @@ test_that("HIGH 6: when the variables cannot be derived from the parsed step, sa
 
 test_that("MEDIUM 1: PROC FREQ statistics use the common strict gate", {
   d <- "data d; input a $ b $ n; datalines;\nX Y 3\nX Z 4\nW Y 5\nW Z 2\n;\nrun;\n"
+  # CMH became verified (freq_stats c51-c57); CMH1 is still unverified and shows
+  # that the PROC FREQ statistics go through the common strict gate.
   withr::with_options(list(sasonr.strict = TRUE), {
-    expect_error(sas_run(paste(d, "proc freq data=d; tables a*b / cmh; weight n; run;")), class = "sasonr_not_verified")
+    e <- tryCatch(sas_run(paste(d, "proc freq data=d; tables a*b / cmh1; weight n; run;")), error = function(z) z)
+    expect_s3_class(e, "sasonr_not_verified")
+    expect_match(conditionMessage(e), "PROC FREQ statistic CMH1", fixed = TRUE)
   })
   withr::with_options(list(sasonr.strict = FALSE), {
     n <- 0L
-    withCallingHandlers(sas_run(paste(d, "proc freq data=d noprint; tables a*b / cmh; weight n; output out=o cmh; run;")),
+    withCallingHandlers(try(sas_run(paste(d, "proc freq data=d; tables a*b / cmh1; weight n; run;")), silent = TRUE),
                         sasonr_unverified = function(w) {
                           n <<- n + 1L
                           invokeRestart("muffleWarning")

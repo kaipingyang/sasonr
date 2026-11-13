@@ -19,7 +19,7 @@ Number of combinations. See the \href{https://documentation.sas.com/doc/en/lefun
 }
 
 \section{Verification}{
- approximate (108 of 330 SAS 9.4 cases agree bit for bit; 222 case(s) differ in the last bits (largest relative difference 2.3e-13; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (108 of 330 SAS 9.4 cases agree bit for bit; 222 case(s) differ in the last bits (largest relative difference 2.3e-13; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

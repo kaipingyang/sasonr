@@ -19,7 +19,7 @@ Position of the first character not in the excerpts. See the \href{https://docum
 }
 
 \section{Verification}{
- verified (27 of 27 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (27 of 27 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

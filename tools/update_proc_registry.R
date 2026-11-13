@@ -13,6 +13,15 @@
 # (some values differ), unverified (no evidence).
 
 args <- commandArgs(trailingOnly = TRUE)
+# --sas-version V (default TS1M7): rebuild the rows of that SAS release from
+# the specification rows of that release (tools/proc_stats.tsv column
+# sas_version); the other release's rows are kept.
+sas_version <- "TS1M7"
+k <- match("--sas-version", args)
+if (!is.na(k)) {
+  sas_version <- toupper(args[k + 1L])
+  args <- args[-c(k, k + 1L)]
+}
 root <- normalizePath(if (length(args)) args[1] else "tests/conformance")
 suppressMessages(devtools::load_all(".", quiet = TRUE, helpers = FALSE))
 env <- new.env(parent = asNamespace("sasonr"))
@@ -20,6 +29,8 @@ sys.source("tests/testthat/helper-conformance.R", envir = env)
 
 spec <- utils::read.delim("tools/proc_stats.tsv", comment.char = "#", colClasses = "character", quote = "")
 spec[is.na(spec)] <- ""
+if (!sas_version %in% get("sas_versions", asNamespace("sasonr"))) stop("unknown SAS release ", sas_version)
+spec <- spec[spec$sas_version == sas_version, , drop = FALSE]
 items <- lapply(strsplit(spec$evidence, ";", fixed = TRUE), function(e) e[nzchar(e)])
 cases <- unique(unlist(lapply(items, function(e) sub("\\|.*$", "", e))))
 
@@ -27,7 +38,7 @@ run_prog <- function(case) {
   dir <- file.path(root, case)
   old <- setwd(tempdir())
   on.exit(setwd(old))
-  op <- options(sasonr.strict = FALSE, sasonr.step_notes = TRUE)
+  op <- options(sasonr.strict = FALSE, sasonr.step_notes = TRUE, sasonr.sas_version = sas_version)
   on.exit(options(op), add = TRUE)
   code <- readLines(file.path(dir, "program.sas"), warn = FALSE, encoding = "latin1")
   tryCatch(suppressWarnings(sas_run(code)), error = function(e) e)
@@ -37,7 +48,9 @@ whole <- list()
 for (cs in cases) {
   needs_whole <- any(vapply(items, function(e) cs %in% e, logical(1)))
   if (needs_whole) {
-    r <- env$conf_run_case(file.path(root, cs))
+    # strict off: the registry must not rebuild itself from its own gate (a
+    # whole case counts only when every layer is bit-identical to the gold)
+    r <- withr::with_options(list(sasonr.strict = FALSE), env$conf_run_case(file.path(root, cs)))
     whole[[cs]] <- r$status %in% c("pass", "both_error")
   }
   if (any(vapply(items, function(e) any(startsWith(e, paste0(cs, "|"))), logical(1)))) results[[cs]] <- run_prog(cs)
@@ -77,11 +90,19 @@ out <- do.call(rbind, lapply(seq_len(nrow(spec)), function(i) {
   note <- spec$note[i]
   if (status == "approximate") note <- paste(c(if (nzchar(note)) note,
                                                sprintf("%d of %d values bit-identical to SAS", ok, n)), collapse = "; ")
-  data.frame(proc = spec$proc[i], statistic = spec$statistic[i], condition = spec$condition[i], status = status,
+  data.frame(sas_version = sas_version, proc = spec$proc[i], statistic = spec$statistic[i], condition = spec$condition[i], status = status,
              domain = spec$domain[i], compared = n, identical = ok,
              evidence = paste(unique(sub("\\|.*$", "", ev)), collapse = " "), note = note, updated = today,
              stringsAsFactors = FALSE)
 }))
-utils::write.csv(out, "inst/registry/proc_stats.csv", row.names = FALSE)
+old <- if (file.exists("inst/registry/proc_stats.csv")) utils::read.csv("inst/registry/proc_stats.csv", stringsAsFactors = FALSE, colClasses = "character") else NULL
+if (!is.null(old)) {
+  if (is.null(old$sas_version)) old$sas_version <- "TS1M7"
+  old <- old[old$sas_version != sas_version, names(out), drop = FALSE]
+}
+all_rows <- rbind(old, out)
+all_rows <- all_rows[order(match(all_rows$sas_version, get("sas_versions", asNamespace("sasonr")))), , drop = FALSE]
+utils::write.csv(all_rows, "inst/registry/proc_stats.csv", row.names = FALSE)
+cat("SAS", sas_version, "\n")
 tab <- table(paste(out$proc, out$status))
 cat(paste(names(tab), tab), sep = "\n")

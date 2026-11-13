@@ -19,7 +19,7 @@ Position of the first alphanumeric character (0 if none). See the \href{https://
 }
 
 \section{Verification}{
- verified (33 of 33 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (33 of 33 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

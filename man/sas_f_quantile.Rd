@@ -21,7 +21,7 @@ Quantile function. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- approximate (34 of 46 SAS 9.4 cases agree bit for bit; 6 case(s) differ in the last bits (largest relative difference 4.9e-16; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (34 of 46 SAS 9.4 cases agree bit for bit; 6 case(s) differ in the last bits (largest relative difference 4.9e-16; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

@@ -19,7 +19,7 @@ Beta function. See the \href{https://documentation.sas.com/doc/en/lefunctionsref
 }
 
 \section{Verification}{
- approximate (25 of 30 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (25 of 30 SAS 9.4 cases agree bit for bit; 5 case(s) differ in the last bits (largest relative difference 3.0e-14; different algorithm)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

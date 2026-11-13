@@ -17,7 +17,7 @@ Length without trailing blanks (0 for a blank string). See the \href{https://doc
 }
 
 \section{Verification}{
- verified (16 of 16 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (16 of 16 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

@@ -23,7 +23,7 @@ Quantile of the F distribution. See the \href{https://documentation.sas.com/doc/
 }
 
 \section{Verification}{
- approximate (26 of 45 SAS 9.4 cases agree bit for bit; 13 case(s) differ in the last bits (largest relative difference 4.1e-13; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (26 of 45 SAS 9.4 cases agree bit for bit; 13 case(s) differ in the last bits (largest relative difference 4.1e-13; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

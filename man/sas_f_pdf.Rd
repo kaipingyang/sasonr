@@ -21,7 +21,7 @@ Probability density (mass) function. See the \href{https://documentation.sas.com
 }
 
 \section{Verification}{
- approximate (30 of 47 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits (largest relative difference 1.3e-15; different algorithm); 7 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (30 of 47 SAS 9.4 cases agree bit for bit; 10 case(s) differ in the last bits (largest relative difference 1.3e-15; different algorithm); 7 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

@@ -21,7 +21,7 @@ Days between two dates under a day-count basis. See the \href{https://documentat
 }
 
 \section{Verification}{
- verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (37 of 37 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

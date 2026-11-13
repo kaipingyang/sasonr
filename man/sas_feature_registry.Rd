@@ -4,12 +4,18 @@
 \alias{sas_feature_registry}
 \title{Feature registry (functions, formats/informats, SAS semantics) with the verification status}
 \usage{
-sas_feature_registry(kind = c("functions", "formats", "semantics"))
+sas_feature_registry(
+  kind = c("functions", "formats", "semantics"),
+  sas_version = sas_target_version()
+)
 }
 \arguments{
 \item{kind}{\code{"functions"}, \code{"formats"} or \code{"semantics"} (SAS behaviours that
 differ from R defaults -- missing values, fixed-length strings, PROC SQL
 remerge ... -- each with the SAS cases that cover it).}
+
+\item{sas_version}{The SAS 9.4 release whose rows are returned (default:
+the selected release, see \link{sasonr_sas_version}); \code{NULL} returns every row.}
 }
 \value{
 A data frame, one row per function, per format/informat or per

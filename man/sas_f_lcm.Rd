@@ -17,7 +17,7 @@ Least common multiple. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Verification}{
- partial (31 of 35 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: LCM with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (31 of 35 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: LCM with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

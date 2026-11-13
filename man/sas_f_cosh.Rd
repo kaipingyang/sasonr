@@ -19,7 +19,7 @@ Hyperbolic cosine. See the \href{https://documentation.sas.com/doc/en/lefunction
 }
 
 \section{Verification}{
- approximate (337 of 419 SAS 9.4 cases agree bit for bit; 82 case(s) differ in the last bits). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (337 of 419 SAS 9.4 cases agree bit for bit; 82 case(s) differ in the last bits). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

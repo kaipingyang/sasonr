@@ -233,10 +233,12 @@ args_matrix <- function(args) {
 #' @export
 sas_f_sum <- function(...) {
   m <- args_matrix(list(...))
-  # sequential double sum (rowSums accumulates in long double; SAS 9.4: SUM(-0) is -0)
+  # sequential double sum in argument order; a missing argument counts as +0
+  # for the sign of a zero result (cases/ts1m2/proc/zero_sign: SUM(., -0) is +0)
   out <- as.numeric(apply(m, 1, function(r) {
-    v <- r[!is.na(r)]
-    if (length(v) == 0) 0 else Reduce(`+`, v)
+    if (all(is.na(r))) return(0)
+    r[is.na(r)] <- 0
+    Reduce(`+`, r)
   }))
   none <- rowSums(!is.na(m)) == 0
   out[none] <- NA_real_
@@ -259,8 +261,9 @@ sas_f_mean <- function(...) {
   out <- apply(m, 1, function(r) {
     v <- r[!is.na(r)]
     if (length(v) == 0) return(NA_real_)
-    # zeros of both signs: SAS 9.4 gives -0 for MEAN(-0, 0) (rule not determined)
-    if (all(v == 0) && length(unique(1 / v)) > 1) abort_unsupported("MEAN of zeros with different signs")
+    # all values are zero: SAS returns the first non-missing argument's sign
+    # (gold cases/ts1m2/proc/zero_sign: MEAN(-0, 0) is -0, MEAN(0, -0) is +0)
+    if (all(v == 0)) return(v[1])
     Reduce(`+`, v) / length(v)
   })
   as.numeric(out)
@@ -268,16 +271,25 @@ sas_f_mean <- function(...) {
 #' @export
 sas_f_min <- function(...) {
   m <- args_matrix(list(...))
-  out <- suppressWarnings(apply(m, 1, min, na.rm = TRUE))
-  out[is.infinite(out)] <- NA_real_
-  out
+  # ties keep the first non-missing argument (its zero sign), as SAS does
+  out <- apply(m, 1, function(r) {
+    v <- r[!is.na(r)]
+    if (length(v) == 0) return(NA_real_)
+    k <- min(v)
+    v[which(v == k)[1L]]
+  })
+  as.numeric(out)
 }
 #' @export
 sas_f_max <- function(...) {
   m <- args_matrix(list(...))
-  out <- suppressWarnings(apply(m, 1, max, na.rm = TRUE))
-  out[is.infinite(out)] <- NA_real_
-  out
+  out <- apply(m, 1, function(r) {
+    v <- r[!is.na(r)]
+    if (length(v) == 0) return(NA_real_)
+    k <- max(v)
+    v[which(v == k)[1L]]
+  })
+  as.numeric(out)
 }
 
 fuzz_int <- function(x) {
@@ -470,6 +482,90 @@ sas_f_substr <- function(x, pos, len = NULL, .at = NULL) {
   out[bad_pos] <- ""
   out
 }
+#' @export
+# Left-hand SUBSTR: replace part of a character variable in place.  An invalid
+# position is a SAS data error (the variable keeps its value); a replacement
+# shorter than the target window is padded with blanks, a longer one is cut to
+# the room that remains.
+sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
+  x <- as_sas_chr(x)
+  value <- as_sas_chr(value)
+  m <- max(length(x), length(pos), length(value), if (is.null(len)) 1L else length(len))
+  x <- rep_len(x, m)
+  value <- rep_len(value, m)
+  pos <- rep_len(trunc(pos), m)
+  n <- nchar(x)
+  bad <- is.na(pos) | pos < 1 | pos > n
+  if (any(bad)) note_invalid_arg("substr", 2L, .at)
+  if (is.null(len)) {
+    fill <- n - pos + 1L
+  } else {
+    len <- rep_len(trunc(len), m)
+    bad_len <- !bad & (is.na(len) | len < 0)
+    if (any(bad_len)) note_invalid_arg("substr", 3L, .at)
+    fill <- ifelse(is.na(len), n - pos + 1L, pmin(len, n - pos + 1L))
+  }
+  fill[bad] <- 0L
+  fill <- pmax(0L, fill)
+  out <- x
+  for (i in seq_len(m)) {
+    if (is.na(fill[i]) || fill[i] <= 0L) next
+    p <- pos[i]
+    rep_txt <- substr(value[i], 1L, fill[i])
+    pad <- fill[i] - nchar(rep_txt)
+    if (pad > 0L) rep_txt <- paste0(rep_txt, strrep(" ", pad))
+    out[i] <- paste0(substr(x[i], 1L, p - 1L), rep_txt, substr(x[i], p + fill[i], n[i]))
+  }
+  out
+}
+
+#' @export
+# EXIST(member <, type>): 1 when the member exists, 0 otherwise.  WORK and
+# SASHELP are the libraries sasonr knows (R/sashelp.R).  The type argument is a
+# member type: 'DATA' is verified, an explicit 'ANY' is not a valid member type
+# in SAS and returns 0 (TS1M2 probe), and any other type fails loud because it
+# is not verified.
+sas_f_exist <- function(name, type = NULL, .work = NULL, .at = NULL) {
+  n <- max(length(name), if (is.null(type)) 1L else length(type))
+  nm <- rep_len(as_sas_chr(name), n)
+  ty <- if (is.null(type)) rep_len(NA_character_, n) else rep_len(toupper(trimws(as_sas_chr(type))), n)
+  vapply(seq_len(n), function(i) sas_exist_one(nm[i], ty[i], .work, .at), 0)
+}
+
+sas_exist_one <- function(nm, type, .work, .at) {
+  nm <- trimws(nm)
+  if (is.na(nm) || !nzchar(nm)) {
+    abort_unsupported("EXIST() of a missing or blank member name (not verified against SAS)")
+  }
+  # SAS: an explicit TYPE='ANY' is not a valid member type, EXIST returns 0
+  if (!is.na(type) && identical(type, "ANY")) return(0)
+  if (!is.na(type) && !identical(type, "DATA")) {
+    abort_unsupported(paste0("EXIST() with TYPE='", type, "' (only DATA is verified)"))
+  }
+  dot <- regexpr("\\.", nm)
+  if (dot > 0) {
+    lib <- tolower(substr(nm, 1L, dot - 1L))
+    mem <- substr(nm, dot + 1L, nchar(nm))
+  } else {
+    lib <- "work"
+    mem <- nm
+  }
+  mem <- tolower(trimws(mem))
+  if (!nzchar(mem)) abort_unsupported("EXIST() with an empty member name (not verified against SAS)")
+  if (lib %in% c("work", "w")) {
+    if (is.null(.work)) abort_unsupported("EXIST() outside a DATA step environment")
+    return(as.numeric(mem %in% tolower(ls(.work, all.names = TRUE))))
+  }
+  if (lib == "sashelp") {
+    # a member missing from the local SASHELP export may still exist in SAS:
+    # not knowable here, so only an exported member answers (1)
+    if (file.exists(file.path(sashelp_dir(), paste0(mem, ".rds")))) return(1)
+    abort_unsupported(paste0("EXIST('SASHELP.", toupper(mem), "'): the member is not in the local SASHELP export ",
+                             "(whether SAS has it is not known here)"))
+  }
+  abort_unsupported(paste0("EXIST('", toupper(lib), ".", toupper(mem), "') for a library other than WORK or SASHELP (not verified against SAS)"))
+}
+
 #' @export
 sas_f_index <- function(x, s) {
   ab <- recycle2(as_sas_chr(x), s)
@@ -756,6 +852,13 @@ sas_fmt_best <- function(x, w = 12L) {
     if (is.na(s) && abs(v) >= 1 && w <= 15L) {
       # too large for fixed notation: the E form of w.d (integer mantissa allowed)
       sci <- sci_fit(v, w)
+      # w.d writes an integer mantissa ("25E5"); BESTw. wrote "2.5E6" in
+      # 6 columns for 2500000 (cases/ts1m2/probes/formats_numeric_display,
+      # TS1M2; no TS1M7 gold): the BEST choice there is not verified
+      if (!is.na(sci) && grepl("^-?[0-9]{2,}E", sci)) {
+        abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), " in E notation with an integer mantissa (",
+                                 sci, "): not verified against SAS"))
+      }
     } else if ((is.na(s) || abs(v) < 1e-5) && w > 15L) {
       # wide widths: at most 14 significant digits, truncated (sig15)
       g <- sig15(abs(v))

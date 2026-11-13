@@ -14,7 +14,7 @@ Current time of day. See the \href{https://documentation.sas.com/doc/en/lefuncti
 }
 
 \section{Verification}{
- not comparable (3 SAS 9.4 cases check type and range only; the value depends on the session clock). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ not comparable (3 SAS 9.4 cases check type and range only; the value depends on the session clock). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

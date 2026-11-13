@@ -17,7 +17,7 @@ Absolute value. See the \href{https://documentation.sas.com/doc/en/lefunctionsre
 }
 
 \section{Verification}{
- verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (21 of 21 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

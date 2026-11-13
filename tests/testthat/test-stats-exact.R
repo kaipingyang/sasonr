@@ -3,6 +3,14 @@
 
 hex <- function(x) paste(rev(as.character(writeBin(x, raw()))), collapse = "")
 
+# hex16 text -> double, for the bit-exact expectations below.
+unhex <- function(h) {
+  vapply(h, function(one) {
+    b <- as.raw(strtoi(substring(one, seq(1L, 15L, 2L), seq(2L, 16L, 2L)), 16L))
+    readBin(b, "double", size = 8L, endian = "big")
+  }, 0, USE.NAMES = FALSE)
+}
+
 test_that("the emulated fused multiply-add is exactly rounded", {
   expect_identical(stats_fma(0.1, 10, -1), 5.551115123125783e-17)
   expect_identical(stats_fma(3, 1 / 3, -1), -2^-54) # 3 * (1/3 rounded) - 1, exactly
@@ -202,3 +210,42 @@ test_that("MOD and MODZ: exact remainders inside the verified domain, fail loud 
 test_that("HARMEAN sums the reciprocals in argument order", {
   expect_identical(sas_f_harmean(0.1, 0.2, 0.3), 3 / Reduce(`+`, 1 / c(0.1, 0.2, 0.3)))
 })
+
+test_that("PROC MEANS CSS for SAS 9.4 TS1M2: shifted sums closed without fma", {
+  withr::local_options(sasonr.sas_version = "TS1M2")
+  css <- function(x) stats_moments(x, "means", need = "css")$css
+  # S2 - q (2 S1 - n q) with q = SUM/n - c0 (cases/ts1m2/rounding/means_accum)
+  expect_identical(hex(css(c(0.1, 0.2, 0.3))), "3f947ae147ae147a")
+  expect_identical(hex(css(c(1, 2, 3, 4))), "4014000000000000")
+  expect_identical(css(5), 0)
+  # nearly constant data, WEIGHT and SKEWNESS have no TS1M2 gold: fail loud
+  expect_error(css(c(1, 1 + 2^-52, 1 + 3 * 2^-52)), class = "sasonr_unsupported")
+  expect_error(stats_moments(c(1, 2), "means", weight = c(1, 2), need = "css"), class = "sasonr_unsupported")
+  expect_error(stats_moments(c(1, 2, 4), "means", need = c("css", "skew")), class = "sasonr_unsupported")
+})
+
+test_that("the SAS version option is validated", {
+  withr::local_options(sasonr.sas_version = "TS1M9")
+  expect_error(sas_target_version(), class = "sasonr_unsupported")
+})
+
+test_that("PROC MEANS: CSS, VAR, STD, STDERR, CV and USS are bit-identical to SAS", {
+  code <- paste0(
+    "data a; input g x; datalines;\n",
+    "1 0.1\n1 0.2\n1 0.3\n2 1\n2 2\n2 3\n2 4\n",
+    "3 1\n3 1.0000000000000002\n3 1.0000000000000006\n;\nrun;\n",
+    "proc means data=a noprint; by g; var x;",
+    " output out=o n=n mean=m css=css var=v std=sd stderr=se cv=cv uss=uss; run;"
+  )
+  r <- sas_run(code) # strict mode: every statistic below must be verified
+  o <- r$work$o
+  expect_identical(o$m, unhex(c("3fc999999999999b", "4004000000000000", "3ff0000000000001")))
+  expect_identical(o$css, unhex(c("3f947ae147ae147a", "4014000000000000", "39a4000000000000")))
+  expect_identical(o$v, unhex(c("3f847ae147ae147a", "3ffaaaaaaaaaaaab", "3994000000000000")))
+  expect_identical(o$sd, unhex(c("3fb9999999999999", "3ff4a7e9cb8a3491", "0000000000000000")))
+  expect_identical(o$se, unhex(c("3fad8f7208e6b82c", "3fe4a7e9cb8a3491", "3cb4a7e9cb8a3491")))
+  expect_identical(o$cv, unhex(c("4048ffffffffffff", "4049d1e43e6cc1b5", "0000000000000000")))
+  expect_identical(o$uss, unhex(c("3fc1eb851eb851ed", "403e000000000000", "4008000000000004")))
+})
+
+

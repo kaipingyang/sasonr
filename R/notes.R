@@ -240,6 +240,7 @@ stmt_assigns_all <- function(s) {
   out <- switch(s$stmt,
     assign = if (s$target$node == "var") s$target$name,
     sum = s$target$name,
+    substr_assign = s$var,
     do = s$var,
     call = c(unlist(lapply(s$targets, function(t) if (t$node == "var") t$name)),
              unlist(lapply(s$args, function(a) if (identical(a$node, "var")) a$name))),

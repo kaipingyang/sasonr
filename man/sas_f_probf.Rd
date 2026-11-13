@@ -23,7 +23,7 @@ F cumulative probability. See the \href{https://documentation.sas.com/doc/en/lef
 }
 
 \section{Verification}{
- approximate (28 of 45 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 2.2e-14; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (28 of 45 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 2.2e-14; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

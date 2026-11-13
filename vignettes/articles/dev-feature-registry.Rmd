@@ -64,11 +64,18 @@ inputs listed per case); each case is still compared on its own: the
 value bit for bit, type and length, `_ERROR_`, the log NOTEs of its step
 (with line numbers) and its PUT output.
 
+Verification is recorded per SAS 9.4 maintenance release (column
+`sas_version`): the tables below show the default release, TS1M7.
+`options(sasonr.sas_version = "TS1M2")` selects the TS1M2 rows, which come
+only from TS1M2 gold (see `?sasonr_sas_version`); a feature without TS1M2
+evidence is `unverified` there.
+
 ## Functions
 
 ```{r}
 fn <- utils::read.csv(system.file("registry", "functions.csv", package = "sasonr"),
                       stringsAsFactors = FALSE)
+fn <- fn[fn$sas_version == "TS1M7", ]
 tab <- table(factor(fn$status, c("verified", "partial", "not_comparable", "approximate", "mismatch", "unsupported", "unverified")))
 cat(sprintf("Functions: %d (%s); cases: %d, of which %d agree bit for bit.",
             nrow(fn), paste(sprintf("%s %d", names(tab), as.integer(tab)), collapse = ", "),
@@ -98,6 +105,7 @@ knitr::kable(dom, col.names = c("Function", "Verified domain (other inputs fail 
 ```{r}
 fm <- utils::read.csv(system.file("registry", "formats.csv", package = "sasonr"),
                       stringsAsFactors = FALSE)
+fm <- fm[fm$sas_version == "TS1M7", ]
 tab <- table(factor(fm$status, c("verified", "partial", "approximate", "mismatch", "unsupported", "unverified")))
 cat(sprintf("Formats and informats: %d (%s); cases: %d, of which %d agree bit for bit.",
             nrow(fm), paste(sprintf("%s %d", names(tab), as.integer(tab)), collapse = ", "),
@@ -136,6 +144,7 @@ between neighbours even when the result is one of them.
 ```{r}
 ps <- utils::read.csv(system.file("registry", "proc_stats.csv", package = "sasonr"),
                       stringsAsFactors = FALSE)
+ps <- ps[ps$sas_version == "TS1M7", ]
 tab <- table(factor(ps$status, c("verified", "partial", "approximate", "unverified")))
 cat(sprintf("Procedure statistics: %d rows (%s).", nrow(ps),
             paste(sprintf("%s %d", names(tab), as.integer(tab)), collapse = ", ")))

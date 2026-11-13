@@ -100,6 +100,42 @@ data m; merge a b; by k; run;"
   expect_equal(res$work$m$y, 2)
 })
 
+test_that("MERGE walks observations when both inputs repeat a BY group", {
+  # Verified against SAS 9.4: a many-to-many MERGE pairs the two inputs
+  # observation by observation (the shorter input falls back to missing) and a
+  # common non-BY variable keeps the value from the last data set named.
+  code <- "data a; input k x; datalines;
+1 10
+1 11
+2 20
+;
+run;
+data b; input k y; datalines;
+1 100
+1 101
+2 200
+;
+run;
+data m; merge a b; by k; run;
+data c; input k v; datalines;
+1 10
+1 11
+;
+run;
+data d; input k v; datalines;
+1 100
+1 101
+;
+run;
+data m2; merge c d; by k; run;"
+  res <- sas_run(code)
+  expect_equal(res$work$m$k, c(1, 1, 2))
+  expect_equal(res$work$m$x, c(10, 11, 20))
+  expect_equal(res$work$m$y, c(100, 101, 200))
+  expect_equal(res$work$m2$k, c(1, 1))
+  expect_equal(res$work$m2$v, c(100, 101))
+})
+
 test_that("RENAME statement applies before output DROP=; data set WHERE= beats WHERE", {
   code <- "data s; input lane weight; datalines;\n1 410\n3 630\n;\nrun;
 data r(drop=kg); set s; rename weight=kg; run;
@@ -120,4 +156,67 @@ test_that("invalid programs SAS rejects fail loud", {
 
 test_that("TIMEw.d writes fractional seconds", {
   expect_equal(sas_run("data _null_; t = 37845.9; put t time12.3; run;")$log, "10:30:45.900")
+})
+
+test_that("left-hand SUBSTR replaces part of a variable (SAS semantics)", {
+  res <- sas_run("data d; length t $6; t='abcdef'; substr(t,2,2)='XY'; r=t; run;")
+  expect_equal(res$work$d$t, "aXYdef")
+  # a replacement longer than the room left is cut to the room
+  res2 <- sas_run("data d; length t $6; t='abcdef'; substr(t,5)='WXYZ'; r=t; run;")
+  expect_equal(res2$work$d$t, "abcdWX")
+  # an invalid position is a data error: NOTE, _ERROR_, variable unchanged
+  res3 <- sas_run("data d; length t $6; t='abcdef'; substr(t,8)='Z'; e=_error_; r=t; run;")
+  expect_equal(res3$work$d$t, "abcdef")
+  expect_equal(res3$work$d$e, 1)
+  expect_true(any(grepl("Invalid second argument to function SUBSTR", res3$log)))
+})
+test_that("SUBSTR assignment to an undeclared variable creates it with length 8", {
+  # TS1M7 has no gold for it: fail loud
+  expect_error(sas_run("data d; substr(t,2,2)='XY'; run;", on_error = "abort"), class = "sasonr_unsupported")
+  # SAS 9.4 TS1M2 (cases/ts1m2/datastep/substr_undeclared) compiles the
+  # left-hand SUBSTR target with a default length of 8
+  withr::local_options(sasonr.sas_version = "TS1M2", sasonr.strict = FALSE)
+  res <- sas_run("data d; substr(t,2,2)='XY'; v=vlength(t); l=lengthn(t); r=t; rv=vlength(r); run;")
+  expect_equal(res$work$d$v, 8)
+  expect_equal(res$work$d$l, 3)     # " XY" after the trailing blanks are dropped
+  expect_equal(res$work$d$rv, 8)    # the assignment result inherits the length
+  # a declared variable keeps its own length
+  res2 <- sas_run("data d; length c $4; substr(c,2,2)='XY'; v=vlength(c); run;")
+  expect_equal(res2$work$d$v, 4)
+  # a longer replacement is cut to the length argument
+  res3 <- sas_run("data d; substr(t,2,2)='XYZ'; l=lengthn(t); run;")
+  expect_equal(res3$work$d$l, 3)
+})
+test_that("the sign of zero in SUM / MEAN / MIN / MAX and PROC MEANS", {
+  hex <- function(x) paste(rev(as.character(writeBin(x, raw()))), collapse = "")
+  res <- sas_run("data f;
+    p = input('0000000000000000', hex16.);
+    n = input('8000000000000000', hex16.);
+    m = .;
+    sm_mn = sum(m,n); sm_nm = sum(n,m); sm_nn = sum(n,n);
+    me_pn = mean(p,n); me_np = mean(n,p); me_npm = mean(n,p,m);
+    mn_pn = min(p,n); mn_np = min(n,p);
+  run;")
+  f <- res$work$f
+  # a missing argument counts as +0 for the sign (gold cases/ts1m2/proc/zero_sign)
+  expect_identical(hex(f$sm_mn), "0000000000000000")
+  expect_identical(hex(f$sm_nm), "0000000000000000")
+  expect_identical(hex(f$sm_nn), "8000000000000000")
+  # MEAN returns the first non-missing argument's sign when every value is zero
+  expect_identical(hex(f$me_pn), "0000000000000000")
+  expect_identical(hex(f$me_np), "8000000000000000")
+  expect_identical(hex(f$me_npm), "8000000000000000")
+  # MIN / MAX keep the first non-missing argument's sign on ties
+  expect_identical(hex(f$mn_pn), "0000000000000000")
+  expect_identical(hex(f$mn_np), "8000000000000000")
+  # PROC MEANS: SUM and MEAN are always +0, MIN / MAX keep the first value's sign
+  r2 <- sas_run("data d; length hx $16; input hx $; x = input(hx, hex16.); datalines;
+8000000000000000
+0000000000000000
+;
+proc means data=d noprint; var x; output out=o sum=s mean=mn min=mi max=ma; run;")
+  expect_identical(hex(r2$work$o$s), "0000000000000000")
+  expect_identical(hex(r2$work$o$mn), "0000000000000000")
+  expect_identical(hex(r2$work$o$mi), "8000000000000000")  # first value is -0
+  expect_identical(hex(r2$work$o$ma), "8000000000000000")
 })

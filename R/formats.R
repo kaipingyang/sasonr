@@ -713,7 +713,7 @@ num_informats <- c("w", "f", "best", "bestd", "comma", "commax", "dollar", "doll
                    "date", "yymmdd", "mmddyy", "ddmmyy", "e8601da", "is8601da", "b8601da", "e8601dt",
                    "is8601dt", "datetime", "time", "monyy", "anydtdte", "anydtdtm", "anydttme",
                    "julian", "yymmn", "nlnum", "trailsgn", "e8601tm", "is8601tm", "hhmmss", "yyq", "bz", "hex")
-char_informats <- c("", "char", "upcase", "quote")
+char_informats <- c("", "char", "upcase", "quote", "hex")
 
 infmt_known <- function(fmt) {
   if (!is.null(user_fmt(fmt$name, fmt$char, "invalue"))) return(TRUE)
@@ -1017,6 +1017,7 @@ read_char_field <- function(s, fmt, keep_lead = FALSE) {
   out <- switch(fmt$name,
     char = s,
     upcase = toupper(s),
+    hex = read_hex_field(s, fmt),
     quote = {
       t <- strip_both(s)
       if (nchar(t) >= 2 && substr(t, 1, 1) %in% c("'", "\"") && substring(t, nchar(t)) == substr(t, 1, 1)) {
@@ -1031,6 +1032,20 @@ read_char_field <- function(s, fmt, keep_lead = FALSE) {
       if (strip_both(t) == ".") "" else t
     }
   )
+  out
+}
+
+# $HEXw.: two hex digits per byte, so w gives w/2 bytes of output.  An odd or
+# non-hex field is invalid data, as in SAS.
+read_hex_field <- function(s, fmt) {
+  w <- fmt$w
+  if (is.na(w)) w <- nchar(strip_both(s))
+  t <- substr(sub("^ +", "", s), 1L, w)
+  if (nchar(t) %% 2L == 1L) t <- paste0(t, "0")
+  if (!grepl("^[0-9A-Fa-f]*$", t)) return("")
+  if (!nzchar(t)) return("")
+  hi <- strtoi(substring(t, seq(1L, nchar(t), by = 2L), seq(2L, nchar(t), by = 2L)), 16L)
+  out <- rawToChar(as.raw(hi))
   out
 }
 

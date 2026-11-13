@@ -356,6 +356,7 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
 #   USS = fma(S, MEAN, CSS)
 # `need`: the statistics the step computes (proc_means.R names).
 stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", need = character()) {
+  if (sas_target_version() == "TS1M2") return(stats_means_moments_ts1m2(x, freq, weight, vardef, need))
   f <- freq %||% rep(1, length(x))
   w <- weight %||% rep(1, length(x))
   wt <- if (is.null(weight)) f else stats_mul(w, f)
@@ -461,6 +462,67 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
       abort_unsupported(paste0("SKEWNESS/KURTOSIS with VARDEF=", toupper(vardef)))
     }
   }
+  stats_means_checked(out)
+}
+
+# PROC MEANS moments of SAS 9.4 TS1M2: the same shifted sums about c0 = x[1],
+# closed without fused multiply-adds (TS1M7 above uses them):
+#   MEAN = SUM / n,  q = MEAN - c0,  CSS = S2 - q (2 S1 - n q),
+#   USS = CSS + SUM * MEAN,  VAR = CSS / (n - 1 | n),  STDERR = sqrt(VAR / n)
+# Gold: cases/ts1m2/rounding/means_accum (exact doubles in two orders: SUM,
+# MEAN, CSS, VAR, STD, USS bit-identical; the TS1M7 fma form differs in USS)
+# and cases/ts1m2/proc/zero_sign.  Verified only without WEIGHT / FREQ, with
+# VARDEF=DF or N, outside the nearly-constant region (|q| < 1.01E-14 |c0|)
+# and the STD cut-off region (VAR <= 1.4312245245430491E-26 MEAN**2):
+# everything else fails loud, as do SKEWNESS and KURTOSIS (no TS1M2 gold).
+stats_means_moments_ts1m2 <- function(x, freq, weight, vardef, need) {
+  css_family <- c("css", "uss", "var", "std", "stderr", "cv", "skew", "kurt", "t", "prt", "lclm", "uclm")
+  moments <- c("sum", "mean", "sumwgt", css_family)
+  why <- NULL
+  if (!is.null(weight) || !is.null(freq)) why <- "a WEIGHT or FREQ statement"
+  else if (!vardef %in% c("df", "n")) why <- paste0("VARDEF=", toupper(vardef))
+  else if (any(need %in% c("skew", "kurt"))) why <- "SKEWNESS / KURTOSIS"
+  if (!is.null(why) && any(need %in% moments)) {
+    abort_unsupported(paste0("PROC MEANS moment statistics with ", why, " for SAS 9.4 TS1M2 (no TS1M2 gold)"))
+  }
+  if (!stats_fma_range_ok(x) && any(need %in% moments)) {
+    abort_unsupported("PROC MEANS moment statistics of values beyond 1E140 or below 1E-140 in magnitude (not verified)")
+  }
+  f <- freq %||% rep(1, length(x))
+  wt <- if (is.null(weight)) f else weight * f
+  n <- sum(f)
+  W <- stats_seq_sum(wt)
+  S <- stats_seq_sum(x)
+  out <- list(n = n, W = W, sum = S, mean = NA_real_, css = NA_real_, uss = NA_real_, var = NA_real_, std = NA_real_,
+              stderr = NA_real_, cv = NA_real_, skew = NA_real_, kurt = NA_real_)
+  if (!(W > 0)) return(stats_means_checked(out))
+  mean <- S / W
+  out$mean <- mean
+  if (!any(need %in% css_family)) return(stats_means_checked(out))
+  c0 <- x[1]
+  d <- x - c0
+  s1 <- stats_seq_sum(d)
+  s2 <- stats_seq_sum(stats_mul(d, d))
+  q <- mean - c0
+  if (s2 != 0 && q != 0 && abs(q) < 1.01e-14 * abs(c0)) {
+    abort_unsupported("PROC MEANS moment statistics of nearly constant data for SAS 9.4 TS1M2 (no TS1M2 gold)")
+  }
+  css <- if (s2 == 0) 0 else s2 - stats_mul(q, 2 * s1 - stats_mul(n, q))
+  if (css < 0) abort_unsupported("PROC MEANS CSS of nearly constant data came out negative (SAS 9.4 TS1M2 not verified)")
+  out$css <- css
+  out$uss <- css + stats_mul(S, mean)
+  div <- if (vardef == "df") n - 1 else n
+  var <- if (div > 0) css / div else NA_real_
+  std <- sqrt(var)
+  if (!is.na(var) && var > 0 && mean != 0 && var / stats_mul(mean, mean) <= STD_CUT_KEEP &&
+      any(need %in% c("std", "cv", "stderr", "t", "prt", "lclm", "uclm"))) {
+    abort_unsupported("PROC MEANS STD of a variance negligible against the squared mean for SAS 9.4 TS1M2 (cut-off to 0 not in the TS1M2 gold)")
+  }
+  out$var <- var
+  out$std <- std
+  out$cv <- if (!is.na(std) && mean != 0) 100 * std / mean else NA_real_
+  if (!is.na(out$cv) && out$cv == 0) out$cv <- 0
+  if (vardef == "df" && n > 1 && !is.na(var)) out$stderr <- sqrt(var / W)
   stats_means_checked(out)
 }
 

@@ -23,7 +23,7 @@ Extracts a substring. See the \href{https://documentation.sas.com/doc/en/lefunct
 }
 
 \section{Verification}{
- partial (36 of 41 SAS 9.4 cases agree bit for bit; 5 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: DATA step statement SUBSTR; SASHELP tables; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (39 of 41 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: SASHELP.CLASS (export it from SAS into inst/sashelp/); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

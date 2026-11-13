@@ -17,7 +17,7 @@ SAS date from a Julian date (yyddd or yyyyddd). See the \href{https://documentat
 }
 
 \section{Verification}{
- partial (26 of 27 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: DATEJUL with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (26 of 27 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: DATEJUL with these arguments (SAS 9.4 behaviour not verified); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

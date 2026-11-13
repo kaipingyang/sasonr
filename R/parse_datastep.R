@@ -249,6 +249,8 @@ parse_statement <- function(p) {
 
   # `name =` is always an assignment, so `set = 1; if = 2; end = 3;` are legal.
   if (is_op(p, "=", 1L)) return(parse_assign(p))
+  # SUBSTR(variable, position <, length>) = value;  (left-hand SUBSTR)
+  if (low == "substr" && tk_type(p, 1L) == "lparen") return(parse_substr_assign(p))
   if (tk_type(p, 1L) == "lbrace" || (tk_type(p, 1L) == "lparen" && low %in% p$arrays)) {
     return(parse_assign(p))
   }
@@ -332,6 +334,34 @@ parse_statement <- function(p) {
     run = abort_syntax("RUN before the enclosing DO/SELECT block was closed", line),
     abort_unsupported(paste0("DATA step statement ", toupper(tk_val(p))), line)
   )
+}
+
+# SUBSTR(target, position <, length>) = value; replaces part of a character
+# variable in place (SAS: "left-hand SUBSTR").
+parse_substr_assign <- function(p) {
+  line <- tk_line(p)
+  col <- tk_col(p)
+  advance(p) # substr
+  expect_type(p, "lparen", "'(' after SUBSTR")
+  if (tk_type(p) != "name") abort_syntax("expected a variable name as the first argument of the SUBSTR statement", line)
+  var <- tk_low(p)
+  var_text <- tk_val(p)
+  advance(p)
+  if (tk_type(p) != "comma") abort_syntax("expected ',' after the variable of the SUBSTR statement", line)
+  advance(p)
+  pos <- parse_expr(p)
+  len <- NULL
+  if (tk_type(p) == "comma") {
+    advance(p)
+    len <- parse_expr(p)
+  }
+  expect_type(p, "rparen", "')'")
+  if (!is_op(p, "=")) abort_syntax(paste("expected '=' but found", tok_desc(p)), line)
+  advance(p)
+  value <- parse_expr(p)
+  expect_semi(p, "SUBSTR assignment")
+  list(stmt = "substr_assign", var = var, var_text = var_text, pos = pos, len = len, value = value,
+       line = line, col = col)
 }
 
 parse_assign <- function(p) {

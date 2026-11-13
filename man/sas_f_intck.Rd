@@ -25,7 +25,7 @@ Number of interval boundaries between two dates. See the \href{https://documenta
 }
 
 \section{Verification}{
- partial (32 of 36 SAS 9.4 cases agree bit for bit; 4 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: INTCK interval 'weekday'; INTCK interval 'semimonth'; INTCK interval 'tenday'; and 1 more; other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ partial (35 of 36 SAS 9.4 cases agree bit for bit; 1 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: SASHELP.CLASS (export it from SAS into inst/sashelp/); other inputs fail loud (\code{sasonr_unsupported}). Contexts where every case agrees: data, sysfunc. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

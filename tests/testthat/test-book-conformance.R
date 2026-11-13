@@ -6,8 +6,9 @@ test_that("PROC SQL: chained comparisons, INPUT() of a column, COUNT(UNIQUE x)",
     proc sql; create table a as select x, (-5 <= x <= -1) as c,
       case when -5 <= x <= -1 then 'YES' else 'NO' end as w, input(s, yymmdd10.) as d from t;
       create table n as select count(unique x) as k from t; quit;"
-  # INPUT() has no passing PROC SQL verification case yet: gated in strict mode
-  expect_error(sas_run(code), class = "sasonr_not_verified")
+  # INPUT() in PROC SQL is verified by the function-pilot SQL cases
+  # INPUT_039/040, which read SASHELP: gated where SASHELP is not exported
+  if (!"sql" %in% sasonr:::feature_contexts("INPUT")) expect_error(sas_run(code), class = "sasonr_not_verified")
   res <- withr::with_options(list(sasonr.strict = FALSE), withCallingHandlers(
     sas_run(code), sasonr_unverified = function(w) invokeRestart("muffleWarning")))
   expect_equal(res$work$a$c, c(1, 0))

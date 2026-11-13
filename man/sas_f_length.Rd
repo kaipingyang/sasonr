@@ -17,7 +17,7 @@ Position of the last non-blank character (1 for a blank string). See the \href{h
 }
 
 \section{Verification}{
- verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ verified (17 of 17 SAS 9.4 cases agree bit for bit). Contexts where every case agrees: data, sysfunc, sql, where. See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

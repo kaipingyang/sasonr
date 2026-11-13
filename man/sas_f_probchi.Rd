@@ -21,7 +21,7 @@ Chi-square cumulative probability. See the \href{https://documentation.sas.com/d
 }
 
 \section{Verification}{
- approximate (21 of 38 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 1.6e-15; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-12.
+ approximate (21 of 38 SAS 9.4 cases agree bit for bit; 11 case(s) differ in the last bits (largest relative difference 1.6e-15; different algorithm); 6 case(s) fail loud (sasonr_unsupported)). See the \href{https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html}{feature registry}. Updated 2026-11-13.
 }
 
 \examples{

@@ -41,6 +41,18 @@ jsonlite_unquote <- function(s) {
   gsub("\\\\\\\\", "\\\\", s)
 }
 
+# The SAS release of a case's gold standard (meta.yaml `sas_version`, e.g.
+# "9.4 (TS1M2)"): sasonr runs the case for that release.  A case without the
+# field, or with a release sasonr does not know, stops the runner (no silent
+# comparison against the wrong release).
+conf_meta_version <- function(meta) {
+  v <- meta$sas_version
+  if (is.null(v) || !nzchar(v)) stop("case without sas_version in meta.yaml")
+  m <- regmatches(v, regexpr("TS[0-9]M[0-9]+", v))
+  if (!length(m) || !m %in% sas_versions) stop("case gold from an unsupported SAS release: ", v)
+  m
+}
+
 conf_root <- function() {
   tp <- tryCatch(testthat::test_path(), error = function(e) "tests/testthat")
   cands <- c(file.path(tp, "..", "conformance"), file.path("tests", "conformance"))
@@ -481,7 +493,7 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
   if (own_dir) on.exit(unlink(run_dir, recursive = TRUE), add = TRUE)
   old <- setwd(run_dir)
   on.exit(setwd(old), add = TRUE)
-  old_opt <- options(sasonr.step_notes = TRUE)
+  old_opt <- options(sasonr.step_notes = TRUE, sasonr.sas_version = conf_meta_version(meta))
   on.exit(options(old_opt), add = TRUE)
   limit <- as.numeric(timeout %||% meta$timeout %||% 30)
   setTimeLimit(elapsed = limit, transient = TRUE)
@@ -720,7 +732,7 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
   data_dir <- file.path(case, "data")
   per <- as.numeric(meta$timeout %||% 30)
   # the gold logs hold the step NOTEs (testthat turns them off, helper-options.R)
-  old_opt <- options(sasonr.step_notes = TRUE)
+  old_opt <- options(sasonr.step_notes = TRUE, sasonr.sas_version = conf_meta_version(meta))
   on.exit(options(old_opt), add = TRUE)
   segs <- list()
   owner <- rep(NA_integer_, n)
