@@ -173,7 +173,7 @@ new_ct_state <- function() {
 #' @keywords internal
 #' @export
 sas_rt_active <- function(session) {
-  if (missing(session)) return(.active$session %||% sas_default_session())
+  if (missing(session)) return(.active$session %||% default_session())
   old <- .active$session
   .active$session <- session
   .active$rt <- if (is.null(session)) NULL else session$rt
@@ -182,14 +182,14 @@ sas_rt_active <- function(session) {
 }
 
 # The session of function-layer calls made outside any submission.
-sas_default_session <- function() {
+default_session <- function() {
   if (is.null(.active$default)) .active$default <- SasSession$new()
   .active$default
 }
 
 # Fast paths for the helpers called per row (sas_err_sync, rt_error ...).
-rt_diag <- function() .active$rt %||% sas_default_session()$rt
-ct_diag <- function() .active$ct %||% sas_default_session()$ct
+rt_diag <- function() .active$rt %||% default_session()$rt
+ct_diag <- function() .active$ct %||% default_session()$ct
 
 # The current LINESIZE (log and PUT line width).
 rt_linesize <- function() sas_rt_active()$options$linesize %||% 132L

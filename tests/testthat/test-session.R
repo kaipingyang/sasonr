@@ -101,7 +101,7 @@ data a; length c $ 3; x = 0; c = upcase('ab'); y = 1 / x; put c= y=; run;", sess
   expect_false("z" %in% names(res$work))
   expect_identical(res$macro_vars$mv, "outer")
   expect_identical(s$options$linesize, 100L)
-  expect_identical(sasonr:::sas_rt_active(), sasonr:::sas_default_session())
+  expect_identical(sasonr:::sas_rt_active(), sasonr:::default_session())
 })
 
 test_that("the SQL connection is opened on first use and closed with the session", {
