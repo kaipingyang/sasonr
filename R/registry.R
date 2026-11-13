@@ -130,7 +130,8 @@ feature_contexts <- function(name) {
 
 feature_context_label <- function(context) {
   switch(context, data = "the DATA step", where = "a WHERE expression", sql = "PROC SQL",
-         sysfunc = "%SYSFUNC", runtime = "a format named at run time", context)
+         sysfunc = "%SYSFUNC", runtime = "a format named at run time",
+         statement = "the SUBSTR statement (left of =)", context)
 }
 
 feature_status_text <- function(status) {
