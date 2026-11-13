@@ -865,6 +865,16 @@ sas_fmt_best <- function(x, w = 12L) {
       # on), k <= 12 sci_dec_text; a text that still does not fit fails loud
       ex0 <- as.integer(sub("^.*e", "", sprintf("%.13e", abs(v))))
       k <- w - (v < 0) - 3L - (ex0 < 0) - nchar(as.character(abs(ex0)))
+      #
+      #
+      #
+      # 1.234E-7, 1E-10) has mantissas of at most 4 significant digits, where
+      # every k >= 3 and every carry rule give the same text
+      if ((w <= 19L || k == 13L) && nchar(sub("0+$", "", gsub("[^0-9]", "", sub("e.*$", "", sprintf("%.14e", abs(v)))))) > 4L) {
+        abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), " in E notation",
+                                 if (w <= 19L) " at widths 16-19" else " with 13 mantissa decimals",
+                                 ": not supported"))
+      }
       if (k >= 13L) {
         g <- e14_digits(NULL, v, k)
         m <- g$keep
