@@ -40,6 +40,15 @@ negate_if <- function(code, negate) if (isTRUE(negate)) paste0("sas_not(", code,
 
 # Expressions -------------------------------------------------------------
 
+# Operations whose missing result is a "generated" missing value for the
+# missing-value NOTE: +, -, *, / and the unary minus.  The result of ** is not
+# (SAS records the next operation again: (a ** 2) + 1 has 2 places), nor is a
+# function result (abs(a) + 1: 2 places).  SAS 9.4 TS1M7 gold
+# datastep/dev_merge/mv_places_chain.
+gen_missing_node <- function(x) {
+  x$node == "binary" && x$op %in% c("+", "-", "*", "/") || x$node == "unary" && identical(x$op, "-")
+}
+
 gen_expr <- function(e, cx) {
   g <- function(x) gen_expr(x, cx)
   switch(e$node,
@@ -51,11 +60,12 @@ gen_expr <- function(e, cx) {
     unary = switch(e$op,
       "-" = {
         # SAS records the place of a unary minus at the operand's position; the
-        # minus itself is not recorded when the operand is the missing result of
-        # an arithmetic operation (-(a + b) records the "+")
+        # minus itself is not recorded when the operand is a generated missing
+        # value (gen_missing_node(): -(a + b) records the "+" only, -(a ** 2)
+        # records the "**" and the minus; SAS 9.4 TS1M7 gold
+        # datastep/dev_merge/mv_places_chain)
         at <- if (!is.null(e$arg$col)) at_code(list(line = e$arg$line, col = e$arg$col)) else ""
-        is_arith_arg <- e$arg$node == "binary" && e$arg$op %in% c("+", "-", "*", "/", "**")
-        if (is_arith_arg && nzchar(at)) at <- paste0(at, ", .gen_a = TRUE")
+        if (gen_missing_node(e$arg)) at <- paste0(at, ", .gen_a = TRUE")
         if (isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
         paste0("sas_neg(", g(e$arg), at, ")")
       },
@@ -101,14 +111,13 @@ gen_expr <- function(e, cx) {
       # vectorised code evaluates guarded expressions for every row, so the
       # missing-value counts there are not exact (the engine re-runs as L3)
       if (arith && isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
-      # an operand that is itself an arithmetic result: its missing values were already
-      # counted, SAS does not count this operation again (a + b + c with b missing: 1 place).
-      # Division and exponentiation need the flags as well: (a + b) / 3 is one place,
-      # the division is not counted again.
-      is_arith <- function(x) x$node == "binary" && x$op %in% c("+", "-", "*", "/", "**")
-      if ((is.na(fun) || fun %in% c("sas_div", "sas_pow")) && nzchar(at)) {
-        if (is_arith(e$lhs)) at <- paste0(at, ", .gen_a = TRUE")
-        if (is_arith(e$rhs)) at <- paste0(at, ", .gen_b = TRUE")
+      # an operand that is a generated missing value (gen_missing_node()): its place
+      # was already recorded and +, -, *, / do not record another one (a + b + c with
+      # b missing: 1 place; (a + b) / 3: 1 place).  ** always records its place,
+      # also for a generated operand ((a + b) ** 2: 2 places).
+      if ((is.na(fun) || fun == "sas_div") && nzchar(at)) {
+        if (gen_missing_node(e$lhs)) at <- paste0(at, ", .gen_a = TRUE")
+        if (gen_missing_node(e$rhs)) at <- paste0(at, ", .gen_b = TRUE")
       }
       if (is.na(fun)) paste0("sas_arith(", a, ", ", b, ", ", r_str(e$op), at, ")") else paste0(fun, "(", a, ", ", b, at, ")")
     },

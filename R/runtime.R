@@ -207,14 +207,10 @@ sas_div <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FA
 }
 
 #' @export
-sas_pow <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
-  if (anyNA(a) || anyNA(b)) {
-    n <- max(length(a), length(b))
-    ma <- rep_len(is.na(a), n)
-    mb <- rep_len(is.na(b), n)
-    cnt <- (ma | mb) & !(.gen_a & ma) & !(.gen_b & mb)
-    if (any(cnt)) sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
-  }
+sas_pow <- function(a, b, .at = NULL, .exact = TRUE) {
+  # ** records its place also when an operand is a generated missing value
+  # (SAS 9.4 TS1M7 gold datastep/dev_merge/mv_places_chain: (a + b) ** 2)
+  if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
   out <- sas_num(a^b, .at)
   out[is.na(a) | is.na(b) | (a == 0 & b <= 0)] <- NA_real_ # 0**0 and 0**-n are missing in SAS
   out
@@ -230,7 +226,11 @@ sas_neg <- function(x, .at = NULL, .exact = TRUE, .gen_a = FALSE) {
     n <- length(x)
     ma <- rep_len(is.na(x), n)
     cnt <- ma & !(.gen_a & ma)
-    if (any(cnt)) sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
+    if (any(cnt)) {
+      # the place is the operand's position; without one it cannot be written
+      if (is.null(.at)) abort_unsupported("missing-value NOTE of a unary minus whose operand has no source position")
+      sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
+    }
   }
   sas_num(-x, .at)
 }

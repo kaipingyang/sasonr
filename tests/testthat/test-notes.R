@@ -76,6 +76,26 @@ test_that("missing values generated: only the operation that produced the missin
   }
 })
 
+test_that("missing-value places: ** and function results are not generated missing values (merge of dev d95db7c)", {
+  # SAS 9.4 TS1M7 gold datastep/dev_merge/mv_places_chain: +, -, *, / and the unary
+  # minus skip an operand that is a generated missing value, ** always records its
+  # place, and the result of ** or of a function is not a generated missing value
+  code <- c("data x;",
+            "  a = .; b = .; d = 2;",
+            "  y1 = (a + b) ** 2;",
+            "  y2 = (a ** 2) + 1;",
+            "  y3 = -(a ** 2);",
+            "  y4 = -abs(a);",
+            "  y5 = - - a;",
+            "  y6 = -a + d;",
+            "run;")
+  for (lv in c("auto", "L3")) {
+    r <- run_notes(code, lv)
+    expect_equal(r$log[3], "      1 at 3:11   1 at 3:16   1 at 4:11   1 at 4:17   2 at 5:12   2 at 6:9   1 at 7:12   1 at 8:9  ",
+                 label = lv)
+  }
+})
+
 test_that("uninitialized variables and macro WARNINGs are logged", {
   r <- run_notes(c("data a; x = y + 1; run;", "%put &nope;"))
   expect_equal(r$log[1], "NOTE: Variable y is uninitialized.")
