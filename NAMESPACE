@@ -2,4 +2,3 @@
 exportPattern("^sas_")
 S3method(print,sasonr_result)
 S3method(print,sasonr_translation)
-importFrom(R6, R6Class)
