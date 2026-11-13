@@ -258,6 +258,7 @@ internal sas_min_op
 internal sas_mv_args
 internal sas_mv_res
 internal sas_ne
+internal sas_neg
 internal sas_not
 internal sas_note_read
 internal sas_num

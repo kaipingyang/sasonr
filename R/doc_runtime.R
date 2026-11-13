@@ -7,6 +7,6 @@
 #' are exported so that translated code can run on its own; they are not a
 #' stable user interface.
 #' @name sasonr-runtime
-#' @aliases sas_and sas_concat sas_delete sas_div sas_eq sas_ge sas_gt sas_in sas_last sas_le sas_lt sas_max_op sas_ne sas_not sas_or sas_pow sas_put_named sas_return sas_rtrim sas_select_error sas_stop_step sas_substr_assign
+#' @aliases sas_and sas_concat sas_delete sas_div sas_eq sas_ge sas_gt sas_in sas_last sas_le sas_lt sas_max_op sas_ne sas_neg sas_not sas_or sas_pow sas_put_named sas_return sas_rtrim sas_select_error sas_stop_step sas_substr_assign
 #' @keywords internal
 NULL
