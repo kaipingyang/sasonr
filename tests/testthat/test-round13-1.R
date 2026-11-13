@@ -49,10 +49,12 @@ test_that("PROC SQL: math-error NOTEs fail loud instead of being dropped, the ru
                class = "sasonr_unsupported")
   # SAS 9.4 writes no missing-value NOTE in PROC SQL (gold semantics/sql_null)
   expect_silent(sas_run("data one; x = .; run; proc sql; create table t as select x + 1 as y from one; quit;"))
-  before <- list(sasonr:::rt$mv, sasonr:::rt$math, sasonr:::rt$notes)
+  # the run-time state outside a run (the default session) is left untouched
+  rt <- sasonr:::rt_diag()
+  before <- list(rt$mv, rt$math, rt$notes)
   try(sas_run("data one; x = 0; run; proc sql; create table t as select 1 / x as y from one; quit;", on_error = "abort"),
       silent = TRUE)
-  expect_identical(list(sasonr:::rt$mv, sasonr:::rt$math, sasonr:::rt$notes), before)
+  expect_identical(list(rt$mv, rt$math, rt$notes), before)
 })
 
 test_that("FIRSTOBS=MIN is 1, OBS=MIN is 0 (finding 6; SAS 9.4 gold datastep/r13/firstobs_min)", {

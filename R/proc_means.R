@@ -633,6 +633,7 @@ means_types_wanted <- function(sp, k, for_print) {
 #' @export
 #' @keywords internal
 sas_proc_means <- function(d, sp) {
+  rt <- rt_diag()
   cn <- vapply(sp$class, `[[`, "", "name")
   k <- length(cn)
   info <- sp$info
@@ -1112,7 +1113,7 @@ means_listing <- function(d, sp, cells_by, print_types) {
       scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp, by_nw))
       # Panel layout (means_panel_layout(): TS1M2 measurements, TS1M7 gold
       # proc_stats/means_panel_ls* and rounding/proc/means_*).
-      ls <- rt$ls %||% 132L
+      ls <- rt_linesize()
       panels <- means_panel_layout(vapply(scols, function(c) as.integer(c$width), 1L),
                                    vapply(fixed, function(c) as.integer(c$width), 1L), ls)
       bad <- Filter(function(p) p$width > ls, panels)

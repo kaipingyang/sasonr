@@ -2,19 +2,20 @@
 # log, listing, macro variables).
 
 sql_note <- function(eng, lines) {
-  if (isTRUE(rt$notes_on) && isTRUE(eng$step_notes)) eng$log <- c(eng$log, lines)
+  if (rt_notes_on() && isTRUE(eng$step_notes)) eng$log <- c(eng$log, lines)
   invisible()
 }
 
-sql_set_mvar <- function(eng, name, value) mv_let(eng$ses, name, value)
+sql_set_mvar <- function(eng, name, value) mv_let(eng$session$macro, name, value)
 
 sql_set_status <- function(eng, sqlobs, sqlrc = 0) {
-  assign("sqlobs", as.character(sqlobs), envir = eng$ses$globals)
-  assign("sqlrc", as.character(sqlrc), envir = eng$ses$globals)
+  assign("sqlobs", as.character(sqlobs), envir = eng$session$macro$globals)
+  assign("sqlrc", as.character(sqlrc), envir = eng$session$macro$globals)
 }
 
 # Execute one SQL statement.
 engine_sql <- function(eng, st) {
+  rt <- rt_diag()
   rt_reset()
   on.exit({
     # PROC SQL writes no "Missing values were generated" NOTE (gold standard)
@@ -25,13 +26,13 @@ engine_sql <- function(eng, st) {
     select = sql_stmt_select(eng, st),
     create_table = sql_stmt_create(eng, st),
     create_view = {
-      eng$views[[st$table]] <- st$query
+      eng$session$views[[st$table]] <- st$query
       sql_note(eng, sprintf("NOTE: SQL view WORK.%s has been defined.", toupper(st$table)))
     },
     create_like = {
-      src <- get0(st$source, envir = eng$wenv, inherits = FALSE)
+      src <- get0(st$source, envir = eng$session$work, inherits = FALSE)
       if (is.null(src)) abort_runtime(paste0("File WORK.", toupper(st$source), ".DATA does not exist."), st$line)
-      sql_store(eng, st$table, src[0, , drop = FALSE], eng$meta[[st$source]] %||% meta_from_df(src))
+      sql_store(eng, st$table, src[0, , drop = FALSE], eng$session$meta[[st$source]] %||% meta_from_df(src))
       sql_note(eng, sprintf("NOTE: Table WORK.%s created, with 0 rows and %d columns.", toupper(st$table), ncol(src)))
     },
     create_cols = sql_stmt_create_cols(eng, st),
@@ -43,16 +44,16 @@ engine_sql <- function(eng, st) {
     drop = {
       for (t in st$tables) {
         if (st$what == "view") {
-          eng$views[[t]] <- NULL
+          eng$session$views[[t]] <- NULL
           sql_note(eng, sprintf("NOTE: View WORK.%s has been dropped.", toupper(t)))
           next
         }
-        if (!exists(t, envir = eng$wenv, inherits = FALSE)) {
+        if (!exists(t, envir = eng$session$work, inherits = FALSE)) {
           sql_note(eng, sprintf("WARNING: File WORK.%s.DATA does not exist.", toupper(t)))
           next
         }
-        rm(list = t, envir = eng$wenv)
-        eng$meta[[t]] <- NULL
+        rm(list = t, envir = eng$session$work)
+        eng$session$meta[[t]] <- NULL
         sql_note(eng, sprintf("NOTE: Table WORK.%s has been dropped.", toupper(t)))
       }
     },
@@ -88,7 +89,7 @@ sql_stmt_select <- function(eng, st) {
   if (n == 0) sql_note(eng, "NOTE: No rows were selected.")
   if (!is.null(into)) sql_into(eng, res, into, st$line)
   if (!isTRUE(eng$sql_opts$noprint) && n > 0) {
-    eng$listing <- c(eng$listing, sas_sql_listing(res, eng$titles, number = isTRUE(eng$sql_opts$number)))
+    eng$listing <- c(eng$listing, sas_sql_listing(res, eng$session$titles, number = isTRUE(eng$sql_opts$number)))
   }
   sql_set_status(eng, n)
 }
@@ -168,10 +169,10 @@ sql_rel_to_table <- function(eng, res, line, warn_dups = TRUE) {
 }
 
 sql_store <- function(eng, name, d, meta, ordered = TRUE) {
-  assign(name, tibble::as_tibble(d), envir = eng$wenv)
-  eng$meta[[name]] <- meta
-  eng$last <- name
-  eng$unordered <- if (ordered) setdiff(eng$unordered, name) else union(eng$unordered, name)
+  assign(name, tibble::as_tibble(d), envir = eng$session$work)
+  eng$session$meta[[name]] <- meta
+  eng$session$last <- name
+  eng$session$unordered <- if (ordered) setdiff(eng$session$unordered, name) else union(eng$session$unordered, name)
   invisible()
 }
 
@@ -203,9 +204,9 @@ sql_stmt_create_cols <- function(eng, st) {
 }
 
 sql_target <- function(eng, name, line) {
-  d <- get0(name, envir = eng$wenv, inherits = FALSE)
+  d <- get0(name, envir = eng$session$work, inherits = FALSE)
   if (is.null(d)) abort_runtime(paste0("File WORK.", toupper(name), ".DATA does not exist."), line)
-  list(data = d, meta = eng$meta[[name]] %||% meta_from_df(d))
+  list(data = d, meta = eng$session$meta[[name]] %||% meta_from_df(d))
 }
 
 # Coerce new values to a target column.
@@ -255,7 +256,7 @@ sql_stmt_insert <- function(eng, st) {
     } else if (type == "char") rep(strrep(" ", len), nrows) else rep(NA_real_, nrows)
   }
   d <- dplyr::bind_rows(tg$data, tibble::as_tibble(add, .rows = nrows))
-  sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$unordered)
+  sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$session$unordered)
   sql_note(eng, sprintf("NOTE: %d %s inserted into WORK.%s.", nrows, if (nrows == 1) "row was" else "rows were", toupper(st$table)))
   sql_set_status(eng, nrows)
 }
@@ -283,7 +284,7 @@ sql_stmt_update <- function(eng, st) {
       d[[v]][idx] <- sql_coerce_col(vals[[k]], type, tg$meta$len[[v]] %||% 8L, v, st$line)
     }
   }
-  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$unordered)
+  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered)
   sql_note(eng, sprintf("NOTE: %d %s updated in WORK.%s.", length(idx), if (length(idx) == 1) "row was" else "rows were", toupper(st$table)))
   sql_set_status(eng, length(idx))
 }
@@ -294,7 +295,7 @@ sql_stmt_delete <- function(eng, st) {
   hit <- if (is.null(st$where)) rep(TRUE, nrow(rel$data)) else sas_true(sql_eval(st$where, sql_ctx(eng, rel)))
   d <- tg$data[!hit, , drop = FALSE]
   k <- sum(hit)
-  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$unordered)
+  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered)
   sql_note(eng, sprintf("NOTE: %d %s deleted from WORK.%s.", k, if (k == 1) "row was" else "rows were", toupper(st$table)))
   sql_set_status(eng, k)
 }
@@ -334,6 +335,6 @@ sql_stmt_alter <- function(eng, st) {
       if (!is.null(c$label)) m$labels[[v]] <- c$label
     }
   }
-  sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$unordered)
+  sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$session$unordered)
   sql_note(eng, sprintf("NOTE: Table WORK.%s has been modified, with %d columns.", toupper(st$table), ncol(d)))
 }

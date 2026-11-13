@@ -66,6 +66,10 @@ sas_feature_registry <- function(kind = c("functions", "formats", "semantics"), 
 #' over from one release to the other; a feature without evidence for the
 #' selected release is `unverified` there.
 #'
+#' A SAS session ([sas_session()], or the throw-away session of a
+#' [sas_run()] call) takes the release from the option when it is created
+#' and keeps it for all its submissions.
+#'
 #' @name sasonr_sas_version
 #' @aliases sasonr.sas_version
 #' @examples
@@ -86,7 +90,10 @@ NULL
 sas_versions <- c("TS1M7", "TS1M2")
 
 sas_target_version <- function() {
-  v <- getOption("sasonr.sas_version", "TS1M7")
+  # inside a run: the release of the session (taken from the option when the
+  # session was created)
+  s <- .active$session
+  v <- if (is.null(s)) getOption("sasonr.sas_version", "TS1M7") else s$options$sas_version
   if (!is.character(v) || length(v) != 1L || !toupper(v) %in% sas_versions) {
     sasonr_abort(paste0("Unsupported: option sasonr.sas_version = ", format(v)[1], " (supported: ",
                         paste(sas_versions, collapse = ", "), ")"), "sasonr_unsupported")

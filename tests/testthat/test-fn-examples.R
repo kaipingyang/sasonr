@@ -14,6 +14,7 @@ test_that("reference-page examples agree with SAS 9.4", {
   expect_gt(nrow(res), 0)
   for (fn in unique(res$fn)) {
     ds <- haven::read_sas(file.path(root, "fn_examples", fn, "expected", "datasets", "ex.sas7bdat"))
+    rt <- rt_diag()
     rt$prx <- list()
     env <- new.env(parent = environment())
     for (i in which(res$fn == fn)) {

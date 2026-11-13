@@ -7,8 +7,9 @@
 #
 # sas_format() writes values (right-justified numeric fields, left-justified
 # character fields, always `w` characters wide); sas_informat_read() reads
-# text. User-defined formats (PROC FORMAT) live in the run-time catalog
-# `rt$catalog` (see diag.R) and take precedence over built-in names.
+# text. User-defined formats (PROC FORMAT) live in the user format catalog of
+# the active session (`SasSession$formats`) and take precedence over built-in
+# names.
 
 # Format text --------------------------------------------------------------
 
@@ -83,7 +84,7 @@ fmt_known <- function(fmt) {
 
 user_fmt <- function(name, char, kind = "value") {
   if (!nzchar(name)) return(NULL)
-  cat <- rt$catalog
+  cat <- sas_rt_active()$formats
   key <- paste0(if (char) "$", name)
   f <- cat[[paste0(kind, ":", key)]]
   f
@@ -699,7 +700,8 @@ fmt_width <- function(fmt, x_char = fmt$char) {
 #' @keywords internal
 sas_define_format <- function(def) {
   key <- paste0(def$kind, ":", if (def$char) "$", def$name)
-  rt$catalog[[key]] <- def
+  fmts <- sas_rt_active()$formats
+  fmts[[key]] <- def
   invisible(NULL)
 }
 

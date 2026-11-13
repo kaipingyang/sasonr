@@ -24,41 +24,37 @@ prepare_work <- function(work) {
   out
 }
 
-# An engine: WORK library, metadata, titles, log and listing; `exec(text,
-# line)` parses, translates and (optionally) runs one chunk of expanded text.
-new_engine <- function(work, level, execute) {
+# An engine: the bookkeeping of one submission (steps translated, phase,
+# syntax-check mode, ERRORs, the log and listing of this submission) against a
+# SasSession (`eng$session`, session.R), which owns WORK, metadata, titles,
+# macro tables, options and the diagnostic state.  `exec(text, line)` parses,
+# translates and (optionally) runs one chunk of expanded text.
+new_engine <- function(session, level, execute) {
   eng <- new.env(parent = emptyenv())
-  inputs <- prepare_work(work)
-  eng$meta <- Map(meta_from_df, inputs, lapply(work, names))
-  names(eng$meta) <- names(inputs)
-  eng$wenv <- new.env(parent = emptyenv())
-  for (nm in names(inputs)) assign(nm, inputs[[nm]], envir = eng$wenv)
+  eng$session <- session
   eng$level <- level
   eng$execute <- execute
   eng$steps <- list()
   eng$log <- character()
   eng$listing <- character()
-  eng$titles <- character()
-  eng$last <- NULL
-  eng$unordered <- character()
-  eng$views <- list()
   eng$sql_open <- FALSE
   eng$sql_opts <- list()
-  eng$ses <- new_macro_session(exec = function(text, line) engine_exec(eng, text, line))
-  rt$catalog <- new.env(parent = emptyenv())
-  rt$filerefs <- list()
+  ses <- session$macro
+  ses$exec <- function(text, line) engine_exec(eng, text, line)
+  ses$line <- 1L
+  ses$frames <- list()
+  rt <- session$rt
+  # PRXPARSE ids do not outlive a submission
   rt$prx <- list()
   rt$prx_cache <- list()
-  rt_reset()
-  rt$notes_on <- TRUE
-  rt$ls <- 132L
+  rt_reset(rt)
   # step-level NOTEs (data set sizes, observations read, missing values...)
   # and macro WARNINGs in the log; options(sasonr.step_notes = FALSE) turns them off
   eng$step_notes <- isTRUE(getOption("sasonr.step_notes", TRUE))
   rt$on_warn <- if (eng$step_notes) function(msg) eng$log <- c(eng$log, paste("WARNING:", msg))
   rt$on_error <- function(msg) eng$log <- c(eng$log, paste("ERROR:", msg))
   rt$on_note <- function(msg) eng$log <- c(eng$log, msg)
-  eng$ses$on_put <- function(line) eng$log <- c(eng$log, line)
+  ses$on_put <- function(line) eng$log <- c(eng$log, line)
   eng
 }
 
@@ -73,6 +69,7 @@ engine_exec <- function(eng, text, line) {
 }
 
 engine_exec_steps <- function(eng, text, line) {
+  rt <- eng$session$rt
   prog <- sas_parse(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE, sql_open = eng$sql_open)
   eng$sql_open <- isTRUE(attr(prog, "sql_open"))
   for (step in prog$steps) {
@@ -115,20 +112,20 @@ engine_exec_steps <- function(eng, text, line) {
       eng$steps <- c(eng$steps, list(list(code = paste0("# PROC DATASETS (SAS line ", step$line, "): executed by the engine"),
                                           level = "PROC", reasons = "PROC DATASETS", line = step$line, outputs = character(), meta = list())))
       if (eng$execute) {
-        rt_reset()
+        rt_reset(rt)
         engine_datasets(eng, step)
       }
       next
     }
     if (step$type == "proc") {
       for (t in step$titles) engine_global(eng, t)
-      tr <- translate_proc(step, eng$meta, eng$last)
+      tr <- translate_proc(step, eng$session$meta, eng$session$last)
     } else {
-      tr <- translate_step(step, eng$meta, eng$level)
+      tr <- translate_step(step, eng$session$meta, eng$level)
     }
-    eng$meta[names(tr$meta)] <- tr$meta
-    eng$unordered <- setdiff(eng$unordered, tr$outputs)
-    if (length(tr$outputs) > 0) eng$last <- tr$outputs[length(tr$outputs)]
+    eng$session$meta[names(tr$meta)] <- tr$meta
+    eng$session$unordered <- setdiff(eng$session$unordered, tr$outputs)
+    if (length(tr$outputs) > 0) eng$session$last <- tr$outputs[length(tr$outputs)]
     eng$steps <- c(eng$steps, list(tr))
     if (!eng$execute) next
     vec <- step$type == "data" && tr$level %in% c("L1", "L2")
@@ -151,7 +148,7 @@ engine_exec_steps <- function(eng, text, line) {
       # A data error in vectorised code: re-run the step row by row (L3) so
       # that _ERROR_, the NOTEs and the PDV dump follow SAS exactly.
       rt$prx <- prx0
-      tr <- translate_step(step, eng$meta, "L3")
+      tr <- translate_step(step, eng$session$meta, "L3")
       tr$reasons <- c(if (branch) "unsupported value or SAS exception in vectorised code (re-run row by row)" else
         "data error at run time (re-run of the vectorised step)", tr$reasons)
       eng$steps[[length(eng$steps)]] <- tr
@@ -159,9 +156,9 @@ engine_exec_steps <- function(eng, text, line) {
                       sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e))
       if (!is.environment(env)) next
     } else if (vec) {
-      for (nm in tr$outputs) assign(nm, env$work[[nm]], envir = eng$wenv)
+      for (nm in tr$outputs) assign(nm, env$work[[nm]], envir = eng$session$work)
       # NOTEs that are not data errors (e.g. INPUT going to a new line)
-      if (length(rt$notes) > 0 && isTRUE(rt$notes_on)) env$.log <- c(env$.log, rt$notes)
+      if (length(rt$notes) > 0 && isTRUE(eng$session$options$notes)) env$.log <- c(env$.log, rt$notes)
     }
     stopped <- step$type == "data" && isTRUE(rt$stop_step)
     if (stopped) {
@@ -169,16 +166,16 @@ engine_exec_steps <- function(eng, text, line) {
       # after the current observation and keeps what was written ("WARNING: The
       # data set ... may be incomplete").  Only a one-observation step is known
       # to match SAS; a longer step would have to stop part-way through.
-      big <- vapply(tr$outputs, function(nm) NROW(get0(nm, envir = eng$wenv, inherits = FALSE)) > 1L, logical(1))
+      big <- vapply(tr$outputs, function(nm) NROW(get0(nm, envir = eng$session$work, inherits = FALSE)) > 1L, logical(1))
       if (any(big)) abort_unsupported("an execution-time ERROR that stops a DATA step with more than one observation", step$line)
       env$.log <- c(env$.log, "NOTE: The SAS System stopped processing this step because of errors.")
     }
     if (step$type == "data") engine_store_numlen(eng, tr$outputs)
-    notes_on <- isTRUE(rt$notes_on) && eng$step_notes
+    notes_on <- isTRUE(eng$session$options$notes) && eng$step_notes
     eng$log <- c(eng$log, if (notes_on) tr$compile_notes, env$.log)
     if (notes_on) {
       ds_notes <- unlist(lapply(tr$outputs, function(nm) {
-        d <- get0(nm, envir = eng$wenv, inherits = FALSE)
+        d <- get0(nm, envir = eng$session$work, inherits = FALSE)
         if (is.null(d)) NULL else if (stopped) {
           sprintf("WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were %d observations and %d variables.",
                   toupper(nm), nrow(d), ncol(d))
@@ -192,8 +189,8 @@ engine_exec_steps <- function(eng, text, line) {
     eng$listing <- c(eng$listing, env$.lst)
     if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
-    if (length(env$.meta) > 0) eng$meta[names(env$.meta)] <- env$.meta
-    if (length(env$.meta) > 0) eng$meta[names(env$.meta)] <- env$.meta
+    if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
+    if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
   }
   invisible()
 }
@@ -202,16 +199,16 @@ engine_exec_steps <- function(eng, text, line) {
 # but not run; a DATA step creates its output data sets with 0 observations.
 engine_check_step <- function(eng, step) {
   if (step$type == "proc") {
-    if (step$name != "datasets") translate_proc(step, eng$meta, eng$last)
+    if (step$name != "datasets") translate_proc(step, eng$session$meta, eng$session$last)
     err_set_macro(eng, syserr = 3)
     return(invisible())
   }
-  tr <- translate_step(step, eng$meta, eng$level)
+  tr <- translate_step(step, eng$session$meta, eng$level)
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
     vars <- m$vars %||% character()
     engine_empty_dataset(eng, nm, m)
-    if (isTRUE(rt$notes_on) && eng$step_notes) {
+    if (isTRUE(eng$session$options$notes) && eng$step_notes) {
       eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and %d variables.", toupper(nm), length(vars)))
     }
   }
@@ -223,15 +220,15 @@ engine_check_step <- function(eng, step) {
 # IEEE 754 value (SAS truncates the mantissa when the observation is written).
 engine_store_numlen <- function(eng, outputs) {
   for (nm in outputs) {
-    m <- eng$meta[[nm]]
-    d <- get0(nm, envir = eng$wenv, inherits = FALSE)
+    m <- eng$session$meta[[nm]]
+    d <- get0(nm, envir = eng$session$work, inherits = FALSE)
     if (is.null(m) || is.null(d)) next
     short <- names(m$len)[vapply(names(m$len), function(v) identical(m$type[[v]], "num") &&
                                     isTRUE(m$len[[v]] < 8L), logical(1))]
     short <- intersect(short, names(d))
     if (length(short) == 0) next
     for (v in short) d[[v]] <- sas_num_store(d[[v]], m$len[[v]])
-    assign(nm, d, envir = eng$wenv)
+    assign(nm, d, envir = eng$session$work)
   }
 }
 
@@ -250,19 +247,20 @@ sas_num_store <- function(x, len) {
 # Evaluate generated code; with `stage = TRUE` output data sets go to a scratch
 # copy of WORK (the caller commits them) and run-time NOTEs are discarded.
 engine_eval <- function(eng, code, stage = FALSE) {
-  rt_reset()
+  rt <- eng$session$rt
+  rt_reset(rt)
   env <- new.env(parent = asNamespace("sasonr"))
   if (stage) {
     env$work <- new.env(parent = emptyenv())
-    for (nm in ls(eng$wenv, all.names = TRUE)) assign(nm, get(nm, envir = eng$wenv), envir = env$work)
+    for (nm in ls(eng$session$work, all.names = TRUE)) assign(nm, get(nm, envir = eng$session$work), envir = env$work)
   } else {
-    env$work <- eng$wenv
+    env$work <- eng$session$work
   }
   env$.log <- character()
   env$.lst <- character()
   env$.meta <- list()
-  env$.symtab <- eng$ses
-  env$.titles <- eng$titles
+  env$.symtab <- eng$session$macro
+  env$.titles <- eng$session$titles
   tryCatch(eval(parse(text = code, keep.source = FALSE), envir = env), error = function(e) {
     # surface a sasonr condition wrapped by dplyr (e.g. raised inside mutate())
     p <- e
@@ -278,20 +276,20 @@ engine_eval <- function(eng, code, stage = FALSE) {
 }
 
 engine_global <- function(eng, g) {
-  if (g$kind == "filename") rt$filerefs[[g$ref]] <- g$path
+  if (g$kind == "filename") eng$session$filerefs[[g$ref]] <- g$path
   if (g$kind == "options") {
-    if (!is.null(g$ls)) rt$ls <- g$ls
-    if ("nonotes" %in% g$opts) rt$notes_on <- FALSE
-    if ("notes" %in% g$opts) rt$notes_on <- TRUE
-    if ("nosyntaxcheck" %in% g$opts) eng$nosyntaxcheck <- TRUE
-    if ("syntaxcheck" %in% g$opts) eng$nosyntaxcheck <- FALSE
+    if (!is.null(g$ls)) eng$session$options$linesize <- g$ls
+    if ("nonotes" %in% g$opts) eng$session$options$notes <- FALSE
+    if ("notes" %in% g$opts) eng$session$options$notes <- TRUE
+    if ("nosyntaxcheck" %in% g$opts) eng$session$options$nosyntaxcheck <- TRUE
+    if ("syntaxcheck" %in% g$opts) eng$session$options$nosyntaxcheck <- FALSE
   }
   if (g$kind == "title") {
-    keep <- eng$titles[seq_len(min(length(eng$titles), g$level - 1L))]
+    keep <- eng$session$titles[seq_len(min(length(eng$session$titles), g$level - 1L))]
     if (length(keep) < g$level - 1L) keep <- c(keep, rep("", g$level - 1L - length(keep)))
-    eng$titles <- if (nzchar(g$text)) c(keep, g$text) else keep
-    while (length(eng$titles) > 0 && !nzchar(eng$titles[length(eng$titles)])) {
-      eng$titles <- eng$titles[-length(eng$titles)]
+    eng$session$titles <- if (nzchar(g$text)) c(keep, g$text) else keep
+    while (length(eng$session$titles) > 0 && !nzchar(eng$session$titles[length(eng$session$titles)])) {
+      eng$session$titles <- eng$session$titles[-length(eng$session$titles)]
     }
   }
   invisible()
@@ -299,8 +297,8 @@ engine_global <- function(eng, g) {
 
 engine_program <- function(eng, code) {
   text <- paste(code, collapse = "\n")
-  sink <- code_sink(eng$ses)
-  mp_scan(mp_src(text, line_of = TRUE), eng$ses, sink, mode = "code")
+  sink <- code_sink(eng$session$macro)
+  mp_scan(mp_src(text, line_of = TRUE), eng$session$macro, sink, mode = "code")
   sink$finish()
   invisible(eng)
 }
@@ -322,7 +320,12 @@ engine_program <- function(eng, code) {
 #' @export
 sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
   level <- match.arg(level)
-  eng <- new_engine(work, level, execute = FALSE)
+  session <- SasSession$new()
+  session_add_work(session, work)
+  on.exit(session$close(), add = TRUE)
+  eng <- new_engine(session, level, execute = FALSE)
+  old <- sas_rt_active(session)
+  on.exit(sas_rt_active(old), add = TRUE)
   engine_program(eng, code)
   structure(list(steps = eng$steps), class = "sasonr_translation")
 }
@@ -369,10 +372,16 @@ sas_run <- function(code, work = list(), level = c("auto", "L3"),
                     on_error = getOption("sasonr.on_error", c("sas", "abort"))) {
   level <- match.arg(level)
   on_error <- match.arg(on_error, c("sas", "abort"))
-  eng <- new_engine(work, level, execute = TRUE)
+  session <- SasSession$new()
+  on.exit(session$close(), add = TRUE)
+  session_add_work(session, work)
+  eng <- new_engine(session, level, execute = TRUE)
   eng$on_error <- on_error
   eng$status <- "ok"
-  on.exit(sql_duck_close(eng), add = TRUE)
+  # bind the session for the generated code and the run-time helpers
+  old <- sas_rt_active(session)
+  on.exit(sas_rt_active(old), add = TRUE)
+  on.exit(engine_flush(eng), add = TRUE)
   if (on_error == "sas") {
     # step ERRORs are handled by engine_exec(); a condition that reaches this
     # level was raised by the macro processor, whose SAS error handling
@@ -398,10 +407,13 @@ macro_error_unsupported <- function(e) {
 # success).  Used by the conformance runner (matrix programs: the cases before
 # a failing case need no second run).
 engine_run_partial <- function(code) {
-  eng <- new_engine(list(), "auto", execute = TRUE)
+  session <- SasSession$new()
+  on.exit(session$close(), add = TRUE)
+  eng <- new_engine(session, "auto", execute = TRUE)
   eng$on_error <- "abort"
   eng$status <- "ok"
-  on.exit(sql_duck_close(eng), add = TRUE)
+  old <- sas_rt_active(session)
+  on.exit(sas_rt_active(old), add = TRUE)
   err <- tryCatch({
     engine_program(eng, code)
     NULL
@@ -410,20 +422,34 @@ engine_run_partial <- function(code) {
   list(result = res, error = err)
 }
 
+# The log and listing of a submission are appended to the session's cumulative
+# log and listing when the submission ends (also after an R error).
+engine_flush <- function(eng) {
+  if (isTRUE(eng$flushed)) return(invisible())
+  eng$flushed <- TRUE
+  s <- eng$session
+  s$log <- c(s$log, unlist(strsplit(eng$log, "\n", fixed = TRUE)))
+  s$listing <- c(s$listing, eng$listing)
+  invisible()
+}
+
+# Automatic macro variables (not listed among the user's global macro variables).
+macro_auto_vars <- c("sysdate", "sysdate9", "sysday", "systime", "sysver", "sysvlong", "sysscp", "sysncpu",
+                     "sysscpl", "syserr", "syscc", "sysrc", "sysmacroname", "sysindex")
+
 # The sasonr_result of an engine.
 engine_result <- function(eng) {
-  out <- lapply(as.list(eng$wenv), function(d) {
+  out <- lapply(as.list(eng$session$work), function(d) {
     dplyr::mutate(d, dplyr::across(dplyr::where(is.character), sas_rtrim))
   })
   eng$log <- unlist(strsplit(eng$log, "\n", fixed = TRUE)) %||% character()
-  mv <- as.list(eng$ses$globals)
-  autos <- c("sysdate", "sysdate9", "sysday", "systime", "sysver", "sysvlong", "sysscp", "sysncpu",
-             "sysscpl", "syserr", "syscc", "sysrc", "sysmacroname", "sysindex")
+  mv <- as.list(eng$session$macro$globals)
+  autos <- macro_auto_vars
   mv <- mv[setdiff(sort(names(mv)), autos)]
   dsn <- sort(names(out) %||% character())
   structure(
-    list(log = eng$log, listing = eng$listing, work = out[dsn], meta = eng$meta[intersect(dsn, names(eng$meta))],
-         unordered = intersect(eng$unordered, dsn),
+    list(log = eng$log, listing = eng$listing, work = out[dsn], meta = eng$session$meta[intersect(dsn, names(eng$session$meta))],
+         unordered = intersect(eng$session$unordered, dsn),
          translation = structure(list(steps = eng$steps), class = "sasonr_translation"),
          macro_vars = mv, status = eng$status, errors = eng$errors %||% character(),
          error_line = eng$error_line %||% NA_integer_),

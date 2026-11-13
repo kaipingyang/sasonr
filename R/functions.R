@@ -582,6 +582,7 @@ sas_f_compare <- function(a, b, mods = "") {
 
 #' @export
 sas_f_symget <- function(symtab, name, .at = NULL) {
+  rt <- rt_diag()
   vapply(as_sas_chr(name), function(nm0) {
     # trailing blanks are ignored; a leading blank makes the name invalid (SAS: blank result,
     # NOTE "Invalid argument to function SYMGET(' mv ')", _ERROR_)
@@ -610,6 +611,7 @@ sas_f_symget <- function(symtab, name, .at = NULL) {
 # Regular expressions (PRX) ----------------------------------------------------
 
 prx_compile <- function(re) {
+  rt <- rt_diag()
   if (is.numeric(re)) {
     p <- rt$prx[[as.character(re)]]
     if (is.null(p)) abort_runtime("PRX regular-expression id was not created by PRXPARSE")
@@ -676,6 +678,7 @@ prx_invalid_note <- function(fname, args, .at) {
 
 #' @export
 sas_f_prxparse <- function(re, .at = NULL) {
+  rt <- rt_diag()
   vapply(re, function(r) {
     if (is.null(rt$prx)) rt$prx <- list()
     p <- prx_compile(r)
@@ -1384,7 +1387,7 @@ sas_dist_known <- function(d) nzchar(d) && any(startsWith(sas_dist_names, d) | s
 
 # Break a log message into lines of at most LINESIZE columns at blanks (SAS
 # continues on lines indented by `indent`).
-log_wrap <- function(text, indent = 6L, ls = rt$ls %||% 132L) {
+log_wrap <- function(text, indent = 6L, ls = rt_linesize()) {
   words <- strsplit(text, " ", fixed = TRUE)[[1]]
   lines <- character()
   cur <- ""

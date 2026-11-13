@@ -54,6 +54,7 @@ gen_expr <- function(e, cx) {
       not = paste0("sas_not(", g(e$arg), ")")
     ),
     binary = {
+      ct <- ct_diag()
       # constant division by zero is folded at compile time (no _ERROR_ at run time)
       if (e$op == "/" && e$lhs$node == "num" && e$rhs$node == "num" && e$rhs$value == 0) {
         ct$notes <- c(ct$notes, sprintf("NOTE: Division by zero detected during the compilation phase, detected at line %d column %d.",

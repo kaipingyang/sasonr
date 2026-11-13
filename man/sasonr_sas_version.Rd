@@ -15,6 +15,11 @@ example the PROC MEANS moment arithmetic) follow it. Nothing is carried
 over from one release to the other; a feature without evidence for the
 selected release is \code{unverified} there.
 }
+\details{
+A SAS session (\code{\link[=sas_session]{sas_session()}}, or the throw-away session of a
+\code{\link[=sas_run]{sas_run()}} call) takes the release from the option when it is created
+and keeps it for all its submissions.
+}
 \examples{
 old <- options(sasonr.sas_version = "TS1M7")
 getOption("sasonr.sas_version")

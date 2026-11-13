@@ -121,7 +121,7 @@ err_failed_stmt <- function(kind, vars, target, line) {
     }))
 }
 
-# Output metadata (eng$meta form) of a DATA step as SAS compiled it, or NULL.
+# Output metadata (eng$session$meta form) of a DATA step as SAS compiled it, or NULL.
 err_data_schema <- function(eng, step) {
   stmts <- list()
   for (s in step$stmts) {
@@ -135,7 +135,7 @@ err_data_schema <- function(eng, step) {
   }
   step$stmts <- stmts
   for (attempt in seq_len(length(stmts) + 1L)) {
-    tr <- tryCatch(translate_step(step, eng$meta, eng$level),
+    tr <- tryCatch(translate_step(step, eng$session$meta, eng$level),
                    sasonr_syntax_error = function(e) e, sasonr_runtime_error = function(e) e, error = function(e) NULL)
     if (is.null(tr)) return(NULL)
     if (!inherits(tr, "condition")) return(tr$meta[vapply(step$outputs, `[[`, "", "name")])
@@ -153,7 +153,7 @@ err_data_schema <- function(eng, step) {
   NULL
 }
 
-# Output data sets of the failing step and their metadata (eng$meta form) as
+# Output data sets of the failing step and their metadata (eng$session$meta form) as
 # SAS has compiled them when the step stops: list(kind, outputs), or NULL
 # when they cannot be derived from the parsed step.
 err_recover_step <- function(eng, text) {
@@ -176,7 +176,7 @@ err_recover_step <- function(eng, text) {
 }
 
 err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
-  g <- eng$ses$globals
+  g <- eng$session$macro$globals
   if (!is.null(syserr)) assign("syserr", as.character(syserr), envir = g)
   if (!is.null(syscc)) {
     old <- suppressWarnings(as.numeric(get0("syscc", envir = g, inherits = FALSE) %||% "0"))
@@ -209,13 +209,13 @@ engine_step_error <- function(eng, e, text) {
     return(invisible())
   }
   eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
-  if (!isTRUE(eng$syntax_check) && !isTRUE(eng$nosyntaxcheck)) {
+  if (!isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {
     eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
                  "      This prevents execution of subsequent data modification statements.")
     eng$syntax_check <- TRUE
   }
   for (nm in names(rec$outputs)) {
-    old <- get0(nm, envir = eng$wenv, inherits = FALSE)
+    old <- get0(nm, envir = eng$session$work, inherits = FALSE)
     m <- rec$outputs[[nm]]
     eng$log <- c(eng$log, sprintf(
       "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and %d variables.",
@@ -231,12 +231,12 @@ engine_step_error <- function(eng, e, text) {
 }
 
 # A data set with 0 observations and the variables (types, lengths, formats)
-# of the output metadata `m` (eng$meta form).
+# of the output metadata `m` (eng$session$meta form).
 engine_empty_dataset <- function(eng, nm, m) {
   vars <- m$vars %||% character()
   cols <- lapply(vars, function(v) if (identical(m$type[[v]], "char")) character() else numeric())
   d <- tibble::as_tibble(stats::setNames(cols, vars), .rows = 0L)
-  assign(nm, d, envir = eng$wenv)
-  eng$meta[[nm]] <- utils::modifyList(meta_from_df(d), m)
+  assign(nm, d, envir = eng$session$work)
+  eng$session$meta[[nm]] <- utils::modifyList(meta_from_df(d), m)
   invisible()
 }

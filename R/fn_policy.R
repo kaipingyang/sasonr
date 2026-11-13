@@ -466,6 +466,7 @@ choose_dom <- function(a) {
 #' @keywords internal
 #' @export
 sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
+  rt <- rt_diag()
   args <- list(...)
   p <- fn_policy[[.name]]
   n <- if (length(args)) max(lengths(args)) else 1L
