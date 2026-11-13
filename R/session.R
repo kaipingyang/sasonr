@@ -52,11 +52,9 @@ SasSession <- R6::R6Class("SasSession",
     filerefs = NULL,
     # macro: Macro symbol tables (global table, local frames) and macro definitions.
     macro = NULL,
-    # options: System options (environment): linesize, notes, nosyntaxcheck,
-    #   sas_version and the fixed values sasonr implements (yearcutoff, errors, missing, encoding).
+    # options: System options (environment): linesize, notes, nosyntaxcheck, the listing
+    #   layout (center, date, number, pagesize, formdlim) and sas_version.
     options = NULL,
-    # ods: ODS state (destinations, OUTPUT/SELECT/EXCLUDE requests, TRACE); not used yet.
-    ods = NULL,
     # sql: SQL back end: environment with the lazily opened DuckDB connection.
     sql = NULL,
     # log: Cumulative SAS log of all submissions.
@@ -84,7 +82,6 @@ SasSession <- R6::R6Class("SasSession",
       self$filerefs <- list()
       self$macro <- new_macro_session()
       self$options <- new_session_options(sas_version)
-      self$ods <- new_ods_state()
       self$sql <- new.env(parent = emptyenv())
       self$log <- character()
       self$listing <- character()
@@ -113,30 +110,26 @@ SasSession <- R6::R6Class("SasSession",
   )
 )
 
-# System options of a session.  `linesize`, `notes` and `nosyntaxcheck` are
-# set by OPTIONS statements; the other values are the only ones sasonr
-# implements today (the code that depends on them still uses these constants,
-# and other values of the corresponding OPTIONS fail loud).
+# System options of a session, set by OPTIONS statements (engine_global()).
+# The listing layout starts at the values of the SAS gold runs (NOCENTER
+# NODATE NONUMBER FORMDLIM=' ' PAGESIZE=MAX); other values fail loud when a
+# procedure writes output under them (engine_add_listing()).  Options whose
+# only implemented value is the SAS default are not session fields: other
+# values fail loud in the OPTIONS statement (YEARCUTOFF=1940, ERRORS=20,
+# MISSING=.).  The session encoding (spec 04 §4.8) is not implemented: the
+# gold-run values are constants where they matter (INFILE reads latin1 bytes,
+# input.R; PROC CONTENTS reports UTF-8, proc_contents.R).
 new_session_options <- function(sas_version) {
   o <- new.env(parent = emptyenv())
   o$linesize <- 132L
   o$notes <- TRUE
   o$nosyntaxcheck <- FALSE
+  o$center <- FALSE
+  o$date <- FALSE
+  o$number <- FALSE
+  o$pagesize <- Inf
+  o$formdlim <- " "
   o$sas_version <- sas_version
-  o$yearcutoff <- 1940L
-  o$errors <- 20L
-  o$missing <- "."
-  o$encoding <- "utf-8"
-  o
-}
-
-new_ods_state <- function() {
-  o <- new.env(parent = emptyenv())
-  o$destinations <- "listing"
-  o$output <- list()
-  o$select <- NULL
-  o$exclude <- NULL
-  o$trace <- FALSE
   o
 }
 

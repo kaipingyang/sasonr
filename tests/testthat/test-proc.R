@@ -145,3 +145,27 @@ data s; set a; by g; if first.g then n = 0; n + v; if last.g then output; run;
   expect_equal(res$work$s$n, c(5, 1))
   expect_equal(res$work$s, sas_run(code, level = "L3")$work$s)
 })
+
+test_that("listing layout options fail loud only when procedure output is written under them (review dd816d3, 6)", {
+  prt <- "data a; do x = 1 to 20; output; end; run; proc print data = a; run;"
+  # the layout of the SAS gold runs, and other values while no output is written
+  r <- sas_run(paste("options nocenter nodate nonumber pageno = 1 ps = max formdlim = ' ';", prt))
+  expect_identical(r$status, "ok")
+  expect_identical(sas_run("options center date number ps = 15 formdlim = '-'; data a; x = 1; run;")$status, "ok")
+  for (o in c("center", "date", "number")) {
+    expect_error(sas_run(paste0("options ", o, ";", prt)), class = "sasonr_unsupported")
+  }
+  # PAGESIZE: an output that fits on one page runs, a longer one fails loud
+  expect_identical(sas_run(paste("options ps = 60;", prt))$status, "ok")
+  expect_error(sas_run(paste("options ps = 20;", prt)), class = "sasonr_unsupported")
+  # FORMDLIM: the delimiter line is written from the second page on
+  expect_identical(sas_run(paste("options formdlim = '-';", prt))$status, "ok")
+  expect_error(sas_run(paste("options formdlim = '-';", prt, "proc print data = a; run;")), class = "sasonr_unsupported")
+  # the settings persist in a session
+  s <- sas_session()
+  on.exit(sas_session_close(s))
+  sas_run("options center;", session = s)
+  expect_error(sas_run(prt, session = s), class = "sasonr_unsupported")
+  sas_run("options nocenter;", session = s)
+  expect_identical(sas_run(prt, session = s)$status, "ok")
+})

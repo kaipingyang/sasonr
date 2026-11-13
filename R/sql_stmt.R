@@ -89,7 +89,7 @@ sql_stmt_select <- function(eng, st) {
   if (n == 0) sql_note(eng, "NOTE: No rows were selected.")
   if (!is.null(into)) sql_into(eng, res, into, st$line)
   if (!isTRUE(eng$sql_opts$noprint) && n > 0) {
-    eng$listing <- c(eng$listing, sas_sql_listing(res, eng$session$titles, number = isTRUE(eng$sql_opts$number)))
+    engine_add_listing(eng, sas_sql_listing(res, eng$session$titles, number = isTRUE(eng$sql_opts$number)), st$line)
   }
   sql_set_status(eng, n)
 }

@@ -3,6 +3,13 @@
 # PROC IR: list(type = "proc", name, line, options = named list, stmts = list)
 # Every other PROC, option or statement fails loud.
 
+# System options OPTIONS accepts.  LINESIZE, NOTES, SYNTAXCHECK and the
+# listing layout options (CENTER, DATE, NUMBER, PAGESIZE, FORMDLIM) are kept in
+# the session (engine_global()); a listing written under layout values other
+# than those of the SAS gold runs fails loud (engine_add_listing(), run.R).
+# PAGENO= only changes the page numbers, which are written only under NUMBER.
+# The others do not change what sasonr reproduces (log source echo, timing,
+# MPRINT ...).
 options_ignorable <- c(
   "center", "nocenter", "date", "nodate", "number", "nonumber", "ls", "linesize",
   "ps", "pagesize", "notes", "nonotes", "nosource", "nosource2",
@@ -49,6 +56,8 @@ parse_global_stmt <- function(p) {
     advance(p)
     opts <- character()
     ls <- NULL
+    ps <- NULL
+    formdlim <- NULL
     while (tk_type(p) != "semi") {
       if (at_eof(p)) abort_syntax("missing semicolon after OPTIONS", line)
       if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in OPTIONS"), line)
@@ -63,6 +72,15 @@ parse_global_stmt <- function(p) {
           ls <- if (identical(v, "max")) 256L else suppressWarnings(as.integer(v))
           if (is.na(ls) || ls < 64L || ls > 256L) abort_syntax("invalid LINESIZE= value", line)
         }
+        if (opt %in% c("pagesize", "ps")) {
+          v <- tk_low(p)
+          ps <- if (identical(v, "max")) Inf else suppressWarnings(as.numeric(v))
+          if (is.na(ps) || ps != round(ps) || ps < 15) abort_unsupported(paste0("OPTIONS ", toupper(opt), "=", toupper(tk_val(p))), line)
+        }
+        if (opt == "formdlim") {
+          if (!tk_type(p) %in% c("str", "str_macro")) abort_unsupported("OPTIONS FORMDLIM= without a quoted value", line)
+          formdlim <- tk_val(p)
+        }
         # the data-error dump limit is fixed at the SAS default ERRORS=20
         if (opt == "errors" && !identical(tk_low(p), "20")) {
           abort_unsupported(paste0("OPTIONS ERRORS=", toupper(tk_val(p)), " (only the default ERRORS=20 is implemented)"), line)
@@ -71,7 +89,7 @@ parse_global_stmt <- function(p) {
       }
     }
     advance(p)
-    return(list(type = "global", kind = "options", opts = opts, ls = ls, line = line))
+    return(list(type = "global", kind = "options", opts = opts, ls = ls, ps = ps, formdlim = formdlim, line = line))
   }
   abort_unsupported(paste0("global statement ", toupper(tk_val(p))), line)
 }

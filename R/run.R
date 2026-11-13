@@ -186,7 +186,7 @@ engine_exec_steps <- function(eng, text, line) {
       reads <- if (identical(tr$reasons, "PROC PRINT")) print_read_notes() else read_notes()
       eng$log <- c(eng$log, step_end_notes(), reads, rt$proc_notes, ds_notes)
     }
-    eng$listing <- c(eng$listing, env$.lst)
+    engine_add_listing(eng, env$.lst, step$line)
     if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
     if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
@@ -283,6 +283,13 @@ engine_global <- function(eng, g) {
     if ("notes" %in% g$opts) eng$session$options$notes <- TRUE
     if ("nosyntaxcheck" %in% g$opts) eng$session$options$nosyntaxcheck <- TRUE
     if ("syntaxcheck" %in% g$opts) eng$session$options$nosyntaxcheck <- FALSE
+    o <- eng$session$options
+    for (k in c("center", "date", "number")) {
+      if (k %in% g$opts) o[[k]] <- TRUE
+      if (paste0("no", k) %in% g$opts) o[[k]] <- FALSE
+    }
+    if (!is.null(g$ps)) o$pagesize <- g$ps
+    if (!is.null(g$formdlim)) o$formdlim <- g$formdlim
   }
   if (g$kind == "title") {
     keep <- eng$session$titles[seq_len(min(length(eng$session$titles), g$level - 1L))]
@@ -440,6 +447,29 @@ engine_run_partial <- function(code) {
   }, error = function(e) e)
   res <- if (is.null(err)) engine_result(eng) else tryCatch(engine_result(eng), error = function(e) NULL)
   list(result = res, error = err)
+}
+
+# Append procedure output to the listing of the submission.  sasonr writes
+# the listing SAS writes under NOCENTER NODATE NONUMBER FORMDLIM=' '
+# PAGESIZE=MAX (the options of the SAS gold runs).  Under other values SAS
+# centres the lines (CENTER), writes a header line with the date or page
+# number (DATE, NUMBER), a delimiter line instead of each new page after the
+# first (FORMDLIM=), or breaks a long output into pages with repeated
+# headings (PAGESIZE=): output written under them fails loud.  An output of at
+# most PAGESIZE - 3 lines fits on one page (margin for the title lines).
+engine_add_listing <- function(eng, lst, line = NULL) {
+  if (length(lst) == 0) return(invisible())
+  o <- eng$session$options
+  bad <- c(if (isTRUE(o$center)) "CENTER", if (isTRUE(o$date)) "DATE", if (isTRUE(o$number)) "NUMBER",
+           if (!identical(o$formdlim, " ") && length(eng$session$listing) + length(eng$listing) > 0)
+             "FORMDLIM= other than ' '",
+           if (length(lst) + 3L > o$pagesize) paste0("PAGESIZE=", o$pagesize, " (output longer than one page)"))
+  if (length(bad)) {
+    abort_unsupported(paste0("procedure output under OPTIONS ", paste(bad, collapse = ", "),
+                             " (only the NOCENTER NODATE NONUMBER FORMDLIM=' ' PAGESIZE=MAX listing is verified)"), line)
+  }
+  eng$listing <- c(eng$listing, lst)
+  invisible()
 }
 
 # The log and listing of a submission are appended to the session's cumulative
