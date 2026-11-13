@@ -32,6 +32,23 @@ clinical procedures and the value runtime.
   exact RELRISK confidence limit that SAS computes with an internal nuisance
   search (documented algorithm gives 0.08997 where SAS prints 0.0901) stays
   fail loud.
+* Holes found by an audit of the new PROC FREQ code are closed by guards:
+  EXACT CHISQ with non-integer weights or without the TABLES CHISQ option,
+  EXACT BINOMIAL with non-integer weights, SCORES=RANK combined with CHISQ /
+  FISHER (the per-stratum Mantel-Haenszel rows silently used the table
+  scores), the MISSING option with numeric table scores, MISSPRINT with LIST,
+  statistics after a LIST table, MISSPRINT statistics on a table that is not
+  2x2, RELRISK(CL=) together with RISKDIFF(CL=), EXACT RISKDIFF without the
+  CL= table, RISKDIFF CL= with a zero cell, ALPHA= other than 0.05 outside
+  BINOMIAL, non-integer weights for CMH / RELRISK / RISKDIFF, FISHER with
+  non-integer weights outside 2x2, BY groups outside 2x2 and negative
+  weights all fail loud instead of printing a half-computed result.
+* The %SYSFUNC and PROC SQL log lines for an out-of-range function argument
+  are reproduced (`WARNING: An argument to the function MDY referenced by
+  the %SYSFUNC or %QSYSFUNC macro function is out of range.` and PROC SQL's
+  `NOTE: Invalid argument to function MDY. Missing values may be generated.`),
+  which verifies MDY in all three contexts and unblocks
+  functions/INTCK_033 and functions/INTNX_035.
 * **PROC SQL computed character columns** get the lengths SAS gives them
   (CAT family 200, constant arguments the length of the value), and the SQL
   context of the functions involved is now in the registry.
