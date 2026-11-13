@@ -592,7 +592,9 @@ an_stmt <- function(s, st) {
       s$then <- an_stmt(s$then, st)
       if (!is.null(s[["else"]])) s[["else"]] <- an_stmt(s[["else"]], st)
     },
-    subset_if = s$cond <- an_cond(s$cond, st, line),
+    # ref_only: errors.R's stand-in that only registers the variables a failed
+    # statement references (not a condition SAS runs)
+    subset_if = s$cond <- if (isTRUE(s$ref_only)) an_expr(s$cond, st) else an_cond(s$cond, st, line),
     where = {
       s$cond <- an_where(s$cond, st)
       st$wheres <- list(s$cond) # a later WHERE statement replaces an earlier one

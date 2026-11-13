@@ -117,7 +117,7 @@ err_failed_stmt <- function(kind, vars, target, line) {
   tv <- list(node = "var", name = target, text = target, line = line)
   c(list(list(stmt = "assign", target = tv, value = list(node = "missing", code = ".", line = line), line = line)),
     lapply(setdiff(vars, target), function(v) {
-      list(stmt = "subset_if", cond = list(node = "var", name = v, text = v, line = line), line = line)
+      list(stmt = "subset_if", cond = list(node = "var", name = v, text = v, line = line), line = line, ref_only = TRUE)
     }))
 }
 

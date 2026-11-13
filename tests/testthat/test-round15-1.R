@@ -177,3 +177,12 @@ test_that("a step that always falls back runs once vectorised and once row by ro
   expect_identical(n, 2L)
   expect_identical(unique(res$work$a$r), 99999.5)
 })
+
+test_that("the character IF check skips errors.R's variable stand-ins (opensas qa_tick357_lexer_eq_munch)", {
+  res <- sas_run("data d; input x k $; datalines;
+1 a
+;
+data w; set d; snd = (k =* \"a\"); run;", on_error = "sas")
+  expect_identical(res$status, "error")
+  expect_true("w" %in% ls(res$work))
+})
