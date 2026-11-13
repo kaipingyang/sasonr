@@ -35,7 +35,7 @@ sas_session <- function(work = list()) {
 }
 
 check_session <- function(session) {
-  if (!inherits(session, "SasSession")) {
+  if (!R6::is.R6(session) || !inherits(session, "SasSession")) {
     rlang::abort("`session` must be a SAS session created by `sas_session()`.", class = "sasonr_error")
   }
   session
