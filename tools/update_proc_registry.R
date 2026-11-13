@@ -2,7 +2,7 @@
 # gold probes (never edited by hand).
 #
 # Usage (package root; one R process at a time):
-#   OPENBLAS_NUM_THREADS=1 Rscript tools/update_proc_registry.R [ROOT]
+#   OPENBLAS_NUM_THREADS=1 Rscript tools/update_proc_registry.R [--archive [COMMIT]] [ROOT]
 #
 # ROOT defaults to tests/conformance.  The specification tools/proc_stats.tsv
 # lists, per procedure x statistic x condition, the evidence: `case|dataset|column`
@@ -21,6 +21,16 @@ k <- match("--sas-version", args)
 if (!is.na(k)) {
   sas_version <- toupper(args[k + 1L])
   args <- args[-c(k, k + 1L)]
+}
+# --archive [COMMIT]: take the case results from the results archive of
+# tools/run_conformance.R (the sasonr.strict = FALSE verdicts and the evidence
+# columns of the run of COMMIT, default HEAD) instead of running the cases.
+arc <- NULL
+k <- match("--archive", args)
+if (!is.na(k)) {
+  has_val <- k < length(args) && !startsWith(args[k + 1L], "--") && !dir.exists(args[k + 1L])
+  arc <- if (has_val) args[k + 1L] else "HEAD"
+  args <- args[-c(k, if (has_val) k + 1L)]
 }
 root <- normalizePath(if (length(args)) args[1] else "tests/conformance")
 suppressMessages(devtools::load_all(".", quiet = TRUE, helpers = FALSE))
@@ -50,7 +60,17 @@ for (cs in cases) {
 }
 results <- list()
 whole <- list()
-for (cs in cases) {
+if (!is.null(arc)) {
+  te <- new.env()
+  sys.source("tools/conf_archive.R", envir = te)
+  key <- te$arc_resolve(".", arc)
+  rn <- te$arc_root_name(root, ".")
+  ns_res <- te$arc_read(key, rn, strict = FALSE, ".")
+  cf <- file.path(te$arc_dir("."), key, paste0(rn, "-proc-columns.csv"))
+  if (is.null(ns_res) || !file.exists(cf)) stop("no archived run of ", rn, " at ", key)
+  cols <- utils::read.csv(cf, stringsAsFactors = FALSE, colClasses = "character")
+  for (cs in cases) whole[[cs]] <- ns_res$status[ns_res$case == cs][1] %in% c("pass", "both_error")
+} else for (cs in cases) {
   needs_whole <- any(vapply(items, function(e) cs %in% e, logical(1)))
   if (needs_whole) {
     # strict off: the registry must not rebuild itself from its own gate (a
@@ -62,17 +82,13 @@ for (cs in cases) {
 }
 
 col_check <- function(cs, ds, col) {
+  if (!is.null(arc)) {
+    r <- cols[cols$case == cs & cols$dataset == ds & cols$column == col, , drop = FALSE]
+    if (!nrow(r)) stop("evidence ", cs, "|", ds, "|", col, " not in the archived run")
+    return(c(compared = as.numeric(r$compared[1]), same = as.numeric(r$same[1])))
+  }
   res <- results[[cs]]
-  if (inherits(res, "error")) return(c(compared = 0, same = 0))
-  e <- haven::read_sas(file.path(root, cs, "expected", "datasets", paste0(ds, ".sas7bdat")))
-  nm <- names(res$work)[toupper(names(res$work)) == toupper(ds)]
-  if (!length(nm)) return(c(compared = 0, same = 0))
-  o <- res$work[[nm]]
-  j <- match(toupper(col), toupper(names(o)))
-  k <- match(toupper(col), toupper(names(e)))
-  if (is.na(j) || is.na(k) || nrow(o) != nrow(e)) return(c(compared = nrow(e), same = 0))
-  same <- env$conf_num_eq(env$conf_sas_num(e[[k]]), env$conf_son_num(o[[j]]))
-  c(compared = length(same), same = sum(same))
+  env$conf_col_check(file.path(root, cs), if (inherits(res, "error")) NULL else res$work, ds, col)
 }
 
 today <- format(Sys.Date())

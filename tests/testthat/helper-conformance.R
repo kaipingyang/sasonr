@@ -465,7 +465,7 @@ conf_fail_status <- function(sas_err, unsupported, sas_style) {
 conf_layers_all <- c("ds", "attr", "log", "lst", "put", "files")
 
 #' @noRd
-conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
+conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL, keep_work = FALSE) {
   case <- normalizePath(case)
   meta <- conf_read_meta(file.path(case, "meta.yaml"))
   exp <- file.path(case, "expected")
@@ -515,6 +515,8 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
     out$status <- conf_fail_status(sas_rc >= 2L, res$rc == 2L, FALSE)
     return(out)
   }
+  # the data sets sasonr left in WORK (tools/run_conformance.R: PROC statistics evidence)
+  if (keep_work) out$work <- res$work
   # sas_run(on_error = "sas"): a SAS ERROR gives a result with status "error"
   gold_v <- as.integer(meta$gold_version %||% 1L)
   both_err <- identical(res$status, "error")
@@ -603,6 +605,22 @@ conf_run_case <- function(case, root_copy = NULL, timeout = NULL, keep = NULL) {
   out$status <- if (sas_err && !son_err) "lenient" else if (all(out$layers)) (if (both_err) "both_error" else "pass") else "fail"
   if (both_err) out$msg <- res$errors[1]
   out
+}
+
+# One column of a SAS data set of a case against the same column of the data
+# set sasonr left in WORK (`work`, NULL when sasonr stopped): c(compared, same)
+# (tools/update_proc_registry.R, PROC statistics evidence `case|dataset|column`).
+conf_col_check <- function(case, work, ds, col) {
+  if (is.null(work)) return(c(compared = 0, same = 0))
+  e <- haven::read_sas(file.path(case, "expected", "datasets", paste0(ds, ".sas7bdat")))
+  nm <- names(work)[toupper(names(work)) == toupper(ds)]
+  if (!length(nm)) return(c(compared = 0, same = 0))
+  o <- work[[nm]]
+  j <- match(toupper(col), toupper(names(o)))
+  k <- match(toupper(col), toupper(names(e)))
+  if (is.na(j) || is.na(k) || nrow(o) != nrow(e)) return(c(compared = nrow(e), same = 0))
+  same <- conf_num_eq(conf_sas_num(e[[k]]), conf_son_num(o[[j]]))
+  c(compared = length(same), same = sum(same))
 }
 
 # ---- matrix layout (fn_matrix/, fmt_matrix/) --------------------------------------------
@@ -719,6 +737,13 @@ conf_matrix_run_segment <- function(code, data_dir, limit) {
   res
 }
 
+# Did SAS stop with an ERROR in matrix case `id` (`s_log`: the case's log NOTEs)?
+conf_matrix_sas_err <- function(s_log, id) {
+  ds <- conf_matrix_ds_name(id)
+  done_note <- c(paste0("NOTE: The data set WORK.", toupper(ds), " has "), paste0("NOTE: Table WORK.", toupper(ds), " created"))
+  any(startsWith(s_log, "ERROR")) && !any(startsWith(s_log, done_note[1]) | startsWith(s_log, done_note[2]))
+}
+
 #' @noRd
 conf_run_matrix <- function(case, keep = NULL, only = NULL) {
   case <- normalizePath(case)
@@ -830,8 +855,7 @@ conf_run_matrix <- function(case, keep = NULL, only = NULL) {
     # code): an ERROR and the case's step did not complete (no data set / table NOTE).
     # A function that writes an ERROR line but returns a value (PRXMATCH with an
     # invalid pattern: SAS return code 0) does not count.
-    done_note <- c(paste0("NOTE: The data set WORK.", toupper(ds), " has "), paste0("NOTE: Table WORK.", toupper(ds), " created"))
-    sas_err <- any(startsWith(s_log, "ERROR")) && !any(startsWith(s_log, done_note[1]) | startsWith(s_log, done_note[2]))
+    sas_err <- conf_matrix_sas_err(s_log, id)
     if (!is.null(fails[[k]])) {
       o$msg <- fails[[k]]$msg
       o$status <- conf_fail_status(sas_err, isTRUE(fails[[k]]$unsupported), isTRUE(fails[[k]]$sas_style))

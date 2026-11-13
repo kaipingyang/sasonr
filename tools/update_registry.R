@@ -6,6 +6,9 @@
 #   (--strict false: in strict mode every approximate function fails loud and
 #   the registry would rebuild itself from its own gate)
 #   Rscript tools/update_registry.R /tmp/matrix.csv [more.csv ...]
+#   or, from the results archive of the last full run (one run gives both the
+#   strict verdicts and these strict = FALSE ones; tools/run_conformance.R):
+#   Rscript tools/update_registry.R --archive HEAD
 #
 # Inputs: the per-case CSV of tools/run_conformance.R (areas fn_matrix/,
 # fmt_matrix/ and the function pilot functions/), the case lists
@@ -52,7 +55,25 @@ take_opt <- function(name, default) {
 }
 sas_version <- toupper(take_opt("--sas-version", "TS1M7"))
 root <- take_opt("--root", file.path("tests", "conformance"))
-if (!length(args)) stop("usage: Rscript tools/update_registry.R [--sas-version V] [--root DIR] results.csv [...]")
+# --archive COMMIT (e.g. HEAD): the sasonr.strict = FALSE results of the root in
+# the results archive of tools/run_conformance.R (.claude/results/<commit>/
+# <root>-strict-false-<V>.csv: the same run as the strict verdicts) instead of
+# results.csv files
+arc <- take_opt("--archive", "")
+if (nzchar(arc)) {
+  te <- new.env()
+  sys.source("tools/conf_archive.R", envir = te)
+  key <- te$arc_resolve(".", arc)
+  f <- te$arc_path(key, te$arc_root_name(root, "."), FALSE, sas_version, ".")
+  if (!file.exists(f)) stop("no archived strict = FALSE results of ", root, " (SAS ", sas_version, ") at ", key)
+  # the cases of the documented run (--pattern '/(fn_matrix|fmt_matrix|functions|fn_where)/')
+  x <- utils::read.csv(f, stringsAsFactors = FALSE)
+  x <- x[grepl("^(fn_matrix|fmt_matrix|functions|fn_where)/", x$case), , drop = FALSE]
+  f <- tempfile(fileext = ".csv")
+  utils::write.csv(x, f, row.names = FALSE)
+  args <- c(args, f)
+}
+if (!length(args)) stop("usage: Rscript tools/update_registry.R [--sas-version V] [--root DIR] [--archive COMMIT] [results.csv ...]")
 suppressMessages(devtools::load_all(".", quiet = TRUE, helpers = FALSE))
 ns <- asNamespace("sasonr")
 # the verdict rules shared with the tests (conf_case_class, conf_feature_status)
