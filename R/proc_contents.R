@@ -595,7 +595,7 @@ engine_datasets <- function(eng, step) {
   }
   end_modify()
   if (rt_notes_on() && eng$step_notes) eng$log <- c(eng$log, notes)
-  eng$listing <- c(eng$listing, lst)
+  engine_add_listing(eng, lst, step$line)
   invisible()
 }
 
