@@ -23,10 +23,6 @@
 rt <- new.env(parent = emptyenv())
 rt$err <- FALSE
 rt$notes <- character()
-# PROC SQL reports an invalid function argument with its own NOTE: no line /
-# column, no argument list and no mathematical-operations summary (SAS 9.4).
-rt$sql <- FALSE
-rt$sql_inv <- character()
 rt$catalog <- new.env(parent = emptyenv())
 
 rt$notes_on <- TRUE
@@ -42,8 +38,6 @@ rt_reset <- function() {
   rt$reads <- list()
   rt$proc_notes <- character()
   rt$flow_note <- FALSE
-  rt$sql <- FALSE
-  rt$sql_inv <- character()
   invisible()
 }
 
@@ -73,21 +67,6 @@ note_chr <- function(v, trim = TRUE) {
 # arguments of the failing call, e.g. "Invalid argument to function LOG(-1)".
 note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = NULL, numbered = FALSE, math = TRUE,
                              trim = TRUE) {
-  if (isTRUE(rt$sql)) {
-    # PROC SQL (SAS 9.4): one NOTE per function and statement, without the
-    # argument list, the line/column and the mathematical-operations summary;
-    # measured with mdy(2, 30, 2024) in a CREATE TABLE ... SELECT.
-    nm <- toupper(fname)
-    if (!nm %in% rt$sql_inv) {
-      rt$sql_inv <- c(rt$sql_inv, nm)
-      msg <- sprintf("NOTE: Invalid argument to function %s. Missing values may be generated.", nm)
-      rt$err <- TRUE
-      # written to the log at once: PROC SQL's own NOTEs (table created, rows
-      # selected) follow it in the SAS log
-      if (is.function(rt$on_note)) rt$on_note(msg) else rt$notes <- c(rt$notes, msg)
-    }
-    return(invisible())
-  }
   if (numbered) {
     # "NOTE: Argument 2 to function SCAN('a b c',0) at line 3 column 7 is invalid."
     i <- if (is.null(bad)) 1L else which(bad)[1]

@@ -500,12 +500,6 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   note <- function(kind, rows) {
     k <- sum(rows)
     if (k == 0) return()
-    if (isTRUE(rt$sql) && kind %in% c("mv", "math")) {
-      # PROC SQL prints neither the "Missing values were generated" NOTE nor the
-      # mathematical-operations summary (gold standard); an invalid argument has
-      # its own PROC SQL NOTE in note_invalid_arg().
-      return()
-    }
     switch(kind,
       mv = {
         if (!.exact) rt$mv_rerun <- TRUE

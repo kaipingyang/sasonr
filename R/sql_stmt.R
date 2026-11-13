@@ -16,10 +16,7 @@ sql_set_status <- function(eng, sqlobs, sqlrc = 0) {
 # Execute one SQL statement.
 engine_sql <- function(eng, st) {
   rt_reset()
-  # invalid function arguments have their own PROC SQL NOTE (see diag.R)
-  rt$sql <- TRUE
   on.exit({
-    rt$sql <- FALSE
     # PROC SQL writes no "Missing values were generated" NOTE (gold standard)
     rt$mv <- integer()
     if (isTRUE(eng$step_notes)) sql_note(eng, step_end_notes())
