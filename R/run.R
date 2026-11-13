@@ -233,7 +233,6 @@ engine_store_numlen <- function(eng, outputs) {
 }
 
 #' Value of a numeric variable after storage with `len` bytes (3-8)
-#' @export
 #' @keywords internal
 sas_num_store <- function(x, len) {
   ok <- !is.na(x)

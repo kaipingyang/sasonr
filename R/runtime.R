@@ -31,7 +31,6 @@ sas_missing <- function(code = ".") {
 #'
 #' @return Integer vector: `NA` for non-missing, 0 for `._`, 1 for `.`,
 #'   2-27 for `.A`-`.Z`.
-#' @export
 #' @keywords internal
 sas_miss_code <- function(x) {
   out <- rep(NA_integer_, length(x))
@@ -49,7 +48,6 @@ sas_miss_code <- function(x) {
   out
 }
 
-#' @export
 sas_is_missing <- function(x) {
   if (is.character(x)) !nzchar(sas_rtrim(x)) else is.na(x)
 }
@@ -103,7 +101,6 @@ chr_cmp <- function(a, b) {
 }
 
 #' Three-way SAS comparison (missing sorts lowest)
-#' @export
 #' @keywords internal
 sas_cmp <- function(a, b) {
   if (is.character(a) || is.character(b)) {
@@ -488,6 +485,7 @@ sas_f_substr <- function(x, pos, len = NULL, .at = NULL) {
 # position is a SAS data error (the variable keeps its value); a replacement
 # shorter than the target window is padded with blanks, a longer one is cut to
 # the room that remains.
+#' @export
 sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
   x <- as_sas_chr(x)
   value <- as_sas_chr(value)
@@ -526,6 +524,7 @@ sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
 # member type: 'DATA' is verified, an explicit 'ANY' is not a valid member type
 # in SAS and returns 0 (TS1M2 probe), and any other type fails loud because it
 # is not verified.
+#' @export
 sas_f_exist <- function(name, type = NULL, .work = NULL, .at = NULL) {
   n <- max(length(name), if (is.null(type)) 1L else length(type))
   nm <- rep_len(as_sas_chr(name), n)
@@ -617,7 +616,6 @@ sas_epoch <- as.Date("1960-01-01")
 month_abb <- c("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
 
 #' Convert a date/time/datetime literal body to its SAS numeric value
-#' @export
 #' @keywords internal
 sas_parse_dt_literal <- function(text, kind) {
   text <- trimws(text)
@@ -1212,7 +1210,6 @@ sas_rows_to_tibble <- function(rows, proto) {
 # INPUT / DATALINES -------------------------------------------------------
 
 #' Read in-stream data lines according to an INPUT specification
-#' @export
 #' @keywords internal
 sas_read_datalines <- function(lines, spec) {
   cols <- lapply(spec, function(s) if (s$char) character() else numeric())

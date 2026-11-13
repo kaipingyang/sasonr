@@ -285,7 +285,6 @@ sql_header_lines <- function(h, width) {
 }
 
 #' PROC SQL report for a query result (as written to the listing)
-#' @export
 #' @keywords internal
 sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
   cols <- rel$cols

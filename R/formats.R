@@ -19,7 +19,6 @@ fmt_spec <- function(name = "", w = NA_integer_, d = NA_integer_, char = FALSE) 
 }
 
 #' Parse a format or informat name held in a string (`"date9."`, `"$char10."`)
-#' @export
 #' @keywords internal
 sas_fmt_text <- function(text) {
   s <- tolower(strip_both(text))
@@ -1151,7 +1150,6 @@ apply_user_invalue <- function(s, uf) {
 
 #' Read text with an informat (one value)
 #' @return list(v, ok): the value and FALSE when the data are invalid.
-#' @export
 #' @keywords internal
 sas_informat_read <- function(s, fmt, keep_lead = FALSE) {
   uf <- user_fmt(fmt$name, fmt$char, "invalue")

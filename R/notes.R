@@ -91,7 +91,6 @@ sas_mv_res <- function(res, .at, .exact = TRUE) {
 #' @param ... The operands; rows where any operand is missing are counted.
 #' @param .exact `FALSE` when vectorised code may over-count (the step is re-run row by row).
 #' @keywords internal
-#' @export
 sas_mv_count <- function(.at, ..., .exact = TRUE) {
   rt <- rt_diag()
   args <- list(...)
