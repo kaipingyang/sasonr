@@ -56,7 +56,7 @@ test_that("a run without a session is independent of every other run", {
   r2 <- sas_run("data b; x = 1; run;")
   expect_identical(names(r2$work), "b")
   expect_null(r2$macro_vars$m)
-  expect_error(sas_run("data c; z = put(1, yn.); run;", on_error = "abort"))
+  expect_error(sas_run("data c; z = put(1, yn.); run;", on_error = "abort"), class = "sasonr_syntax_error")
   # nothing is left bound after a run
   expect_null(sasonr:::.active$session)
 })
@@ -102,6 +102,45 @@ data a; length c $ 3; x = 0; c = upcase('ab'); y = 1 / x; put c= y=; run;", sess
   expect_identical(res$macro_vars$mv, "outer")
   expect_identical(s$options$linesize, 100L)
   expect_identical(sasonr:::sas_rt_active(), sasonr:::default_session())
+})
+
+test_that("a nested submission to the same session is refused; the outer run is intact (review dd816d3, 1)", {
+  s <- sas_session()
+  on.exit(sas_session_close(s))
+  nested <- NULL
+  orig <- sasonr:::sas_f_upcase
+  local_mocked_bindings(sas_f_upcase = function(...) {
+    if (is.null(nested)) nested <<- tryCatch(sas_run("%let mv = inner; %put inner;", session = s), error = function(e) e)
+    orig(...)
+  })
+  res <- sas_run("%let mv = outer;
+data a; length c $ 3; x = 0; c = upcase('ab'); y = 1 / x; put c=; run;", session = s, level = "L3")
+  expect_s3_class(nested, "sasonr_error")
+  expect_match(conditionMessage(nested), "another submission")
+  expect_identical(res$work$a$c, "AB")
+  expect_true("c=AB" %in% res$log)
+  expect_true(any(grepl("Division by zero", res$log)))
+  expect_false("inner" %in% res$log)
+  expect_identical(res$macro_vars$mv, "outer")
+})
+
+test_that("a submission releases the session and drops its closures, also after an R error (review dd816d3, 1)", {
+  s <- sas_session()
+  on.exit(sas_session_close(s))
+  released <- function() {
+    expect_false(s$busy)
+    expect_null(s$macro$exec)
+    expect_null(s$macro$on_put)
+    expect_null(s$rt$on_note)
+    expect_null(s$rt$on_error)
+    expect_null(s$rt$on_warn)
+    expect_null(sasonr:::.active$session)
+  }
+  sas_run("data a; x = 1; put x=; run;", session = s)
+  released()
+  expect_error(sas_run("data b; set nosuch; run;", session = s, on_error = "abort"), class = "sasonr_runtime_error")
+  released()
+  expect_identical(sas_run("data c; set a; run;", session = s)$work$c$x, 1)
 })
 
 test_that("the SQL connection is opened on first use and closed with the session", {
