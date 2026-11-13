@@ -52,6 +52,42 @@ The level is decided by analysing the AST. If a vectorised step meets a
 condition that needs row-by-row diagnostics (for example invalid data that
 sets `_ERROR_`), it is re-run as L3.
 
+## The SAS session
+
+Everything a SAS program can change lives in one session object
+(`SasSession`, an R6 class), never in package-level variables:
+
+| Component | Contents |
+|---|---|
+| WORK | data sets (tibbles), their metadata (types, lengths, formats, labels), PROC SQL views, `_LAST_` |
+| Format catalog | user formats and informats from PROC FORMAT |
+| Macro | global symbol table, local frames, macro definitions, automatic macro variables (`SYSCC`, `SYSERR`, `SQLOBS`, ...) |
+| Options | `LINESIZE`, `NOTES`, `SYNTAXCHECK`, the SAS 9.4 release, and the fixed values sasonr implements (`YEARCUTOFF=1940`, `ERRORS=20`, `MISSING=.`, UTF-8) |
+| Titles, filerefs | `TITLE` lines, `FILENAME` assignments |
+| ODS | destinations and OUTPUT/SELECT/EXCLUDE requests (reserved for the clinical procedures) |
+| SQL back end | the DuckDB connection, opened on first use and closed with the session |
+| Sinks | the cumulative log and listing of all submissions |
+| Diagnostics | compile-time NOTEs of the step being translated; run-time state of the step being run (`_ERROR_` flag, data-error NOTEs, missing-value and math-error counters, observations read, PRXPARSE ids) |
+
+`sas_run(code)` creates a throw-away session; `sas_session()` creates one
+that several `sas_run(code, session = s)` calls share, like submissions in
+an interactive SAS session (each submission still starts outside
+syntax-check mode). `sas_work()`, `sas_meta()`, `sas_macro_vars()`,
+`sas_log()` and `sas_listing()` read a session.
+
+The generated step code does not take the session as an argument. The engine
+binds the session for the duration of a submission and restores the previous
+binding on exit; the run-time helpers that generated code calls
+(`sas_err_sync()`, `sas_put_line()`, the functions and formats) read the
+bound session. Two sessions used alternately therefore never see each
+other's state, and a `sas_run()` nested inside a running step gets its own
+session without disturbing the outer one. Function-layer calls made outside
+any run (`sas_f_round()` in your own code) use a separate default session.
+
+Parsed programs, translations and results are plain S3 values; the function,
+format and procedure-option registries are built once at load time and are
+never changed by a run.
+
 ## Why not regular expressions
 
 SAS syntax is not a regular language: nested `DO`/`END` blocks, nested

@@ -1,5 +1,22 @@
 # sasonr (development version)
 
+## Round 16: the SAS session object (2026-11-13)
+
+* **`sas_session()`**: a persistent SAS session. Successive
+  `sas_run(code, session = s)` calls behave like submissions to one SAS
+  session: WORK data sets, macro variables and macro definitions, user
+  formats, `OPTIONS`, titles and filerefs carry over. Accessors
+  `sas_work()`, `sas_meta()`, `sas_macro_vars()`, `sas_log()`,
+  `sas_listing()`; `sas_session_close()` closes the PROC SQL connection.
+* All run state moved from package-level environments into the session
+  (R6 class `SasSession`). The engine binds the session while a submission
+  runs; two sessions used alternately, or a run nested inside a running step,
+  no longer share anything. `sas_run()` without a session behaves exactly as
+  before (every conformance verdict unchanged).
+* A run no longer leaves state behind for later function-layer calls (for
+  example `OPTIONS LINESIZE=` or PRXPARSE ids of the last run); calls outside
+  a run use their own default session.
+
 ## Round 15.1: review of round 15 (2026-11-13)
 
 * Integers too long for their decimals (16 or more digits with 4 or more
