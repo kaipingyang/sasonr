@@ -708,6 +708,10 @@ freq_one_request <- function(db, wt, rq, sp) {
   #
   # is gated by the statistics registry (freq_stat_gate, per SAS release).  The n-way (CROSSLIST-style) cell rows
   # are not printed by sasonr yet, so that case still fails loud.
+  if (length(vars) == 2 && sas_target_version() == "SAS 9.4" && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
+    #
+    abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 cell rows for SAS 9.4 (only one-way tables are supported there)", rq$line)
+  }
   if (length(vars) > 2 && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
     abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for an n-way table (only the two-way crosstab layout is supported)", rq$line)
   }

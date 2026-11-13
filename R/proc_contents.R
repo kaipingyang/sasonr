@@ -483,7 +483,9 @@ engine_datasets <- function(eng, step) {
             name = it$name,
             prefix = members[startsWith(members, it$prefix)],
             range = expand_numbered_range(it$from, it$to, s$line),
-            special = if (it$name == "_all_") members else abort_unsupported("DELETE list form", s$line),
+            #
+            #
+            special = abort_unsupported(paste0("DELETE ", toupper(it$name), " in PROC DATASETS (not supported)"), s$line),
             abort_unsupported("DELETE list form", s$line))
           for (nm in nms) {
             if (exists_ds(nm)) {
