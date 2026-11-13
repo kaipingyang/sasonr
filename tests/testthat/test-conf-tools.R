@@ -139,3 +139,22 @@ test_that("finding 7: the compile cache is keyed by NAMESPACE and the names of t
   expect_false(identical(c1, c2))
   expect_false(identical(c2, c3))
 })
+
+test_that("merge of dev 53e4a05: the impact caches live in imp_cache_dir() (POSIX path unchanged, override honoured)", {
+  withr::local_envvar(SASONR_IMP_CACHE = "")
+  if (.Platform$OS.type != "windows") {
+    expect_identical(te$imp_cache_dir(), file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER"))))
+  }
+  d <- file.path(tempfile("imp_cache_"), "deep", "dir")
+  withr::local_envvar(SASONR_IMP_CACHE = d)
+  expect_identical(te$imp_cache_dir(), d)
+  # the meta.yaml facts are saved under the override (created recursively)
+  te$imp_meta_cache$tab <- list(x = 1)
+  te$imp_meta_cache$dirty <- TRUE
+  on.exit({
+    te$imp_meta_cache$tab <- NULL
+    te$imp_meta_cache$dirty <- FALSE
+  })
+  te$imp_meta_save()
+  expect_true(file.exists(file.path(d, "meta_info.rds")))
+})
