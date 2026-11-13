@@ -19,7 +19,6 @@
 #' cases.
 #' @return A data frame.
 #' @keywords internal
-#' @export
 sas_proc_stat_registry <- function() {
   if (is.null(registry_cache$proc_stats)) {
     f <- system.file("registry", "proc_stats.csv", package = "sasonr")

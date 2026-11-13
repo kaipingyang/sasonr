@@ -40,7 +40,6 @@ registry_cache <- new.env(parent = emptyenv())
 #' @param sas_version The SAS 9.4 release whose rows are returned (default:
 #'   the selected release, see [sasonr_sas_version]); `NULL` returns every row.
 #' @keywords internal
-#' @export
 sas_feature_registry <- function(kind = c("functions", "formats", "semantics"), sas_version = sas_target_version()) {
   kind <- match.arg(kind)
   if (is.null(registry_cache[[kind]])) {

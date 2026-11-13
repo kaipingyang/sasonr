@@ -365,8 +365,8 @@ sas_f_propcase <- function(x, dlm = " /-(.\t") {
   }, as_sas_chr(x), dlm)
 }
 
-#' @export
 # a zero-length value (from TRIMN, STRIP, ...) has length 0; variables and literals are at least 1 long
+#' @export
 sas_f_lengthc <- function(x) as.numeric(nchar(as_sas_chr(x)))
 #' @export
 sas_f_lengthm <- function(x) sas_f_lengthc(x)
