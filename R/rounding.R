@@ -354,6 +354,54 @@ incr_decimal <- function(s) {
   s
 }
 
+# Exact significant decimal digits of a finite positive double, computed from
+# its IEEE 754 bits with base R only.  Needed because sprintf is exact beyond
+# 17 significant digits only with glibc; the Windows UCRT prints the tail from
+# a truncated approximation, so the E-notation tie detection must not rely on
+# it.  Returns list(digits = significant digits without leading/trailing
+# zeros, ex = decimal exponent of the first significant digit).
+exact_significant_digits <- function(a) {
+  stopifnot(is.finite(a), a > 0)
+  rw <- as.integer(writeBin(as.double(a), raw(), size = 8L, endian = "little"))
+  # value = m * 2^p, from the 52-bit fraction, the 11-bit exponent and the sign
+  f <- rw[1L] + rw[2L] * 2^8 + rw[3L] * 2^16 + rw[4L] * 2^24 +
+    rw[5L] * 2^32 + rw[6L] * 2^40 + (rw[7L] %% 16L) * 2^48
+  expfield <- (rw[8L] %% 128L) * 16L + (rw[7L] %/% 16L)
+  if (expfield == 0L) {
+    m <- f
+    p <- -1074L
+  } else {
+    m <- f + 2^52
+    p <- expfield - 1075L
+  }
+  mul_digits <- function(d, k) {
+    carry <- 0L
+    for (i in rev(seq_along(d))) {
+      t <- d[i] * k + carry
+      d[i] <- t %% 10L
+      carry <- t %/% 10L
+    }
+    while (carry > 0L) {
+      d <- c(carry %% 10L, d)
+      carry <- carry %/% 10L
+    }
+    d
+  }
+  d <- as.integer(strsplit(sprintf("%.0f", m), "", fixed = TRUE)[[1]])
+  if (p >= 0L) {
+    for (i in seq_len(p)) d <- mul_digits(d, 2L)
+    ex <- length(d) - 1L
+  } else {
+    q <- -p
+    for (i in seq_len(q)) d <- mul_digits(d, 5L) # m / 2^q = m * 5^q / 10^q
+    n <- length(d)
+    ex <- if (n > q) n - q - 1L else -(q - n + 1L)
+  }
+  n <- length(d)
+  while (n > 1L && d[n] == 0L) n <- n - 1L
+  list(digits = paste(d[seq_len(n)], collapse = ""), ex = ex)
+}
+
 # Signed fixed-point display text of v with d decimals (the one display
 # engine, display_round_text): "-" for a negative value, also when it rounds
 # to zero ("-0.00", as SAS writes it).  Values of 1E17 or more have no
@@ -401,29 +449,35 @@ sci_dec_text <- function(v, k, edge = "abort") {
     list(keep = keep, ex = ex)
   }
   r <- round_k(dg, ex)
-  # an exact tie at the 15th digit (2^-21 = 4.76837158203125E-7): sprintf
-  # breaks it to even, SAS's direction has no gold - fail loud when the two
-  # directions give different digits
-  s30 <- sprintf("%.30e", a)
-  d30 <- gsub(".", "", sub("e.*$", "", s30), fixed = TRUE)
-  if (substr(d30, 15L, 15L) == "5" && !grepl("[1-9]", substring(d30, 16L)) &&
-      !grepl("[1-9]", sub("^[0-9]\\.[0-9]{14}", "", sub("e.*$", "", sprintf("%.800e", a))))) {
-    ex30 <- as.integer(sub("^.*e", "", s30))
-    lo <- substr(d30, 1L, 14L)
-    hi <- incr_decimal(lo)
-    ehi <- ex30
-    if (nchar(hi) > 14L) {
-      hi <- substr(hi, 1L, 14L)
-      ehi <- ehi + 1L
-    }
-    r_lo <- round_k(lo, ex30)
-    r_hi <- round_k(hi, ehi)
-    if (!identical(r_lo, r_hi)) {
-      if (identical(edge, "abort")) {
-        abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with ", k, " mantissa decimals: an exact tie ",
-                                 "at the 15th significant digit is not determined by the gold standard"))
+  # An exact tie at the 15th digit (2^-21 = 4.76837158203125E-7): if the exact
+  # binary value ends at 15 significant digits with a trailing 5, the 14-digit
+  # rounding step is ambiguous (SAS's direction has no gold) - fail loud when
+  # the two directions give different digits.  Detect it from exact arithmetic:
+  # sprintf beyond 17 significant digits is exact only on glibc, the Windows
+  # UCRT prints the tail from a truncated approximation (a value ending in
+  # ...450000 then looks like ...4499999).  The 17-digit pre-check is cheap
+  # and only candidates reach the exact expansion.
+  d17 <- gsub(".", "", sub("e.*$", "", sprintf("%.16e", a)), fixed = TRUE)
+  if (substr(d17, 15L, 15L) == "5" && substr(d17, 16L, 17L) == "00") {
+    sig <- exact_significant_digits(a)
+    if (nchar(sig$digits) == 15L && substr(sig$digits, 15L, 15L) == "5") {
+      ex30 <- sig$ex
+      lo <- substr(sig$digits, 1L, 14L)
+      hi <- incr_decimal(lo)
+      ehi <- ex30
+      if (nchar(hi) > 14L) {
+        hi <- substr(hi, 1L, 14L)
+        ehi <- ehi + 1L
       }
-      r <- r_hi
+      r_lo <- round_k(lo, ex30)
+      r_hi <- round_k(hi, ehi)
+      if (!identical(r_lo, r_hi)) {
+        if (identical(edge, "abort")) {
+          abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with ", k, " mantissa decimals: an exact tie ",
+                                   "at the 15th significant digit is not determined by the gold standard"))
+        }
+        r <- r_hi
+      }
     }
   }
   keep <- r$keep
