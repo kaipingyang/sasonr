@@ -269,9 +269,23 @@ where_text <- function(e) {
       compare = {
         #
         #
-        if (identical(x$rhs$node, "var") && identical(x$lhs$node, "call") && !isTRUE(x$colon)) {
-          flip <- c("<" = ">", ">" = "<", "<=" = ">=", ">=" = "<=")
-          x <- list(node = "compare", op = if (x$op %in% names(flip)) flip[[x$op]] else x$op, lhs = x$rhs, rhs = x$lhs)
+        # "y=x+1", "2 = y" "y=2", "abs(x) < y" "y>ABS(x)", "(x*2) >= y"
+        # "y<=x*2"); two non-variable operands keep their order ("x+1=ABS(y)",
+        # "SUBSTR(s,1,3)='van'"); a constant compared with an expression other
+        #
+        is_var <- function(y) identical(y$node, "var")
+        is_const <- function(y) y$node %in% c("num", "str", "missing") || (identical(y$node, "unary") && y$arg$node == "num")
+        if (!is_var(x$lhs)) {
+          if (isTRUE(x$colon) && is_var(x$rhs)) {
+            abort_unsupported("the WHERE note of a colon comparison with the variable on the right (not supported)")
+          }
+          if (is_var(x$rhs)) {
+            flip <- c("<" = ">", ">" = "<", "<=" = ">=", ">=" = "<=")
+            x <- list(node = "compare", op = if (x$op %in% names(flip)) flip[[x$op]] else x$op, lhs = x$rhs, rhs = x$lhs,
+                      colon = x$colon)
+          } else if (is_const(x$lhs) || (is_const(x$rhs) && !identical(x$lhs$node, "call"))) {
+            abort_unsupported("the WHERE note of a constant compared with an expression (operand order not supported)")
+          }
         }
         paste0(w(x$lhs), if (x$op == "^=") " not = " else x$op, if (isTRUE(x$colon)) ":" else "", w(x$rhs))
       },
