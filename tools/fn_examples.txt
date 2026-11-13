@@ -1300,9 +1300,9 @@ prxmatch('/^a/', ' abc')
 
 ## PRXPARSE
 desc: PRXPARSE compiles a Perl regular expression and returns a numeric pattern identifier; the first one is 1.
-prxparse('/a+/')
+prxparse('/a+/') => sas_f_prxparse("/a+/", session = s)
 desc: Each further PRXPARSE call gets the next identifier, 2.
-prxparse('/b/i')
+prxparse('/b/i') => sas_f_prxparse("/b/i", session = s)
 
 ## PUT
 desc: PUT formats 3.14159 with the w.d format 8.3: rounded to 3 decimals, right-aligned in 8 columns.

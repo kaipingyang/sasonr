@@ -15,10 +15,13 @@
 # (`sas_rt_active(session)`, restored with `on.exit()`), and the run-time
 # helpers read it through `sas_rt_active()` / `rt_diag()` / `ct_diag()`.
 # The only package-level mutable object is that binding slot (`.active`): it
-# holds a reference to the bound session, never run state of its own.  Calls
-# of the function layer outside any submission (`sas_f_prxparse()` typed at
-# the console, the reference examples) use a default session created on first
-# use, so that they never touch the state of a run.
+# holds a reference to the bound session, never run state of its own.  There
+# is no default session (spec 04 §4.7): a function-layer call outside any
+# submission (`sas_f_round()` in the user's own code) runs without hidden
+# state - its diagnostics go to a throw-away state (rt_diag(), ct_diag()), it
+# sees no user formats and no filerefs (a fileref fails loud), uses the
+# default LINESIZE (or its `.ls` argument), and PRXPARSE ids need an explicit
+# `session =` (sas_f_prxparse()).
 #
 # Package-level objects that are *not* run state (built at load time or
 # read-once caches, never written by a run): the registries
@@ -156,19 +159,13 @@ new_ct_state <- function() {
 # diagnostic environments (cached for the per-row helpers).
 .active <- new.env(parent = emptyenv())
 .active$session <- NULL
-.active$default <- NULL
 
-#' The active SAS session (internal)
-#'
-#' Without an argument, the session bound by the submission being run (the
-#' default session outside a run). With `session`, binds it (or unbinds with
-#' `NULL`) and returns the previously bound session invisibly; callers restore
-#' it with `on.exit()`.
-#' @param session A `SasSession` or `NULL`.
-#' @keywords internal
-#' @export
+# The active session.  Without an argument: the session bound by the
+# submission being run (NULL outside a run).  With `session`: binds it (or
+# unbinds with NULL) and returns the previously bound session invisibly;
+# callers register the restore with on.exit() before binding.
 sas_rt_active <- function(session) {
-  if (missing(session)) return(.active$session %||% default_session())
+  if (missing(session)) return(.active$session)
   old <- .active$session
   .active$session <- session
   .active$rt <- if (is.null(session)) NULL else session$rt
@@ -176,21 +173,20 @@ sas_rt_active <- function(session) {
   invisible(old)
 }
 
-# The session of function-layer calls made outside any submission.
-default_session <- function() {
-  if (is.null(.active$default)) .active$default <- SasSession$new()
-  .active$default
-}
-
 # Fast paths for the helpers called per row (sas_err_sync, rt_error ...).
-rt_diag <- function() .active$rt %||% default_session()$rt
-ct_diag <- function() .active$ct %||% default_session()$ct
+# Outside a submission each call gets a throw-away state: what a standalone
+# function call records (data-error NOTEs, counters) is discarded.
+rt_diag <- function() .active$rt %||% new_rt_state()
+ct_diag <- function() .active$ct %||% new_ct_state()
 
-# The current LINESIZE (log and PUT line width).
-rt_linesize <- function() sas_rt_active()$options$linesize %||% 132L
+# The current LINESIZE (log and PUT line width); the SAS default outside a run.
+rt_linesize <- function() .active$session$options$linesize %||% 132L
 
-# The current NOTES/NONOTES setting.
-rt_notes_on <- function() isTRUE(sas_rt_active()$options$notes)
+# The current NOTES/NONOTES setting; NOTES outside a run.
+rt_notes_on <- function() {
+  s <- .active$session
+  is.null(s) || isTRUE(s$options$notes)
+}
 
 # Start a submission on `session`.  A submission rebinds the session's macro
 # executor, line counter, PRXPARSE ids and log callbacks to its own engine, so

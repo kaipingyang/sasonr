@@ -1941,6 +1941,7 @@ NULL
 #' @param times Number of matches to replace; -1 replaces all matches.
 #' @param x Character source string.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
+#' @param session A session from [sas_session()] that holds the PRXPARSE ids, for calls outside [sas_run()] (inside a run, the running session is used).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
 #' @section Verification: partial (30 of 33 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: PRXCHANGE() of an invalid regular expression (SAS writes the Perl diagnostic, not reproduced); regular expression without delimiters: ; regular expression without delimiters: xyz; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-13.
@@ -1956,6 +1957,7 @@ NULL
 #' @param re Pattern identifier returned by PRXPARSE, or a Perl regular expression string in delimiters (e.g. '/b+/').
 #' @param x Character source string to search; the result is the position of the first match, or 0.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
+#' @param session A session from [sas_session()] that holds the PRXPARSE ids, for calls outside [sas_run()] (inside a run, the running session is used).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
 #' @section Verification: partial (18 of 21 SAS 9.4 cases agree bit for bit; 3 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: PRXMATCH() of an invalid regular expression (SAS writes the Perl diagnostic, not reproduced); regular expression without delimiters: ; regular expression without delimiters: xyz; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data, where. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-13.
@@ -1970,6 +1972,7 @@ NULL
 #'
 #' @param re Perl regular expression in delimiters, e.g. '/a+/i' or a substitution 's/a/b/'; options such as i follow the closing delimiter.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
+#' @param session A session from [sas_session()] that holds the PRXPARSE ids, for calls outside [sas_run()] (inside a run, the running session is used).
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Follows the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.
 #' @section Verification: partial (5 of 7 SAS 9.4 cases agree bit for bit; 2 case(s) fail loud (sasonr_unsupported)). Verified domain: fails loud for: regular expression without delimiters: ; regular expression without delimiters: xyz; other inputs fail loud (`sasonr_unsupported`). Contexts where every case agrees: data. See the [feature registry](https://kaipingyang.github.io/sasonr/articles/dev-feature-registry.html). Updated 2026-11-13.

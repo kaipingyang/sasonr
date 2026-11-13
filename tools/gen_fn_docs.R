@@ -43,6 +43,7 @@ param_desc <- c(
   sdate = "Start date.", edate = "End date.", mode = "Mode.", values = "Values.", op = "Operator.",
   quant = "`\"any\"` or `\"all\"`.", pattern = "LIKE pattern.", escape = "Escape character.",
   a3 = "Modifiers or start position (as in SAS).", a4 = "Start position or modifiers (as in SAS).",
+  session = "A session from [sas_session()] that holds the PRXPARSE ids, for calls outside [sas_run()] (inside a run, the running session is used).",
   excerpt = "Excerpt.", source = "Source string.", target = "Target string.", replacement = "Replacement string."
 )
 

@@ -9,6 +9,8 @@
 \item{x}{Character source string to search; the result is the position of the first match, or 0.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
+
+\item{session}{A session from \code{\link[=sas_session]{sas_session()}} that holds the PRXPARSE ids, for calls outside \code{\link[=sas_run]{sas_run()}} (inside a run, the running session is used).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.

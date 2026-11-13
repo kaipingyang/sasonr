@@ -101,7 +101,7 @@ data a; length c $ 3; x = 0; c = upcase('ab'); y = 1 / x; put c= y=; run;", sess
   expect_false("z" %in% names(res$work))
   expect_identical(res$macro_vars$mv, "outer")
   expect_identical(s$options$linesize, 100L)
-  expect_identical(sasonr:::sas_rt_active(), sasonr:::default_session())
+  expect_null(sasonr:::sas_rt_active())
 })
 
 test_that("a nested submission to the same session is refused; the outer run is intact (review dd816d3, 1)", {
@@ -169,17 +169,36 @@ test_that("the SQL connection is opened on first use and closed with the session
   expect_false(DBI::dbIsValid(seen))
 })
 
-test_that("function-layer calls outside a run use the default session", {
-  rt <- sasonr:::rt_diag()
-  old <- rt$prx
-  on.exit(rt$prx <- old)
-  rt$prx <- list()
-  expect_identical(sas_f_prxparse("/a+/"), 1)
-  expect_identical(sas_f_prxparse("/b/"), 2)
-  # a run does not see or change these ids
+test_that("function-layer calls outside a run have no hidden state (spec 04 §4.7)", {
+  expect_null(sasonr:::sas_rt_active())
+  # diagnostics go to a throw-away state: nothing persists between calls
+  rt1 <- sasonr:::rt_diag()
+  rt1$notes <- "x"
+  expect_identical(sasonr:::rt_diag()$notes, character())
+  expect_false(identical(sasonr:::rt_diag(), sasonr:::rt_diag()))
+  expect_false(identical(sasonr:::ct_diag(), sasonr:::ct_diag()))
+  # no user formats, default LINESIZE and NOTES
+  expect_null(sasonr:::user_fmt("yn", FALSE))
+  expect_identical(sasonr:::rt_linesize(), 132L)
+  expect_true(sasonr:::rt_notes_on())
+  expect_error(sasonr::sas_define_format(list(kind = "value", name = "yn", char = FALSE)), class = "sasonr_error")
+  # a fileref has nothing to resolve against: fails loud
+  expect_error(sas_analyze(sas_parse("filename f 'x.txt'; data a; infile f; input x; run;")$steps[[2]]),
+               class = "sasonr_unsupported")
+  # PRXPARSE ids need an explicit session; pattern texts work without one
+  expect_error(sas_f_prxparse("/a+/"), class = "sasonr_error")
+  expect_error(sas_f_prxmatch(1, "aa"), class = "sasonr_error")
+  expect_identical(sas_f_prxmatch("/a+/", "baa"), 2)
+  s <- sas_session()
+  on.exit(sas_session_close(s))
+  expect_identical(sas_f_prxparse("/a+/", session = s), 1)
+  expect_identical(sas_f_prxparse("/b/", session = s), 2)
+  expect_identical(sas_f_prxmatch(2, "abc", session = s), 2)
+  expect_identical(sas_f_prxchange(sas_f_prxparse("s/a/X/", session = s), -1, "banana", session = s), "bXnXnX")
+  # a run has its own ids and does not change the session's (another session)
   res <- sas_run("data a; id = prxparse('/c/'); run;")
   expect_identical(res$work$a$id, 1)
-  expect_length(rt$prx, 2L)
+  expect_length(s$rt$prx, 3L)
 })
 
 test_that("accessors reject objects that are not sessions", {

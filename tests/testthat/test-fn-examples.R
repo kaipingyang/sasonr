@@ -14,9 +14,9 @@ test_that("reference-page examples agree with SAS 9.4", {
   expect_gt(nrow(res), 0)
   for (fn in unique(res$fn)) {
     ds <- haven::read_sas(file.path(root, "fn_examples", fn, "expected", "datasets", "ex.sas7bdat"))
-    rt <- rt_diag()
-    rt$prx <- list()
+    # calls that need session state (PRXPARSE ids) name the session `s`
     env <- new.env(parent = environment())
+    env$s <- sas_session()
     for (i in which(res$fn == fn)) {
       # an example outside a verified domain now fails loud (not a silent difference)
       v <- tryCatch(suppressWarnings(eval(parse(text = res$r[i])[[1]], envir = env)), sasonr_unsupported = function(e) NULL)

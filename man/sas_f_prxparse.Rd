@@ -7,6 +7,8 @@
 \item{re}{Perl regular expression in delimiters, e.g. '/a+/i' or a substitution 's/a/b/'; options such as i follow the closing delimiter.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
+
+\item{session}{A session from \code{\link[=sas_session]{sas_session()}} that holds the PRXPARSE ids, for calls outside \code{\link[=sas_run]{sas_run()}} (inside a run, the running session is used).}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -25,12 +27,15 @@ Compiles a Perl regular expression. See the \href{https://documentation.sas.com/
 \examples{
 # PRXPARSE: each call is explained above it and followed by the result of the same call in SAS 9.4
 
+# Outside sas_run() the PRXPARSE ids are kept in an explicit SAS session.
+s <- sas_session()
+
 # PRXPARSE compiles a Perl regular expression and returns a numeric pattern
 # identifier; the first one is 1.
-sas_f_prxparse("/a+/")  # SAS 9.4: prxparse('/a+/') = 1
+sas_f_prxparse("/a+/", session = s)  # SAS 9.4: prxparse('/a+/') = 1
 
 # Each further PRXPARSE call gets the next identifier, 2.
-sas_f_prxparse("/b/i")  # SAS 9.4: prxparse('/b/i') = 2
+sas_f_prxparse("/b/i", session = s)  # SAS 9.4: prxparse('/b/i') = 2
 }
 \seealso{
 Other special functions:

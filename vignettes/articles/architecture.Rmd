@@ -105,7 +105,10 @@ SAS 9.4 (TS1M7) session:
 | PROC SQL without `QUIT;` | closed at the end of the submission | stays open for the next submission |
 | PROC SQL options (`NUMBER`, `NOPRINT`, ...) | reset with each submission | kept while PROC SQL stays open |
  Function-layer calls made outside
-any run (`sas_f_round()` in your own code) use a separate default session.
+any run (`sas_f_round()` in your own code) have no hidden state: there is no
+default session. Their data-error NOTEs are discarded, they see no user
+formats and no filerefs, use `LINESIZE=132` (or their `.ls` argument), and
+PRXPARSE ids need an explicit session (`sas_f_prxparse(re, session = s)`).
 
 Parsed programs, translations and results are plain S3 values; the function,
 format and procedure-option registries are built once at load time and are

@@ -322,9 +322,9 @@ run_examples <- function(spec) {
     rc <- if (file.exists(file.path(case, "meta.yaml"))) {
       as.integer(sub("^sas_rc: *", "", grep("^sas_rc:", readLines(file.path(case, "meta.yaml")), value = TRUE)))
     } else NA_integer_
-    rt_env <- get("rt", asNamespace("sasonr"))
-    rt_env$prx <- list()
+    # calls that need session state (PRXPARSE ids) name the session `s`
     env <- new.env(parent = globalenv())
+    env$s <- sas_session()
     for (k in seq_along(s$calls)) {
       cl <- s$calls[[k]]
       g <- if (is.null(ds)) NULL else sas_value(ds, k)
@@ -356,7 +356,9 @@ write_fx_examples <- function(spec, res) {
     dates <- any(grepl("'[dD]|'[dD][tT]|'[tT]", paste(ok$sas, collapse = " ")))
     out <- c(sprintf("# %s: each call is explained above it and followed by the result of the same call in SAS 9.4", s$name),
              if (dates) "# (SAS dates are day counts from 1960-01-01; datetimes and times are seconds)",
-             if (nzchar(s$note)) paste("#", strwrap(s$note, 76)))
+             if (nzchar(s$note)) paste("#", strwrap(s$note, 76)),
+             if (any(grepl("session = s", ok$r, fixed = TRUE)))
+               c("", "# Outside sas_run() the PRXPARSE ids are kept in an explicit SAS session.", "s <- sas_session()"))
     for (j in seq_len(nrow(ok))) {
       out <- c(out, "", if (nzchar(ok$desc[j])) paste("#", strwrap(ok$desc[j], 78)),
                sprintf("%s  # SAS 9.4: %s = %s", ok$r[j], ok$sas[j], ok$sas_show[j]))
