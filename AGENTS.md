@@ -33,15 +33,11 @@ judged against output produced by a real SAS 9.4 installation.
    git-ignored and must stay out of the repository. Write your own programs
    with invented `datalines` instead of copying documentation examples.
 
-## Environment (this machine)
+## Environment of each development machine
 
-| Tool | Path / fact |
-|---|---|
-| R | `D:\R\R-4.4.2\bin\Rscript.exe`, Rtools44 available (`pkgbuild::has_build_tools()` is TRUE) |
-| Python | `D:\Python\313` |
-| Local SAS | SAS 9.4 **TS1M2 DBCS3170**, `sas.exe` under `HKLM\SOFTWARE\SAS Institute Inc.\Common Data\Shared Files` → `SASFoundation\9.4\`. English locale via `-config "...\nls\en\sasv9.cfg"` (the Chinese default gives EUC-CN and Chinese log text) |
-| Conformance repository | `E:\dsh\sasonr-conformance`, branch `ts1m2` (private; gold generated on TS1M2) |
-| Local SAS helper | `.local/run-case.ps1` (git-ignored): runs a program under local SAS with the English config and dumps every WORK data set |
+Machine-specific paths (R, Python, local SAS installation and its start-up
+options, local clone locations, helper scripts) are kept out of this public
+repository: see `docs/dev_machines.md` in the private conformance repository.
 
 The conformance repository stores `cases/own/**` with **TS1M7** provenance and
 `cases/ts1m2/**` with **TS1M2** gold produced on this machine. Local SAS is
