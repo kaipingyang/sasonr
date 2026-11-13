@@ -585,10 +585,10 @@ finalize <- function(selection, shards) {
         if (is.null(old)) stop("archived results of ", rn, " at ", bk, " are missing (", m, ")")
         unit_of <- function(case) ifelse(case %in% s$inc$keep, case, sub("/[^/]*$", "", case))
         old <- old[unit_of(old$case) %in% s$inc$keep, , drop = FALSE]
-        if (!"gate" %in% names(old)) old$gate <- ""
+        if (!"gate" %in% names(old)) old$gate <- rep("", nrow(old))
         if (is.null(old$source)) old$source <- "run"
         old$source <- ifelse(is.na(old$source) | old$source == "run", paste0("inherited:", substr(bk, 1, 12)), old$source)
-        old$root <- rn
+        old$root <- rep(rn, nrow(old)) # no rows when every case directory reran
         res[[m]] <- rbind(res[[m]], old[, names(res[[m]])])
         inherited <- nrow(old)
       }
