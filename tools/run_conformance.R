@@ -197,6 +197,7 @@ if (merge) {
   })
 } else {
   selection <- select_roots()
+  imp_meta_save()
 }
 
 if (nzchar(list_units)) {
@@ -457,6 +458,7 @@ run_selection <- function(selection) {
       nonstrict = if (length(rows$nonstrict)) do.call(rbind, rows$nonstrict),
       units = units)
   }
+  imp_meta_save()
   list(roots = out, load_keys = load_keys, fingerprint = arc_fingerprint(pkg), mode = mode)
 }
 

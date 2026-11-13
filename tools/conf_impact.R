@@ -241,17 +241,27 @@ imp_collect <- function() {
 # Files a case directory's verdict depends on besides the code: the directory
 # itself (program, meta.yaml, expected/, data/), a program_ref program and its
 # data/, the area's _root/.  Size and modification time of every file.
-# Every file under a root: relative path, size, modification time (one `find`,
-# much faster than list.files() + file.info() on the shared file system).
+# Every file under a root: relative path, size, modification time.  The file
+# times are slow to read on the shared file system (latency-bound), so the
+# root is read by parallel `find` processes, one per second-level directory.
 imp_index_cache <- new.env(parent = emptyenv())
 imp_root_index <- function(root) {
   root <- normalizePath(root)
   if (!is.null(imp_index_cache[[root]])) return(imp_index_cache[[root]])
-  x <- system2("find", c(shQuote(root), "-type", "f", "-printf", shQuote("%P\\t%s\\t%T@\\n")), stdout = TRUE)
+  w <- tempfile("sasonr_idx_")
+  dir.create(w)
+  on.exit(unlink(w, recursive = TRUE))
+  fmt <- shQuote("%p\\t%s\\t%T@\\n")
+  sh <- paste0(
+    "cd ", shQuote(root), " && find . -maxdepth 2 -type f -printf ", fmt, " > ", shQuote(file.path(w, "top")),
+    " && find . -mindepth 2 -maxdepth 2 -type d -print0 | xargs -0 -r -P 16 -n 8 sh -c ",
+    shQuote(paste0("for d; do find \"$d\" -type f -printf ", fmt, "; done > ", w, "/part_$$"), type = "sh"), " _")
+  if (system(sh) != 0) stop("conf_impact: indexing ", root, " failed")
+  x <- unlist(lapply(list.files(w, full.names = TRUE), readLines, warn = FALSE, encoding = "UTF-8"))
   p <- strsplit(x, "\t", fixed = TRUE)
-  ix <- data.frame(path = vapply(p, `[`, "", 1L), size = vapply(p, `[`, "", 2L),
+  ix <- data.frame(path = sub("^\\./", "", vapply(p, `[`, "", 1L)), size = vapply(p, `[`, "", 2L),
                    mtime = sub("\\..*$", "", vapply(p, `[`, "", 3L)), stringsAsFactors = FALSE)
-  ix <- ix[!grepl("(^|/)\\.", ix$path), , drop = FALSE]
+  ix <- ix[!grepl("(^|/)\\.", ix$path) & !duplicated(ix$path), , drop = FALSE]
   ix <- ix[order(ix$path, method = "radix"), , drop = FALSE]
   assign(root, ix, envir = imp_index_cache)
   ix
@@ -264,38 +274,63 @@ imp_list_cases <- function(root) {
   sort(file.path(normalizePath(root), dirname(m)))
 }
 
+# program_ref and cwd of a case (meta.yaml), cached by the meta.yaml's size and
+# time (reading thousands of small files on the shared file system is slow).
+imp_meta_cache <- new.env(parent = emptyenv())
+imp_meta_info <- function(case, sig) {
+  ck <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")), "meta_info.rds")
+  if (is.null(imp_meta_cache$tab)) {
+    imp_meta_cache$tab <- if (file.exists(ck)) tryCatch(readRDS(ck), error = function(e) list()) else list()
+    imp_meta_cache$dirty <- FALSE
+  }
+  k <- paste(case, sig)
+  hit <- imp_meta_cache$tab[[k]]
+  if (!is.null(hit)) return(hit)
+  meta <- readLines(file.path(case, "meta.yaml"), warn = FALSE)
+  ref <- sub("^program_ref:\\s*", "", grep("^program_ref:", meta, value = TRUE))
+  v <- list(ref = if (length(ref)) gsub("^\"|\"$", "", ref[1]) else "", root = any(grepl("^cwd:\\s*_root\\s*$", meta)))
+  imp_meta_cache$tab[[k]] <- v
+  imp_meta_cache$dirty <- TRUE
+  v
+}
+imp_meta_save <- function() {
+  if (!isTRUE(imp_meta_cache$dirty)) return(invisible())
+  d <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
+  dir.create(d, showWarnings = FALSE)
+  tmp <- tempfile(tmpdir = d)
+  saveRDS(imp_meta_cache$tab, tmp)
+  file.rename(tmp, file.path(d, "meta_info.rds"))
+  imp_meta_cache$dirty <- FALSE
+}
+
 # Files a case directory's verdict depends on besides the code: the directory
 # itself (program, meta.yaml, expected/, data/), a program_ref program and its
-# data/, the area's _root/.  md5 of path, size and modification time of each.
+# data/, the area's _root/.  Signature: path, size and modification time of each.
 imp_unit_hash <- function(case, root) {
   root <- normalizePath(root)
   ix <- imp_root_index(root)
   rel <- substring(case, nchar(root) + 2L)
   sel <- startsWith(ix$path, paste0(rel, "/"))
   lines <- paste(ix$path[sel], ix$size[sel], ix$mtime[sel], sep = "\t")
-  meta_f <- file.path(case, "meta.yaml")
-  meta <- if (file.exists(meta_f)) readLines(meta_f, warn = FALSE) else character()
-  ref <- sub("^program_ref:\\s*", "", grep("^program_ref:", meta, value = TRUE))
-  if (length(ref)) {
+  mi <- match(paste0(rel, "/meta.yaml"), ix$path)
+  info <- if (is.na(mi)) list(ref = "", root = FALSE) else imp_meta_info(case, paste(ix$size[mi], ix$mtime[mi]))
+  if (nzchar(info$ref)) {
     br <- Sys.getenv("SASONR_BOOKS_ROOT")
     if (!nzchar(br)) {
       lines <- c(lines, "<no books root>")
     } else {
-      pd <- file.path(br, gsub("^\"|\"$", "", ref[1]))
+      pd <- file.path(br, info$ref)
       fs <- c(file.path(pd, "program.sas"), list.files(file.path(pd, "data"), recursive = TRUE, full.names = TRUE))
       fi <- file.info(fs, extra_cols = FALSE)
       lines <- c(lines, paste(substring(fs, nchar(br) + 2L), fi$size, as.integer(fi$mtime), sep = "\t"))
     }
   }
-  if (any(grepl("^cwd:\\s*_root\\s*$", meta))) {
+  if (isTRUE(info$root)) {
     rd <- paste0(sub("/.*$", "", rel), "/_root/")
     s2 <- startsWith(ix$path, rd)
     lines <- c(lines, paste(ix$path[s2], ix$size[s2], ix$mtime[s2], sep = "\t"))
   }
-  tf <- tempfile()
-  on.exit(unlink(tf))
-  writeLines(lines, tf, useBytes = TRUE)
-  unname(tools::md5sum(tf))
+  paste(lines, collapse = "\n")
 }
 
 # ---- structural diff ----------------------------------------------------------------------
@@ -585,7 +620,8 @@ imp_select <- function(ch, map, units, hashes, fingerprint) {
 # Byte-compile the namespace functions (as an installed package is).  The
 # compiled closures are cached (local disk) together with their source
 # closures: a function whose body and formals are unchanged reuses its
-# compiled version (a full compile takes about 25 s per R process).
+# compiled version (a full compile takes about 25 s per R process; sources are
+# compared without srcrefs).
 imp_compile <- function() {
   ns <- asNamespace("sasonr")
   cache <- file.path("/tmp", paste0("sasonr_imp_cache_", Sys.getenv("USER")))
@@ -598,9 +634,10 @@ imp_compile <- function() {
     if (!is.function(f) || is.primitive(f)) next
     own <- identical(environment(f), ns)
     o <- old[[nm]]
-    hit <- own && !is.null(o) && identical(body(o$src), body(f)) && identical(formals(o$src), formals(f))
+    src <- if (own) utils::removeSource(f)
+    hit <- own && !is.null(o) && identical(o$src, src, ignore.environment = TRUE)
     g <- if (hit) o$cmp else compiler::cmpfun(f)
-    if (own) new[[nm]] <- list(src = f, cmp = g)
+    if (own) new[[nm]] <- list(src = src, cmp = g)
     if (own && !hit) changed <- changed + 1L
     unlockBinding(nm, ns)
     assign(nm, g, envir = ns)
