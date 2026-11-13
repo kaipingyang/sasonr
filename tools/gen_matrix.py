@@ -271,18 +271,44 @@ def case_block(cid, ctx, expr, setup, rtype):
         out.append("data work.w_%s;" % ds)
         if setup:
             out.append("  " + setup)
-        wexpr = expr
-        pc = split_call(expr)
-        if pc and pc[1] and pc[0].lower() not in ("put", "input") and not any(re.match(r"(?i)^of\s", a) for a in pc[1]):
+        fn = cid.rsplit("_", 1)[0]
+        hoist = {}
+        top = split_call(expr)
+        nxt = [len(top[1]) if top else 0]
+
+        def where_call(e, at_top=False):
+            # literal and expression arguments become variables w1, w2, ...; an
+            # argument that calls the function under test is rewritten the same
+            # way, so that the WHERE clause (not the DATA step) evaluates it
+            # (lengthc(trim('  ')) -> lengthc(trim(w1)))
+            pc = split_call(e)
+            if not (pc and pc[1] and pc[0].lower() not in ("put", "input") and
+                    not any(re.match(r"(?i)^of\s", a) for a in pc[1])):
+                return e
             vars_ = []
             for k, a in enumerate(pc[1], 1):
                 if not a or re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", a):
                     vars_.append(a)
+                elif re.search(r"(?i)\b%s\s*\(" % re.escape(fn), a) and split_call(a):
+                    vars_.append(where_call(a))
                 else:
-                    out.append("  w%d = %s;" % (k, a))
-                    vars_.append("w%d" % k)
-            wexpr = "%s(%s)" % (pc[0].lower(), ", ".join(vars_))
-        out += ["  __ref = %s;" % expr, "run;", "data work.%s;" % ds, "  set work.w_%s;" % ds,
+                    # top-level arguments keep their position (w2 = argument 2)
+                    if not at_top:
+                        nxt[0] += 1
+                    j = k if at_top else nxt[0]
+                    hoist[j] = a
+                    vars_.append("w%d" % j)
+            return "%s(%s)" % (pc[0].lower(), ", ".join(vars_))
+        wexpr = where_call(expr, True)
+        out += ["  w%d = %s;" % (k, hoist[k]) for k in sorted(hoist)]
+        if rtype == "C":
+            # a character result is compared through a probe that shows its
+            # length and trailing blanks (a plain comparison pads with blanks)
+            probe = "cats(lengthc(%s)) || '|' || %s || '|'"
+            ref, wexpr = probe % (expr, expr), probe % (wexpr, wexpr)
+        else:
+            ref = expr
+        out += ["  __ref = %s;" % ref, "run;", "data work.%s;" % ds, "  set work.w_%s;" % ds,
                 "  where %s = __ref;" % wexpr, "  r = __ref;", "  keep r;", "run;"]
     elif ctx == "sql":
         out += ["data work.one; x = 1; run;", "proc sql;",
@@ -379,15 +405,19 @@ def write_cases(out_root, fn, cases, rtype, source, tags, glob, area, keep_only)
     if os.path.exists(pc):
         with open(pc, newline="") as f:
             prev = {r["case"]: r.get("group") or "" for r in csv.DictReader(f)}
-    rows, seen = [], set()
+    rows, seen = [], {}
     for ctx, expr, setup, note in cases:
         cid = case_id(fn, ctx, expr, setup)
+        if cid in seen and seen[cid] != (ctx, expr, setup):
+            # two different cases with the same 6-digit id (fn_where IFN): a longer id
+            h = hashlib.sha1(("%s|%s|%s" % (ctx, expr, setup)).encode("utf-8")).hexdigest()[:10]
+            cid = "%s_%s" % (fn, h)
         if cid in seen:
             continue
-        seen.add(cid)
+        seen[cid] = (ctx, expr, setup)
         # an expression wrapped in another function (lengthc(strip(...))) records that function's type
         rt = rtype
-        outer = split_call(expr) if ctx in ("data", "sql") else None
+        outer = split_call(expr) if ctx in ("data", "sql", "where") else None
         if outer and outer[0].upper() != fn and INV_TYPES.get(outer[0].upper()):
             rt = INV_TYPES[outer[0].upper()]
         grp = "isolated" if ctx == "ce" else (old_group(d, cid) or prev.get(cid) or "main")

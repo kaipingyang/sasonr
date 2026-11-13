@@ -2,7 +2,7 @@
 # the offline conformance results (never edited by hand).
 #
 # Usage (package root; one R process at a time):
-#   OPENBLAS_NUM_THREADS=1 Rscript tools/run_conformance.R tests/conformance --pattern '/(fn_matrix|fmt_matrix|functions)/' --strict false --out /tmp/matrix.csv
+#   OPENBLAS_NUM_THREADS=1 Rscript tools/run_conformance.R tests/conformance --pattern '/(fn_matrix|fmt_matrix|functions|fn_where)/' --strict false --out /tmp/matrix.csv
 #   (--strict false: in strict mode every approximate function fails loud and
 #   the registry would rebuild itself from its own gate)
 #   Rscript tools/update_registry.R /tmp/matrix.csv [more.csv ...]
@@ -192,6 +192,8 @@ fn_rows <- lapply(docs$name, function(nm) {
     rows$context[pil] <- tags
   }
   rows$context[is.na(rows$context)] <- "data"
+  # DATA step cases the WHERE matrix repeats (not the compile-error cases "ce")
+  n_data <- sum(rows$context %in% c("data", "datastep") & rows$area %in% c("fn_matrix", "functions"))
   rows$context[rows$context %in% c("datastep", "ce")] <- "data"
   s <- summarise(rows)
   if (NM %in% env_fns) {
@@ -206,10 +208,13 @@ fn_rows <- lapply(docs$name, function(nm) {
     nrow(r) > 0 && any(r$class == "pass") && all(r$class %in% c("pass", "unsupported"))
   }, logical(1))
   # WHERE context: the fn_where matrix (every DATA step case again inside a
-  # WHERE statement); it decides only whether "where" is a verified context
+  # WHERE statement); it decides only whether "where" is a verified context.
+  # The WHERE matrix must have as many cases as the DATA step matrix (fn_matrix
+  # and function pilot cases in the DATA step), so that a partial run or a
+  # missing case cannot verify the context
   wrows <- res[res$area == "fn_where" & res$feature == NM, , drop = FALSE]
-  ok_where <- s$status %in% c("verified", "partial") && nrow(wrows) > 0 && any(wrows$class == "pass") &&
-    all(wrows$class %in% c("pass", "unsupported"))
+  ok_where <- s$status %in% c("verified", "partial") && nrow(wrows) > 0 && nrow(wrows) >= n_data &&
+    any(wrows$class == "pass") && all(wrows$class %in% c("pass", "unsupported"))
   len <- if (is.null(spec)) NA else if (spec$type == "num") "8 (numeric)" else if (identical(spec$len, "arg")) "length of argument 1" else
     if (identical(spec$len, "fmt")) "format width" else as.character(spec$len)
   data.frame(

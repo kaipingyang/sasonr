@@ -202,19 +202,36 @@ sas_f_intz <- function(x) {
 #    the value fails loud (edge = "abort");
 #  * 16 significant digits: rounding at the 16th digit and truncating to 15
 #    gives the SAS text unless the two readings below disagree (fail loud);
-#    17 or more: the rounded value of a' truncated to 15 digits.  Integers are
-#    written with their exact digits; non-integers with 16 or more integer
-#    digits and values below 1 with 15 or more decimals fail loud.
+#    17 or more: the rounded value of a' truncated to 15 digits.  Integers
+#    are written with their exact digits where verified (below 1E18 without
+#    decimals, below 1E15 with decimals); other integers of 1E15 or more with
+#    decimals, non-integers with 16 or more integer digits and values below 1
+#    with 15 or more decimals fail loud.
 #
 # Returns the absolute value with exactly `d` decimals (digits, ".", no
-# sign), or NA when |v| >= 1e17.  `exact = TRUE`: half away from zero on the
-# exact binary value without the display adjustment (PROC MEANS MAXDEC=).
-display_round_text <- function(v, d, edge = "abort", down_at = NULL, exact = FALSE) {
+# sign), or NA when |v| >= 1e17 (the callers write the E form).  `exact =
+# TRUE`: half away from zero on the exact binary value without the display
+# adjustment (PROC MEANS MAXDEC=).  `down_rel` (PERCENTw.d): a value below a
+# half point by less than `down_rel` relative that the rules above round down
+# fails loud instead (gold: PERCENT rounds 1.0049999999999997 up to 101%,
+# where w.d rounds down; PERCENT has not been scanned ulp by ulp).
+display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0) {
   a <- abs(v)
   if (!is.finite(a)) return(NA_character_)
-  if (a == 0) return(formatC(0, format = "f", digits = d))
-  # integers are written with their exact digits (SAS 9.4: 32. of 9.39586291501115E17 is 939586291501115008)
-  if (a == floor(a) && a >= 1 && !exact) return(paste0(sprintf("%.0f", a), if (d > 0) paste0(".", strrep("0", d))))
+  if (a == 0) return(paste0("0", if (d > 0L) paste0(".", strrep("0", d))))
+  if (a == floor(a) && a >= 1 && !exact) {
+    # integers are written with their exact digits (SAS 9.4: 32. of
+    # 9.39586291501115E17 is 939586291501115008); verified without decimals
+    # below 1E18, and with decimals while the integer has at most 15 digits
+    if (d == 0L && a < 1e18) return(sprintf("%.0f", a))
+    if (d > 0L && a < 1e15) return(paste0(sprintf("%.0f", a), ".", strrep("0", d)))
+    if (a < 1e17) {
+      # every reading has the same width: a width probe (edge "up"/"down") gets the exact digits
+      if (!identical(edge, "abort")) return(paste0(sprintf("%.0f", a), ".", strrep("0", d)))
+      abort_unsupported(paste0("format rounding of the integer ", sprintf("%.0f", v), " to ", d,
+                               " decimals: an integer of 16 or more digits with decimals is not verified against SAS"))
+    }
+  }
   if (a >= 1e17) return(NA_character_)
   fmt_d <- function(keep) {
     if (d > 0) paste0(substr(keep, 1L, nchar(keep) - d), ".", substr(keep, nchar(keep) - d + 1L, nchar(keep))) else keep
@@ -229,6 +246,11 @@ display_round_text <- function(v, d, edge = "abort", down_at = NULL, exact = FAL
     if (identical(edge, "up")) return(TRUE)
     if (identical(edge, "down")) return(FALSE)
     abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " to ", d, " decimals: ", why))
+  }
+  # PERCENT: rounding down within down_rel below a half point is not verified
+  down_ok <- function(f) {
+    if (down_rel <= 0 || (0.5 - f) * 10^-d / a > down_rel) return(FALSE)
+    edge_fail("PERCENT rounding just below a half point is not determined by the gold standard")
   }
   if (exact) {
     p <- split(a)
@@ -245,6 +267,10 @@ display_round_text <- function(v, d, edge = "abort", down_at = NULL, exact = FAL
                              " decimals: the 15-digit limit for values below 1 is not verified against SAS"))
   }
   if (ni + d >= 16L) {
+    if (down_rel > 0) {
+      abort_unsupported(paste0("PERCENT rounding of ", format(v, digits = 17), " to ", d,
+                               " decimals: more than 15 significant digits are not verified against SAS"))
+    }
     # SAS shows 15 significant digits: from 17 digits on, the first 15 digits
     # of the display value (rounding at the last decimal does not carry into
     # them: 2922024225.7520895 in 32.7 is 2922024225.7520800)
@@ -267,7 +293,7 @@ display_round_text <- function(v, d, edge = "abort", down_at = NULL, exact = FAL
   up <- if (p$f >= 0.5) {
     TRUE
   } else if (d == 0L) {
-    split(ab)$f >= 0.5
+    split(ab)$f >= 0.5 || down_ok(p$f)
   } else {
     hdec <- paste0(substr(p$keep, 1L, nchar(p$keep) - d), ".", substring(p$keep, nchar(p$keep) - d + 1L), "5")
     if (as.numeric(hdec) == a) {
@@ -276,7 +302,7 @@ display_round_text <- function(v, d, edge = "abort", down_at = NULL, exact = FAL
       ulp <- 2^(floor(log2(a)) - 52)
       dist <- (0.5 - p$f) * 10^-d / ulp
       lim <- if (grepl("^0*$", p$keep)) 5 else 3
-      if (dist >= lim) FALSE else edge_fail("the value lies within a few ulps below the half point, where SAS's choice is not determined by the gold standard")
+      if (dist >= lim) down_ok(p$f) else edge_fail("the value lies within a few ulps below the half point, where SAS's choice is not determined by the gold standard")
     }
   }
   fmt_d(if (up) incr_decimal(p$keep) else p$keep)
@@ -319,32 +345,30 @@ incr_decimal <- function(s) {
   s
 }
 
-# Display rounding as a number (for PROC listings that format with sprintf).
-display_round <- function(v, d, exact = FALSE) {
-  vapply(v, function(x) {
-    if (is.na(x)) return(NA_real_)
-    t <- display_round_text(x, d, exact = exact)
-    if (is.na(t)) return(x)
-    r <- as.numeric(t)
-    if (x < 0) -r else r
-  }, 0)
+# Signed fixed-point display text of v with d decimals (the one display
+# engine, display_round_text): "-" for a negative value, also when it rounds
+# to zero ("-0.00", as SAS writes it).  Values of 1E17 or more have no
+# verified fixed-point text: fail loud.
+display_fixed <- function(v, d, edge = "abort", exact = FALSE) {
+  t <- display_round_text(v, d, edge = edge, exact = exact)
+  if (is.na(t)) {
+    abort_unsupported(paste0("fixed-point display of ", format(v, digits = 17), " with ", d,
+                             " decimals: values of 1E17 or more are not verified against SAS"))
+  }
+  paste0(if (v < 0) "-", t)
 }
 
 # Scientific forms used when a number does not fit its width (w.d, Z,
 # COMMA, DOLLAR fall back to these; BESTw. chooses among them):
 #   sci_dec_text(v, k)  "-1.23E6", "5E-4"   (k mantissa decimals, exact digits,
 #                                             half away from zero with the fuzz)
-sci_dec_text <- function(v, k, edge = "abort", down_at = -2.6e-16) {
+sci_dec_text <- function(v, k, edge = "abort") {
   a <- abs(v)
   if (k >= 13L) {
     # at most 14 significant digits (SAS 9.4: 32. of the largest double is 1.7976931348623E308)
     g <- sig15(a)
     keep <- e14_digits(g, v)
     ex <- g$ex
-    if (nchar(keep) > 14L) {
-      keep <- substr(keep, 1L, 14L)
-      ex <- ex + 1L
-    }
     keep <- paste0(keep, strrep("0", k - 13L))
     m <- paste0(substr(keep, 1L, 1L), ".", substring(keep, 2L))
     ms <- sub("\\.$", "", sub("0+$", "", m))

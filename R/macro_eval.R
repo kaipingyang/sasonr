@@ -216,7 +216,8 @@ mac_eval <- function(text, float = FALSE, what = "%EVAL") {
   v
 }
 
-val_text <- function(v) if (v$kind == "str") v$value else mac_num_text(v$value)
+# a number compared with text: its BEST16. text (the display engine, as %SYSEVALF writes it)
+val_text <- function(v) if (v$kind == "str") v$value else mac_float_text(v$value)
 
 num_cmp <- function(a, b) {
   if (is.na(a) && is.na(b)) return(0L)
@@ -234,19 +235,14 @@ text_cmp <- function(a, b) {
   sign(length(x) - length(y))
 }
 
-# Up to 15 significant digits, SAS-style exponent ("1E20").
+# Integer macro values (%EVAL, %DO, %SYSEVALF INTEGER/CEIL/FLOOR) in full.
+# Other values had glibc's 15-digit rounding (%.15g), which is not SAS's
+# display rounding and is not verified against SAS: fail loud.
 mac_num_text <- function(x) {
   if (is.na(x)) return(".")
   if (x == trunc(x) && abs(x) < 1e15) return(sprintf("%.0f", x))
-  s <- sprintf("%.15g", x)
-  if (grepl("e", s, fixed = TRUE)) {
-    mant <- sub("e.*$", "", s)
-    ex <- as.integer(sub("^.*e", "", s))
-    if (grepl(".", mant, fixed = TRUE)) mant <- sub("\\.?0+$", "", mant)
-    return(paste0(mant, "E", ex))
-  }
-  if (grepl(".", s, fixed = TRUE)) s <- sub("\\.?0+$", "", s)
-  s
+  abort_unsupported(paste0("the macro text of the value ", format(x, digits = 17),
+                           " (a non-integer or an integer of 1E15 or more is not verified against SAS)"))
 }
 
 mac_eval_int <- function(text, what = "%EVAL") {

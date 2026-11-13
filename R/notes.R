@@ -267,11 +267,25 @@ where_text <- function(e) {
         }
       },
       compare = {
-        # SAS writes a comparison of a variable with a function call variable first
-        # (fn_where gold: "where abs(w1) = __ref" is echoed "WHERE __ref=ABS(w1);")
-        if (identical(x$rhs$node, "var") && identical(x$lhs$node, "call") && !isTRUE(x$colon)) {
-          flip <- c("<" = ">", ">" = "<", "<=" = ">=", ">=" = "<=")
-          x <- list(node = "compare", op = if (x$op %in% names(flip)) flip[[x$op]] else x$op, lhs = x$rhs, rhs = x$lhs)
+        # SAS writes a variable compared with anything but a variable first
+        # (gold datastep/r13/where_echo_shapes and fn_where: "x+1 = y" is echoed
+        # "y=x+1", "2 = y" "y=2", "abs(x) < y" "y>ABS(x)", "(x*2) >= y"
+        # "y<=x*2"); two non-variable operands keep their order ("x+1=ABS(y)",
+        # "SUBSTR(s,1,3)='van'"); a constant compared with an expression other
+        # than a call, and colon comparisons, are not verified
+        is_var <- function(y) identical(y$node, "var")
+        is_const <- function(y) y$node %in% c("num", "str", "missing") || (identical(y$node, "unary") && y$arg$node == "num")
+        if (!is_var(x$lhs)) {
+          if (isTRUE(x$colon) && is_var(x$rhs)) {
+            abort_unsupported("the WHERE note of a colon comparison with the variable on the right (not verified against SAS)")
+          }
+          if (is_var(x$rhs)) {
+            flip <- c("<" = ">", ">" = "<", "<=" = ">=", ">=" = "<=")
+            x <- list(node = "compare", op = if (x$op %in% names(flip)) flip[[x$op]] else x$op, lhs = x$rhs, rhs = x$lhs,
+                      colon = x$colon)
+          } else if (is_const(x$lhs) || (is_const(x$rhs) && !identical(x$lhs$node, "call"))) {
+            abort_unsupported("the WHERE note of a constant compared with an expression (SAS may reorder it; not verified)")
+          }
         }
         paste0(w(x$lhs), if (x$op == "^=") " not = " else x$op, if (isTRUE(x$colon)) ":" else "", w(x$rhs))
       },

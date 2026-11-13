@@ -350,17 +350,34 @@ sql_eval_lowered <- function(low, ctx, rows = NULL) {
   for (id in names(d)) assign(id, d[[id]], envir = env)
   assign(".sql_n", n, envir = env)
   saved <- list(err = rt$err, notes = rt$notes, math = rt$math, mv = rt$mv)
+  on.exit({
+    rt$err <- saved$err
+    rt$notes <- saved$notes
+    rt$math <- saved$math
+    rt$mv <- saved$mv
+  }, add = TRUE)
   rt$err <- FALSE
   rt$notes <- character()
+  rt$math <- character()
+  rt$mv <- character()
   v <- eval(parse(text = code, keep.source = FALSE), env)
   sql_function_notes(rt$notes, ctx)
-  rt$err <- saved$err
-  rt$notes <- saved$notes
-  rt$math <- saved$math
-  rt$mv <- saved$mv
+  sql_count_notes(rt$mv, rt$math, function_note = length(rt$notes) > 0L)
   if (length(v) == 1 && n != 1) v <- rep(v, n)
   if (length(v) != n) v <- rep_len(v, n)
   v
+}
+
+# "Missing values were generated" / "Mathematical operations could not be
+# performed" NOTEs of a PROC SQL expression.  SAS 9.4 writes no missing-value
+# NOTE in PROC SQL (gold: semantics/sql_null `x + 1` of a missing x,
+# opensas/sql_empty_agg_expr `mean(x)+1` over no rows), so those are dropped.
+# A math error that comes with a function's data-error NOTE (MDY(2,30,2024))
+# is covered by that NOTE (SAS 9.4 writes only "Invalid argument to function
+# MDY."); any other math error is not verified in PROC SQL: fail loud.
+sql_count_notes <- function(mv, math, function_note = FALSE) {
+  if (length(math) && !function_note) abort_unsupported("the PROC SQL NOTE for mathematical operations that could not be performed (not verified against SAS)")
+  invisible()
 }
 
 # Data-error NOTEs of functions evaluated by PROC SQL.  SAS 9.4 writes

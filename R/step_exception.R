@@ -23,10 +23,10 @@ step_runs_once <- function(step) {
   bad <- c("set", "merge", "update", "modify", "infile", "input", "datalines", "cards", "output", "do", "link", "goto")
   walk <- function(stmts) {
     for (s in stmts) {
-      if (is.list(s) && !is.null(s$stmt) && tolower(s$stmt) %in% bad) return(FALSE)
-      if (is.list(s) && !is.null(s$body) && !walk(s$body)) return(FALSE)
-      if (is.list(s) && !is.null(s$then) && !walk(list(s$then))) return(FALSE)
-      if (is.list(s) && !is.null(s$els) && !walk(list(s$els))) return(FALSE)
+      if (!is.list(s) || is.null(s$stmt)) next
+      if (tolower(s$stmt) %in% bad) return(FALSE)
+      # every nested statement: IF then/else, DO bodies, SELECT whens and otherwise
+      if (!walk(stmt_children(s))) return(FALSE)
     }
     TRUE
   }

@@ -140,9 +140,10 @@ parse_ds_options <- function(p, context) {
       opts$in_var <- tk_low(p)
       expect_type(p, "name", "a variable name after IN=")
     } else if (opt %in% c("firstobs", "obs") && context == "input") {
-      # n, nK / nM / nG / nT (multiples of 1024), MIN (0) or MAX (the largest count)
+      # n, nK / nM / nG / nT (multiples of 1024), MIN or MAX (the largest count);
+      # MIN is 1 for FIRSTOBS= and 0 for OBS= (SAS 9.4 gold: datastep/r13/firstobs_min)
       if (tk_type(p) == "name" && tk_low(p) %in% c("min", "max")) {
-        opts[[opt]] <- if (tk_low(p) == "min") 0 else 2^63 - 1
+        opts[[opt]] <- if (tk_low(p) == "min") (if (opt == "firstobs") 1 else 0) else 2^63 - 1
         advance(p)
       } else {
         v <- as.numeric(tk_val(p))

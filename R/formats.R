@@ -113,8 +113,8 @@ civil <- function(day) {
 }
 
 # Round |x| half away from zero to d decimals (display fuzz) and write it.
-fixed_body <- function(v, d, commas = FALSE, edge = "abort", down_at = -2.6e-16) {
-  s <- display_round_text(v, d, edge, down_at)
+fixed_body <- function(v, d, commas = FALSE, edge = "abort", down_rel = 0) {
+  s <- display_round_text(v, d, edge, down_rel = down_rel)
   if (is.na(s)) return(NA_character_)
   if (commas) s <- add_commas(s)
   # SAS writes a minus sign for a negative value that rounds to zero ("-0.00")
@@ -137,7 +137,7 @@ add_commas <- function(s) {
 # without the leading zero, then without thousands separators, then without
 # the dollar sign; then the E form (sci_fit); then asterisks.  A rounding at
 # the edge of the display fuzz only fails loud when the text would fit.
-fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, swap = FALSE, down_at = -2.6e-16) {
+fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, swap = FALSE, down_rel = 0) {
   # an integer beyond 2^53 / 10^d: the decimals are zeros (SAS 9.4: COMMA32.4 of 1E15)
   if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21) {
     ip <- sprintf("%.0f", abs(v))
@@ -149,7 +149,7 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
     }
   }
   build <- function(dd, cm, dl, lead0 = TRUE, edge = "abort") {
-    b <- fixed_body(v, dd, cm, edge, down_at)
+    b <- fixed_body(v, dd, cm, edge, down_rel)
     if (identical(b, NA_character_)) return(NA_character_)
     s <- b$s
     if (!lead0 && startsWith(s, "0.")) s <- substring(s, 2L)
@@ -211,10 +211,6 @@ fmt_e <- function(v, w, d) {
         g <- sig15(abs(v))
         ex <- g$ex
         keep <- e14_digits(g, v)
-        if (nchar(keep) > 14L) {
-          keep <- substr(keep, 1L, 14L)
-          ex <- ex + 1L
-        }
       } else {
         g <- sci_dec_text(v, kk)
         ex <- g$ex
@@ -253,8 +249,9 @@ e14_digits <- function(g, v) {
 fmt_percent <- function(v, w, d) {
   if (w < 4L) return(stars(w))
   # PERCENT rounds values just below a half differently from w.d (gold:
-  # 1.0049999999999997 -> 101%); that band fails loud
-  num <- trimws(fit_number(abs(v) * 100, w - 3L, d, down_at = -6e-16))
+  # 1.0049999999999997 -> 101%): rounding down within 6E-16 (relative) below
+  # a half point fails loud (display_round_text down_rel)
+  num <- trimws(fit_number(abs(v) * 100, w - 3L, d, down_rel = 6e-16))
   if (v < 0) return(paste0("(", formatC(num, width = w - 3L), "%)"))
   paste0(" ", formatC(num, width = w - 3L), "% ")
 }
@@ -276,7 +273,7 @@ fmt_negparen <- function(v, w, d) {
 }
 
 fmt_pvalue <- function(v, w, d) {
-  if (v < 10^-d) return(just_right(paste0("<", substring(formatC(10^-d, format = "f", digits = d), 2L)), w))
+  if (v < 10^-d) return(just_right(paste0("<", substring(display_fixed(10^-d, d), 2L)), w))
   fit_number(v, w, d)
 }
 
@@ -395,11 +392,22 @@ sec_text <- function(s, nd) {
   txt
 }
 
-# round half away from zero at nd decimals (on the decimal value of the binary number)
+# round half away from zero at nd decimals (on the decimal value of the binary
+# number) for the time and datetime formats.  The 1E-9 fuzz is checked against
+# the one display engine (display_round_text): where the two disagree (a value
+# just below a half point) the rounding is not verified, so it fails loud.
 round_half_away <- function(v, nd) {
   if (is.na(v)) return(v)
   m <- 10^nd
-  sign(v) * floor(abs(v) * m + 0.5 + 1e-9) / m
+  r <- sign(v) * floor(abs(v) * m + 0.5 + 1e-9) / m
+  if (abs(v) < 1e15) {
+    e <- display_round_text(v, nd, edge = "up")
+    if (!identical(e, NA_character_) && as.numeric(e) != abs(r)) {
+      abort_unsupported(paste0("time format rounding of ", format(v, digits = 17), " to ", nd,
+                               " decimals: the value lies just below a half point (not verified against SAS)"))
+    }
+  }
+  r
 }
 
 # YYMMDD / MMDDYY / DDMMYY width ladder.
@@ -465,8 +473,8 @@ fmt_time_value <- function(v, base, w, d) {
     return(just_right(body, w))
   }
   if (base == "hour") {
-    hv <- if (nd == 0) floor(av / 3600 + 0.5) else av / 3600
-    body <- paste0(sg, formatC(hv, format = "f", digits = nd))
+    # the hours with nd decimals: the one display engine
+    body <- paste0(sg, display_fixed(av / 3600, nd))
     return(just_right(body, w))
   }
   if (base == "mmss") {

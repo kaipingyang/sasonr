@@ -292,10 +292,11 @@ freq_is_missing <- function(x) {
 
 freq_num <- function(v) {
   if (is.na(v)) return(".")
-  if (abs(v - round(v)) < 1e-9 * max(1, abs(v))) return(sprintf("%.0f", v))
+  # within 1E-9 of an integer: no decimals (the one display engine rounds it)
+  if (abs(v - round(v)) < 1e-9 * max(1, abs(v))) return(display_fixed(v, 0L))
   trimws(sas_fmt_best(v, 8L))
 }
-freq_pct <- function(v) if (is.na(v)) "." else sprintf("%.2f", display_round(v, 2L))
+freq_pct <- function(v) if (is.na(v)) "." else display_fixed(v, 2L)
 
 #' PROC FREQ engine
 #' @param d Input data (after WHERE).
@@ -894,7 +895,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
 freq_stats_listing <- function(st, tab, vars, info, o, sp) {
   out <- character()
   k <- length(vars)
-  f4 <- function(v) if (is.na(v)) "." else sprintf("%.4f", display_round(v, 4L))
+  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
   if (isTRUE(st$oneway_chi) && isTRUE(o$chisq)) {
     out <- c(out, "   Chi-Square Test", "for Equal Proportions", "",

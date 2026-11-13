@@ -1,5 +1,41 @@
 # sasonr (development version)
 
+## Round 13.1 (2026-11-12): review of round 13
+
+An independent review of round 13 found one regression (PERCENT lost its
+fail-loud band) and places where display text still bypassed the display
+engine. All findings are fixed; each has a regression test.
+
+* **PERCENTw.d** fails loud again when it would round down a value within
+  6E-16 (relative) below a half point (SAS's PERCENT rounding there differs
+  from `w.d` and has not been scanned). The unused `down_at` arguments are
+  gone.
+* **Exact integer digits only where verified**: without decimals below 1E18
+  (gold: `32.` of 939586291501115008), with decimals below 1E15. From 1E18 on
+  the E form is written again as before round 13; an integer of 16 or more
+  digits with decimals fails loud.
+* **One display engine.** The narrow BESTw. E form, HOURw.d, PROC FREQ / MEANS
+  / PRINT numbers and the PVALUE threshold now take their text from the
+  display engine instead of `sprintf()`/`formatC()`. The time formats' own
+  rounding fails loud where it disagrees with the engine; macro values other
+  than integers below 1E15 fail loud instead of using `%.15g`, and a number
+  compared with text in %SYSEVALF uses its BEST16. text.
+* **WHERE matrix evidence**: character functions are compared in WHERE through
+  a probe that shows the length and trailing blanks of the result, nested
+  calls of the function are evaluated by the WHERE clause, and `where` counts
+  as verified only when the WHERE matrix has as many cases as the DATA step
+  matrix (this found a case-id collision that had dropped one IFN case).
+  Gold refreshed for 38 functions. The probe showed that a WHERE
+  concatenation beyond 32767 characters differs from the DATA step; it now
+  fails loud.
+* **WHERE note**: a variable compared with anything but a variable is written
+  first, with the operator mirrored (new real-SAS case of 18 shapes); a
+  constant compared with an expression other than a call fails loud.
+* The SAS-exception rule traverses SELECT groups; PROC SQL expressions restore
+  the runtime state on error and fail loud on math-error NOTEs instead of
+  dropping them (missing-value NOTEs: SAS writes none in PROC SQL, gold);
+  `FIRSTOBS=MIN` is 1 (real-SAS case).
+
 ## Round 13 (2026-11-12): display rounding scans, WHERE matrix, CONSTANT and MDY
 
 New ulp-by-ulp real-SAS scans of numeric display rounding (about 45,000

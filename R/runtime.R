@@ -728,11 +728,23 @@ sas_fmt_best <- function(x, w = 12L) {
     dmax <- if (v == 0) w - 1L else max(0L, 15L - as.integer(floor(log10(abs(v)))) - 1L)
     if (is.na(s)) {
       for (d in seq(min(w - 1L, dmax), 0L)) {
-        # SAS rounds half away from zero (sprintf rounds half to even)
         # skip widths that cannot fit before rounding (rounding adds at most one digit)
         if (nchar(sprintf("%.0f", trunc(abs(v)))) + (d > 0) + d + (v < 0) > w) next
-        # above 16 columns v already holds SAS's 15 digits (best_digits15): printed as they are
-        cand <- strip_zeros(sprintf("%.*f", d, if (w > 16L) v else display_round(v, d)))
+        # above 15 columns a value below 1E-5 is written in E notation (below)
+        if (w > 15L && abs(v) < 1e-5) break
+        if (w > 16L) {
+          # above 16 columns v already holds SAS's 15 digits (best_digits15):
+          # written as they are; dropping some of them is not verified
+          cand <- display_fixed(v, d, exact = TRUE)
+          if (as.numeric(cand) != v) {
+            abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), ": fewer than its 15 digits in fixed ",
+                                     "notation is not verified against SAS"))
+          }
+          cand <- strip_zeros(cand)
+        } else {
+          # the one display engine (half away from zero on the display value)
+          cand <- strip_zeros(display_fixed(v, d))
+        }
         if (nchar(cand) <= w) {
           if (cand %in% c("0", "-0") && v != 0) break
           s <- cand
@@ -756,11 +768,14 @@ sas_fmt_best <- function(x, w = 12L) {
       m <- if (nchar(m) > 1L) paste0(substr(m, 1L, 1L), ".", substring(m, 2L)) else m
       sci <- paste0(if (v < 0) "-", m, "E", if (g$ex < 0) "-", abs(g$ex))
     } else if (is.na(s) || (v != 0 && abs(v) < 1e-5)) {
-      for (d in seq(min(max(w - 2L, 0L), 14L), 0L)) {
-        cand <- sprintf("%.*E", d, v)
-        mant <- strip_zeros(sub("E.*$", "", cand))
-        ex <- as.integer(sub("^.*E", "", cand))
-        cand <- paste0(mant, "E", ifelse(ex < 0, "-", ""), abs(ex))
+      # (at most 12 decimals: a 14-digit mantissa that fits in 15 columns ends
+      # in zeros and is written as with 12)
+      for (d in seq(min(max(w - 2L, 0L), 12L), 0L)) {
+        # the E form of the one display engine (sci_dec_text); the width is
+        # probed with both roundings first, so that only the text written can
+        # fail loud at a half point
+        if (nchar(sci_dec_text(v, d, edge = "up")$text) > w && nchar(sci_dec_text(v, d, edge = "down")$text) > w) next
+        cand <- sci_dec_text(v, d)$text
         if (nchar(cand) <= w) {
           sci <- cand
           break

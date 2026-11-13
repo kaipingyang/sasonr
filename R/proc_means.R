@@ -37,7 +37,7 @@ means_stat_heading <- function(s, alpha = 0.05) {
 
 format_pct_level <- function(alpha) {
   v <- (1 - alpha) * 100
-  if (abs(v - round(v)) < 1e-9) sprintf("%d", as.integer(round(v))) else sub("0+$", "", sprintf("%.4f", v))
+  if (abs(v - round(v)) < 1e-9) display_fixed(v, 0L) else sub("0+$", "", display_fixed(v, 4L))
 }
 
 means_autoname <- c(
@@ -827,7 +827,7 @@ means_num_text <- function(v, w, maxdec) {
     for (dd in seq(maxdec, 0L)) {
       # MAXDEC= rounds the exact binary value half up, without the format fuzz
       # (gold: a mean of 1.2249999999999999 shows as 1.22)
-      s <- sprintf("%.*f", dd, display_round(v, dd, exact = TRUE))
+      s <- display_fixed(v, dd, exact = TRUE)
       if (nchar(s) <= w) return(s)
     }
     return(trimws(sas_fmt_best(v, w)))
@@ -840,16 +840,17 @@ means_num_text <- function(v, w, maxdec) {
   }
   dec <- max(0L, as.integer(round((w - 2) * 0.7)))
   for (dd in dec:0) {
-    s <- sprintf("%.*f", dd, display_round(v, dd))
-    # the minus sign does not count against the field (-218.9158575)
-    if (nchar(sub("^-", "", s)) <= w - 1L) return(s)
+    # the minus sign does not count against the field (-218.9158575); the
+    # width is probed first, so that only the text written can fail loud
+    s <- display_fixed(v, dd, edge = "up")
+    if (nchar(sub("^-", "", s)) <= w - 1L) return(display_fixed(v, dd))
   }
   trimws(sas_fmt_best(v, w))
 }
 
 means_stat_text <- function(s, v, sp) {
   if (s %in% c("n", "nmiss")) return(if (is.na(v)) "." else sprintf("%.0f", v))
-  if (s == "t") return(if (is.na(v)) "." else sprintf("%.2f", display_round(v, 2L)))
+  if (s == "t") return(if (is.na(v)) "." else display_fixed(v, 2L))
   if (s == "prt") return(trimws(fmt_pvalue(v, 6L, 4L)))
   means_num_text(v, sp$fw, sp$maxdec)
 }

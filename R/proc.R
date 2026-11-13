@@ -352,14 +352,14 @@ print_num_column <- function(x) {
       dmax
     }, 1L)
     d <- max(need)
-    out[!miss] <- sprintf("%.*f", d, display_round(v, d))
+    out[!miss] <- vapply(v, display_fixed, "", d = d)
     return(out)
   }
   s <- trimws(sas_fmt_best(abs(v), 7L))
   has_e <- grepl("E", s, fixed = TRUE)
   dec <- ifelse(grepl(".", s, fixed = TRUE) & !has_e, nchar(sub("^[^.]*\\.", "", s)), 0L)
   d <- max(dec)
-  if (d > 0 && !any(has_e)) s <- sprintf("%.*f", d, display_round(abs(v), d))
+  if (d > 0 && !any(has_e)) s <- vapply(abs(v), display_fixed, "", d = d)
   out[!miss] <- paste0(ifelse(v < 0, "-", ""), s)
   out
 }

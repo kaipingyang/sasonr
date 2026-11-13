@@ -38,7 +38,7 @@ test_that("BESTw. above 16 columns: the first 15 digits of the display value, tr
   expect_equal(f(hexd("4012416C16C16C17")), "4.56388888888888") # former fail-loud window: SAS 9.4 truncates
 })
 
-test_that("E notation with 14 digits: truncated up to 0.75 of the 14th digit, fail loud above", {
+test_that("E notation with 14 digits: truncated up to 0.888 of the 14th digit, fail loud above", {
   f <- function(x) sas_f_putn(x, "E32.")
   expect_equal(f(23082174.53712922), " 2.3082174537129000000000000E+07")
   expect_error(f(pi), class = "sasonr_unsupported")

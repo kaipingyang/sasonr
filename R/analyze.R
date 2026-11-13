@@ -247,6 +247,12 @@ an_expr <- function(e, st) {
     binary = {
       e$lhs <- an_expr(e$lhs, st)
       e$rhs <- an_expr(e$rhs, st)
+      # a WHERE concatenation longer than 32767 characters: SAS 9.4 keeps no
+      # row where the DATA step value (truncated to 32767) is compared (fn_where
+      # gold, trim(s) of a $32767 variable in the length probe); not derived
+      if (e$op == "||" && identical(st$context, "where") && expr_type(e, st)$len > 32767L) {
+        abort_unsupported("a WHERE concatenation of more than 32767 characters (not verified against SAS)", e$line)
+      }
       if (e$op %in% c("+", "-", "*", "/", "**", "min", "max", "and", "or")) {
         if (expr_type(e$lhs, st)$type == "char" || expr_type(e$rhs, st)$type == "char") {
           abort_unsupported("automatic character-to-numeric conversion", e$line)
