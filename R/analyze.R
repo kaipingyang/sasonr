@@ -444,6 +444,15 @@ convert_fn_args <- function(e, st) {
   })
 }
 
+# A character value as an IF condition: SAS converts it to numeric (a
+# conversion NOTE at compile time), which sasonr does not reproduce.  Checked
+# here so that the step fails loud whether or not the IF runs.
+an_cond <- function(e, st, line) {
+  e <- an_expr(e, st)
+  if (expr_type(e, st)$type == "char") abort_unsupported("character value used as a condition", e$line %||% line)
+  e
+}
+
 # Statement annotation ----------------------------------------------------
 
 check_format <- function(fmt, line) {
@@ -579,11 +588,11 @@ an_stmt <- function(s, st) {
       if (!identical(expr_type(s$value, st)$type, "char")) abort_unsupported("SUBSTR assignment of a numeric value", line)
     },
     "if" = {
-      s$cond <- an_expr(s$cond, st)
+      s$cond <- an_cond(s$cond, st, line)
       s$then <- an_stmt(s$then, st)
       if (!is.null(s[["else"]])) s[["else"]] <- an_stmt(s[["else"]], st)
     },
-    subset_if = s$cond <- an_expr(s$cond, st),
+    subset_if = s$cond <- an_cond(s$cond, st, line),
     where = {
       s$cond <- an_where(s$cond, st)
       st$wheres <- list(s$cond) # a later WHERE statement replaces an earlier one

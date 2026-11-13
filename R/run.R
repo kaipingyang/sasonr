@@ -133,22 +133,31 @@ engine_exec_steps <- function(eng, text, line) {
     if (!eng$execute) next
     vec <- step$type == "data" && tr$level %in% c("L1", "L2")
     eng$phase <- if (step$type == "data") "execute_data" else "execute"
+    # run-wide state the vectorised attempt may change before a re-run (PRXPARSE ids)
+    prx0 <- rt$prx
+    # Vectorised code evaluates every IF/SELECT branch on every row, so a branch
+    # SAS never runs can fail loud or raise a SAS exception: the step is re-run
+    # row by row (L3), where only the taken branches run; a genuine unsupported
+    # value or exception is raised there again.  A construct that is unsupported
+    # whatever the values (sasonr_unsupported_construct) fails loud at once.
     env <- tryCatch(engine_eval(eng, tr$code, stage = vec),
-                    sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e),
-                    sasonr_unsupported = function(e) if (vec) e else stop(e))
-    # vectorised code evaluates every IF/SELECT branch on every row (a branch
-    # SAS never runs can fail loud): re-run row by row, where only the taken
-    # branches run; a genuine unsupported value fails loud there again
-    unsup <- vec && inherits(env, "sasonr_unsupported")
-    if (!unsup && !is.environment(env)) next
-    if (unsup || (vec && (rt$err || isTRUE(rt$mv_rerun)))) {
+                    sasonr_step_exception = function(e) if (vec) e else engine_step_exception(eng, step, tr, e),
+                    sasonr_unsupported = function(e) {
+                      if (vec && !inherits(e, "sasonr_unsupported_construct")) e else stop(e)
+                    })
+    branch <- vec && inherits(env, c("sasonr_unsupported", "sasonr_step_exception"))
+    if (!branch && !is.environment(env)) next
+    if (branch || (vec && (rt$err || isTRUE(rt$mv_rerun)))) {
       # A data error in vectorised code: re-run the step row by row (L3) so
       # that _ERROR_, the NOTEs and the PDV dump follow SAS exactly.
+      rt$prx <- prx0
       tr <- translate_step(step, eng$meta, "L3")
-      tr$reasons <- c(if (unsup) "unsupported value in vectorised code (re-run row by row)" else
+      tr$reasons <- c(if (branch) "unsupported value or SAS exception in vectorised code (re-run row by row)" else
         "data error at run time (re-run of the vectorised step)", tr$reasons)
       eng$steps[[length(eng$steps)]] <- tr
-      env <- engine_eval(eng, tr$code, stage = FALSE)
+      env <- tryCatch(engine_eval(eng, tr$code, stage = FALSE),
+                      sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e))
+      if (!is.environment(env)) next
     } else if (vec) {
       for (nm in tr$outputs) assign(nm, env$work[[nm]], envir = eng$wenv)
       # NOTEs that are not data errors (e.g. INPUT going to a new line)

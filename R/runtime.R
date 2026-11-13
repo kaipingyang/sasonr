@@ -108,7 +108,7 @@ chr_cmp <- function(a, b) {
 sas_cmp <- function(a, b) {
   if (is.character(a) || is.character(b)) {
     if (!(is.character(a) && is.character(b))) {
-      abort_unsupported("comparison between character and numeric values")
+      abort_unsupported_construct("comparison between character and numeric values")
     }
     return(chr_cmp(a, b))
   }
@@ -180,7 +180,7 @@ sas_in <- function(x, values) {
 #' @keywords internal
 sas_true <- function(x) {
   if (is.logical(x)) return(!is.na(x) & x)
-  if (is.character(x)) abort_unsupported("character value used as a condition")
+  if (is.character(x)) abort_unsupported_construct("character value used as a condition")
   !is.na(x) & x != 0
 }
 #' @export

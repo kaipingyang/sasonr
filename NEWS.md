@@ -12,6 +12,11 @@
   exceeds 1E-6 (its fuzz window is not rescanned yet).
 * Wide `BEST` E forms take their mantissa decimals from the width and fail
   loud when the text does not fit (`BEST16.` wrote 18 columns).
+* A vectorised DATA step whose untaken IF/SELECT branch fails loud or raises a
+  SAS exception is re-run row by row; the failed attempt leaves no PRXPARSE
+  ids behind, a SAS exception in a branch that does not run is no longer
+  reported, and a character value as an IF condition fails loud at
+  translation (it was skipped when the branch did not run).
 * E notation: an exact tie at the 15th significant digit fails loud when its
   direction decides the digits shown.
 

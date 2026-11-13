@@ -11,6 +11,12 @@ abort_unsupported <- function(msg, line = NULL) {
   sasonr_abort(paste("Unsupported:", msg), "sasonr_unsupported", line)
 }
 
+# Unsupported whatever the values (a type mismatch found at run time): the
+# engine does not re-run a vectorised step row by row for it (run.R).
+abort_unsupported_construct <- function(msg, line = NULL) {
+  sasonr_abort(paste("Unsupported:", msg), c("sasonr_unsupported_construct", "sasonr_unsupported"), line)
+}
+
 abort_syntax <- function(msg, line = NULL) {
   sasonr_abort(paste("Syntax error:", msg), "sasonr_syntax_error", line)
 }
