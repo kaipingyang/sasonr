@@ -134,13 +134,19 @@ engine_exec_steps <- function(eng, text, line) {
     vec <- step$type == "data" && tr$level %in% c("L1", "L2")
     eng$phase <- if (step$type == "data") "execute_data" else "execute"
     env <- tryCatch(engine_eval(eng, tr$code, stage = vec),
-                    sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e))
-    if (!is.environment(env)) next
-    if (vec && (rt$err || isTRUE(rt$mv_rerun))) {
+                    sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e),
+                    sasonr_unsupported = function(e) if (vec) e else stop(e))
+    # vectorised code evaluates every IF/SELECT branch on every row (a branch
+    # SAS never runs can fail loud): re-run row by row, where only the taken
+    # branches run; a genuine unsupported value fails loud there again
+    unsup <- vec && inherits(env, "sasonr_unsupported")
+    if (!unsup && !is.environment(env)) next
+    if (unsup || (vec && (rt$err || isTRUE(rt$mv_rerun)))) {
       # A data error in vectorised code: re-run the step row by row (L3) so
       # that _ERROR_, the NOTEs and the PDV dump follow SAS exactly.
       tr <- translate_step(step, eng$meta, "L3")
-      tr$reasons <- c("data error at run time (re-run of the vectorised step)", tr$reasons)
+      tr$reasons <- c(if (unsup) "unsupported value in vectorised code (re-run row by row)" else
+        "data error at run time (re-run of the vectorised step)", tr$reasons)
       eng$steps[[length(eng$steps)]] <- tr
       env <- engine_eval(eng, tr$code, stage = FALSE)
     } else if (vec) {

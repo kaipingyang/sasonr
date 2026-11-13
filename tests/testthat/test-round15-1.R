@@ -67,3 +67,17 @@ test_that("ROUND above 2^49: only exact multiples are exempt (finding 7)", {
   expect_error(sas_f_round(600000000000001, 0.3), class = "sasonr_unsupported")
   expect_equal(sas_f_round(123456789012.5, 1e-4), 123456789012.5) # x/unit an integer: SAS 9.4 (round_b01)
 })
+
+test_that("a SELECT branch SAS does not run cannot fail loud (vectorised code re-runs row by row)", {
+  # rounding/values/round_b01 R00269: ROUND(99999.45, 0.1) is 99999.5 (SAS 9.4); the
+  # vectorised SELECT also evaluated ROUNDE(99999.45, 0.1), which fails loud since finding 4
+  code <- "data _null_; input f :$8. x u; select (f); when ('ROUND') r = round(x, u);
+    when ('ROUNDE') r = rounde(x, u); otherwise r = -1; end; put r; datalines;
+ROUND 99999.45 0.1
+ROUNDE 1 1
+;
+"
+  res <- sas_run(code)
+  expect_identical(res$log[res$log %in% c("99999.5", "1")], c("99999.5", "1"))
+  expect_error(sas_run(sub("ROUND 99999", "ROUNDE 99999", code)), class = "sasonr_unsupported")
+})
