@@ -7,6 +7,6 @@
 sas_chain(args, ops)
 }
 \description{
-Comparison chain \verb{a < b < c}: every operand is evaluated once
+An op ending in \verb{:} is a colon (truncated) comparison.
 }
 \keyword{internal}

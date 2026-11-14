@@ -180,7 +180,8 @@ parse_expr <- function(p, min_bp = 1L) {
 
     if (info$kind == "cmp") {
       rhs <- parse_expr(p, info$bp + 1L)
-      lhs <- sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp)
+      lhs <- sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp,
+                            expr_ctx(p))
       last_cmp <- TRUE
       st <- sas_op_after(info)
       next
@@ -189,6 +190,7 @@ parse_expr <- function(p, min_bp = 1L) {
 
     lhs <- switch(info$kind,
       binary = {
+        p$operand_of <- info$op
         rhs <- parse_expr(p, if (info$right) info$bp else info$bp + 1L)
         list(node = "binary", op = info$op, lhs = lhs, rhs = rhs, line = line, col = col)
       },
@@ -218,9 +220,12 @@ parse_expr <- function(p, min_bp = 1L) {
 }
 
 parse_prefix <- function(p, min_bp = 1L) {
-  # the prefix sign right before this operand (two signs in a row)
+  # the prefix sign right before this operand (two signs in a row) and the
+  # operator whose operand this is (set by the caller)
   sign <- p$prefix_sign
   p$prefix_sign <- NULL
+  operand_of <- p$operand_of
+  p$operand_of <- NULL
   t <- tk_type(p)
   v <- tk_val(p)
   line <- tk_line(p)
@@ -264,25 +269,28 @@ parse_prefix <- function(p, min_bp = 1L) {
     op = {
       if (v %in% c("-", "+", "^")) {
         name <- switch(v, "-" = "neg", "+" = "pos", "^" = "not")
-        o <- sas_prefix_op(name, expr_ctx(p), min_bp, p, sign)
+        o <- sas_prefix_op(name, expr_ctx(p), min_bp, p, sign, operand_of)
         advance(p)
         if (name != "not") p$prefix_sign <- name
+        on.exit(p$prefix_sign <- NULL, add = TRUE)
+        p$operand_of <- name
         arg <- parse_expr(p, o$bp)
         return(list(node = "unary", op = if (v == "^") "not" else v, arg = arg, line = line))
       }
     },
-    name = return(parse_name_primary(p, min_bp))
+    name = return(parse_name_primary(p, min_bp, operand_of))
   )
   abort_syntax(paste("unexpected", tok_desc(p), "in expression"), line)
 }
 
-parse_name_primary <- function(p, min_bp = 1L) {
+parse_name_primary <- function(p, min_bp = 1L, operand_of = NULL) {
   low <- tk_low(p)
   line <- tk_line(p)
   col <- tk_col(p)
   if (low == "not" && !tk_type(p, 1L) %in% c("semi", "rparen", "comma", "eof")) {
-    o <- sas_prefix_op("not", expr_ctx(p), min_bp, p)
+    o <- sas_prefix_op("not", expr_ctx(p), min_bp, p, operand_of = operand_of)
     advance(p)
+    p$operand_of <- "not"
     return(list(node = "unary", op = "not", arg = parse_expr(p, o$bp), line = line))
   }
   # first.x / last.x
@@ -510,13 +518,13 @@ expr_to_sexpr <- function(e) {
     "in" = paste0("(", if (e$negate) "not-in" else "in", " ", s(e$lhs), " ",
                   paste(vapply(e$items, function(it) if (it$node == "range") paste0(it$from, ":", it$to) else s(it), ""), collapse = " "), ")"),
     between = paste0("(", if (isTRUE(e$negate)) "not-between" else "between", " ", s(e$lhs), " ", s(e$lo), " ", s(e$hi), ")"),
-    contains = paste0("(contains ", s(e$lhs), " ", s(e$rhs), ")"),
+    contains = paste0("(", if (isTRUE(e$negate)) "not-contains" else "contains", " ", s(e$lhs), " ", s(e$rhs), ")"),
     like = paste0("(", if (isTRUE(e$negate)) "not-like" else "like", " ", s(e$lhs), " ", s(e$rhs), ")"),
     # PROC SQL nodes
     col = if (is.null(e$table)) e$name else paste0(e$table, ".", e$name),
     in_list = paste0("(", if (isTRUE(e$negate)) "not-in" else "in", " ", s(e$lhs), " ",
                      paste(vapply(e$items, s, ""), collapse = " "), ")"),
-    is_missing = paste0("(is-missing ", s(e$lhs), ")"),
+    is_missing = paste0("(", if (isTRUE(e$negate)) "is-not-missing" else "is-missing", " ", s(e$lhs), ")"),
     call = paste0("(call ", e$name, paste0(" ", vapply(e$args, function(a) {
       if (a$node == "of") {
         paste0("(of ", paste(vapply(a$items, function(it) switch(it$kind,

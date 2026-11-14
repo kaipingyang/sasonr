@@ -312,7 +312,8 @@ where_text <- function(e) {
       },
       # a < b < c is written a<b and b<c
       chain = paste(vapply(seq_along(x$ops), function(k) {
-        w(list(node = "compare", op = x$ops[k], colon = FALSE, lhs = x$args[[k]], rhs = x$args[[k + 1L]]))
+        w(list(node = "compare", op = sub(":", "", x$ops[k], fixed = TRUE), colon = endsWith(x$ops[k], ":"),
+               lhs = x$args[[k]], rhs = x$args[[k + 1L]]))
       }, ""), collapse = " and "),
       "in" = if (length(x$items) == 1L && !isTRUE(x$negate) && x$items[[1]]$node != "range") {
         # an IN list of one value is written as an equality, the operand first

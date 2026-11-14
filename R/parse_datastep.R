@@ -132,9 +132,7 @@ parse_ds_options <- function(p, context) {
       opts$rename <- parse_rename_pairs(p, paren = TRUE)
     } else if (opt == "where") {
       expect_type(p, "lparen", "'(' after WHERE=")
-      p$where_ctx <- TRUE
-      opts$where <- parse_expr(p)
-      p$where_ctx <- FALSE
+      opts$where <- parse_where_expr(p)
       expect_type(p, "rparen", "')'")
     } else if (opt == "in" && context == "input") {
       opts$in_var <- tk_low(p)
@@ -840,11 +838,19 @@ parse_where <- function(p) {
   line <- tk_line(p)
   advance(p)
   if (is_kw(p, c("also", "same"))) abort_unsupported("WHERE ALSO / WHERE SAME", line)
-  p$where_ctx <- TRUE
-  cond <- parse_expr(p)
-  p$where_ctx <- FALSE
+  cond <- parse_where_expr(p)
   expect_semi(p, "WHERE")
   list(stmt = "where", cond = cond, line = line)
+}
+
+# A WHERE expression: parsed with the WHERE rules; the parser state is restored
+# also when the expression has an error (the statement-level error recovery
+# goes on with the same parser).
+parse_where_expr <- function(p) {
+  old <- p$where_ctx
+  p$where_ctx <- TRUE
+  on.exit(p$where_ctx <- old, add = TRUE)
+  parse_expr(p)
 }
 
 parse_put <- function(p) {

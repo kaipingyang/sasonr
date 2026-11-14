@@ -136,7 +136,7 @@ test_that("WHERE: prefix signs bind tighter than **, ** tighter than MIN and MAX
   expect_equal(pw("a = not b"), "(= a (not b))")
   expect_equal(pw("- - a"), "(neg (neg a))")
   expect_equal(pw("not - a"), "(not (neg a))")
-  for (e in c("a * not b", "a ** not b", "not not a", "- not a", "- + a", "+ - a")) {
+  for (e in c("a ** not b", "not not a", "- not a", "- + a", "+ - a")) {
     expect_error(sas_parse_expr(e, where = TRUE), class = "sasonr_syntax_error")
   }
 })
@@ -159,4 +159,44 @@ test_that("PROC SQL: NOT takes a comparison; the conditions stand alone", {
               "a = not b", "not not a", "- not a", "- + a", "a is missing = 1")) {
     expect_error(psql(e), class = "sasonr_syntax_error")
   }
+})
+
+test_that("NOT IN and IN: bind like IN; colon comparisons chain", {
+  expect_equal(px("a < b not in (1)"), "(< a (not-in b 1))")
+  expect_equal(px("n < s in: ('ab')"), "(< n (=: s 'ab'))")
+  expect_equal(px("s =: t < u"), "(chain =: < s t u)")
+  expect_equal(px("s < t =: u"), "(chain < =: s t u)")
+  expect_equal(pw("s =: t =: u"), "(chain =: =: s t u)")
+  expect_error(sas_parse_expr("a < b < c =: d"), class = "sasonr_unsupported")
+  expect_equal(psql("s < t eqt u"), "(chain < =: s t u)")
+  expect_error(psql("s eqt t < u"), class = "sasonr_unsupported")
+  expect_error(psql("s eqt t eqt u"), class = "sasonr_unsupported")
+})
+
+test_that("WHERE: NOT as an operand", {
+  for (e in c("a * not b", "a - not b", "a + not b", "a / not b")) {
+    expect_error(sas_parse_expr(e, where = TRUE), class = "sasonr_unsupported")
+  }
+  for (e in c("a min not b", "a max not b", "a ** not b", "- not a", "not not a")) {
+    expect_error(sas_parse_expr(e, where = TRUE), class = "sasonr_syntax_error")
+  }
+  expect_equal(pw("a || not b"), "(|| a (not b))")
+  expect_equal(pw("a between not b and c"), "(between a (not b) c)")
+  expect_equal(pw("s like not t"), "(like s (not t))")
+  expect_equal(pw("a < not b"), "(< a (not b))")
+  expect_equal(px("a * not b"), "(* a (not b))")
+})
+
+test_that("negated conditions are shown in the S-expressions", {
+  expect_equal(pw("s not contains 'a'"), "(not-contains s 'a')")
+  expect_equal(pw("x is not missing"), "(is-not-missing x)")
+})
+
+test_that("a WHERE expression with an error leaves the parser in the DATA step rules", {
+  p <- new_parser(sas_lex("where a * ; - + 1"))
+  expect_error(parse_where(p), class = "sasonr_syntax_error")
+  expect_false(isTRUE(p$where_ctx))
+  while (tk_type(p) != "semi") advance(p)
+  advance(p)
+  expect_equal(expr_to_sexpr(parse_expr(p)), "(neg (+ 1))")
 })

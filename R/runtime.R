@@ -153,12 +153,20 @@ sas_cmp_trunc <- function(op, a, b) {
 }
 
 #' Comparison chain `a < b < c`: every operand is evaluated once
+#'
+#' An op ending in `:` is a colon (truncated) comparison.
 #' @export
 #' @keywords internal
 sas_chain <- function(args, ops) {
   res <- TRUE
   for (k in seq_along(ops)) {
-    res <- res & sas_true(cmp_fun(ops[k])(args[[k]], args[[k + 1L]]))
+    op <- ops[k]
+    v <- if (endsWith(op, ":")) {
+      sas_cmp_trunc(sub(":", "", op, fixed = TRUE), args[[k]], args[[k + 1L]])
+    } else {
+      cmp_fun(op)(args[[k]], args[[k + 1L]])
+    }
+    res <- res & sas_true(v)
   }
   as.numeric(res)
 }

@@ -728,7 +728,7 @@ parse_sql_expr <- function(p, min_bp = 1L) {
         next
       }
       rhs <- parse_sql_expr(p, info$bp + 1L)
-      lhs <- sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp)
+      lhs <- sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp, "sql")
       last_cmp <- TRUE
       st <- sas_op_after(info)
       next
@@ -868,6 +868,7 @@ parse_sql_prefix <- function(p, min_bp = 1L) {
     o <- sas_prefix_op(name, "sql", min_bp, p, sign)
     advance(p)
     if (name != "not") p$prefix_sign <- name
+    on.exit(p$prefix_sign <- NULL, add = TRUE)
     arg <- parse_sql_expr(p, o$bp)
     return(list(node = "unary", op = if (v == "^") "not" else v, arg = arg, line = line, col = col))
   }
