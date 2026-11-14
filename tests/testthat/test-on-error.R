@@ -1,5 +1,4 @@
 #
-#
 
 run_sas_mode <- function(code) {
   withr::local_options(sasonr.step_notes = TRUE)

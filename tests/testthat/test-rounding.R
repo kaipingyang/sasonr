@@ -1,6 +1,5 @@
-# ROUND family, INT/FLOOR/CEIL and w.d-type formats: expectations taken from
 #
-#
+# displays them.
 
 hex <- function(x) toupper(paste(as.character(writeBin(x, raw(), size = 8L, endian = "big")), collapse = ""))
 
@@ -49,8 +48,8 @@ test_that("a subnormal literal: an ERROR in SAS 9.4, kept as-is in SAS 9.4", {
   expect_identical(hex(res$work$a$y), "01A56E1FC2F8F346")
 })
 
-test_that("ROUND fails loud where the expected results does not determine the result", {
-  #
+test_that("ROUND fails loud where the result is not determined", {
+  # floor(fl(fl(|q| + 0.5) + min(1E-12 |q|, 1E-6)))
   expect_identical(sas_f_round(1267.7744999989193, 0.001), 1267.774)
   expect_identical(sas_f_round(0.03499999999996535, 0.01), 0.04)     # 0.99E-12 |q| below the half point: up
   expect_identical(sas_f_round(-0.034999999999964386, 0.01), -0.03)  # 1.02E-12 |q| below: down
@@ -83,8 +82,7 @@ test_that("w.d: at or above the half point up, the double nearest to it up, 3 ul
   f <- function(x, fmt) sas_f_putn(x, fmt)
   expect_equal(f(1.005, "4.2"), "1.01")
   expect_equal(f(2.675, "8.2"), "    2.68")
-  #
-  # stays below 1.01)
+  # 1.00: (1.0049999999999997 + 0.005) (1 + 2^-52) stays below 1.01
   expect_equal(f(1.0049999999999997, "4.2"), "1.00")
   expect_equal(f(1.0049999999999992, "4.2"), "1.00")
 })

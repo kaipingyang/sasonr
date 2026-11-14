@@ -49,7 +49,7 @@ test_that("guarded missing-value counts are exact (vectorised steps re-run row b
 })
 
 test_that("missing values generated: only the operation that produced the missing value is a place", {
-  #
+  # a chained expression has
   # one place, at its first missing-producing operation; division, power and a
   # unary minus of an already generated missing result are not counted again,
   # while a unary minus of a missing variable is (at the operand's position)
@@ -76,8 +76,8 @@ test_that("missing values generated: only the operation that produced the missin
   }
 })
 
-test_that("missing-value places: ** and function results are not generated missing values (merge of dev d95db7c)", {
-  #
+test_that("missing-value places: ** and function results are not generated missing values", {
+  # +, -, *, / and the unary
   # minus skip an operand that is a generated missing value, ** always records its
   # place, and the result of ** or of a function is not a generated missing value
   code <- c("data x;",
@@ -97,7 +97,6 @@ test_that("missing-value places: ** and function results are not generated missi
 })
 
 test_that("missing-value places: inside function arguments every operation records its place", {
-  #
   code <- c("data x;",
             "  a = .;",
             "  y1 = (a - 1) / 7;",

@@ -1,6 +1,6 @@
 # These tests check the PROC MEANS computations and layouts.  Strict mode
 # stays on; the tests that request statistics which are `approximate` or not
-#
+# supported in the PROC statistics registry (SKEWNESS, quantile layouts ...) run
 # them through run_approx(): strict off for that one program, only its
 # `sasonr_strict_warning` warnings muffled (the gate itself is tested in
 # test-stats-exact.R).
@@ -30,15 +30,13 @@ run;
 test_that("default statistics and the listing of one analysis variable", {
   res <- sas_run(paste(means_data, "proc means data=d; var x; run;"))
   #
-  #
   expect_equal(squish(res$listing), c(
     "The MEANS Procedure", "Analysis Variable : x",
     "N Mean Std Dev Minimum Maximum", strrep("-", 65),
     "5 30.0000000 15.8113883 10.0000000 50.0000000", strrep("-", 65)
   ))
-  #
-  # groups (the data set has 13 observations), in both releases
-  #
+  # a 2-column N field comes from BY groups (13 observations: see
+  # test-proc-misc.R), in both releases
 })
 
 test_that("OUTPUT OUT= with CLASS: _TYPE_ numbering, _FREQ_, missing class values excluded", {
@@ -209,9 +207,7 @@ test_that("undetermined panel layouts fail loud instead of printing a wrong rule
 })
 
 
-test_that("default decimals of the printed table (FW=12, no MAXDEC) follow the measured rule", {
-  #
-  #
+test_that("default decimals of the printed table (FW=12, no MAXDEC) follow the SAS 9.4 rule", {
   #
   n <- means_num_text
   expect_identical(n(42, 12L, NULL), "42.0000000")

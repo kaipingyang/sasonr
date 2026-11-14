@@ -101,7 +101,7 @@ data m; merge a b; by k; run;"
 })
 
 test_that("MERGE walks observations when both inputs repeat a BY group", {
-  #
+  # a many-to-many MERGE pairs the two inputs
   # observation by observation (the shorter input falls back to missing) and a
   # common non-BY variable keeps the value from the last data set named.
   code <- "data a; input k x; datalines;
@@ -198,7 +198,7 @@ test_that("the sign of zero in SUM / MEAN / MIN / MAX and PROC MEANS", {
     mn_pn = min(p,n); mn_np = min(n,p);
   run;")
   f <- res$work$f
-  #
+  # a missing argument counts as +0 for the sign
   expect_identical(hex(f$sm_mn), "0000000000000000")
   expect_identical(hex(f$sm_nm), "0000000000000000")
   expect_identical(hex(f$sm_nn), "8000000000000000")

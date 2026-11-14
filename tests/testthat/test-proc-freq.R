@@ -54,9 +54,9 @@ test_that("TABLES grouping syntax and LIST / n-way tables", {
   expect_true("s trt resp Frequency Percent Frequency Percent" %in% squish(res$listing))
 })
 
-test_that("statistics not yet supported fail loud by default", {
-  #
-  #
+test_that("unsupported statistics fail loud by default", {
+  # EXPECTED on a one-way table is accepted and ignored by SAS, so it is
+  # not in this list
   for (src in c("proc freq data=d; by s; tables trt*resp / relrisk; weight n; run;",
                 "proc freq data=d; tables trt*resp; exact relrisk; weight n; run;",
                 "proc freq data=d; tables trt*resp / noprint; output out=o n; weight n; run;",
@@ -65,7 +65,7 @@ test_that("statistics not yet supported fail loud by default", {
   }
   # plain frequency tables are unaffected; CHISQ / FISHER / BINOMIAL, the
   # RELRISK / RISKDIFF tables, the multiway CMH summary, EXACT CHISQ for a 2x2
-  #
+  # table and CHISQ / FISHER with BY groups are supported
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / out=o outpct; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq fisher; exact fisher; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt / binomial; weight n; run;")))
@@ -74,13 +74,13 @@ test_that("statistics not yet supported fail loud by default", {
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / cmh; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq; exact chisq; weight n; run;")))
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; by s; tables trt*resp / chisq fisher; weight n; run;")))
-  #
+  # CMH is supported only for the multiway summary: a two-way table request,
   # SCORES= on a two-way table and exact statistics on a multiway table fail loud
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / cmh; weight n; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq scores=rank; weight n; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq; exact fisher; weight n; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq scores=ridit; weight n; run;")), class = "sasonr_unsupported")
-  #
+  # EXACT CHISQ is supported only for the 2x2 exact enumeration
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables s*trt*resp / chisq; exact chisq; weight n; run;")), class = "sasonr_unsupported")
 })
 
@@ -101,10 +101,10 @@ run;
 proc freq data=d; weight cnt; tables trt*resp / %s; run;"
   # EXACT CHISQ enumerates integer tables only (like EXACT FISHER)
   err(sprintf(frac, "chisq; exact chisq"), "EXACT CHISQ with non-integer weights")
-  #
+  # SCORES=RANK is supported only for the multiway CMH summary without CHISQ
   err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / chisq scores=rank; run;"), "SCORES=RANK")
   err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / cmh chisq scores=rank; run;"), "SCORES=RANK")
-  #
+  # table scores of a numeric variable with the MISSING option are not supported
   miss_num <- "data d; input site $ trt $ sev w; datalines;
 1 A 1 5
 1 A 2 4
@@ -121,7 +121,7 @@ run;"
   err(paste(miss_num, "proc freq data=d; weight w; tables site*trt*sev / cmh missing; run;"), "numeric table-score")
   # EXACT CHISQ needs the asymptotic CHISQ option (the exact blocks hang off it)
   err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp; exact chisq; run;"), "EXACT CHISQ requires the CHISQ option")
-  #
+  # MISSPRINT combinations whose missing-value semantics are not supported
   err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / list missprint; run;"), "MISSPRINT with the LIST option")
   err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / missprint relrisk; run;"), "MISSPRINT with RELRISK")
   miss_2x3 <- "data d; input a $ b $ w; datalines;
@@ -145,7 +145,7 @@ B 3.5
 run;
 proc freq data=d; weight w; tables trt / binomial; exact binomial; run;",
       "EXACT BINOMIAL with non-integer weights")
-  #
+  # CMH / RELRISK / RISKDIFF are supported with integer weights only
   frac_cmh <- "data d; input site $ trt $ resp $ cnt; datalines;
 1 A Yes 5.5
 1 A No 2
@@ -161,9 +161,9 @@ proc freq data=d; weight cnt; tables site*trt*resp / %s; run;"
   err(sprintf(frac_cmh, "cmh"), "CMH statistics with non-integer weights")
   err(sprintf(frac, "relrisk"), "RELRISK / RISKDIFF with non-integer weights")
   err(sprintf(frac, "riskdiff"), "RELRISK / RISKDIFF with non-integer weights")
-  #
+  # ALPHA= is supported only for the binomial confidence limits
   err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / cmh alpha=0.1; run;"), "ALPHA= with CMH")
-  #
+  # Fisher with fractional frequencies is supported for 2x2 tables only
   frac_2x3 <- "data d; input trt $ resp $ cnt; datalines;
 A L 3.5
 A M 4.5
@@ -175,7 +175,7 @@ B H 6.5
 run;
 proc freq data=d; weight cnt; tables trt*resp / fisher; run;"
   err(frac_2x3, "FISHER with non-integer weights for a table that is not 2x2")
-  #
+  # BY groups: only the 2x2 CHISQ / FISHER listing is supported
   err(paste(freq_data, "proc freq data=d; by s; weight n; tables trt / chisq; run;"), "with BY groups")
   by_2x3 <- "data d; input site $ a $ b $ w; datalines;
 1 X P 3
@@ -197,13 +197,13 @@ A 2
 ;
 run;
 proc freq data=d; weight w; tables a; run;", "negative weights")
-  #
+  # two confidence-limit tables in one listing are not supported
   err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / relrisk(cl=(wald)) riskdiff(cl=(wald)); run;"),
       "two confidence-limit tables")
-  #
+  # EXACT RISKDIFF layout is supported only together with RISKDIFF(CL=)
   err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / riskdiff; exact riskdiff; run;"),
       "EXACT RISKDIFF without the RISKDIFF(CL=)")
-  #
+  # a zero cell with the RISKDIFF(CL=) table is not supported
   err("data d; input trt $ resp $ cnt; datalines;
 A Yes 0
 A No 6
@@ -213,7 +213,7 @@ B No 4
 run;
 proc freq data=d; weight cnt; tables trt*resp / riskdiff(cl=(wald)); run;",
       "RISKDIFF CL= with a zero cell")
-  #
+  # statistics after a LIST table are not supported
   err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / list chisq; run;"), "LIST option")
   err(paste(freq_data, "proc freq data=d; weight n; tables s*trt*resp / list cmh; run;"), "LIST option")
 })
@@ -238,7 +238,7 @@ proc freq data=d; weight cnt; tables trt*resp / chisq; run;"
 })
 
 test_that("PROC FREQ degenerate table, BY groups, EXACT CHISQ and TESTP/TESTF", {
-  #
+  # a single-row table prints no statistics block at all
   res <- sas_run("data d; input trt $ cat $ cnt; datalines;
 A X 4
 A Y 7
@@ -249,7 +249,7 @@ proc freq data=d; weight cnt; tables trt*cat / chisq; run;")
   l <- squish(res$listing)
   expect_identical(utils::tail(l, 1), "30.77 53.85 15.38 100.00")
   expect_false(any(startsWith(l, "Statistics for Table")))
-  #
+  # BY groups repeat the procedure title and print the statistics per group
   res <- sas_run("data d; input site $ trt $ resp $ cnt; datalines;
 S1 A Yes 8
 S1 A No 3
@@ -269,7 +269,7 @@ proc freq data=d; weight cnt; by site; tables trt*resp / chisq fisher; run;")
   expect_true("site=S2" %in% l)
   expect_true("Chi-Square 1 4.1958 0.0405" %in% l)
   expect_true("Chi-Square 1 0.4103 0.5218" %in% l)
-  #
+  # EXACT CHISQ adds the three exact-test blocks
   res <- sas_run("data d; input trt $ resp $ cnt; datalines;
 A Yes 12
 A No 5
@@ -284,7 +284,7 @@ proc freq data=d; weight cnt; tables trt*resp / chisq; exact chisq; run;")
   expect_true("Mantel-Haenszel Chi-Square Test" %in% l)
   expect_true("Exact Pr >= ChiSq 0.0248" %in% l)
   expect_true("Fisher's Exact Test" %in% l)
-  #
+  # one-way CHISQ(TESTP=) / CHISQ(TESTF=)
   res <- sas_run("data d; input cat $ cnt; datalines;
 A 18
 B 27
@@ -350,7 +350,7 @@ proc freq data=d; tables trt*resp / chisq missprint; run;")
 })
 
 test_that("PROC FREQ CMH summary: statistics, common OR/RR, Breslow-Day, scores", {
-  #
+  # a 2x2 table in 3 strata
   code <- "data d; input site $ trt $ resp $ cnt; datalines;
 S1 A Yes 10
 S1 A No 5
@@ -386,7 +386,7 @@ proc freq data=d; weight cnt; tables site*trt*resp / cmh; run;"
   expect_true("DF 2" %in% l)
   expect_true("Pr > ChiSq 0.9940" %in% l)
   expect_identical(utils::tail(l, 1), "Total Sample Size = 89")
-  #
+  # per-stratum CHISQ blocks
   res <- sas_run(sub("cmh", "cmh chisq", code))
   l <- squish(res$listing)
   expect_true("Statistics for Table 1 of trt by resp" %in% l)
@@ -394,7 +394,7 @@ proc freq data=d; weight cnt; tables site*trt*resp / cmh; run;"
   expect_true("Chi-Square 1 2.1429 0.1432" %in% l)
   expect_true("Sample Size = 30" %in% l)
   expect_identical(utils::tail(l, 1), "Total Sample Size = 89")
-  #
+  # SCORES=RANK: rank scores are computed within each stratum
   code2 <- "data d; input site $ dose sev cnt; datalines;
 S1 1 1 7
 S1 1 2 4
@@ -450,11 +450,9 @@ proc freq data=z; weight w / zeros; tables a*b / chisq; run;")
   expect_false(any(grepl("^Chi-Square ", res$listing)))
 })
 
-test_that("CHISQ, FISHER, CMH and BINOMIAL print the SAS 9.4 values", {
-  #
-  #
-  #
-  #
+test_that("CHISQ, FISHER, CMH and BINOMIAL listing lines", {
+  # the expected listing lines (compared with runs of blanks squished); strict
+  # mode: the statistics are supported in the registry
   has <- function(res, lines) for (l in lines) expect_true(squish(l) %in% squish(res$listing), info = l)
   r1 <- sas_run("data d; input trt $ resp $ cnt; datalines;
 A Yes 12

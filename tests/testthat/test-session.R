@@ -1,4 +1,4 @@
-#
+# SasSession: run state lives in a session object; successive
 #
 # session; nothing a run changes is package-global.
 
@@ -169,7 +169,7 @@ test_that("the SQL connection is opened on first use and closed with the session
   expect_false(DBI::dbIsValid(seen))
 })
 
-test_that("function-layer calls outside a run have no hidden state (spec 04 §4.7)", {
+test_that("function-layer calls outside a run have no hidden state", {
   expect_null(sasonr:::sas_rt_active())
   # diagnostics go to a throw-away state: nothing persists between calls
   rt1 <- sasonr:::rt_diag()

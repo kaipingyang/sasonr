@@ -4,8 +4,7 @@
 # Windows UCRT is only correctly rounded up to about 17 significant digits
 # (123456789012345 = 1.23456789012345E14 prints as ...4499999... beyond that),
 # so a sprintf-based E-notation tie detection silently rounded on Windows
-#
-# expansion of R/rounding.R).
+# (fixed in the exact-bit expansion of R/rounding.R).
 
 test_that("the exact decimal expansion of a double is the same on every platform", {
   sig <- sasonr:::exact_significant_digits

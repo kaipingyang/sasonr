@@ -148,7 +148,7 @@ data s; set a; by g; if first.g then n = 0; n + v; if last.g then output; run;
 
 test_that("listing layout options fail loud only when procedure output is written under them", {
   prt <- "data a; do x = 1 to 20; output; end; run; proc print data = a; run;"
-  #
+  # the supported layout, and other values while no output is written
   r <- sas_run(paste("options nocenter nodate nonumber pageno = 1 ps = max formdlim = ' ';", prt))
   expect_identical(r$status, "ok")
   expect_identical(sas_run("options center date number ps = 15 formdlim = '-'; data a; x = 1; run;")$status, "ok")

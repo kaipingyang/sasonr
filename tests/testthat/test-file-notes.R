@@ -1,5 +1,4 @@
-#
-#
+# FILE statement, LINESIZE and log NOTEs.
 
 # run in a fresh temporary working directory (removed when the test ends)
 withr_local_dir <- function(env = parent.frame()) {

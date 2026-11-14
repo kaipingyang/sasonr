@@ -88,7 +88,7 @@ test_that("character macro functions", {
 
 test_that("%SYSFUNC supports a small function set and formats", {
   today <- toupper(format(Sys.Date(), "%d%b%Y"))
-  #
+  # TODAY() is supported in the DATA step only: in %SYSFUNC it is gated
   expect_error(mlog("%put %sysfunc(today(), date9.);"), class = "sasonr_strict_error")
   withr::with_options(list(sasonr.strict = FALSE), {
     expect_identical(withCallingHandlers(mlog("%put %sysfunc(today(), date9.);"),
@@ -197,9 +197,8 @@ test_that("global statements take effect before the macro code that follows them
   note <- paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
                 "The result of the operations have been set to a missing value.")
   # a global statement applies to the macro code after it with
-  #
-  #
-  #
+  # no step boundary in between, and the %SYSFUNC NOTE written at
+  # LINESIZE=MAX is one line
   expect_identical(sas_run("options linesize=max;\n%let d = %sysfunc(mdy(2, 30, 2024));")$log, note)
   expect_identical(sas_run("%macro m; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); %mend; %m")$log, note)
   # PROC SQL runs its statements one by one
@@ -259,22 +258,22 @@ test_that("the %SYSFUNC NOTE fails loud where the options in effect are not know
   }
   # an OPTIONS statement of the step that does not parse before the step runs
   expect_error(sas_run(in_step("options minoperator;")), class = "sasonr_unsupported", regexp = "not supported")
-  #
+  # inside a step only LINESIZE=MAX and NONOTES are supported
   expect_error(sas_run(in_step("options linesize=100;")), class = "sasonr_unsupported", regexp = "not supported")
   expect_error(sas_run(in_step("options nonotes notes;")), class = "sasonr_unsupported", regexp = "not supported")
 })
 
 test_that("positive and negative system options apply in the order written", {
   withr::local_options(sasonr.step_notes = TRUE)
-  #
+  # the last of NOTES / NONOTES wins
   r <- sas_run("options notes nonotes; data a; x = 1; run; options nonotes notes; data b; x = 1; run;")
   expect_identical(r$log, "NOTE: The data set WORK.B has 1 observations and 1 variables.")
-  #
+  # NOSYNTAXCHECK wins, the step after the ERROR runs
   r <- sas_run("options syntaxcheck nosyntaxcheck; data a; x = 1; run; data b; set a y = 2; run;
     data c; x = 1; run;", on_error = "sas")
   expect_identical(r$status, "error")
   expect_identical(nrow(r$work$c), 1L)
-  #
+  # CENTER wins (centred listings fail loud)
   expect_error(sas_run("data a; x = 1; run; options nocenter center; proc print data=a; run;"),
                class = "sasonr_unsupported", regexp = "CENTER")
   expect_no_error(sas_run("data a; x = 1; run; options center nocenter date nodate number nonumber; proc print data=a; run;"))

@@ -21,7 +21,7 @@ test_that("numeric formats follow the SAS width ladder", {
   expect_equal(fmt(-1234, "negparen8."), " (1,234)")
   expect_equal(fmt(123.456, "e12."), " 1.23456E+02")
   expect_equal(fmt(0.00001, "pvalue6.4"), "<.0001")
-  expect_equal(fmt(NA_real_, "8.2"), "     .  ") #
+  expect_equal(fmt(NA_real_, "8.2"), "     .  ") # the missing value sits in the units column
 })
 
 test_that("date, time and datetime formats", {
@@ -249,12 +249,12 @@ run;")
 })
 
 test_that("$HEX informat turns hex digit pairs into bytes", {
-  #
+  # the result bytes as hex
   hx <- function(code) toupper(paste(as.character(charToRaw(sas_run(code)$work$a$r)), collapse = ""))
-  expect_identical(hx("data a; r = input('414243', $hex4.); run;"), "4142")     # HEXC_IN_811a08
-  expect_identical(hx("data a; r = input('414243', $hex6.); run;"), "414243")   # HEXC_IN_8df8bd
-  expect_identical(hx("data a; r = input('4', $hex2.); run;"), "40")            # HEXC_IN_cafcdd: odd digit count
-  # invalid hex digits: a blank, _ERROR_ and the INPUT NOTE (HEXC_IN_05b3ab)
+  expect_identical(hx("data a; r = input('414243', $hex4.); run;"), "4142")
+  expect_identical(hx("data a; r = input('414243', $hex6.); run;"), "414243")
+  expect_identical(hx("data a; r = input('4', $hex2.); run;"), "40")            # odd digit count
+  # invalid hex digits: a blank, _ERROR_ and the INPUT NOTE
   withr::local_options(sasonr.on_error = "sas")
   res <- sas_run("data a; r = input('ZZ', $hex2.); e = _error_; run;")
   expect_identical(sub(" +$", "", res$work$a$r), "")
