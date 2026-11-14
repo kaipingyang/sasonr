@@ -231,8 +231,17 @@ sas_pow <- function(a, b, .at = NULL, .exact = TRUE) {
   # ** records its place also when an operand is a generated missing value
   # ((a + b) ** 2)
   if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
-  out <- sas_num(a^b, .at)
-  out[is.na(a) | is.na(b) | (a == 0 & b <= 0)] <- NA_real_ # 0**0 and 0**-n are missing
+  # 0**0 and 0**-n: an invalid argument (NOTE, _ERROR_) and a mathematical
+  # operation that could not be performed at the place of the operator
+  bad <- !is.na(a) & !is.na(b) & a == 0 & b <= 0
+  if (any(bad)) {
+    rt_error(paste0("NOTE: Invalid argument(s) to the exponential operator \"**\"", at_text(.at), "."))
+    note_math(.at, sum(bad))
+  }
+  x <- a^b
+  x[rep_len(bad, length(x))] <- NA_real_
+  out <- sas_num(x, .at)
+  out[is.na(a) | is.na(b)] <- NA_real_
   out
 }
 

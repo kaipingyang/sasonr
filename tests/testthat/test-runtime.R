@@ -231,3 +231,14 @@ proc sql; create table s as select a, a between 3 and 1 as r, a not between 3 an
   expect_identical(r$work$s$r, c(1, 1, 1, 0))
   expect_identical(r$work$s$n, c(0, 0, 0, 1))
 })
+
+test_that("0 ** 0 and 0 ** -1 are invalid arguments of **: NOTE, _ERROR_, missing result", {
+  old <- options(sasonr.step_notes = TRUE)
+  on.exit(options(old))
+  r <- sas_run("data t; a = 0; b = 0; c = -1; x = a ** b; y = a ** c; z = 2 ** c; run;")
+  expect_true(is.na(r$work$t$x) && is.na(r$work$t$y))
+  expect_identical(r$work$t$z, 0.5)
+  expect_true(any(startsWith(r$log, "NOTE: Invalid argument(s) to the exponential operator \"**\" at line 1 column")))
+  expect_true(any(startsWith(r$log, "NOTE: Mathematical operations could not be performed")))
+  expect_true(any(grepl("_ERROR_=1", r$log, fixed = TRUE)))
+})
