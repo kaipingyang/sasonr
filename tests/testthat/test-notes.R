@@ -160,3 +160,13 @@ test_that("WHERE conditions write no missing-value NOTE and no NOTE for invalid 
   expect_true(any(startsWith(r$log, "NOTE: Missing values were generated")))
   expect_true(any(startsWith(r$log, "NOTE: Invalid argument(s) to the exponential operator")))
 })
+
+test_that("WHERE conditions drop function data-error NOTEs; a division by zero fails loud", {
+  withr::local_options(sasonr.strict = FALSE)
+  r <- run_notes(c("data a; x = -1; v = .; run;", "data w; set a; where sqrt(x) = v; e = _error_; run;"))
+  expect_false(any(grepl("Invalid argument to function SQRT", r$log, fixed = TRUE)))
+  expect_identical(nrow(r$work$w), 1L)
+  expect_identical(r$work$w$e, 0)
+  expect_error(run_notes(c("data a; x = 0; v = .; run;", "data w; set a; where 1 / x = v; run;")),
+               class = "sasonr_unsupported")
+})

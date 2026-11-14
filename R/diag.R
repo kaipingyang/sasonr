@@ -83,27 +83,29 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
 
 #' Value of a WHERE condition
 #'
-#' The WHERE processor writes no "Missing values were generated" NOTE and no
-#' NOTE for invalid arguments of `**`, and sets no `_ERROR_` for them: those
-#' records of the condition's evaluation are dropped; any other data error it
-#' records is kept.
+#' The WHERE processor writes no data-error NOTE (missing values generated,
+#' invalid arguments of functions and of `**`, invalid numeric data,
+#' mathematical operations that could not be performed) and sets no
+#' `_ERROR_`: those records of the condition's evaluation are dropped.  An
+#' ERROR message of a function is kept as recorded; a division by zero is not
+#' supported.
 #' @export
 #' @keywords internal
 sas_where_cond <- function(x) {
   rt <- rt_diag()
   saved <- list(err = rt$err, notes = rt$notes, mv = rt$mv, math = rt$math, mv_rerun = rt$mv_rerun)
   force(x)
-  added <- if (length(rt$notes) > length(saved$notes)) rt$notes[-seq_along(saved$notes)] else character()
-  pow <- startsWith(added, "NOTE: Invalid argument(s) to the exponential operator")
+  n0 <- length(saved$notes)
+  added <- if (length(rt$notes) > n0) rt$notes[(n0 + 1L):length(rt$notes)] else character()
+  if (any(startsWith(added, "ERROR"))) return(x)
+  if (any(startsWith(added, "NOTE: Division by zero detected"))) {
+    abort_unsupported("a division by zero in a WHERE condition")
+  }
+  rt$notes <- saved$notes
+  rt$math <- saved$math
   rt$mv <- saved$mv
   rt$mv_rerun <- saved$mv_rerun
-  if (all(pow)) {
-    rt$notes <- saved$notes
-    rt$math <- saved$math
-    rt$err <- saved$err
-  } else if (any(pow)) {
-    abort_unsupported("a WHERE condition with invalid arguments of ** and other data errors")
-  }
+  rt$err <- saved$err
   x
 }
 
