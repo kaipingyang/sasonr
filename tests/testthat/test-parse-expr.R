@@ -62,3 +62,101 @@ test_that("literals are typed", {
 test_that("macro references fail loud", {
   expect_error(sas_parse_expr("&x + 1"), class = "sasonr_unsupported")
 })
+
+# The operator table (operators.R): DATA step, WHERE and PROC SQL
+pw <- function(code) px(code, where = TRUE)
+psql <- function(code) {
+  p <- new_parser(sas_lex(code))
+  e <- parse_sql_expr(p)
+  if (!at_eof(p)) abort_syntax(paste("unexpected", tok_desc(p)), tk_line(p))
+  expr_to_sexpr(e)
+}
+
+test_that("IN binds tighter than the other comparison operators", {
+  expect_equal(px("a <= b in (0, 5)"), "(<= a (in b 0 5))")
+  expect_equal(px("a = b in (0, 1)"), "(= a (in b 0 1))")
+  expect_equal(px("a in (3, 4) < c"), "(< (in a 3 4) c)")
+  expect_equal(px("a in (3, 4) in (0)"), "(in (in a 3 4) 0)")
+  expect_equal(px("a + b in (2, 4)"), "(in (+ a b) 2 4)")
+  expect_equal(px("a || b in ('ab')"), "(in (|| a b) 'ab')")
+  expect_equal(px("a < b in (1) < c"), "(chain < < a (in b 1) c)")
+  expect_equal(px("a ne b not in (1)"), "(^= a (not-in b 1))")
+})
+
+test_that("an IN list is no left operand of an operator that binds tighter", {
+  for (op in c("**", "><", "<>", "*", "/", "+", "-", "||")) {
+    expect_error(sas_parse_expr(paste("a in (1, 2)", op, "c")), class = "sasonr_syntax_error")
+  }
+  expect_equal(px("a in (1, 2) and c"), "(and (in a 1 2) c)")
+})
+
+test_that("group 1 groups right to left, the prefix operators included", {
+  expect_equal(px("a ** -b ** c"), "(** a (neg (** b c)))")
+  expect_equal(px("-3 >< -3"), "(neg (min 3 (neg 3)))")
+  expect_equal(px("a >< b <> c"), "(min a (max b c))")
+  expect_equal(px("a ** b >< c"), "(** a (min b c))")
+  expect_equal(px("not a ** b"), "(not (** a b))")
+  expect_equal(px("not a = b"), "(= (not a) b)")
+  expect_equal(px("a = not b"), "(= a (not b))")
+  expect_equal(px("- not a + b"), "(+ (neg (not a)) b)")
+  expect_equal(px("- + a"), "(neg (+ a))")
+  expect_equal(px("a min b + c"), "(+ (min a b) c)")
+})
+
+test_that("chains of comparison operators", {
+  expect_equal(px("a < b < c < d"), "(chain < < < a b c d)")
+  expect_equal(px("a = b = c"), "(chain = = a b c)")
+  expect_equal(px("a lt b le c"), "(chain < <= a b c)")
+  expect_equal(px("(a < b) < c"), "(< (< a b) c)")
+  expect_equal(px("a < b + c < d"), "(chain < < a (+ b c) d)")
+})
+
+test_that("WHERE: a condition is no operand of a comparison or of another condition", {
+  for (e in c("a < b in (0)", "a in (0) < b", "a in (0) in (1)", "a < b like 'x%'", "a like 'x%' = b",
+              "a between 1 and 2 < c", "a < b < c in (0)", "a is missing = 1", "a in (0) + b", "a ? 'b' = c")) {
+    expect_error(sas_parse_expr(e, where = TRUE), class = "sasonr_syntax_error")
+  }
+  expect_equal(pw("a < b < c"), "(chain < < a b c)")
+  expect_equal(pw("a between b and c - d"), "(between a b (- c d))")
+  expect_equal(pw("a between b and c and d"), "(and (between a b c) d)")
+  expect_equal(pw("a <> b < c"), "(chain ^= < a b c)")
+})
+
+test_that("WHERE: prefix signs bind tighter than **, ** tighter than MIN and MAX", {
+  expect_equal(pw("-a ** b"), "(** (neg a) b)")
+  expect_equal(pw("a ** - b ** c"), "(** a (** (neg b) c))")
+  expect_equal(pw("- a min b"), "(min (neg a) b)")
+  expect_equal(pw("a ** b min c"), "(min (** a b) c)")
+  expect_equal(pw("a min b max c"), "(max (min a b) c)")
+  expect_equal(pw("a * b min c"), "(* a (min b c))")
+  expect_equal(pw("not a ** b"), "(not (** a b))")
+  expect_equal(pw("not a min b"), "(not (min a b))")
+  expect_equal(pw("not a * b"), "(* (not a) b)")
+  expect_equal(pw("not a = b"), "(= (not a) b)")
+  expect_equal(pw("a = not b"), "(= a (not b))")
+  expect_equal(pw("- - a"), "(neg (neg a))")
+  expect_equal(pw("not - a"), "(not (neg a))")
+  for (e in c("a * not b", "a ** not b", "not not a", "- not a", "- + a", "+ - a")) {
+    expect_error(sas_parse_expr(e, where = TRUE), class = "sasonr_syntax_error")
+  }
+})
+
+test_that("PROC SQL: NOT takes a comparison; the conditions stand alone", {
+  expect_equal(psql("not a = b"), "(not (= a b))")
+  expect_equal(psql("^ a = b"), "(not (= a b))")
+  expect_equal(psql("not a ** b"), "(not (** a b))")
+  expect_equal(psql("not a and b"), "(and (not a) b)")
+  expect_equal(psql("not a in (1, 2)"), "(not (in a 1 2))")
+  expect_equal(psql("a & not b"), "(and a (not b))")
+  expect_equal(psql("-a ** b"), "(neg (** a b))")
+  expect_equal(psql("a ** b ** c"), "(** a (** b c))")
+  expect_equal(psql("a < b < c"), "(chain < < a b c)")
+  expect_equal(psql("a = b = c"), "(chain = = a b c)")
+  expect_equal(psql("a between b and c - d"), "(between a b (- c d))")
+  expect_equal(psql("a like b || c"), "(like a (|| b c))")
+  expect_equal(psql("a || b in ('ab')"), "(in (|| a b) 'ab')")
+  for (e in c("a < b in (0)", "a in (0) < b", "a in (0) in (1)", "a in (0) + b", "a like b = c", "a < b between 1 and 2",
+              "a = not b", "not not a", "- not a", "- + a", "a is missing = 1")) {
+    expect_error(psql(e), class = "sasonr_syntax_error")
+  }
+})

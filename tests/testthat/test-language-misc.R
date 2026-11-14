@@ -79,3 +79,11 @@ x 60
 proc freq data=d; tables t*a / nopercent norow nocol; format a g.; run;")
   expect_true(any(grepl("|  50+   |", res$listing, fixed = TRUE)))
 })
+
+test_that("IN binds tighter than the other comparison operators", {
+  r <- sas_run("data t; a = 0; b = 2; x = a <= b in (0, 5); a = 0; b = 0; y = a = b in (0, 1); z = a in (0) < b + 1; run;")
+  expect_identical(r$work$t$x, 1)
+  expect_identical(r$work$t$y, 0)
+  expect_identical(r$work$t$z, 0)
+  expect_error(sas_run("data t; a = 0; c = 1; x = a in (0, 1) + c; run;"), class = "sasonr_syntax_error")
+})

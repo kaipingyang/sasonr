@@ -694,29 +694,27 @@ parse_sql_modify_col <- function(p) {
 
 # Expressions -----------------------------------------------------------------
 
+# The Pratt loop of PROC SQL expressions: binding powers, chains and the
+# rules of conditions and prefix operators come from the operator table of
+# operators.R (context "sql"; shared with the DATA step parser).
 parse_sql_expr <- function(p, min_bp = 1L) {
-  lhs <- parse_sql_prefix(p)
-  chain_rhs <- NULL
+  lhs <- parse_sql_prefix(p, min_bp)
+  last_cmp <- FALSE
+  st <- list(cond_bp = NA_integer_, used = "")
   repeat {
-    line <- tk_line(p)
-    col <- tk_col(p)
-    # NOT IN / NOT BETWEEN / NOT LIKE / NOT CONTAINS
-    if (is_kw(p, "not") && is_kw(p, c("in", "between", "like", "contains"), 1L) && min_bp <= 3L) {
-      advance(p)
-      lhs <- parse_sql_postfix(p, lhs, tk_low(p), TRUE, line)
-      next
-    }
-    if (is_kw(p, c("in", "between", "like", "contains", "is")) && min_bp <= 3L) {
-      lhs <- parse_sql_postfix(p, lhs, tk_low(p), FALSE, line)
-      next
-    }
-    if (is_op(p, "?") && min_bp <= 3L) {
-      advance(p)
-      lhs <- list(node = "contains", lhs = lhs, rhs = parse_sql_expr(p, 4L), negate = FALSE, line = line)
-      next
-    }
     info <- sql_peek_infix(p)
     if (is.null(info) || info$bp < min_bp) break
+    sas_op_check(st, info, p)
+    line <- tk_line(p)
+    col <- tk_col(p)
+    if (info$cond) {
+      # NOT IN / NOT BETWEEN / NOT LIKE / NOT CONTAINS
+      if (info$negate) advance(p)
+      lhs <- parse_sql_postfix(p, lhs, info, line)
+      last_cmp <- FALSE
+      st <- sas_op_after(info)
+      next
+    }
     advance(p, info$ntok)
     if (info$kind == "cmp") {
       if (is_kw(p, c("any", "all", "some")) && tk_type(p, 1L) == "lparen") {
@@ -725,22 +723,26 @@ parse_sql_expr <- function(p, min_bp = 1L) {
         q <- parse_sql_query(p)
         expect_type(p, "rparen", "')'")
         lhs <- list(node = "quant", op = info$op, quant = quant, lhs = lhs, query = q, line = line)
+        last_cmp <- FALSE
+        st <- sas_op_after(info)
         next
       }
-      rhs <- parse_sql_expr(p, 4L)
-      cmp <- list(node = "compare", op = sub(":", "", info$op, fixed = TRUE), colon = endsWith(info$op, ":"),
-                  lhs = if (is.null(chain_rhs)) lhs else chain_rhs, rhs = rhs, line = line)
-      # a <= b <= c is (a <= b) and (b <= c), as in the DATA step
-      lhs <- if (is.null(chain_rhs)) cmp else list(node = "binary", op = "and", lhs = lhs, rhs = cmp, line = line, col = col)
-      chain_rhs <- rhs
+      rhs <- parse_sql_expr(p, info$bp + 1L)
+      lhs <- sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp)
+      last_cmp <- TRUE
+      st <- sas_op_after(info)
       next
     }
-    chain_rhs <- NULL
+    last_cmp <- FALSE
     rhs <- parse_sql_expr(p, if (info$right) info$bp else info$bp + 1L)
     lhs <- list(node = "binary", op = info$op, lhs = lhs, rhs = rhs, line = line, col = col)
+    st <- sas_op_after(info)
   }
   lhs
 }
+
+# truncated string comparison operators (EQT ...)
+sql_trunc_ops <- c(eqt = "=:", net = "^=:", ltt = "<:", let = "<=:", gtt = ">:", get = ">=:")
 
 sql_peek_infix <- function(p) {
   t <- tk_type(p)
@@ -748,38 +750,51 @@ sql_peek_infix <- function(p) {
     v <- tk_val(p)
     if (v == "=" && is_op(p, "*", 1L) && tk_adjacent(p, 0L, 1L)) abort_unsupported("the sounds-like operator =*", tk_line(p))
     base <- sub(":", "", v, fixed = TRUE)
-    if (base %in% cmp_ops) return(infix("cmp", v, 3L))
+    if (base %in% cmp_ops) return(sas_infix("cmp", v, "cmp", "sql"))
     return(switch(v,
-      "|" = infix("binary", "or", 1L),
-      "&" = infix("binary", "and", 2L),
-      "||" = infix("binary", "||", 4L),
-      "+" = infix("binary", "+", 5L),
-      "-" = infix("binary", "-", 5L),
-      "*" = infix("binary", "*", 6L),
-      "/" = infix("binary", "/", 6L),
-      "**" = infix("binary", "**", 7L, right = TRUE),
-      "<>" = infix("cmp", "^=", 3L),
+      "|" = sas_infix("binary", "or", "or", "sql"),
+      "&" = sas_infix("binary", "and", "and", "sql"),
+      "||" = ,
+      "+" = ,
+      "-" = ,
+      "*" = ,
+      "/" = ,
+      "**" = sas_infix("binary", v, v, "sql"),
+      "<>" = sas_infix("cmp", "^=", "cmp", "sql"),
       "><" = abort_syntax("The >< (MIN) operator is not valid in PROC SQL.", tk_line(p)),
+      "?" = sas_infix("contains", "contains", "contains", "sql"),
       NULL
     ))
   }
   if (t != "name") return(NULL)
   low <- tk_low(p)
-  if (low %in% names(mnemonic_cmp)) return(infix("cmp", mnemonic_cmp[[low]], 3L))
-  trunc_ops <- c(eqt = "=:", net = "^=:", ltt = "<:", let = "<=:", gtt = ">:", get = ">=:")
-  if (low %in% names(trunc_ops)) return(infix("cmp", trunc_ops[[low]], 3L))
+  if (low %in% names(mnemonic_cmp)) return(sas_infix("cmp", mnemonic_cmp[[low]], "cmp", "sql"))
+  if (low %in% names(sql_trunc_ops)) return(sas_infix("cmp", sql_trunc_ops[[low]], "cmp", "sql"))
   switch(low,
-    or = infix("binary", "or", 1L),
-    and = infix("binary", "and", 2L),
+    or = sas_infix("binary", "or", "or", "sql"),
+    and = sas_infix("binary", "and", "and", "sql"),
     # the MIN / MAX word operators (a min b) are accepted by PROC SQL, not implemented
     min = ,
     max = abort_unsupported(paste0("the ", toupper(low), " operator in PROC SQL"), tk_line(p)),
+    "in" = ,
+    between = ,
+    like = ,
+    contains = ,
+    is = sas_infix(low, low, low, "sql"),
+    not = if (is_kw(p, c("in", "between", "like", "contains"), 1L)) {
+      nxt <- tk_low(p, 1L)
+      sas_infix(nxt, nxt, nxt, "sql", ntok = 2L, negate = TRUE)
+    },
     NULL
   )
 }
 
-parse_sql_postfix <- function(p, lhs, op, negate, line) {
-  force(op)
+# A condition (IN, BETWEEN-AND, LIKE, CONTAINS, IS): `info` from sql_peek_infix(),
+# at its keyword (after a NOT).  The operands bind tighter than the condition.
+parse_sql_postfix <- function(p, lhs, info, line) {
+  op <- info$kind
+  negate <- info$negate
+  obp <- info$bp + 1L
   advance(p)
   switch(op,
     "in" = {
@@ -791,7 +806,7 @@ parse_sql_postfix <- function(p, lhs, op, negate, line) {
       }
       items <- list()
       repeat {
-        items <- c(items, list(parse_sql_expr(p, 4L)))
+        items <- c(items, list(parse_sql_expr(p, obp)))
         if (tk_type(p) != "comma") break
         advance(p)
       }
@@ -799,21 +814,21 @@ parse_sql_postfix <- function(p, lhs, op, negate, line) {
       list(node = "in_list", lhs = lhs, items = items, negate = negate, line = line)
     },
     between = {
-      lo <- parse_sql_expr(p, 4L)
+      lo <- parse_sql_expr(p, obp)
       expect_kw(p, "and")
-      hi <- parse_sql_expr(p, 4L)
+      hi <- parse_sql_expr(p, obp)
       list(node = "between", lhs = lhs, lo = lo, hi = hi, negate = negate, line = line)
     },
     like = {
-      rhs <- parse_sql_expr(p, 4L)
+      rhs <- parse_sql_expr(p, obp)
       esc <- NULL
       if (is_kw(p, "escape")) {
         advance(p)
-        esc <- parse_sql_expr(p, 4L)
+        esc <- parse_sql_expr(p, obp)
       }
       list(node = "like", lhs = lhs, rhs = rhs, escape = esc, negate = negate, line = line)
     },
-    contains = list(node = "contains", lhs = lhs, rhs = parse_sql_expr(p, 4L), negate = negate, line = line),
+    contains = list(node = "contains", lhs = lhs, rhs = parse_sql_expr(p, obp), negate = negate, line = line),
     is = {
       neg <- FALSE
       if (is_kw(p, "not")) {
@@ -827,7 +842,10 @@ parse_sql_postfix <- function(p, lhs, op, negate, line) {
   )
 }
 
-parse_sql_prefix <- function(p) {
+parse_sql_prefix <- function(p, min_bp = 1L) {
+  # the prefix sign right before this operand (two signs in a row)
+  sign <- p$prefix_sign
+  p$prefix_sign <- NULL
   t <- tk_type(p)
   line <- tk_line(p)
   col <- tk_col(p)
@@ -846,8 +864,11 @@ parse_sql_prefix <- function(p) {
   }
   if (t == "op" && tk_val(p) %in% c("-", "+", "^")) {
     v <- tk_val(p)
+    name <- switch(v, "-" = "neg", "+" = "pos", "^" = "not")
+    o <- sas_prefix_op(name, "sql", min_bp, p, sign)
     advance(p)
-    arg <- parse_sql_expr(p, 7L)
+    if (name != "not") p$prefix_sign <- name
+    arg <- parse_sql_expr(p, o$bp)
     return(list(node = "unary", op = if (v == "^") "not" else v, arg = arg, line = line, col = col))
   }
   if (t == "missing" || (t == "dot" && !(tk_type(p, 1L) == "name" && tk_adjacent(p, 0L, 1L)))) {
@@ -858,8 +879,9 @@ parse_sql_prefix <- function(p) {
   if (t != "name") return(parse_prefix(p))
   low <- tk_low(p)
   if (low == "not") {
+    o <- sas_prefix_op("not", "sql", min_bp, p)
     advance(p)
-    return(list(node = "unary", op = "not", arg = parse_sql_expr(p, 3L), line = line, col = col))
+    return(list(node = "unary", op = "not", arg = parse_sql_expr(p, o$bp), line = line, col = col))
   }
   if (low == "exists" && tk_type(p, 1L) == "lparen") {
     advance(p, 2L)

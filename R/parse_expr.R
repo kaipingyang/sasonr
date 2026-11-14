@@ -1,10 +1,7 @@
-# Pratt (precedence-climbing) expression parser for SAS expressions.
-#
-# Binding powers follow the documented operator precedence (Table 6.6 of
-# SAS 9.4 Language Reference: Concepts; larger binds tighter):
-#   1 OR |          2 AND &          3 comparisons, IN (chains allowed)
-#   4 ||            5 + -            6 * /
-#   7 Group I: ** >< <> and prefix + - NOT (right associative)
+# Pratt (precedence-climbing) expression parser for SAS expressions of the
+# DATA step and of WHERE.  Binding powers, associativity, comparison chains and
+# the rules of conditions and prefix operators come from the operator table of
+# operators.R (shared with the PROC SQL parser, sql_parse.R).
 
 # Parser state ------------------------------------------------------------
 
@@ -110,30 +107,30 @@ sas_parse_expr <- function(text, where = FALSE) {
 cmp_ops <- c("=", "^=", "<", "<=", ">", ">=")
 mnemonic_cmp <- c(eq = "=", ne = "^=", lt = "<", le = "<=", gt = ">", ge = ">=")
 
-infix <- function(kind, op, bp, right = FALSE, ntok = 1L, negate = FALSE) {
-  list(kind = kind, op = op, bp = bp, right = right, ntok = ntok, negate = negate)
-}
+# The context of the operator table for a parser state.
+expr_ctx <- function(p) if (isTRUE(p$where_ctx)) "where" else "data"
 
 peek_infix <- function(p) {
+  ctx <- expr_ctx(p)
   t <- tk_type(p)
   if (t == "op") {
     v <- tk_val(p)
     base <- sub(":", "", v, fixed = TRUE)
-    if (base %in% cmp_ops) return(infix("cmp", v, 3L))
+    if (base %in% cmp_ops) return(sas_infix("cmp", v, "cmp", ctx))
     return(switch(v,
-      "|" = infix("binary", "or", 1L),
-      "&" = infix("binary", "and", 2L),
-      "||" = infix("binary", "||", 4L),
-      "+" = infix("binary", "+", 5L),
-      "-" = infix("binary", "-", 5L),
-      "*" = infix("binary", "*", 6L),
-      "/" = infix("binary", "/", 6L),
-      "**" = infix("binary", "**", 7L, right = TRUE),
+      "|" = sas_infix("binary", "or", "or", ctx),
+      "&" = sas_infix("binary", "and", "and", ctx),
+      "||" = ,
+      "+" = ,
+      "-" = ,
+      "*" = ,
+      "/" = ,
+      "**" = sas_infix("binary", v, v, ctx),
       "><" = if (p$where_ctx) {
         abort_unsupported("the >< operator in a WHERE expression", tk_line(p))
-      } else infix("binary", "min", 7L, right = TRUE),
-      "<>" = if (p$where_ctx) infix("cmp", "^=", 3L) else infix("binary", "max", 7L, right = TRUE),
-      "?" = if (p$where_ctx) infix("contains", "contains", 3L) else NULL, # WHERE: ? is CONTAINS
+      } else sas_infix("binary", "min", "min", ctx),
+      "<>" = if (p$where_ctx) sas_infix("cmp", "^=", "cmp", ctx) else sas_infix("binary", "max", "max", ctx),
+      "?" = if (p$where_ctx) sas_infix("contains", "contains", "contains", ctx) else NULL, # WHERE: ? is CONTAINS
       NULL
     ))
   }
@@ -142,57 +139,50 @@ peek_infix <- function(p) {
   if (low %in% names(mnemonic_cmp)) {
     # GE: / EQ: ... the colon modifier on a mnemonic operator (prefix compare)
     if (tk_type(p, 1L) == "op" && identical(tk_val(p, 1L), ":")) {
-      return(infix("cmp", paste0(mnemonic_cmp[[low]], ":"), 3L, ntok = 2L))
+      return(sas_infix("cmp", paste0(mnemonic_cmp[[low]], ":"), "cmp", ctx, ntok = 2L))
     }
-    return(infix("cmp", mnemonic_cmp[[low]], 3L))
+    return(sas_infix("cmp", mnemonic_cmp[[low]], "cmp", ctx))
   }
   switch(low,
-    or = infix("binary", "or", 1L),
-    and = infix("binary", "and", 2L),
-    min = infix("binary", "min", 7L, right = TRUE),
-    max = infix("binary", "max", 7L, right = TRUE),
-    "in" = infix("in", "in", 3L),
+    or = sas_infix("binary", "or", "or", ctx),
+    and = sas_infix("binary", "and", "and", ctx),
+    min = sas_infix("binary", "min", "min", ctx),
+    max = sas_infix("binary", "max", "max", ctx),
+    "in" = sas_infix("in", "in", "in", ctx),
     not = {
       nxt <- tk_low(p, 1L)
       if (tk_type(p, 1L) != "name") return(NULL)
-      if (nxt == "in") return(infix("in", "in", 3L, ntok = 2L, negate = TRUE))
+      if (nxt == "in") return(sas_infix("in", "in", "in", ctx, ntok = 2L, negate = TRUE))
       if (p$where_ctx && nxt %in% c("between", "contains", "like")) {
-        return(infix(nxt, nxt, 3L, ntok = 2L, negate = TRUE))
+        return(sas_infix(nxt, nxt, nxt, ctx, ntok = 2L, negate = TRUE))
       }
       NULL
     },
     between = ,
     contains = ,
-    like = if (p$where_ctx) infix(low, low, 3L) else NULL,
-    is = if (p$where_ctx) infix("is", "is", 3L) else NULL,
+    like = if (p$where_ctx) sas_infix(low, low, low, ctx) else NULL,
+    is = if (p$where_ctx) sas_infix("is", "is", "is", ctx) else NULL,
     NULL
   )
 }
 
 parse_expr <- function(p, min_bp = 1L) {
-  lhs <- parse_prefix(p)
+  lhs <- parse_prefix(p, min_bp)
   last_cmp <- FALSE
+  st <- list(cond_bp = NA_integer_, used = "")
   repeat {
     info <- peek_infix(p)
     if (is.null(info) || info$bp < min_bp) break
+    sas_op_check(st, info, p)
     line <- tk_line(p)
     col <- tk_col(p)
     advance(p, info$ntok)
 
     if (info$kind == "cmp") {
-      rhs <- parse_expr(p, 4L)
-      colon <- endsWith(info$op, ":")
-      op <- sub(":", "", info$op, fixed = TRUE)
-      chainable <- last_cmp && !colon && !isTRUE(lhs$colon)
-      if (chainable && lhs$node == "compare") {
-        lhs <- list(node = "chain", ops = c(lhs$op, op), args = list(lhs$lhs, lhs$rhs, rhs), line = lhs$line)
-      } else if (chainable && lhs$node == "chain") {
-        lhs$ops <- c(lhs$ops, op)
-        lhs$args <- c(lhs$args, list(rhs))
-      } else {
-        lhs <- list(node = "compare", op = op, colon = colon, lhs = lhs, rhs = rhs, line = line)
-      }
+      rhs <- parse_expr(p, info$bp + 1L)
+      lhs <- sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp)
       last_cmp <- TRUE
+      st <- sas_op_after(info)
       next
     }
     last_cmp <- FALSE
@@ -204,13 +194,13 @@ parse_expr <- function(p, min_bp = 1L) {
       },
       "in" = parse_in_list(p, lhs, info$negate, line),
       between = {
-        lo <- parse_expr(p, 4L)
+        lo <- parse_expr(p, info$bp + 1L)
         expect_kw(p, "and")
-        hi <- parse_expr(p, 4L)
+        hi <- parse_expr(p, info$bp + 1L)
         list(node = "between", lhs = lhs, lo = lo, hi = hi, negate = info$negate, line = line)
       },
-      contains = list(node = "contains", lhs = lhs, rhs = parse_expr(p, 4L), negate = info$negate, line = line),
-      like = list(node = "like", lhs = lhs, rhs = parse_expr(p, 4L), negate = info$negate, line = line),
+      contains = list(node = "contains", lhs = lhs, rhs = parse_expr(p, info$bp + 1L), negate = info$negate, line = line),
+      like = list(node = "like", lhs = lhs, rhs = parse_expr(p, info$bp + 1L), negate = info$negate, line = line),
       is = {
         negate <- FALSE
         if (is_kw(p, "not")) {
@@ -222,11 +212,15 @@ parse_expr <- function(p, min_bp = 1L) {
         list(node = "is_missing", lhs = lhs, negate = negate, line = line)
       }
     )
+    st <- sas_op_after(info)
   }
   lhs
 }
 
-parse_prefix <- function(p) {
+parse_prefix <- function(p, min_bp = 1L) {
+  # the prefix sign right before this operand (two signs in a row)
+  sign <- p$prefix_sign
+  p$prefix_sign <- NULL
   t <- tk_type(p)
   v <- tk_val(p)
   line <- tk_line(p)
@@ -269,23 +263,27 @@ parse_prefix <- function(p) {
     },
     op = {
       if (v %in% c("-", "+", "^")) {
+        name <- switch(v, "-" = "neg", "+" = "pos", "^" = "not")
+        o <- sas_prefix_op(name, expr_ctx(p), min_bp, p, sign)
         advance(p)
-        arg <- parse_expr(p, 7L)
+        if (name != "not") p$prefix_sign <- name
+        arg <- parse_expr(p, o$bp)
         return(list(node = "unary", op = if (v == "^") "not" else v, arg = arg, line = line))
       }
     },
-    name = return(parse_name_primary(p))
+    name = return(parse_name_primary(p, min_bp))
   )
   abort_syntax(paste("unexpected", tok_desc(p), "in expression"), line)
 }
 
-parse_name_primary <- function(p) {
+parse_name_primary <- function(p, min_bp = 1L) {
   low <- tk_low(p)
   line <- tk_line(p)
   col <- tk_col(p)
   if (low == "not" && !tk_type(p, 1L) %in% c("semi", "rparen", "comma", "eof")) {
+    o <- sas_prefix_op("not", expr_ctx(p), min_bp, p)
     advance(p)
-    return(list(node = "unary", op = "not", arg = parse_expr(p, 7L), line = line))
+    return(list(node = "unary", op = "not", arg = parse_expr(p, o$bp), line = line))
   }
   # first.x / last.x
   if (low %in% c("first", "last") && tk_type(p, 1L) == "dot" && tk_type(p, 2L) == "name" &&
@@ -511,8 +509,13 @@ expr_to_sexpr <- function(e) {
     chain = paste0("(chain ", paste(e$ops, collapse = " "), " ", paste(vapply(e$args, s, ""), collapse = " "), ")"),
     "in" = paste0("(", if (e$negate) "not-in" else "in", " ", s(e$lhs), " ",
                   paste(vapply(e$items, function(it) if (it$node == "range") paste0(it$from, ":", it$to) else s(it), ""), collapse = " "), ")"),
-    between = paste0("(between ", s(e$lhs), " ", s(e$lo), " ", s(e$hi), ")"),
+    between = paste0("(", if (isTRUE(e$negate)) "not-between" else "between", " ", s(e$lhs), " ", s(e$lo), " ", s(e$hi), ")"),
     contains = paste0("(contains ", s(e$lhs), " ", s(e$rhs), ")"),
+    like = paste0("(", if (isTRUE(e$negate)) "not-like" else "like", " ", s(e$lhs), " ", s(e$rhs), ")"),
+    # PROC SQL nodes
+    col = if (is.null(e$table)) e$name else paste0(e$table, ".", e$name),
+    in_list = paste0("(", if (isTRUE(e$negate)) "not-in" else "in", " ", s(e$lhs), " ",
+                     paste(vapply(e$items, s, ""), collapse = " "), ")"),
     is_missing = paste0("(is-missing ", s(e$lhs), ")"),
     call = paste0("(call ", e$name, paste0(" ", vapply(e$args, function(a) {
       if (a$node == "of") {

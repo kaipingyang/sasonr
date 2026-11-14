@@ -50,6 +50,7 @@ sql_walk <- function(e, f) {
     in_subq = ,
     quant = list(e$lhs),
     in_list = c(list(e$lhs), e$items),
+    chain = ,
     call = e$args,
     case = c(list(e$operand, e$else_), unlist(lapply(e$whens, function(w) list(w$cond, w$value)), recursive = FALSE)),
     list()
@@ -187,6 +188,10 @@ sql_lower <- function(e, ctx) {
       if (e$node == "compare" && isTRUE(e$colon) && sql_type_of(e$lhs, ctx)$type != "char") {
         abort_syntax("Arguments for truncated compares must be strings.", e$line)
       }
+      e
+    },
+    chain = {
+      e$args <- lapply(e$args, L)
       e
     },
     between = {
