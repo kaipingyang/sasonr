@@ -133,3 +133,17 @@ test_that("variable attributes are kept for export", {
   expect_equal(attrs$label, rep(c("Char", "", ""), 2))
   expect_equal(readLines(file.path(dir, "A.csv")), c("c,n,d", "x,1,01JAN1960"))
 })
+
+test_that("WHERE NOTEs: MIN / MAX, one-value IN lists, chains, prefix signs", {
+  where_line <- function(w) {
+    r <- run_notes(c("data a; a = 1; b = 2; c = 3; run;", paste0("data b; set a; where ", w, "; run;")))
+    sub("^ +", "", r$log[startsWith(r$log, "      WHERE ")])
+  }
+  expect_identical(where_line("a min b < c"), "WHERE c>a><b;")
+  expect_identical(where_line("a max b = c"), "WHERE c=a<>b;")
+  expect_identical(where_line("a + b in (3)"), "WHERE a+b=3;")
+  expect_identical(where_line("a < b < c"), "WHERE a<b and b<c;")
+  expect_identical(where_line("a ^= b < c"), "WHERE a not = b and b<c;")
+  expect_identical(where_line("a & + b < c"), "WHERE a and (b<c);")
+  expect_identical(where_line("- - a + b < c"), "WHERE c>a+b;")
+})

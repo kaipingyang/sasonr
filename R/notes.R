@@ -256,8 +256,22 @@ stmt_assigns_all <- function(s) {
   c(out, unlist(lapply(stmt_children(s), stmt_assigns_all)))
 }
 
+# A WHERE expression as its NOTE shows it: a prefix plus is dropped and a
+# double minus cancels (+b is b, - - a is a).
+where_fold_signs <- function(x) {
+  if (!is.list(x) || is.null(x$node)) return(x)
+  for (nm in c("lhs", "rhs", "arg", "lo", "hi")) if (!is.null(x[[nm]])) x[[nm]] <- where_fold_signs(x[[nm]])
+  if (!is.null(x$args)) x$args <- lapply(x$args, where_fold_signs)
+  if (identical(x$node, "unary") && identical(x$op, "+")) return(x$arg)
+  if (identical(x$node, "unary") && identical(x$op, "-") && identical(x$arg$node, "unary") && identical(x$arg$op, "-")) {
+    return(x$arg$arg)
+  }
+  x
+}
+
 # The text of a WHERE expression (for the "WHERE ...;" line of a NOTE).
 where_text <- function(e) {
+  e <- where_fold_signs(e)
   w <- function(x, top = FALSE) {
     switch(x$node,
       num = x$text %||% r_num(x$value),
@@ -270,7 +284,8 @@ where_text <- function(e) {
           wrap <- function(y) if (y$node %in% c("compare", "binary") && !y$node %in% c("var")) paste0("(", w(y), ")") else w(y)
           paste(wrap(x$lhs), x$op, wrap(x$rhs))
         } else {
-          paste0(w(x$lhs), x$op, w(x$rhs))
+          # the MIN and MAX operators are written >< and <>
+          paste0(w(x$lhs), switch(x$op, min = "><", max = "<>", x$op), w(x$rhs))
         }
       },
       compare = {
@@ -295,19 +310,28 @@ where_text <- function(e) {
         }
         paste0(w(x$lhs), if (x$op == "^=") " not = " else x$op, if (isTRUE(x$colon)) ":" else "", w(x$rhs))
       },
-      chain = paste(vapply(x$args, w, ""), collapse = " "),
-      "in" = paste0(w(x$lhs), if (isTRUE(x$negate)) " not in (" else " in (",
-                    paste(vapply(x$items, function(it) if (it$node == "range") paste0(it$from, ":", it$to) else w(it), ""),
-                          collapse = ", "), ")"),
+      # a < b < c is written a<b and b<c
+      chain = paste(vapply(seq_along(x$ops), function(k) {
+        w(list(node = "compare", op = x$ops[k], colon = FALSE, lhs = x$args[[k]], rhs = x$args[[k + 1L]]))
+      }, ""), collapse = " and "),
+      "in" = if (length(x$items) == 1L && !isTRUE(x$negate) && x$items[[1]]$node != "range") {
+        # an IN list of one value is written as an equality, the operand first
+        paste0(w(x$lhs), "=", w(x$items[[1]]))
+      } else {
+        paste0(w(x$lhs), if (isTRUE(x$negate)) " not in (" else " in (",
+               paste(vapply(x$items, function(it) if (it$node == "range") paste0(it$from, ":", it$to) else w(it), ""),
+                     collapse = ", "), ")")
+      },
+      like = paste0(w(x$lhs), if (isTRUE(x$negate)) " not like " else " like ", w(x$rhs)),
       between = {
         # constant bounds are shown as a range; expression bounds keep BETWEEN
         const <- function(y) y$node %in% c("num", "str", "missing") || (y$node == "unary" && y$arg$node == "num")
-        txt <- if (const(x$lo) && const(x$hi)) {
-          paste0("(", w(x$lhs), ">=", w(x$lo), " and ", w(x$lhs), "<=", w(x$hi), ")")
+        if (const(x$lo) && const(x$hi)) {
+          txt <- paste0("(", w(x$lhs), ">=", w(x$lo), " and ", w(x$lhs), "<=", w(x$hi), ")")
+          if (isTRUE(x$negate)) paste0("not ", txt) else txt
         } else {
-          paste0(w(x$lhs), " between ", w(x$lo), " and ", w(x$hi))
+          paste0(w(x$lhs), if (isTRUE(x$negate)) " not between " else " between ", w(x$lo), " and ", w(x$hi))
         }
-        if (isTRUE(x$negate)) paste0("not ", txt) else txt
       },
       contains = paste0(w(x$lhs), if (isTRUE(x$negate)) " not contains " else " contains ", w(x$rhs)),
       is_missing = paste0(w(x$lhs), if (isTRUE(x$negate)) " is not null" else " is null"),
