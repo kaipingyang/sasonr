@@ -1,4 +1,4 @@
-#
+# Generated file -- do not edit by hand.
 
 #' Runtime helpers used by translated code
 #'
