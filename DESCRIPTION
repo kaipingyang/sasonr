@@ -2,9 +2,12 @@ Package: sasonr
 Title: Independent Implementation of SAS 9.4 Program Semantics in R
 Version: 0.0.0.9000
 Authors@R: person("Kaiping", "Yang", role = c("aut", "cre"), email = "1260146556@qq.com")
-Description: Deterministically parses SAS programs into a faithful abstract
-    syntax tree and compiles DATA steps into tidyverse R code. Unsupported
-    language features fail loudly with classed conditions.
+Description: sasonr is an independent implementation of SAS 9.4 program
+    semantics in R, written with reference to the publicly available SAS 9.4
+    documentation. Features it does not support fail loud instead of being
+    approximated. Compatibility with SAS is not guaranteed. sasonr is not
+    affiliated with, endorsed by, or sponsored by SAS Institute Inc. SAS is a
+    registered trademark of SAS Institute Inc.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Imports:
