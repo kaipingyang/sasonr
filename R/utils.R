@@ -25,6 +25,16 @@ abort_runtime <- function(msg, line = NULL) {
   sasonr_abort(paste("Runtime error:", msg), "sasonr_runtime_error", line)
 }
 
+# A SAS ERROR in a global statement (OPTIONS, FILENAME ...).  `what` names the
+# error and `open_code` says whether the statement stands outside a step: the
+#
+# verifies, everything else fails loud.
+abort_global <- function(msg, line, what, open_code = FALSE) {
+  if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
+  rlang::abort(paste("Syntax error:", msg), class = c("sasonr_global_error", "sasonr_syntax_error", "sasonr_error"),
+               sas_line = line, what = what, open_code = open_code)
+}
+
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 # Split "date9" into list(base = "date", width = 9L); no regex needed.

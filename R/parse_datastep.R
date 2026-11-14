@@ -56,7 +56,7 @@ sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
       advance(p, 2L)
       next
     }
-    steps <- c(steps, list(parse_global_stmt(p)))
+    steps <- c(steps, list(parse_global_stmt(p, open_code = TRUE)))
   }
   structure(list(steps = steps), class = "sasonr_program", sql_open = sql_open)
 }

@@ -77,6 +77,17 @@ engine_exec_steps <- function(eng, text, line) {
     eng$phase <- "compile"
     # the AST of the step being compiled / run (errors.R derives from it what an ERROR leaves in WORK)
     eng$cur_step <- step
+    if (isTRUE(eng$sc_pending) && step$type != "global") {
+      #
+      #
+      if (step$type != "data") {
+        abort_unsupported("a PROC step after an ERROR in a global statement (supported: a DATA step)", step$line)
+      }
+      eng$sc_pending <- FALSE
+      eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
+                   "      This prevents execution of subsequent data modification statements.")
+      eng$syntax_check <- TRUE
+    }
     if (step$type == "global") {
       engine_global(eng, step)
       next
@@ -351,6 +362,9 @@ engine_program <- function(eng, code) {
   sink <- code_sink(eng$session$macro)
   mp_scan(mp_src(text, line_of = TRUE), eng$session$macro, sink, mode = "code")
   sink$finish()
+  if (isTRUE(eng$sc_pending)) {
+    abort_unsupported("the end of a program after an ERROR in a global statement (supported: a DATA step follows)")
+  }
   invisible(eng)
 }
 

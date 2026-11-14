@@ -168,7 +168,8 @@ err_recover_step <- function(eng, text) {
     }
     return(list(kind = "proc", outputs = outs))
   }
-  if (step$type != "data") return(list(kind = "global", outputs = list()))
+  # an ERROR in a global statement is not a step ERROR (engine_global_error())
+  if (step$type != "data") return(NULL)
   if (isTRUE(step$null) || !length(step$outputs)) return(list(kind = "data", outputs = list()))
   meta <- err_data_schema(eng, step)
   if (is.null(meta) || any(vapply(meta, is.null, logical(1)))) return(NULL)
@@ -184,8 +185,32 @@ err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
   }
 }
 
+#
+#
+#
+# writes no "stopped processing this step" NOTE, and enters syntax-check mode
+# at the next step, which writes "Due to ERROR(s) above, SAS set option OBS=0
+#
+# inside a step or PROC SQL, in syntax-check mode or under NOSYNTAXCHECK are
+#
+engine_global_error <- function(eng, e) {
+  if (!identical(e$what, "linesize") || !isTRUE(e$open_code) || isTRUE(eng$sql_open) ||
+      isTRUE(eng$syntax_check) || isTRUE(eng$sc_pending) || isTRUE(eng$session$options$nosyntaxcheck)) {
+    abort_unsupported(paste0("the SAS error handling of this ERROR in a global statement (", err_message_lines(e), ")"),
+                      e$sas_line %||% NULL)
+  }
+  eng$status <- "error"
+  eng$errors <- c(eng$errors, conditionMessage(e))
+  if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
+  eng$log <- c(eng$log, err_message_lines(e))
+  err_set_macro(eng, syscc = 1012)
+  eng$sc_pending <- TRUE
+  invisible()
+}
+
 # Handle a SAS ERROR raised while compiling or running the step in `text`.
 engine_step_error <- function(eng, e, text) {
+  if (inherits(e, "sasonr_global_error")) return(engine_global_error(eng, e))
   if (identical(eng$phase, "execute_data")) {
     abort_unsupported(paste0("the data sets that an execution-time ERROR leaves in WORK (", conditionMessage(e), ")"),
                       e$sas_line %||% NULL)

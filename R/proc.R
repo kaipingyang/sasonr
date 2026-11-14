@@ -20,9 +20,12 @@ options_ignorable <- c(
   "nosyntaxcheck", "syntaxcheck"
 )
 
-parse_global_stmt <- function(p) {
+# `open_code`: the statement stands outside a step (sas_parse()); its SAS
+# ERRORs are raised with abort_global() for the error model (errors.R).
+parse_global_stmt <- function(p, open_code = FALSE) {
   line <- tk_line(p)
   low <- tk_low(p)
+  g_err <- function(msg, what = "syntax") abort_global(msg, line, what, open_code)
   sp <- split_trailing_digits(low)
   if (sp$base == "title" && (is.na(sp$width) || sp$width <= 10)) {
     advance(p)
@@ -38,7 +41,7 @@ parse_global_stmt <- function(p) {
   }
   if (low == "filename") {
     advance(p)
-    if (tk_type(p) != "name") abort_syntax("expected a fileref after FILENAME", line)
+    if (tk_type(p) != "name") g_err("expected a fileref after FILENAME")
     ref <- tk_low(p)
     advance(p)
     if (!tk_type(p) %in% c("str", "str_macro")) abort_unsupported("FILENAME without a quoted physical path", line)
@@ -59,8 +62,8 @@ parse_global_stmt <- function(p) {
     ps <- NULL
     formdlim <- NULL
     while (tk_type(p) != "semi") {
-      if (at_eof(p)) abort_syntax("missing semicolon after OPTIONS", line)
-      if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in OPTIONS"), line)
+      if (at_eof(p)) g_err("missing semicolon after OPTIONS")
+      if (tk_type(p) != "name") g_err(paste("unexpected", tok_desc(p), "in OPTIONS"))
       opt <- tk_low(p)
       opts <- c(opts, opt)
       if (!opt %in% options_ignorable) abort_unsupported(paste0("system option ", toupper(opt)), line)
@@ -70,7 +73,14 @@ parse_global_stmt <- function(p) {
         if (opt %in% c("linesize", "ls")) {
           v <- tk_low(p)
           ls <- if (identical(v, "max")) 256L else suppressWarnings(as.integer(v))
-          if (is.na(ls) || ls < 64L || ls > 256L) abort_syntax("invalid LINESIZE= value", line)
+          if (is.na(ls) || ls < 64L || ls > 256L) {
+            #
+            # number that is not MAX or 64-256 is ERROR 18-12
+            if (tk_type(p) %in% c("name", "num")) {
+              g_err("Option value for SAS option LINESIZE must be between 64 and 256. (ERROR 18-12)", "linesize")
+            }
+            g_err("invalid LINESIZE= value")
+          }
         }
         if (opt %in% c("pagesize", "ps")) {
           v <- tk_low(p)
@@ -85,7 +95,7 @@ parse_global_stmt <- function(p) {
         if (opt == "errors" && !identical(tk_low(p), "20")) {
           abort_unsupported(paste0("OPTIONS ERRORS=", toupper(tk_val(p)), " (only the default ERRORS=20 is implemented)"), line)
         }
-        if (tk_type(p) %in% c("name", "num", "str", "str_macro")) advance(p) else abort_syntax("invalid OPTIONS value", line)
+        if (tk_type(p) %in% c("name", "num", "str", "str_macro")) advance(p) else g_err("invalid OPTIONS value")
       }
     }
     advance(p)
