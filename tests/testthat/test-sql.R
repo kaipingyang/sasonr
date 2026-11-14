@@ -240,3 +240,17 @@ test_that("PROC SQL sets the lengths of computed character columns", {
   hx <- function(v) toupper(paste(as.character(charToRaw(v)), collapse = ""))
   expect_identical(c(hx(res$work$w$p), hx(res$work$w$s), hx(res$work$w$t)), c("616263", "62", "626364"))
 })
+
+test_that("||, LIKE and CONTAINS take character operands in PROC SQL and WHERE", {
+  base <- "data t; a = 1; b = 2; s = 'x'; run;\n"
+  expect_error(sas_run(paste0(base, "proc sql; create table q as select a || b as r from t; quit;")), class = "sasonr_syntax_error")
+  expect_error(sas_run(paste0(base, "proc sql; create table q as select a like 'x%' as r from t; quit;")),
+               class = "sasonr_syntax_error")
+  expect_error(sas_run(paste0(base, "proc sql; create table q as select a contains 'x' as r from t; quit;")),
+               class = "sasonr_syntax_error")
+  expect_error(sas_run(paste0(base, "data w; set t; where a || s = 'x'; run;")), class = "sasonr_syntax_error")
+  expect_error(sas_run(paste0(base, "data w; set t; where a like 'x%'; run;")), class = "sasonr_syntax_error")
+  r <- sas_run(paste0(base, "proc sql; create table q as select s || s as r, s like 'x%' as k from t; quit;"))
+  expect_identical(r$work$q$r, "xx")
+  expect_identical(r$work$q$k, 1)
+})

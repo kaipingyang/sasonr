@@ -252,6 +252,12 @@ an_expr <- function(e, st) {
       # a WHERE concatenation longer than 32767 characters selects no row
       # where the DATA step value (truncated to 32767) is compared; not
       # implemented
+      # WHERE and PROC SQL do not convert numbers for a concatenation
+      if (e$op == "||" && st$context %in% c("where", "sql") &&
+          (expr_type(e$lhs, st)$type != "char" || expr_type(e$rhs, st)$type != "char")) {
+        abort_syntax(if (identical(st$context, "sql")) "Concatenation (||) requires character operands." else
+          "WHERE clause operator requires character variables.", e$line)
+      }
       if (e$op == "||" && identical(st$context, "where") && expr_type(e, st)$len > 32767L) {
         abort_unsupported("a WHERE concatenation of more than 32767 characters (not supported)", e$line)
       }
@@ -279,6 +285,11 @@ an_expr <- function(e, st) {
     like = {
       e$lhs <- an_expr(e$lhs, st)
       e$rhs <- an_expr(e$rhs, st)
+      # LIKE and CONTAINS compare character operands only
+      if (expr_type(e$lhs, st)$type != "char" || expr_type(e$rhs, st)$type != "char") {
+        abort_syntax(if (identical(st$context, "sql")) paste0(toupper(e$node), " operator requires character operands.") else
+          "WHERE clause operator requires character variables.", e$line)
+      }
       if (e$node == "like") {
         if (!is.null(e$escape)) abort_unsupported("LIKE ... ESCAPE in a WHERE statement", e$line)
         call <- list(node = "call", name = "sqllike", args = list(e$lhs, e$rhs), line = e$line, construct = TRUE)

@@ -206,6 +206,9 @@ sql_lower <- function(e, ctx) {
     },
     like = {
       args <- list(L(e$lhs), L(e$rhs))
+      if (sql_type_of(args[[1]], ctx)$type != "char" || sql_type_of(args[[2]], ctx)$type != "char") {
+        abort_syntax("LIKE operator requires character operands.", e$line)
+      }
       if (!is.null(e$escape)) args <- c(args, list(L(e$escape)))
       out <- list(node = "call", name = "sqllike", args = args, line = e$line, construct = TRUE)
       if (isTRUE(e$negate)) out <- list(node = "unary", op = "not", arg = out, line = e$line)
