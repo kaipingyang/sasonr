@@ -24,9 +24,8 @@
 # a failing statement contributes:
 #   assignment  its target and the variables named before the error; when the
 #               value is complete and the statement goes on (`x = 1 y = 2;`, a
-#               missing semicolon or operator), also the variables named in the
-#               rest of the statement (numeric when new), except when the rest
-#               starts with IF (err_assign_rest())
+#               missing semicolon or operator), also the variables of the rest
+#               of the statement for the rests err_assign_rest() supports
 #   SET / MERGE nothing; the statement is ignored
 #   PROC SORT   the OUT= data set, with 0 variables
 # Any other failing statement or PROC fails loud (sasonr_unsupported): what
@@ -127,18 +126,21 @@ err_stmt_words <- c("abort", "array", "attrib", "by", "call", "cards", "cards4",
                     "run", "select", "set", "stop", "then", "title", "update", "when", "where", "window")
 
 # The variables that the rest of a failing assignment adds, when the value is
-# complete and the statement goes on without a semicolon (`x = 1 y = z + 2;`):
-# the rest is compiled as part of the value, so every variable it names is
-# added (numeric when new), in order; a rest that starts with IF adds nothing.
-# Only rests of names, numeric constants, + - * / = and parentheses that start
-# with a name or a number are supported: NULL (fail loud) for any other rest,
-# character() when the value itself is not complete.
+# complete and the statement goes on without a semicolon (`x = 1 y = z + 2;`),
+# in order and numeric when new.  The supported rests:
+#   one or more assignments `name = value` (value: names, numbers, + - * / and
+#   parentheses), optionally followed by `IF name` or `THEN name`: every name
+#   but IF / THEN
+#   `name`, `number name`: the name
+#   `name name` and a rest that starts with IF: nothing
+# Any other rest, and a rest naming an array or a statement keyword, is not
+# supported: NULL (fail loud).  character() when the value is not complete.
 err_assign_rest <- function(p, start) {
   pos0 <- p$pos
   on.exit(p$pos <- pos0)
   p$pos <- start
   complete <- tryCatch({
-    if (tk_type(p, 1L) %in% c("lbrace", "lparen")) parse_array_ref(p) else advance(p)
+    advance(p)
     if (!is_op(p, "=")) stop("not an assignment")
     advance(p)
     parse_expr(p)
@@ -152,16 +154,44 @@ err_assign_rest <- function(p, start) {
   ty <- p$type[k:(end - 1L)]
   low <- p$low[k:(end - 1L)]
   val <- p$value[k:(end - 1L)]
+  m <- length(ty)
   if (ty[1] == "name" && low[1] == "if") return(character())
-  if (!ty[1] %in% c("name", "num") || (ty[1] == "name" && low[1] %in% err_stmt_words)) return(NULL)
-  if (!all(ty %in% c("name", "num", "op", "lparen", "rparen")) || !all(val[ty == "op"] %in% c("=", "+", "-", "*", "/"))) {
-    return(NULL)
+  bad_name <- function(i) low[i] %in% c(err_stmt_words, names(mnemonic_cmp), "and", "or", "not", "in", "min", "max") ||
+    low[i] %in% p$arrays
+  if (m == 1L && ty[1] == "name") return(if (bad_name(1)) NULL else low[1])
+  if (m == 2L && identical(ty, c("num", "name"))) return(if (bad_name(2)) NULL else low[2])
+  if (m == 2L && identical(ty, c("name", "name"))) return(if (bad_name(1) || bad_name(2)) NULL else character())
+  # assignments, optionally followed by IF name / THEN name
+  tail <- character()
+  if (m >= 2L && ty[m - 1L] == "name" && low[m - 1L] %in% c("if", "then") && ty[m] == "name") {
+    if (bad_name(m)) return(NULL)
+    tail <- low[m]
+    m <- m - 2L
   }
-  nm <- low[ty == "name"]
-  if (any(nm %in% c(names(mnemonic_cmp), "and", "or", "not", "in", "min", "max"))) return(NULL)
-  # a name before '(' is a function call or an array element
-  if (length(ty) > 1L && any(ty[-length(ty)] == "name" & ty[-1L] == "lparen")) return(NULL)
-  unique(nm)
+  out <- character()
+  i <- 1L
+  while (i <= m) {
+    if (i + 1L > m || ty[i] != "name" || bad_name(i) || !(ty[i + 1L] == "op" && val[i + 1L] == "=")) return(NULL)
+    out <- c(out, low[i])
+    j <- i + 2L
+    depth <- 0L
+    first <- j
+    while (j <= m) {
+      if (depth == 0L && ty[j] == "name" && j + 1L <= m && ty[j + 1L] == "op" && val[j + 1L] == "=") break
+      if (ty[j] == "lparen") depth <- depth + 1L
+      if (ty[j] == "rparen") depth <- depth - 1L
+      ok <- ty[j] %in% c("name", "num", "lparen", "rparen") || (ty[j] == "op" && val[j] %in% c("+", "-", "*", "/"))
+      if (!ok || depth < 0L) return(NULL)
+      if (ty[j] == "name") {
+        if (bad_name(j) || (j + 1L <= m && ty[j + 1L] == "lparen")) return(NULL)
+        out <- c(out, low[j])
+      }
+      j <- j + 1L
+    }
+    if (j == first || depth != 0L) return(NULL)
+    i <- j
+  }
+  unique(c(out, tail))
 }
 
 # What a failing DATA step statement contributes at compile time: a list of

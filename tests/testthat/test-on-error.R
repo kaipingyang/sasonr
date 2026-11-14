@@ -77,3 +77,15 @@ test_that("an assignment without its semicolon: the rest of the statement adds i
   # a rest with a character constant is not supported
   expect_error(run_sas_mode("data one;\n  x = 1\n  y = 'abc';\nrun;"), class = "sasonr_unsupported")
 })
+
+test_that("missing semicolons: remainders with IF / THEN, two names, parentheses, several assignments", {
+  vars <- function(rest) names(run_sas_mode(paste0("data one;\n  x = 1\n  ", rest, ";\nrun;"))$work$one)
+  expect_identical(vars("y = 2 if z"), c("x", "y", "z"))
+  expect_identical(vars("y = 2 then w"), c("x", "y", "w"))
+  expect_identical(vars("y z"), "x")
+  expect_identical(vars("y = (z) * 2"), c("x", "y", "z"))
+  expect_identical(vars("y = 2\n  z = 3\n  w = 4"), c("x", "y", "z", "w"))
+  # an array name or a statement keyword in the remainder is not supported
+  expect_error(run_sas_mode("data one;\n  array arr{2} a1 a2;\n  x = 1\n  arr = 2;\nrun;"), class = "sasonr_unsupported")
+  expect_error(run_sas_mode("data one;\n  x = 1\n  y = 2 output;\nrun;"), class = "sasonr_unsupported")
+})
