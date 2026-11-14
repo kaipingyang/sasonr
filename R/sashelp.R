@@ -1,18 +1,15 @@
+# SASHELP data sets.
 #
-#
-#
-# redistributed: inst/sashelp/ is in .gitignore and .Rbuildignore, so only a
-# development tree (devtools::load_all(), where system.file() resolves to
-# <package>/inst/sashelp) or an explicit directory sees them:
-#   options(sasonr.sashelp_dir = DIR) or the environment variable
-#   SASONR_SASHELP_DIR.
-# A member is either
-#
+# sasonr does not ship SASHELP members.  They are read from the directory set
+# with options(sasonr.sashelp_dir = DIR) or the environment variable
+# SASONR_SASHELP_DIR (the option wins); without one, every SASHELP member is
+# missing.  A member is either
+#   <member>.rds          a data frame that keeps the declared character
+#                         lengths and the column formats, or
 #   <member>.sas7bdat     the data set copied from SASHELP by PROC COPY, read
 #                         with haven (Suggests), together with
 #   <member>_meta.csv     its DICTIONARY.COLUMNS rows (name, type, length,
-#
-#
+#                         format, informat, label), which give the declared
 #
 # When a member, its column attributes or haven are missing, the program stops
 # loudly instead of guessing.
@@ -21,8 +18,7 @@ sashelp_cache <- new.env(parent = emptyenv())
 
 sashelp_dir <- function() {
   d <- getOption("sasonr.sashelp_dir", Sys.getenv("SASONR_SASHELP_DIR"))
-  if (length(d) == 1L && !is.na(d) && nzchar(d)) return(d)
-  system.file("sashelp", package = "sasonr")
+  if (length(d) == 1L && !is.na(d) && nzchar(d)) d else ""
 }
 
 # The files of a member in the local store (NULL when it is not there).
@@ -45,8 +41,8 @@ sashelp_member <- function(name, line = NULL) {
   if (!is.null(cached)) return(cached)
   f <- sashelp_files(name)
   if (is.null(f)) {
-    abort_unsupported(paste0("SASHELP.", toupper(name), " (not in the SASHELP store: copy it from SAS into ",
-                             "inst/sashelp/ or set options(sasonr.sashelp_dir))"), line)
+    abort_unsupported(paste0("SASHELP.", toupper(name), " (not in the SASHELP directory: set ",
+                             "options(sasonr.sashelp_dir) or SASONR_SASHELP_DIR)"), line)
   }
   d <- if (!is.null(f$rds)) readRDS(f$rds) else sashelp_read_sas7bdat(f$sas7bdat, f$meta, name, line)
   d <- as.data.frame(d, stringsAsFactors = FALSE)
@@ -57,7 +53,6 @@ sashelp_member <- function(name, line = NULL) {
 }
 
 # A SASHELP data set copied by PROC COPY, with the declared character lengths
-#
 #
 #
 sashelp_read_sas7bdat <- function(path, meta_path, name = basename(path), line = NULL) {

@@ -216,7 +216,7 @@ gen_call <- function(e, cx) {
   }
   if (e$name == "exist") {
     # EXIST(member <, type>): the generated DATA step environment carries the
-    # WORK library (`work`, see engine_eval()); SASHELP is read from inst/sashelp
+    # WORK library (`work`, see engine_eval()); SASHELP from the store of R/sashelp.R
     a1 <- gen_expr(e$args[[1]], cx)
     a2 <- if (length(e$args) > 1) gen_expr(e$args[[2]], cx) else "NULL"
     return(sprintf("sas_f_exist(%s, %s, work)", a1, a2))

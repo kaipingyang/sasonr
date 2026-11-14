@@ -29,8 +29,8 @@ sql_table_rel <- function(src, eng, outer) {
   name <- src$name
   quals <- src$alias %||% name
   if (identical(src$libref, "sashelp")) {
-    #
-    # committed); a missing member fails loud inside sashelp_member()
+    # members of the SASHELP store (R/sashelp.R: options(sasonr.sashelp_dir));
+    # a missing member fails loud inside sashelp_member()
     d <- sashelp_member(name, src$line)
     m <- meta_from_df(d)
     sm <- attr(d, "sashelp_meta")
