@@ -129,11 +129,24 @@ raw_match_paren <- function(src, k) {
   NA_integer_
 }
 
-# Skip a quoted literal or comment starting at k; returns the next position or
-# NA when k does not start one.
+# Skip a quoted literal, a comment or the argument of %STR / %NRSTR / %QUOTE /
+# %NRQUOTE (where %' %" %( %) mark a quotation mark or parenthesis that is not
+# matched) starting at k; returns the next position or NA when k does not start
+# one.
 raw_skip_opaque <- function(src, k) {
   c <- src$cp[k]
   n <- src$n
+  if (c == 37L && is_alpha_cp(src_at(src, k + 1L))) {
+    w <- tolower(src_word(src, k + 1L))
+    if (w %in% c("str", "nrstr", "quote", "nrquote")) {
+      j <- src_skip_ws(src, k + 1L + nchar(w))
+      if (src_at(src, j) == 40L) {
+        e <- raw_match_paren(src, j)
+        if (!is.na(e)) return(e + 1L)
+      }
+    }
+    return(NA_integer_)
+  }
   if (c == 39L || c == 34L) {
     j <- k + 1L
     while (j <= n && src$cp[j] != c) j <- j + 1L

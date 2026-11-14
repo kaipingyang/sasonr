@@ -278,3 +278,22 @@ test_that("positive and negative system options apply in the order written", {
                class = "sasonr_unsupported", regexp = "CENTER")
   expect_no_error(sas_run("data a; x = 1; run; options center nocenter date nodate number nonumber; proc print data=a; run;"))
 })
+
+test_that("%STR(%') in %IF and %DO actions and in macro bodies", {
+  code <- "%macro m(x);
+  %if &x = 1 %then %let q = %str(%');
+  %else %let q = none;
+  %put q=&q;   /* q is the quote character; don't change it */
+  data a; s = 1; run;
+%mend;
+%m(2)
+%m(1)
+"
+  r <- sas_run(code)
+  expect_true(all(c("q=none", "q='") %in% r$log))
+  expect_identical(nrow(r$work$a), 1L)
+  r <- sas_run("%macro m;\n  %do;\n    %let q = %str(%');\n  %end;\n  %put q=&q;\n%mend;\n%m\n")
+  expect_true("q='" %in% r$log)
+  r <- sas_run("%macro m;\n  %let q = %str(%');\n  %put q=&q;\n%mend;\n%m\n")
+  expect_true("q='" %in% r$log)
+})
