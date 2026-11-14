@@ -262,11 +262,6 @@ test_that("the %SYSFUNC NOTE fails loud where the options in effect are not know
   #
   expect_error(sas_run(in_step("options linesize=100;")), class = "sasonr_unsupported", regexp = "not supported")
   expect_error(sas_run(in_step("options nonotes notes;")), class = "sasonr_unsupported", regexp = "not supported")
-  # syntax-check mode: SAS executes the OPTIONS statements of a step it only checks
-  expect_error(sas_run("data a; x = 1; run; data b; set a y = 2; run;
-    proc datasets lib=work nolist; options linesize=max; quit;
-    %let d = %sysfunc(mdy(2, 30, 2024));", on_error = "sas"),
-    class = "sasonr_unsupported", regexp = "syntax-check mode")
 })
 
 test_that("positive and negative system options apply in the order written", {

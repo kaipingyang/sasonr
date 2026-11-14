@@ -94,6 +94,16 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "sql_begin") {
       eng$sql_opts <- step$options
+      if (isTRUE(eng$syntax_check)) {
+        # PROC SQL in syntax-check mode runs as with NOEXEC: no statement runs,
+        #
+        if (sas_target_version() != "SAS 9.4") {
+          abort_unsupported(paste0("PROC SQL in syntax-check mode for SAS 9.4 ", sas_target_version(), " (not in its expected results)"), step$line)
+        }
+        eng$log <- c(eng$log, "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.")
+        eng$sql_noexec <- TRUE
+        mac_auto_unknown(eng$session$macro, "sqlrc", paste0("PROC SQL in syntax-check mode (SAS line ", step$line, ")"))
+      }
       next
     }
     if (step$type == "sql_end") {
@@ -106,6 +116,7 @@ engine_exec_steps <- function(eng, text, line) {
     if (step$type == "sql") {
       if (isTRUE(eng$sql_noexec) || isTRUE(eng$syntax_check)) {
         if (isTRUE(eng$sql_noexec)) eng$log <- c(eng$log, "NOTE: Statement not executed due to NOEXEC option.")
+        if (isTRUE(eng$syntax_check)) assign("sqlobs", "0", envir = eng$session$macro$globals)
         next
       }
       eng$steps <- c(eng$steps, list(list(code = paste0("# PROC SQL ", toupper(step$stmt$kind), " (SAS line ", step$line,
@@ -115,10 +126,8 @@ engine_exec_steps <- function(eng, text, line) {
       if (eng$execute) engine_sql(eng, step$stmt)
       next
     }
-    if (isTRUE(eng$syntax_check)) {
-      engine_check_step(eng, step)
-      next
-    }
+    # syntax-check mode: PROC CONTENTS runs on (OUT= with 0 observations below)
+    if (isTRUE(eng$syntax_check) && !engine_check_step(eng, step)) next
     if (step$type == "proc" && step$name == "datasets") {
       for (t in step$titles) engine_global(eng, t)
       eng$steps <- c(eng$steps, list(list(code = paste0("# PROC DATASETS (SAS line ", step$line, "): executed by the engine"),
@@ -173,6 +182,11 @@ engine_exec_steps <- function(eng, text, line) {
       # NOTEs that are not data errors (e.g. INPUT going to a new line)
       if (length(rt$notes) > 0 && isTRUE(eng$session$options$notes)) env$.log <- c(env$.log, rt$notes)
     }
+    if (isTRUE(eng$syntax_check)) {
+      # PROC CONTENTS in syntax-check mode (engine_check_step()): OUT= has 0
+      #
+      for (nm in tr$outputs) assign(nm, get(nm, envir = eng$session$work)[0, , drop = FALSE], envir = eng$session$work)
+    }
     stopped <- step$type == "data" && isTRUE(rt$stop_step)
     if (stopped) {
       #
@@ -200,7 +214,7 @@ engine_exec_steps <- function(eng, text, line) {
       eng$log <- c(eng$log, step_end_notes(), reads, rt$proc_notes, ds_notes)
     }
     engine_add_listing(eng, env$.lst, step$line)
-    if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = 0)
+    if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = if (isTRUE(eng$syntax_check)) 3 else 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
     if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
     if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
@@ -219,44 +233,117 @@ engine_check_last_view <- function(eng, step) {
 }
 
 # Syntax-check mode (after an ERROR, on_error = "sas"): the step is compiled
-# but not run; a DATA step creates its output data sets with 0 observations.
+#
+# a09):
+#
+#
+#   * a DATA step creates each new output data set with 0 observations and
+#     the variables compiled; an existing one is not replaced ("not replaced
+#
+#   * PROC CONTENTS runs: its listing as usual, OUT= (new or existing) with 0
+#
+#   * PROC SORT OUT=, PROC MEANS NOPRINT with one OUTPUT OUT=, PROC FREQ
+#     NOPRINT with one OUT= and PROC APPEND BASE= create a new data set with 0
+#     observations and 0 variables (MEANS: as a stopped step), which becomes
+#
+#   * PROC PRINT, PROC DELETE, PROC DATASETS DELETE / KILL and an in-place PROC
+#
+# all with SYSERR 3.  Other steps (PROC TRANSPOSE, which runs with 0
+# observations in SAS, PROC FORMAT, printing PROC MEANS / FREQ, other DATASETS
+# statements, an existing OUT= ...) fail loud, and so does anything these
+#
+# Returns TRUE when the caller runs the step (PROC CONTENTS), FALSE otherwise.
 engine_check_step <- function(eng, step) {
+  unsupported <- function(what) {
+    abort_unsupported(paste0(what, " in syntax-check mode (after an ERROR; not supported)"), step$line)
+  }
+  SAS 9.4 <- function() if (sas_target_version() != "SAS 9.4") unsupported(paste("SAS 9.4", sas_target_version()))
   if (step$type == "proc") {
-    # SAS still executes the global statements of the step; sasonr does not
-    # apply the OPTIONS statements of a PROC DATASETS step it only checks, so
-    # the options a later macro-time NOTE depends on are not known
-    # (mac_sysfunc() fails loud)
-    if (step$name == "datasets" &&
-        any(vapply(step$stmts, function(s) identical(s$type, "global") && identical(s$kind, "options"), logical(1)))) {
-      eng$session$macro$options_unknown <- step$line
+    if (step$name == "contents") {
+      SAS 9.4()
+      return(TRUE)
     }
-    tr <- if (step$name != "datasets") translate_proc(step, eng$session$meta, eng$session$last)
-    if (length(tr$outputs) || any(vapply(step$stmts, function(s) identical(s$stmt, "append"), logical(1)))) {
-      mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
-                       paste0("PROC ", toupper(step$name), " in syntax-check mode (SAS line ", step$line, ")"))
+    if (length(step$titles)) SAS 9.4()
+    for (t in step$titles) engine_global(eng, t)
+    exists_ds <- function(nm) exists(nm, envir = eng$session$work, inherits = FALSE)
+    notes_on <- isTRUE(eng$session$options$notes) && eng$step_notes
+    # a new output data set with 0 observations and 0 variables
+    empty_out <- function(nm, stopped = FALSE) {
+      SAS 9.4()
+      engine_empty_dataset(eng, nm, list(vars = character(), type = list(), len = list(), formats = list(), disp = list()))
+      if (stopped) {
+        eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.", sprintf(
+          "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and 0 variables.",
+          toupper(nm)))
+      } else if (notes_on) {
+        eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and 0 variables.", toupper(nm)))
+      }
+      session_set_last(eng$session, nm)
+    }
+    if (step$name == "datasets") {
+      if (identical(step$origin, "append")) {
+        s <- step$stmts[[1]]
+        if (length(s$base$options) || length(s$data$options) || !exists_ds(s$data$name)) unsupported("this PROC APPEND")
+        if (!exists_ds(s$base$name)) empty_out(s$base$name)
+      } else if (!identical(step$origin, "delete")) {
+        for (s in step$stmts) {
+          if (identical(s$type, "global")) {
+            SAS 9.4()
+            engine_global(eng, s)
+          } else if (!s$stmt %in% c("delete", "run")) {
+            unsupported(paste("PROC DATASETS statement", toupper(s$stmt)))
+          }
+        }
+        bad <- setdiff(names(step$options), c("nolist", "noprint", "kill", "nowarn", "nodetails", "details", "force"))
+        if (length(bad)) unsupported(paste("PROC DATASETS option", toupper(bad[1])))
+      }
+    } else {
+      tr <- translate_proc(step, eng$session$meta, eng$session$last)
+      outs <- tr$outputs
+      one_new <- length(outs) == 1L && !exists_ds(outs)
+      if (step$name == "sort") {
+        if (is.null(step$options$out)) {
+          #
+          mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
+                           paste0("an in-place PROC SORT in syntax-check mode (SAS line ", step$line, ")"))
+        } else {
+          if (!one_new || length(step$options$out$options)) unsupported("PROC SORT with an existing or optioned OUT= data set")
+          empty_out(outs)
+        }
+      } else if (step$name %in% c("means", "freq")) {
+        if (!isTRUE(step$options$noprint) || !one_new) {
+          unsupported(paste0("PROC ", toupper(step$name), " other than NOPRINT with one new OUT= data set"))
+        }
+        empty_out(outs, stopped = step$name == "means")
+      } else if (step$name != "print") {
+        unsupported(paste0("PROC ", toupper(step$name)))
+      }
     }
     err_set_macro(eng, syserr = 3)
-    return(invisible())
+    return(FALSE)
   }
   tr <- translate_step(step, eng$session$meta, eng$level)
   old <- vapply(tr$outputs, function(nm) exists(nm, envir = eng$session$work, inherits = FALSE), logical(1))
+  if (any(old)) {
+    SAS 9.4()
+    if (length(tr$outputs) > 1L) unsupported("a DATA step with several output data sets, one of them existing,")
+  }
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
     vars <- m$vars %||% character()
-    engine_empty_dataset(eng, nm, m)
     if (isTRUE(eng$session$options$notes) && eng$step_notes) {
       eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and %d variables.", toupper(nm), length(vars)))
     }
+    if (old[[nm]]) {
+      eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because this step was stopped.", toupper(nm)))
+    } else {
+      engine_empty_dataset(eng, nm, m)
+    }
   }
   #
-  if (length(tr$outputs) && !any(old)) {
-    session_set_last(eng$session, tr$outputs[length(tr$outputs)])
-  } else if (any(old)) {
-    mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
-                     paste0("a DATA step in syntax-check mode writing an existing data set (SAS line ", step$line, ")"))
-  }
+  if (length(tr$outputs) && !any(old)) session_set_last(eng$session, tr$outputs[length(tr$outputs)])
   err_set_macro(eng, syserr = 3)
-  invisible()
+  FALSE
 }
 
 # Numeric variables stored with LENGTH < 8 keep only the first bytes of the

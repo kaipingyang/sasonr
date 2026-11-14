@@ -210,6 +210,8 @@ session_leave <- function(session) {
   m <- session$macro
   m$exec <- NULL
   m$on_put <- NULL
+  m$on_step_options <- NULL
+  m$step_opts <- NULL
   m$frames <- list()
   rt <- session$rt
   rt$on_warn <- NULL

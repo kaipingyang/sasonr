@@ -11,6 +11,7 @@ sql_set_mvar <- function(eng, name, value) mv_let(eng$session$macro, name, value
 sql_set_status <- function(eng, sqlobs, sqlrc = 0) {
   assign("sqlobs", as.character(sqlobs), envir = eng$session$macro$globals)
   assign("sqlrc", as.character(sqlrc), envir = eng$session$macro$globals)
+  eng$session$macro$auto_unknown$sqlrc <- NULL
 }
 
 # Execute one SQL statement.

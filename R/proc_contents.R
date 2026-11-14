@@ -653,7 +653,7 @@ datasets_append <- function(eng, s) {
 }
 
 # PROC APPEND BASE= DATA= [FORCE]; and PROC DELETE DATA= ...; share the
-# DATASETS engine.
+# DATASETS engine (`origin` tells them apart in syntax-check mode, run.R).
 parse_proc_append <- function(p, line) {
   advance(p)
   o <- list()
@@ -672,7 +672,7 @@ parse_proc_append <- function(p, line) {
   expect_semi(p, "PROC APPEND")
   body <- proc_parse_body(p, "append", function(p, kw, sline) abort_syntax(paste0("Statement ", toupper(kw), " is not valid in PROC APPEND"), sline))
   if (is.null(o$data)) abort_unsupported("PROC APPEND without DATA= (_LAST_)", line)
-  list(type = "proc", name = "datasets", line = line, options = list(nolist = TRUE),
+  list(type = "proc", name = "datasets", origin = "append", line = line, options = list(nolist = TRUE),
        stmts = list(list(stmt = "append", base = o$base, data = o$data, force = isTRUE(o$force), line = line)), titles = body$titles)
 }
 
@@ -693,6 +693,6 @@ parse_proc_delete <- function(p, line) {
   }
   expect_semi(p, "PROC DELETE")
   body <- proc_parse_body(p, "delete", function(p, kw, sline) abort_syntax(paste0("Statement ", toupper(kw), " is not valid in PROC DELETE"), sline))
-  list(type = "proc", name = "datasets", line = line, options = list(nolist = TRUE),
+  list(type = "proc", name = "datasets", origin = "delete", line = line, options = list(nolist = TRUE),
        stmts = list(list(stmt = "delete", items = items, line = line)), titles = body$titles)
 }

@@ -282,11 +282,6 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
                                    "statement inside the step (line ", so$line, ") whose effect before the step runs ",
                                    "is not supported (supported: LINESIZE=MAX, NONOTES)"), line)
         }
-        if (!is.null(ses$options_unknown)) {
-          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") after the OPTIONS ",
-                                   "statements of a PROC DATASETS step in syntax-check mode (line ", ses$options_unknown,
-                                   "; SAS executes them, sasonr does not)"), line)
-        }
         if (if (is.null(so)) rt_notes_on() else isTRUE(so$notes)) {
           rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
                                     "The result of the operations have been set to a missing value."),

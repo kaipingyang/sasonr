@@ -94,7 +94,7 @@ mac_auto_read <- function(ses, name, e = NULL) {
                              " (not implemented)"), ses$line)
   }
   why <- ses$auto_unknown[[name]]
-  if (!is.null(why) && identical(e, ses$globals)) {
+  if (!is.null(why) && (is.null(e) || identical(e, ses$globals))) {
     abort_unsupported(paste0("&", toupper(name), " after ", why, " (its value there is not supported)"), ses$line)
   }
   if (name %in% c("syslast", "sysdsn", "sysfilrc") && identical(e, ses$globals) && sas_target_version() != "SAS 9.4") {
