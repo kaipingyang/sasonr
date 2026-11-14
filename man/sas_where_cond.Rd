@@ -7,11 +7,11 @@
 sas_where_cond(x)
 }
 \description{
-The WHERE processor writes no data-error NOTE (missing values generated,
-invalid arguments of functions and of \verb{**}, invalid numeric data,
-mathematical operations that could not be performed) and sets no
-\verb{_ERROR_}: those records of the condition's evaluation are dropped.  An
-ERROR message of a function is kept as recorded; a division by zero is not
+sasonr evaluates a WHERE condition without data-error NOTEs (missing values
+generated, invalid arguments of functions and of \verb{**}, invalid numeric
+data, mathematical operations that could not be performed) and without
+setting \verb{_ERROR_}: those records of the evaluation are dropped.  An ERROR
+message of a function and a division by zero in the condition are not
 supported.
 }
 \keyword{internal}

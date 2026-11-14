@@ -38,6 +38,29 @@ var_ref <- function(name, cx) {
 
 negate_if <- function(code, negate) if (isTRUE(negate)) paste0("sas_not(", code, ")") else code
 
+# The value of a numeric constant operand: a literal, a signed literal or an
+# arithmetic operation on such operands (the operation itself valid); NULL
+# for anything else.
+const_num_value <- function(e) {
+  switch(e$node,
+    num = if (identical(e$kind, "num")) e$value,
+    unary = if (e$op %in% c("-", "+")) {
+      v <- const_num_value(e$arg)
+      if (!is.null(v)) (if (e$op == "-") -v else v)
+    },
+    binary = if (e$op %in% c("+", "-", "*", "/", "**")) {
+      a <- const_num_value(e$lhs)
+      b <- const_num_value(e$rhs)
+      if (is.null(a) || is.null(b)) return(NULL)
+      if (e$op == "/" && b == 0) return(NULL)
+      if (e$op == "**" && ((a == 0 && b <= 0) || (a < 0 && b != trunc(b)))) return(NULL)
+      v <- switch(e$op, "+" = a + b, "-" = a - b, "*" = a * b, "/" = a / b, "**" = a^b)
+      if (is.finite(v)) v
+    },
+    NULL
+  )
+}
+
 # Expressions -------------------------------------------------------------
 
 # Operations whose missing result is a "generated" missing value for the
@@ -75,32 +98,48 @@ gen_expr <- function(e, cx) {
     ),
     binary = {
       ct <- ct_diag()
+      # in a WHERE condition the compile-time NOTEs of constant operations
+      # below are not supported
+      where_ct <- function() {
+        if (isTRUE(cx$where)) abort_unsupported("a constant operation with a compile-time NOTE in a WHERE condition", e$line)
+      }
       # constant division by zero is folded at compile time (no _ERROR_ at run time)
       if (e$op == "/" && e$lhs$node == "num" && e$rhs$node == "num" && e$rhs$value == 0) {
+        where_ct()
         ct$notes <- c(ct$notes, sprintf("NOTE: Division by zero detected during the compilation phase, detected at line %d column %d.",
                                         as.integer(e$line), as.integer(e$col %||% 0L)))
         return("NA_real_")
       }
       arith <- e$op %in% c("+", "-", "*", "/", "**")
-      if (arith && e$lhs$node == "num" && e$rhs$node == "num") {
+      # ** of two constant operands (literals, signed literals and operations
+      # on them) is folded at compile time when it is invalid: 0 ** n with
+      # n <= 0, a negative base with a non-integer exponent, or a result too
+      # large: the NOTE without a place, a missing value, no _ERROR_
+      if (identical(e$op, "**")) {
+        a0 <- const_num_value(e$lhs)
+        b0 <- const_num_value(e$rhs)
+        if (!is.null(a0) && !is.null(b0) &&
+            ((a0 == 0 && b0 <= 0) || (a0 < 0 && b0 != trunc(b0)) || is.infinite(a0^b0))) {
+          where_ct()
+          ct$notes <- c(ct$notes, "NOTE: Invalid argument(s) to the exponential operator \"**\".")
+          return("NA_real_")
+        }
+      }
+      if (arith && e$op != "**" && e$lhs$node == "num" && e$rhs$node == "num") {
         # compile-time diagnostics of constant operations
         a0 <- e$lhs$value
         b0 <- e$rhs$value
-        if (e$op == "**" && a0 == 0 && b0 <= 0) {
-          # folded at compile time: a missing value, no _ERROR_ at run time
-          ct$notes <- c(ct$notes, "NOTE: Invalid argument(s) to the exponential operator \"**\".")
-          return("NA_real_")
-        } else {
-          v0 <- switch(e$op, "+" = a0 + b0, "-" = a0 - b0, "*" = a0 * b0, "/" = a0 / b0, "**" = a0^b0)
-          if (is.infinite(v0)) {
-            ct$notes <- c(ct$notes, sprintf("NOTE: A number has become too large during the compilation phase, detected at line %d column %d. ",
-                                            as.integer(e$line), as.integer(e$col %||% 0L)))
-          }
+        v0 <- switch(e$op, "+" = a0 + b0, "-" = a0 - b0, "*" = a0 * b0, "/" = a0 / b0)
+        if (is.infinite(v0)) {
+          where_ct()
+          ct$notes <- c(ct$notes, sprintf("NOTE: A number has become too large during the compilation phase, detected at line %d column %d. ",
+                                          as.integer(e$line), as.integer(e$col %||% 0L)))
         }
       }
       # an operation on constants with a missing operand is folded as well
       if (arith && e$lhs$node %in% c("num", "missing") && e$rhs$node %in% c("num", "missing") &&
           (e$lhs$node == "missing" || e$rhs$node == "missing")) {
+        where_ct()
         ct$mv <- c(ct$mv, at_key(c(e$line, e$col %||% NA_integer_)))
         return("NA_real_")
       }
@@ -359,12 +398,15 @@ ds_code <- function(d, an, obs_col = FALSE, wheres = list()) {
   code <- sprintf("sas_ds(%s)", paste(args, collapse = ", "))
   if (obs_col) code <- paste0(code, " |> dplyr::mutate(.obs = dplyr::row_number())")
   if (!is.null(o$where)) {
-    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(o$where, new_cx("vec", an)))
+    wcx <- new_cx("vec", an)
+    wcx$where <- TRUE
+    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(o$where, wcx))
   }
   # WHERE statement conditions apply to every input data set without a WHERE=
   # option (the data set option takes precedence), before FIRSTOBS=/OBS=
   if (length(wheres) > 0 && is.null(o$where)) {
     cx <- new_cx("vec", an)
+    cx$where <- TRUE
     conds <- vapply(wheres, function(w) sprintf("sas_where_cond(sas_true(%s))", gen_expr(w, cx)), "")
     code <- sprintf("%s |> dplyr::filter(%s)", code, paste(conds, collapse = " & "))
   }

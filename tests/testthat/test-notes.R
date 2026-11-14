@@ -170,3 +170,29 @@ test_that("WHERE conditions drop function data-error NOTEs; a division by zero f
   expect_error(run_notes(c("data a; x = 0; v = .; run;", "data w; set a; where 1 / x = v; run;")),
                class = "sasonr_unsupported")
 })
+
+test_that("WHERE= options and PROC WHERE drop data-error NOTEs; compile-time NOTEs in WHERE fail loud", {
+  r <- run_notes(c("data a; a = 0; b = .; v = 1; run;", "data w; set a(where = ((a * b is missing) = v)); run;",
+                   "proc print data=a; where (a * b is missing) = v; run;"))
+  expect_false(any(grepl("Missing values were generated", r$log, fixed = TRUE)))
+  expect_identical(nrow(r$work$w), 1L)
+  for (w in c("x = 1/0", "x = 0 ** 0", "x = . + 1")) {
+    expect_error(run_notes(c("data a; x = 1; run;", paste0("data w; set a; where ", w, "; run;"))), class = "sasonr_unsupported")
+  }
+})
+
+test_that("an ERROR of a function in a WHERE condition fails loud", {
+  withr::local_options(sasonr.strict = FALSE)
+  expect_error(suppressWarnings(run_notes(c("data a; nm = ' '; run;", "data w; set a; where symget(nm) = 'x'; run;"))),
+               class = "sasonr_unsupported")
+})
+
+test_that("WHERE NOTEs: constant BETWEEN bounds in ascending order, colon comparisons in chains", {
+  where_line <- function(w) {
+    r <- run_notes(c("data a; a = 2; s = 'ab'; t = 'a'; u = 'b'; v = 1; run;", paste0("data b; set a; where ", w, "; run;")))
+    sub("^ +", "", r$log[startsWith(r$log, "      WHERE ")])
+  }
+  expect_identical(where_line("a between 3 and 1"), "WHERE (a>=1 and a<=3);")
+  expect_identical(where_line("a not between 3 and 1"), "WHERE not (a>=1 and a<=3);")
+  expect_identical(where_line("(s =: t < u) = v"), "WHERE v=s=:t and t<u;")
+})

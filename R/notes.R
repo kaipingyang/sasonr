@@ -328,6 +328,18 @@ where_text <- function(e) {
         # constant bounds are shown as a range; expression bounds keep BETWEEN
         const <- function(y) y$node %in% c("num", "str", "missing") || (y$node == "unary" && y$arg$node == "num")
         if (const(x$lo) && const(x$hi)) {
+          # numeric bounds in ascending order (missing is the lowest)
+          num_of <- function(y) switch(y$node, num = y$value, missing = -Inf, unary = -y$arg$value, NA_real_)
+          lo <- num_of(x$lo)
+          hi <- num_of(x$hi)
+          if (anyNA(c(lo, hi)) && !identical(x$lo$node, x$hi$node)) {
+            abort_unsupported("the WHERE note of BETWEEN with a character and a numeric bound")
+          }
+          if (!anyNA(c(lo, hi)) && lo > hi) {
+            x[c("lo", "hi")] <- x[c("hi", "lo")]
+          } else if (identical(x$lo$node, "str") && x$lo$value > x$hi$value) {
+            abort_unsupported("the WHERE note of BETWEEN with character bounds in descending order")
+          }
           txt <- paste0("(", w(x$lhs), ">=", w(x$lo), " and ", w(x$lhs), "<=", w(x$hi), ")")
           if (isTRUE(x$negate)) paste0("not ", txt) else txt
         } else {

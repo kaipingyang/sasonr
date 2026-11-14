@@ -252,3 +252,25 @@ test_that("0 ** 0 of two constants is folded at compile time", {
   expect_true("NOTE: Invalid argument(s) to the exponential operator \"**\"." %in% r$log)
   expect_false(any(grepl("Mathematical operations could not be performed", r$log, fixed = TRUE)))
 })
+
+test_that("** of a negative base and a non-integer exponent is an invalid argument", {
+  old <- options(sasonr.step_notes = TRUE)
+  on.exit(options(old))
+  r <- sas_run("data t; a = -8; b = 0.5; x = a ** b; e = _error_; c = (-2) ** 3; run;")
+  expect_true(is.na(r$work$t$x))
+  expect_identical(r$work$t$e, 1)
+  expect_identical(r$work$t$c, -8)
+  expect_true(any(startsWith(r$log, "NOTE: Invalid argument(s) to the exponential operator \"**\" at line 1 column")))
+})
+
+test_that("invalid ** of constant operands is folded at compile time", {
+  old <- options(sasonr.step_notes = TRUE)
+  on.exit(options(old))
+  r <- sas_run("data t; x1 = 0 ** -1; x2 = 0 ** (1-1); x3 = 2 ** 1024; x4 = (-8) ** (1/3); x5 = 2 ** 0.5; e = _error_; run;")
+  w <- r$work$t
+  expect_true(all(is.na(c(w$x1, w$x2, w$x3, w$x4))))
+  expect_equal(w$x5, sqrt(2))
+  expect_identical(w$e, 0)
+  expect_identical(sum(r$log == "NOTE: Invalid argument(s) to the exponential operator \"**\"."), 4L)
+  expect_false(any(grepl("Mathematical operations|too large", r$log)))
+})

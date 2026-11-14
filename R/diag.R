@@ -83,11 +83,11 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
 
 #' Value of a WHERE condition
 #'
-#' The WHERE processor writes no data-error NOTE (missing values generated,
-#' invalid arguments of functions and of `**`, invalid numeric data,
-#' mathematical operations that could not be performed) and sets no
-#' `_ERROR_`: those records of the condition's evaluation are dropped.  An
-#' ERROR message of a function is kept as recorded; a division by zero is not
+#' sasonr evaluates a WHERE condition without data-error NOTEs (missing values
+#' generated, invalid arguments of functions and of `**`, invalid numeric
+#' data, mathematical operations that could not be performed) and without
+#' setting `_ERROR_`: those records of the evaluation are dropped.  An ERROR
+#' message of a function and a division by zero in the condition are not
 #' supported.
 #' @export
 #' @keywords internal
@@ -97,7 +97,9 @@ sas_where_cond <- function(x) {
   force(x)
   n0 <- length(saved$notes)
   added <- if (length(rt$notes) > n0) rt$notes[(n0 + 1L):length(rt$notes)] else character()
-  if (any(startsWith(added, "ERROR"))) return(x)
+  if (any(startsWith(added, "ERROR"))) {
+    abort_unsupported(paste0("an ERROR of a function in a WHERE condition (", sub("^ERROR: ", "", added[startsWith(added, "ERROR")][1]), ")"))
+  }
   if (any(startsWith(added, "NOTE: Division by zero detected"))) {
     abort_unsupported("a division by zero in a WHERE condition")
   }
