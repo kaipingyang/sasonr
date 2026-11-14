@@ -87,7 +87,9 @@ gen_expr <- function(e, cx) {
         a0 <- e$lhs$value
         b0 <- e$rhs$value
         if (e$op == "**" && a0 == 0 && b0 <= 0) {
+          # folded at compile time: a missing value, no _ERROR_ at run time
           ct$notes <- c(ct$notes, "NOTE: Invalid argument(s) to the exponential operator \"**\".")
+          return("NA_real_")
         } else {
           v0 <- switch(e$op, "+" = a0 + b0, "-" = a0 - b0, "*" = a0 * b0, "/" = a0 / b0, "**" = a0^b0)
           if (is.infinite(v0)) {

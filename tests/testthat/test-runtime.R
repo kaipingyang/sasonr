@@ -242,3 +242,13 @@ test_that("0 ** 0 and 0 ** -1 are invalid arguments of **: NOTE, _ERROR_, missin
   expect_true(any(startsWith(r$log, "NOTE: Mathematical operations could not be performed")))
   expect_true(any(grepl("_ERROR_=1", r$log, fixed = TRUE)))
 })
+
+test_that("0 ** 0 of two constants is folded at compile time", {
+  old <- options(sasonr.step_notes = TRUE)
+  on.exit(options(old))
+  r <- sas_run("data t; x = 0 ** 0; e = _error_; run;")
+  expect_true(is.na(r$work$t$x))
+  expect_identical(r$work$t$e, 0)
+  expect_true("NOTE: Invalid argument(s) to the exponential operator \"**\"." %in% r$log)
+  expect_false(any(grepl("Mathematical operations could not be performed", r$log, fixed = TRUE)))
+})
