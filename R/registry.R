@@ -82,7 +82,7 @@ NULL
 #
 # Feature statuses are kept per SAS release (registries: column `sas_version`).
 #
-#
+# release: the registry rows of that release gate the
 # features (strict mode), and the code paths whose SAS behaviour differs
 # between the releases follow it.  Nothing is carried over from one release to
 # the other: a feature without a status for the selected release is
@@ -161,7 +161,7 @@ feature_status_text <- function(status) {
 #' * `TRUE` (the default): the program stops with a condition of class
 #'   `sasonr_strict_error` (a subclass of `sasonr_unsupported`) that names the
 #'   SAS feature, its status and the SAS line. This applies to `approximate`
-#'   features (numeric results may differ in the last bits), `unsupported`
+#'   features (the last bits of numeric results may not be exact), `unsupported`
 #'   ones, features missing from the registry, and functions called in a
 #'   context (DATA step, WHERE, PROC SQL, `%SYSFUNC`) in which they are not
 #'   supported.
@@ -176,7 +176,7 @@ feature_status_text <- function(status) {
 #' @name sasonr_strict
 #' @aliases sasonr.strict
 #' @examples
-#' # PROBT() is approximate: some results may differ in the last bits
+#' # PROBT() is approximate: the last bits of some results may not be exact
 #' try(sas_run("data a; y = probt(1.5, 10); run;"))
 #' old <- options(sasonr.strict = FALSE)
 #' res <- suppressWarnings(sas_run("data a; y = probt(1.5, 10); run;"))
@@ -220,7 +220,7 @@ registry_arg_types <- function(name, n) {
   out
 }
 
-#
+# c(minimum, maximum) number of accepted arguments (maximum NA when
 # unlimited), or NULL when the function is not in the registry.
 registry_arg_counts <- function(name) {
   reg <- sas_feature_registry("functions")
@@ -229,7 +229,7 @@ registry_arg_counts <- function(name) {
   c(as.numeric(r$sas_minarg[1]), suppressWarnings(as.numeric(r$sas_maxarg[1])))
 }
 
-#
+# Default width of a format or informat used without a width
 # (feature registry, from the SAS inventory); NA when unknown.
 registry_defw <- function(kind, fmt) {
   reg <- sas_feature_registry("formats")
@@ -249,7 +249,7 @@ sas_known_function <- function(name) {
 
 # Is `fmt` (a format, or an informat with kind = "informat") one of SAS 9.4
 # (inst/registry/sas_format_names.txt, "F NAME" / "I NAME" from the SAS
-# inventory)?  An unknown name is SAS's compile-time ERROR 48-59.
+# inventory)?  An unknown name is the compile-time ERROR 48-59.
 sas_known_format <- function(fmt, kind = "format") {
   if (is.null(registry_cache$fmt_names)) {
     registry_cache$fmt_names <- sas_function_inventory(system.file("registry", "sas_format_names.txt", package = "sasonr"))

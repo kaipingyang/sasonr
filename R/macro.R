@@ -285,10 +285,10 @@ datalines_stmt_words <- c("datalines", "cards", "lines", "datalines4", "cards4",
 # The compiler-bound sink: tracks statements (outside quotes and comments) and
 # cuts complete steps out of the text.
 #
-# Global statements take effect as soon as they are complete ("Global
-# statements are not executable statements; they are declarative statements
-#
-# Global Statements: Reference), interleaved with macro execution: OPTIONS
+# Global statements take effect as soon as they are complete (SAS 9.4 Global
+# Statements: Reference describes them as declarative statements that take
+# effect when the program statements are compiled), interleaved with macro
+# execution: OPTIONS
 # MINOPERATOR and OPTIONS SASAUTOS= apply to the macro call that follows them
 # with no step boundary in between.  So every statement outside a step (open code)
 # is handed to the executor when its semicolon is seen, before the macro
@@ -297,7 +297,7 @@ datalines_stmt_words <- c("datalines", "cards", "lines", "datalines4", "cards4",
 # is complete; an OPTIONS statement of the step is also handed to
 # `ses$on_step_options` at its semicolon (engine_step_options(), run.R), which
 # keeps the options the macro code after it in the step sees (`ses$step_opts`;
-#
+# they apply when the statement is compiled).
 code_sink <- function(ses) {
   s <- new.env(parent = emptyenv())
   s$compiler <- TRUE
@@ -449,7 +449,7 @@ code_sink <- function(ses) {
 # Scan `src` from its cursor, resolving macro triggers into `sink`.
 #   mode     "code": compiler-bound text, single quotes hide triggers;
 #            "macro": macro statement text; single quotes also hide triggers
-#
+#            (`%let q='AT&t';` stores `'AT&t'` unresolved);
 #            "macro_bq": %BQUOTE / %NRBQUOTE arguments, single quotes only group.
 #   stop     list(chars = code points, kw = %keywords, nodepth = TRUE/FALSE):
 #            return (without consuming) at a top-level stop character or a
@@ -576,7 +576,7 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
 }
 
 # `%* ... ;` comment starting after `%*`; quotes inside are honoured, and an
-#
+# unmatched one swallows the rest of the text.
 mp_skip_macro_comment <- function(src, k) {
   while (k <= src$n) {
     c <- src$cp[k]

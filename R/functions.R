@@ -336,7 +336,7 @@ sas_f_transtrn <- function(x, from, to) {
 sas_f_translate <- function(x, ...) {
   pairs <- list(...)
   x <- as_sas_chr(x)
-  #
+  # an unpaired last to-argument is ignored
   for (k in seq(1, length(pairs) - 1L, by = 2)) {
     to <- pairs[[k]]
     from <- pairs[[k + 1]]
@@ -425,7 +425,7 @@ class_pos <- function(x, mods, negate, start) {
     if (negate) hit <- !hit
     n <- length(ch)
     if (is.na(st)) st <- 1
-    #
+    # a start position that truncates to 0 finds nothing
     st <- trunc(st)
     if (st == 0) return(0)
     if (st >= 0) {
@@ -584,7 +584,7 @@ sas_f_compare <- function(a, b, mods = "") {
 sas_f_symget <- function(symtab, name, .at = NULL) {
   rt <- rt_diag()
   vapply(as_sas_chr(name), function(nm0) {
-    #
+    # trailing blanks are ignored; a leading blank makes the name invalid (blank result,
     # NOTE "Invalid argument to function SYMGET(' mv ')", _ERROR_)
     nm <- sas_rtrim(nm0)
     if (!nzchar(nm)) {
@@ -683,9 +683,8 @@ prx_compile <- function(re, rt = .active$rt, fname = "PRX") {
   out
 }
 
-#
-# ("ERROR: Unmatched [ before HERE mark in regex ..." for PRXMATCH and
-#
+# An invalid regular expression (PRXMATCH, PRXCHANGE): sasonr does not write
+# the Perl compiler's diagnostic to the log, so it fails loud.
 prx_invalid_note <- function(fname, args, .at) {
   abort_unsupported(sprintf("%s() of an invalid regular expression (the Perl diagnostic in the log is not supported)",
                             toupper(fname)), .at[1] %||% NULL)
@@ -742,7 +741,7 @@ sas_f_prxchange <- function(re, times, x, .at = NULL, session = NULL) {
     if (is.na(n)) return("")
     if (n == -1 || n >= 2^31) return(gsub(p$pattern, p$repl, s, perl = TRUE, ignore.case = p$icase))
     if (n < 0) {
-      #
+      # an ERROR is written, the result is blank and the step continues
       # (-1E300 and below: invalid argument, see fn_policy)
       if (n > -1e300) {
         rt_error(sprintf("ERROR: Argument 2 to the routine PRXCHANGE, the maximum number of replacements, must be nonnegative but the value is %s.",
@@ -784,8 +783,7 @@ sas_f_modz <- function(a, b, .at = NULL) {
   out
 }
 
-#
-# multiply-add).
+# Remainder a - b * trunc(a / b) with one rounding (a fused multiply-add).
 mod_exact <- function(a, b) {
   q <- trunc(a / b)
   out <- rep(NA_real_, length(a))
@@ -796,10 +794,10 @@ mod_exact <- function(a, b) {
 
 # Supported domain of MOD and MODZ (registry status partial).  MODZ: the
 # arguments lie within 1E-140..1E140 in magnitude and a / b is not an integer
-#
+# unless the remainder is exactly 0 (the result is then 0 where the exact
 # remainder is a few ulps).  MOD (`exact_only`) additionally needs arguments
 # that are multiples of 2^-10 below 2^53 in magnitude (their remainder is exact,
-# so SAS's fuzz cannot change it) or a remainder that the fuzz rule sets to 0.
+# so the fuzz cannot change it) or a remainder that the fuzz rule sets to 0.
 mod_domain_check <- function(fname, a, b, exact_only, fuzz_zero = NULL) {
   ok <- !is.na(a) & !is.na(b) & b != 0
   if (!any(ok)) return(invisible())
@@ -877,18 +875,17 @@ sas_f_geomean <- function(...) row_stat(function(v) {
 #' @export
 sas_f_harmean <- function(...) row_stat(function(v) {
   if (length(v) == 0 || any(v < 0)) return(NA_real_)
-  if (any(v == 0)) return(0) #
+  if (any(v == 0)) return(0) # a zero value gives 0
   # sequential double sum
   length(v) / stats_seq_sum(1 / v)
 }, ...)
 #' @export
 sas_f_skewness <- function(...) {
   sk <- ds_moments("skewness", num_args(...))$skew
-  #
-  # argument lists where the kernel leaves a rounding residue of about 1E-15,
-  # but it also keeps residues as small as 9.99E-16 (n = 3), so no threshold on
-  # the result separates them.  Results below 1E-12 in magnitude therefore fail
-  # loud.
+  # A guard, not a fitted rule.  For symmetric argument lists the kernel can
+  # leave a rounding residue of about 1E-15 where the skewness is 0, and no
+  # threshold on the result separates such residues from small non-zero
+  # results.  Results below 1E-12 in magnitude therefore fail loud.
   if (any(!is.na(sk) & sk != 0 & abs(sk) < 1e-12)) {
     abort_unsupported("SKEWNESS() with a result below 1E-12 in magnitude (possibly a rounding residue of 0; not supported)")
   }
@@ -975,7 +972,7 @@ sas_f_lcm <- function(...) {
     if (anyNA(r) || any(abs(r) >= 2^53)) return(NA_real_)
     g <- function(a, b) if (b == 0) abs(a) else g(b, a %% b)
     out <- Reduce(function(a, b) if (a == 0 || b == 0) 0 else abs(a) / g(a, b) * abs(b), trunc(r))
-    #
+    # a result beyond 2^53 is missing, without a NOTE
     if (out > 2^53) NA_real_ else out
   })
 }
@@ -1040,7 +1037,7 @@ sas_f_constant <- function(name, p = NULL) {
     if (nm == "exactint" && !is.null(p) && !is.na(pp)) {
       # EXACTINT(n): largest integer stored exactly in n bytes (3 to 8)
       if (is.na(pp) || pp != trunc(pp) || pp < 2 || pp > 8) {
-        #
+        # an ERROR is written, the result is missing and the step continues (fn_policy counts the place)
         if (!is.na(pp)) {
           rt_error("ERROR: The second argument to the CONSTANT function with first argument of EXACTINT must be between 2 and 8.")
         }
@@ -1076,7 +1073,7 @@ sas_f_probnorm <- function(x) stats::pnorm(x)
 #' @export
 sas_f_probit <- function(p) {
   out <- stats::qnorm(p)
-  out[!is.na(out) & out == 0] <- -0 #
+  out[!is.na(out) & out == 0] <- -0 # PROBIT(0.5) is -0
   out
 }
 #' @export
@@ -1392,7 +1389,7 @@ sas_f_probbnml <- function(p, n, m) stats::pbinom(m, n, p)
 #' @export
 sas_f_poisson <- function(m, n) stats::ppois(n, m)
 
-#
+# the distribution names (prefixes of these are not decided here: fail loud)
 sas_dist_names <- c("bernoulli", "beta", "binomial", "cauchy", "chisquare", "exponential", "f", "gamma", "gaussian",
                     "geometric", "genpoisson", "hypergeometric", "igauss", "laplace", "logistic", "lognormal", "negb",
                     "negbinomial", "normal", "pareto", "poisson", "t", "tweedie", "uniform", "wald", "weibull")
@@ -1448,7 +1445,7 @@ dist_fun <- function(kind, dist, x, args) {
     abort_unsupported("QUANTILE('T', 0.5, ...) (not supported)")
   }
   fa <- Filter(Negate(is.null), f$a)
-  #
+  # log(0) is written as -SQRT(BIG) in LOGPDF/LOGCDF/LOGSDF
   logz <- function(v) ifelse(!is.na(v) & v == -Inf, -sqrt(.Machine$double.xmax), v)
   out <- suppressWarnings(switch(kind,
     cdf = do.call(f$p, c(list(x), fa)),
@@ -1572,9 +1569,9 @@ sas_f_yrdif <- function(start, end, basis = "AGE") {
     b <- floor(b)
     bs <- toupper(strip_both(bs))
     if (bs == "AGE") {
-      #
-      #
-      # are in the supported domain
+      # whole years plus the remaining days in a 365-day year; the last bits
+      # of a fractional age are not exact, so only whole years are in the
+      # supported domain
       sgn <- 1
       if (b < a) {
         t <- a

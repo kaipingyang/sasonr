@@ -1,32 +1,32 @@
 # SAS error model of sas_run(on_error = "sas").
 #
-#
-# writes "NOTE: The SAS System stopped processing this step because of
-# errors." and, outside PROC SQL, enters syntax-check mode (OBS=0): the steps
-# that follow are compiled but not run -- a DATA step creates its output data
-# sets with 0 observations, PROC steps produce nothing -- while global
-# statements and the macro language are still processed.  An ERROR inside
-# PROC SQL sets NOEXEC for the rest of that PROC SQL step only.  Output data
-# sets of the failing step: a new one is created with 0 observations and the
-# variables compiled so far; an existing one is not replaced.  SYSERR/SYSCC
-#
+# The batch-mode model: a step that raises an ERROR is not executed (or
+# stops); the log gets "NOTE: The SAS System stopped processing this step
+# because of errors." and, outside PROC SQL, syntax-check mode (OBS=0)
+# starts: the steps that follow are compiled but not run -- a DATA step
+# creates its output data sets with 0 observations, PROC steps produce
+# nothing -- while global statements and the macro language are still
+# processed.  An ERROR inside PROC SQL sets NOEXEC for the rest of that PROC
+# SQL step only.  Output data sets of the failing step: a new one is created
+# with 0 observations and the variables compiled so far; an existing one is
+# not replaced.  SYSERR and SYSCC are set.
 #
 # Only SAS ERRORs (`sasonr_syntax_error`, `sasonr_runtime_error`) are handled
 # this way.  `sasonr_unsupported` (fail loud) and R errors always abort.  An
 # execution-time ERROR in a DATA step (data sets partly written) still aborts
-#
+# with `sasonr_unsupported`: the partial data sets are not supported yet.
 #
 # The variables of the 0-observation data sets come from the parser and the
 # analyzer, never from scanning tokens: the step's AST (or, after a syntax
 # error, a statement-level recovery parse) is translated with the failing
-#
-# translation (names, types, lengths, formats) is used.  What a failing
-# statement contributes:
+# statements replaced by what they contribute at compile time, and the output
+# metadata of that translation (names, types, lengths, formats) is used.  What
+# a failing statement contributes:
 #   assignment  its target and the variables named before the error
-#
+#   SET / MERGE nothing; the statement is ignored
 #   PROC SORT   the OUT= data set, with 0 variables
-# Any other failing statement or PROC fails loud (sasonr_unsupported): sasonr
-#
+# Any other failing statement or PROC fails loud (sasonr_unsupported): what
+# WORK holds then is not supported.
 
 err_message_lines <- function(e) {
   msg <- conditionMessage(e)
@@ -109,7 +109,7 @@ err_parse_recover <- function(text) {
   list(type = "data", line = line, null = any(is_null), outputs = if (any(is_null)) list() else outputs, stmts = stmts)
 }
 
-#
+# What a failing DATA step statement contributes at compile time: a list of
 # statements, or NULL when that is not supported (fail loud).
 err_failed_stmt <- function(kind, vars, target, line) {
   if (kind %in% c("set", "merge")) return(list())
@@ -121,7 +121,7 @@ err_failed_stmt <- function(kind, vars, target, line) {
     }))
 }
 
-#
+# Output metadata (eng$session$meta form) of a DATA step as compiled, or NULL.
 err_data_schema <- function(eng, step) {
   stmts <- list()
   for (s in step$stmts) {
@@ -139,7 +139,7 @@ err_data_schema <- function(eng, step) {
                    sasonr_syntax_error = function(e) e, sasonr_runtime_error = function(e) e, error = function(e) NULL)
     if (is.null(tr)) return(NULL)
     if (!inherits(tr, "condition")) return(tr$meta[vapply(step$outputs, `[[`, "", "name")])
-    #
+    # an ERROR of the analyzer at one statement: replace it by what it contributes at compile time
     ln <- tr$sas_line
     k <- which(vapply(step$stmts, function(s) identical(as.integer(s$line), as.integer(ln)), logical(1)))
     if (length(k) != 1L) return(NULL)
@@ -154,7 +154,7 @@ err_data_schema <- function(eng, step) {
 }
 
 # Output data sets of the failing step and their metadata (eng$session$meta form) as
-# SAS has compiled them when the step stops: list(kind, outputs), or NULL
+# compiled when the step stops: list(kind, outputs), or NULL
 # when they cannot be derived from the parsed step.
 err_recover_step <- function(eng, text) {
   step <- eng$cur_step %||% err_parse_recover(text)
@@ -186,9 +186,9 @@ err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
 }
 
 # An ERROR in a global statement (`options ls=abc;` in open code, also when a
-#
-# and leaves SYSERR alone, writes no "stopped processing this step" NOTE, and
-# enters syntax-check mode at the next step, which writes "Due to ERROR(s)
+# macro generates the statement): the ERROR is written, SYSCC is set to 1012
+# and SYSERR left alone, no "stopped processing this step" NOTE is written,
+# and syntax-check mode starts at the next step, which writes "Due to ERROR(s)
 # above, SAS set option OBS=0 ..." (a DATA step; engine_exec_steps()).  Other
 # errors, an error inside a step or PROC SQL, in syntax-check mode or under
 # NOSYNTAXCHECK are not supported: fail loud.

@@ -141,7 +141,7 @@ parse_ds_options <- function(p, context) {
       expect_type(p, "name", "a variable name after IN=")
     } else if (opt %in% c("firstobs", "obs") && context == "input") {
       # n, nK / nM / nG / nT (multiples of 1024), MIN or MAX (the largest count);
-      #
+      # MIN is 1 for FIRSTOBS= and 0 for OBS=
       if (tk_type(p) == "name" && tk_low(p) %in% c("min", "max")) {
         opts[[opt]] <- if (tk_low(p) == "min") (if (opt == "firstobs") 1 else 0) else 2^63 - 1
         advance(p)
@@ -337,7 +337,7 @@ parse_statement <- function(p) {
 }
 
 # SUBSTR(target, position <, length>) = value; replaces part of a character
-#
+# variable in place (the "left-hand SUBSTR").
 parse_substr_assign <- function(p) {
   line <- tk_line(p)
   col <- tk_col(p)
@@ -542,7 +542,7 @@ parse_set <- function(p, kind) {
       advance(p, 2L)
       set_opts <- c("end", "nobs", "point", "key", "indsname", "curobs", "open", "keyreset")
       if (!opt %in% set_opts) {
-        # not an option of the SET/MERGE statement: SAS's syntax ERROR 22-322
+        # not an option of the SET/MERGE statement: syntax ERROR 22-322
         abort_syntax(paste0("expected a data set name or a ", toupper(kind), " statement option but found ", toupper(opt), "="), oline)
       }
       if (!opt %in% c("end", "nobs") || (kind == "merge" && opt == "nobs")) {

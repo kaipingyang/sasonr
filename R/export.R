@@ -1,5 +1,5 @@
-#
-# table of variable attributes shaped like DICTIONARY.COLUMNS.
+# Export WORK data sets as CSV files in the PROC EXPORT (DBMS=CSV) layout,
+# plus a table of variable attributes shaped like DICTIONARY.COLUMNS.
 
 csv_field <- function(x) {
   x[is.na(x)] <- ""

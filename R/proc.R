@@ -10,7 +10,7 @@
 # or longer than one page of a finite PAGESIZE= fails loud
 # (engine_add_listing(), run.R).
 # PAGENO= only changes the page numbers, which are written only under NUMBER.
-#
+# The others do not change what sasonr writes (log source echo, timing,
 # MPRINT ...).
 options_ignorable <- c(
   "center", "nocenter", "date", "nodate", "number", "nonumber", "ls", "linesize",
@@ -43,9 +43,9 @@ parse_global_stmt <- function(p, open_code = FALSE) {
   }
   if (low == "filename") {
     advance(p)
-    #
-    # logical assign for filename 'text'." (with the quotes written, "..." for
-    # a double-quoted name) and sets SYSFILRC to -20004; `col` locates the
+    # `FILENAME 'text';` is not an ERROR: the log gets "WARNING: No logical
+    # assign for filename 'text'." (with the quotes written, "..." for a
+    # double-quoted name) and SYSFILRC is set to -20004; `col` locates the
     # quote (engine_quote_at())
     if (tk_type(p) %in% c("str", "str_macro") && tk_type(p, 1L) == "semi" && !grepl("['\"]", tk_val(p))) {
       text <- tk_val(p)

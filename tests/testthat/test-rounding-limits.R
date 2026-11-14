@@ -22,7 +22,7 @@ test_that("w.d integer zeros: only inside the supported domain and at the known 
 })
 
 test_that("ROUNDE and ROUNDZ fail loud from |x/unit| = 2^49 as ROUND does", {
-  #
+  # ROUND(507561523905906.125, 0.25) is 507561523905906 (not the nearest multiple)
   expect_error(sas_f_round(507561523905906.125, 0.25), class = "sasonr_unsupported")
   expect_error(sas_f_rounde(507561523905906.125, 0.25), class = "sasonr_unsupported")
   expect_error(sas_f_roundz(507561523905906.125, 0.25), class = "sasonr_unsupported")
@@ -38,7 +38,7 @@ test_that("integers from 1E18 to 1E21 without decimals: the known point only", {
   expect_identical(trimws(sas_f_putn(1e18, "8.")), "1E18")                # no fixed form fits: E notation
 })
 
-test_that("ROUNDE: the undetermined window fails loud from 1.1E-12 |q| > 1E-6", {
+test_that("ROUNDE: the unsupported window fails loud from 1.1E-12 |q| > 1E-6", {
   # 1.5E-6 below 1000000.5: outside the 0.8-1.25 W band
   expect_error(sas_f_rounde(1000000.5 - 1.5e-6, 1), class = "sasonr_unsupported")
   expect_error(sas_f_rounde(1000000.5 - 1e-9, 1), class = "sasonr_unsupported")

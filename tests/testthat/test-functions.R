@@ -9,7 +9,7 @@ run1 <- function(stmts, setup = "") {
 test_that("$HEXw. and HEX16. write the bytes of the value", {
   d <- run1("length r $6 h $12; r = 'bcd'; h = putc(r, '$hex12.'); x = 1; n = put(x, hex16.); z = put(-0.4 * 0, hex16.);")
   expect_equal(d$h, "626364202020")
-  #
+  # a new variable gets the length of PUTC's first argument (putc('abc', '$hex6.') = '616')
   d2 <- run1("r = putc('abc', '$hex6.'); l = vlength(r);")
   expect_equal(d2$r, "616")
   expect_equal(d2$l, 3)
@@ -128,7 +128,7 @@ run;")
   expect_equal(res$work$d$f, 21966)   # 15 Feb -> start of 21-29 block
 })
 test_that("EXIST() reports WORK and SASHELP members", {
-  #
+  # 1 / 0 as EXIST returns them
   res <- sas_run("data work.present; x = 1; run;
 data work.check;
   e1 = exist('work.present');
@@ -142,7 +142,7 @@ run;")
   # PROC SQL
   r2 <- sas_run("data work.present; x = 1; run; proc sql; create table t as select exist('work.present') as e from present; quit;")
   expect_identical(r2$work$t$e, 1)
-  #
+  # a SASHELP member missing from the SASHELP directory fails loud (it may still be a SASHELP member)
   expect_error(sas_run("data c; f = exist('sashelp.nope'); run;", on_error = "abort"), class = "sasonr_unsupported")
   # unsupported shapes fail loud instead of guessing
   expect_error(sas_run("data c; e = exist('other.ds'); run;"), class = "sasonr_unsupported")

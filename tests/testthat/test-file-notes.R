@@ -67,7 +67,7 @@ test_that("INPUT() with invalid data is listed in the mathematical-operations NO
   expect_match(paste(log[k:(k + 3)], collapse = " "), "1 at 2:7")
 })
 
-test_that("an invalid PRX pattern fails loud (the Perl diagnostic in the log is not supported)", {
+test_that("an invalid PRX pattern fails loud (no Perl diagnostic in the log)", {
   notes_on()
   expect_error(sas_run("data _null_;\n  rx = prxparse('/(abc/');\nrun;"), class = "sasonr_unsupported")
 })
@@ -83,7 +83,7 @@ test_that("the PDV dump writes a blank character value as one blank and wraps at
   log <- sas_run("data _null_; a = ' '; b = substr('abc', 9); run;")$log
   expect_true("a=  b=  _ERROR_=1 _N_=1" %in% log)
   items <- c(paste0("s=", strrep("ab", 100)), "r= ", "_ERROR_=1", "_N_=1")
-  #
+  # a value wider than the line continues on the next lines (cut every LINESIZE columns)
   expect_equal(dump_wrap(items, 132L), c(substr(items[1], 1, 132), paste(substring(items[1], 133), "r=  _ERROR_=1 _N_=1")))
   expect_equal(dump_wrap(c("a=1", "b=2"), 132L), "a=1 b=2")
 })

@@ -376,7 +376,7 @@ parse_freq_tables <- function(p) {
           v <- tolower(parse_opt_value(p, k, kl))
           if (v != "none") abort_unsupported(paste0("TABLES option PLOTS=", toupper(v)), kl)
         } else if (k == "testp" || k == "testf") {
-          #
+          # TESTP= / TESTF= are also accepted as TABLES statement options next
           # to CHISQ; they give the null proportions / frequencies of the
           # one-way goodness-of-fit test
           freq_stat_gate(k, kl)
@@ -603,8 +603,8 @@ freq_num <- function(v) {
   trimws(sas_fmt_best(v, 8L))
 }
 freq_pct <- function(v) if (is.na(v)) "." else display_fixed(v, 2L)
-#
-# a six-column width (BEST6.), so 8.7179, -3.718 and 10.909 all take six
+# Cell statistics (expected, deviation, cell chi-square) are printed with a
+# six-column width (BEST6.), so 8.7179, -3.718 and 10.909 all take six
 # characters and trailing zeros are dropped.
 freq_stat_num <- function(v) {
   if (is.na(v)) return(".")
@@ -931,7 +931,7 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   tot <- sum(tab)
   rt_ <- rowSums(tab)
   ct_ <- colSums(tab)
-  #
+  # MISSPRINT: the missing-value level is listed as an extra row and column
   # (its cells show the observed counts) but excludes it from the totals,
   # percentages and statistics
   missprint <- isTRUE(o$missprint) && !isTRUE(o$missing)
@@ -1291,7 +1291,7 @@ freq_binomial <- function(cnt, alpha = 0.05, p0 = 0.5, x_index = 1L, cl = NULL, 
   agresti <- lim(c(pt - hac, pt + hac))
   jeffreys <- lim(c(if (x <= 0) 0 else stats::qbeta(alpha / 2, x + 0.5, n - x + 0.5),
                     if (x >= n) 1 else stats::qbeta(1 - alpha / 2, x + 0.5, n - x + 0.5)))
-  #
+  # continuity-corrected forms (a 1/(2n) shift for Wald, the score interval
   # with the ±1 terms for Wilson)
   wald_c <- lim(c(p - (z * ase + 0.5 / n), p + (z * ase + 0.5 / n)))
   q <- 1 - p
@@ -2020,8 +2020,8 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       keep_r <- rowSums(tb) > 0
       keep_c <- colSums(tb) > 0
       if (sum(keep_r) < 2 || sum(keep_c) < 2) {
-        #
-        # statistic and prints no statistics block at all
+        # a table that structurally has a single row or column: no statistic is
+        # computed and no statistics block is printed at all
         st$nostat_structural <- TRUE
         return(st)
       }
@@ -2056,7 +2056,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
           if (nrow(tb) != 2L || ncol(tb) != 2L) {
             abort_unsupported("FISHER with non-integer weights for a table that is not 2x2 (only the 2x2 behaviour is supported)")
           }
-          #
+          # Fisher's exact test is not computed for a 2x2 table of
           # fractional (non-integer) frequencies: the chi-square table is still
           # printed but has no Fisher block
         } else {
@@ -2091,7 +2091,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
 }
 
 # The BINOMIAL block of a one-way table: proportion, confidence limits and the
-#
+# asymptotic (and optionally exact) test.  Column widths:
 # the proportion block is 32 columns wide, 22 when CL= is given (the limits
 # then go in their own table), 35 when the exact test adds its longer labels.
 freq_binomial_listing <- function(st, info) {
@@ -2251,7 +2251,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
              "Row or column sum zero. No statistics computed for this table.", "", freq_sample_size(st))
     did <- TRUE
   } else if ((isTRUE(o$chisq) || isTRUE(o$fisher) || "fisher" %in% sp$exact) && k == 2 && !is.null(st$pchi)) {
-    #
+    # FISHER also prints the chi-square table (it is computed with every 2-way test)
     rows <- list(c("Chi-Square", st$df_pchi, st$pchi, st$p_pchi), c("Likelihood Ratio Chi-Square", st$df_lrchi, st$lrchi, st$p_lrchi))
     if (!is.null(st$ajchi)) rows <- c(rows, list(c("Continuity Adj. Chi-Square", 1, st$ajchi, st$p_ajchi)))
     rows <- c(rows, list(c("Mantel-Haenszel Chi-Square", 1, st$mhchi, st$p_mhchi)))
@@ -2347,7 +2347,6 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
 #
 freq_riskdiff_listing <- function(st, info) {
   #
-  #
   if (sas_target_version() != "SAS 9.4") abort_unsupported(paste0("PROC FREQ RELRISK / RISKDIFF listing for SAS 9.4 ", sas_target_version()))
   rd <- st$rd
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
@@ -2392,9 +2391,7 @@ freq_riskdiff_listing <- function(st, info) {
 
 # RELRISK: the default "Odds Ratio and Relative Risks" table, or - when CL= is
 #
-# layout).
 freq_relrisk_listing <- function(st, info) {
-  #
   #
   if (sas_target_version() != "SAS 9.4") abort_unsupported(paste0("PROC FREQ RELRISK / RISKDIFF listing for SAS 9.4 ", sas_target_version()))
   rel <- st$rel

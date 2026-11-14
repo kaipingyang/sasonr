@@ -372,18 +372,18 @@ sql_eval_lowered <- function(low, ctx, rows = NULL) {
 }
 
 # "Missing values were generated" / "Mathematical operations could not be
-#
-# NOTE in PROC SQL (`x + 1` of a missing x, `mean(x)+1` over no rows), so
+# performed" NOTEs of a PROC SQL expression.  PROC SQL writes no
+# missing-value NOTE (`x + 1` of a missing x, `mean(x)+1` over no rows), so
 # those are dropped.
 # A math error that comes with a function's data-error NOTE (MDY(2,30,2024))
-#
-# MDY."); any other math error is not supported in PROC SQL: fail loud.
+# is covered by that NOTE (only "Invalid argument to function MDY." is
+# written); any other math error is not supported in PROC SQL: fail loud.
 sql_count_notes <- function(mv, math, function_note = FALSE) {
   if (length(math) && !function_note) abort_unsupported("the PROC SQL NOTE for mathematical operations that could not be performed (not supported)")
   invisible()
 }
 
-#
+# Data-error NOTEs of functions evaluated by PROC SQL.  PROC SQL writes
 # "NOTE: Invalid argument to function MDY. Missing values may be generated."
 # (no arguments, no line) where the DATA step writes "NOTE: Invalid argument to
 # function MDY(2,30,2024) at line ..."; other NOTEs, and several failing calls

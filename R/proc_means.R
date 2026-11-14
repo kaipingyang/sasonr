@@ -1,9 +1,9 @@
 # PROC MEANS / PROC SUMMARY: parser, translation and run-time engine.
 #
 # Statistics are computed in R from the observation values, frequencies and
-#
-# layout (_TYPE_ / _FREQ_ / _STAT_ or named statistics) and the listing
-# follows the MEANS procedure's printed table.
+# weights (no external package); the output data sets have the OUTPUT OUT=
+# layout (_TYPE_ / _FREQ_ / _STAT_ or named statistics) and the listing the
+# layout of the printed MEANS table.
 
 means_stat_names <- c(
   "n", "nmiss", "mean", "std", "var", "min", "max", "range", "sum", "uss", "css", "stderr", "cv",
@@ -337,11 +337,11 @@ translate_proc_means <- function(step, meta, last) {
   }
   if (length(stats) == 0) stats <- c("n", "mean", "std", "min", "max")
   # The panel layout is implemented in means_listing() except the heading
-  #
-  # multi-word headings ("Std Error" -> "Std"/"Error") and abbreviates single
-  # words ("Minimum" -> "Min", "Coefficient of Variation" -> "Coeff of"/
-  #
-  #
+  # split for a narrow FW=: below the default field width multi-word headings
+  # are split again ("Std Error" -> "Std"/"Error") and single words are
+  # abbreviated ("Minimum" -> "Min", "Coefficient of Variation" -> "Coeff of"/
+  # "Variation"), which sasonr does not support.  Ten or more statistics are
+  # split into panels.
   if (printing && !is.null(o$fw) && o$fw < 12L) {
     abort_unsupported("PROC MEANS listing with FW= below the default 12 (re-split and abbreviated column headings are not supported)", step$line)
   }
@@ -557,11 +557,11 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
       if ("mode" %in% stats) {
         r <- rle(xs)
         mx <- max(r$lengths)
-        #
+        # the value of a run is its first observation (0 and -0 tie; the first is kept)
         k <- which(r$lengths == mx)[1]
         val$mode <- if (mx > 1 || length(r$values) == 1) xs[sum(r$lengths[seq_len(k - 1L)]) + 1L] else NA_real_
       }
-      #
+      # the sign of a zero quantile of data with both 0 and -0 is not supported
       if (any(xv == 0 & 1 / xv < 0) && any(unlist(val[c(setdiff(q_stats, "qrange"), "mode")]) %in% 0)) {
         abort_unsupported("PROC MEANS quantile of 0 for data that contain both 0 and -0 (sign of the result not determined)")
       }
@@ -761,7 +761,7 @@ means_out_layout <- function(sp, o) {
   nms <- vapply(c(cols, stat_cols), `[[`, "", "name")
   dup <- nms[duplicated(nms)]
   if (length(dup) > 0) {
-    #
+    # the first is kept, with a WARNING that the variable already exists
     keep <- !duplicated(vapply(stat_cols, `[[`, "", "name")) & !vapply(stat_cols, `[[`, "", "name") %in% vapply(cols, `[[`, "", "name")
     stat_cols <- stat_cols[keep]
   }
@@ -830,9 +830,7 @@ means_default_text <- function(v, w) {
   if (v == 0) return("0")
   a <- abs(v)
   if (a < .Machine$double.xmin) {
-    #
-    # ("0.00000E-309" for the smallest subnormal); the rule is not known, so
-    # do not guess.
+    # the text of a subnormal statistic is not supported; do not guess.
     abort_unsupported("PROC MEANS default display of a subnormal statistic value (not supported; use MAXDEC=)")
   }
   neg <- v < 0
@@ -889,8 +887,8 @@ means_num_text <- function(v, w, maxdec) {
     return(means_default_text(v, w))
   }
   if (v != trunc(v) && (abs(v) >= 1e6 || abs(v) < 1e-4)) {
-    #
-    # other field widths is not implemented
+    # these magnitudes get other decimals (1622403.34, 0.000012500); the rule
+    # for other field widths is not implemented
     abort_unsupported("PROC MEANS default decimals for a non-integer statistic of 1E6 or more or below 1E-4 (not supported; use MAXDEC=)")
   }
   dec <- max(0L, as.integer(round((w - 2) * 0.7)))
@@ -917,8 +915,8 @@ means_stat_col <- function(s, cells, sp, by_nw = NULL) {
   list(parts = parts, width = max(vw, minw), right = TRUE, cells = cells)
 }
 
-#
-# field for the whole data set, not for the counts of the group (13
+# N / N Miss: as wide as the printed counts.  With BY groups the field is
+# sized for the whole data set, not for the counts of the group (13
 #
 #
 # is non-missing in as many digits as there are observations; otherwise a
@@ -942,9 +940,7 @@ means_by_count_width <- function(d, sp, k) {
 # Printed-table geometry ------------------------------------------------------------
 #
 #
-#
-# 16) and MAXDEC= 0 to 7, with and without CLASS.  The line is filled left to
-# right as follows.
+# left to right as follows.
 #
 #  * Every statistic column is a field of FW= columns (default 12), except
 #    N / N Miss (as wide as the printed counts) and t Value / Pr > |t|; a
@@ -1102,21 +1098,18 @@ means_listing <- function(d, sp, cells_by, print_types) {
                                    vapply(fixed, function(c) as.integer(c$width), 1L), ls)
       bad <- Filter(function(p) p$width > ls, panels)
       if (length(bad) > 0) {
-        #
-        # length, or a very wide Variable column) by narrowing that column and
-        # redistributing the spare columns; that rule is not determined
+        # an over-long fixed part (a CLASS variable with a long length, or a
+        # very wide Variable column) would have to be narrowed and the spare
+        # columns redistributed; that rule is not implemented
         abort_unsupported("PROC MEANS listing wider than LINESIZE= (narrowing the class/fixed columns is not supported)")
       }
       if (length(fixed) > 0 && (length(panels) >= 3L || ls < 120L)) {
-        # The fixed columns follow this layout for one or two panels.  The rule
-        # holds for LINESIZE= 120 to 200 and one or two CLASS variables of
-        # length 1, 4 or 8; other line sizes of 120 or more and other lengths
-        # use it as well.  Below LINESIZE=120 and across three or more
-        #
-        # gaps around the CLASS columns) by a rule that is not implemented: at
-        # LINESIZE=100 a 12-statistic CLASS table is 92 columns wide where this
-        # layout gives 94.
-        abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not determined)")
+        # The fixed columns follow this layout for one or two panels and
+        # LINESIZE= 120 or more.  Below LINESIZE=120 and across three or more
+        # statistic panels the fixed part (the "N Obs" field and the gaps
+        # around the CLASS columns) is narrowed by a rule that is not
+        # implemented.
+        abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not supported)")
       }
       for (p in panels) {
         cols <- c(fixed, scols[p$first:p$last])

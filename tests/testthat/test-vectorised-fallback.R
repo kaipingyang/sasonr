@@ -1,5 +1,5 @@
 # Vectorised DATA steps (L1/L2) that stop on an unsupported value, a data
-#
+# error or a SAS exception re-run row by row (L3): only the branches that run
 # count, and the failed vectorised attempt leaves nothing behind.
 
 test_that("a SELECT branch that does not run cannot fail loud (vectorised code re-runs row by row)", {
@@ -58,7 +58,7 @@ ROUNDE 99999.45 0.1
 
 test_that("a type-level unsupported construct fails loud and is not re-run", {
   # a character IF condition in a branch that does not run is not re-run row
-  #
+  # by row (that run would miss the conversion NOTE)
   expect_error(sas_run("data a; input x c $; if x = 1 then y = 1; else if c then y = 2; datalines;
 1 a
 ;
@@ -78,7 +78,7 @@ test_that("a type-level unsupported construct fails loud and is not re-run", {
 
 test_that("a SAS exception in a branch that does not run is not reported", {
   # vectorised code evaluated CONSTANT('EXACTINT', 1E300) for x = 1 and stopped
-  #
+  # the step with the SAS exception block; only the ELSE branch runs
   res <- sas_run("data a; x = 1; if x = 2 then y = constant('EXACTINT', 1E300); else y = 3; run;")
   expect_identical(res$work$a$y, 3)
   expect_false(any(grepl("exception", res$log)))

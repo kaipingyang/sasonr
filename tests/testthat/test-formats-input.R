@@ -10,7 +10,7 @@ fmt <- function(x, text) sas_format(x, sas_fmt_text(text))
 test_that("numeric formats follow the SAS width ladder", {
   expect_equal(fmt(3.14159, "8.2"), "    3.14")
   expect_equal(fmt(0.5, "3.2"), ".50")
-  #
+  # too narrow: integer mantissa + exponent (PUT(123456789, 5.) is 123E6)
   expect_equal(fmt(123456, "4."), "12E4")
   expect_equal(fmt(2.675, "8.2"), "    2.68")
   expect_equal(fmt(-12, "z5."), "-0012")
@@ -156,7 +156,7 @@ datalines;
 4,,6
 ;
 run;")
-  #
+  # named output writes a blank value as one blank
   expect_equal(log, c("a=1 b=x,y c=3", "a=4 b=  c=6"))
   log <- run_log("data _null_; infile datalines missover; input a b c; put a= b= c=;
 datalines;

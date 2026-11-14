@@ -118,7 +118,7 @@ fixed_body <- function(v, d, commas = FALSE, edge = "abort", down_rel = 0) {
   s <- display_round_text(v, d, edge, down_rel = down_rel)
   if (is.na(s)) return(NA_character_)
   if (commas) s <- add_commas(s)
-  #
+  # a negative value that rounds to zero keeps its minus sign ("-0.00")
   list(s = s, neg = v < 0)
 }
 
@@ -133,8 +133,8 @@ add_commas <- function(s) {
   paste0(ip, rest)
 }
 
-# Integers with decimal zeros beyond the supported domain that are written as
-#
+# Integers with decimal zeros beyond the supported domain whose text is
+# supported (exact value, width, decimals, form): COMMA32.4 and
 # DOLLAR32.4 of 1E15; 32.d with d = 15 to 18, 20, 25 or 30 of
 # 939586291501115008 and 26745296926266265600 (as many zeros as fit).
 int_zeros_listed <- function(v, w, d, commas, dollar, zero, swap) {
@@ -143,14 +143,14 @@ int_zeros_listed <- function(v, w, d, commas, dollar, zero, swap) {
     (v %in% c(939586291501115008, 26745296926266265600) && d %in% c(15:18, 20L, 25L, 30L) && !commas && !dollar)
 }
 
-#
+# Fit ladder shared by w.d / Z / COMMA / DOLLAR:
 # for each number of decimals from d down to 0 try the full form, then
 # without the leading zero, then without thousands separators, then without
 # the dollar sign; then the E form (sci_fit); then asterisks.  A rounding at
 # the edge of the display fuzz only fails loud when the text would fit.
 fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, swap = FALSE, down_rel = 0) {
-  #
-  # (and fewer zeros when they do not fit: SAS 9.4, 32.15 of 939586291501115008
+  # an integer beyond 2^53 / 10^d: the decimals are zeros (COMMA32.4 of 1E15)
+  # (and fewer zeros when they do not fit: 32.15 of 939586291501115008
   # is 939586291501115008.0000000000000)
   # Supported only where display_round_text is (below 1E15; 3 decimals below
   # 2^53) and at the points of int_zeros_listed(); elsewhere fail loud when a
@@ -196,7 +196,7 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
   if (commas) forms <- c(forms, list(list(cm = FALSE, dl = dollar)))
   if (dollar) forms <- c(forms, list(list(cm = FALSE, dl = FALSE)))
   for (dd in seq(d, 0L)) {
-    #
+    # with fewer decimals than d the separators and the dollar sign are dropped
     for (f in if (dd == d) forms else list(list(cm = FALSE, dl = FALSE))) {
       for (lead0 in c(TRUE, FALSE)) {
         if (!fits(dd, f$cm, f$dl, lead0)) next
@@ -209,7 +209,7 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
     # a negative value that rounds to zero and has no room for its sign is "0"
     if (v < 0 && w >= 1L && identical(display_round_text(v, 0L, edge = "up"), "0")) return(pad("0"))
     s <- sci_fit(v, w)
-    #
+    # COMMAX/DOLLARX write the E form with a decimal comma (1,23E6)
     if (!is.na(s) && swap) s <- chartr(".", ",", s)
     if (!is.na(s)) return(pad(s))
   }
@@ -226,7 +226,7 @@ fmt_e <- function(v, w, d) {
   if (!neg && is.na(d) && k == 0L) k <- 1L
   repeat {
     # the mantissa comes from 15 significant digits (sig15); at 14 or more
-    #
+    # decimals 14 significant digits are shown, padded with zeros
     kk <- max(min(k, 13L), 0L)
     if (v == 0) {
       m <- if (kk > 0) paste0("0.", strrep("0", kk)) else "0"
@@ -256,16 +256,15 @@ fmt_e <- function(v, w, d) {
 # 14 significant digits of an E form with 13 or more mantissa decimals
 # (Ew. from E20., BESTw. above 16 columns, w.d written in E notation), from
 # the exact binary value: list(keep = 14 digits, ex = decimal exponent).
-# In E20.-E32. (values from 2^-61 to 2^60), SAS's 14th digit carries when the
+# In E20.-E32. (values from 2^-61 to 2^60), the 14th digit carries when the
 # rest r (the digits after the 14th, as a fraction of it) plus a fuzz of about
 # 1E-15 relative reaches the carry point - at 13 mantissa decimals (E20.) the
 # half point, at 14 or more the next digit (truncation).  The fuzz grows with
 # the mantissa (a rest of 0.97 carries for 1.x, 0.84 for 9.x) and is not a
 # function of r and the mantissa alone, so: 13 decimals - r < 0.30 truncated,
 # r >= 0.55 rounded up; 14 or more - truncated below the smallest rest that
-# carried for the same leading digit (0.965 for 1.x down to 0.838 for 9.x);
-#
-# in BEST32.).
+# carries for the same leading digit (0.965 for 1.x down to 0.838 for 9.x);
+# the band above fails loud (there the carry is not monotone in r).
 e14_digits <- function(g, v, k = 14L) {
   a <- abs(v)
   s <- sprintf("%.*e", 40L, a)
@@ -315,7 +314,7 @@ fmt_negparen <- function(v, w, d) {
       # a positive value keeps a column for ")" only when the negative form would fit
       s <- if (b$neg) paste0("(", b$s, ")") else paste0(b$s, " ")
       if (nchar(b$s) + 2L <= w) return(just_right(s, w))
-      #
+      # no room for the parentheses (or the trailing column): a minus sign (NEGPAREN6. of -1234 is -1,234)
       s <- if (b$neg) paste0("-", b$s) else b$s
       if (nchar(s) <= w) return(just_right(s, w))
     }
@@ -335,7 +334,7 @@ four <- function(x) formatC(x, width = 4, flag = "0")
 
 fmt_date_value <- function(v, base, w, sep = NULL, d = NA_integer_) {
   dt <- base %in% c("datetime", "e8601dt", "is8601dt", "e8601dn", "dtdate", "dtmonyy", "dtyear")
-  #
+  # datetime values are rounded to the decimals shown (86399.5 is 02JAN60:00:00:00 with DATETIME16.)
   if (base %in% c("datetime", "e8601dt", "is8601dt")) v <- round_half_away(v, if (is.na(d)) 0L else d)
   dd <- if (dt) floor(v / 86400) else floor(v)
   if (base %in% c("time", "tod", "hhmm", "hour", "mmss", "e8601tm", "is8601tm", "timeampm")) return(fmt_time_value(v, base, w, d))
@@ -588,8 +587,8 @@ sas_format <- function(x, fmt = NULL) {
     w <- fmt$w
     if (fmt$name == "quote" && is.na(w)) w <- max(nchar(x), 0L) + 2L
     if (!fmt$name %in% char_fmt_names) abort_unsupported(paste0("format ", fmt$text))
-    #
-    # of the argument), not the default width of the inventory; not modelled
+    # PUT(x, $HEX.) without a width writes all bytes (result length 2 * length
+    # of the argument), not the default width of the inventory; not implemented
     if (fmt$name == "hex" && is.na(w)) abort_unsupported("format $HEX. without a width")
     out <- switch(fmt$name,
       upcase = toupper(x),
@@ -598,8 +597,7 @@ sas_format <- function(x, fmt = NULL) {
         # too long for the width: the text is cut so that the closing quote fits
         if (!is.na(w)) {
           cut <- nchar(inner) > w - 2L
-          #
-          # rule is not known; fail loud
+          # a cut through a doubled quote: the rule is not implemented; fail loud
           if (any(cut & vapply(seq_along(inner), function(i) {
             if (!cut[i] || w < 3L) return(FALSE)
             k <- w - 2L
@@ -663,7 +661,7 @@ fmt_hex_char <- function(x, w) {
   n <- (w + 1L) %/% 2L
   vapply(x, function(s) {
     b <- charToRaw(enc2native(s))
-    #
+    # a width beyond the value: only the bytes of the value are written (blank-padded text)
     substr(toupper(paste(as.character(b[seq_len(min(n, length(b)))]), collapse = "")), 1L, w)
   }, "", USE.NAMES = FALSE)
 }
@@ -793,7 +791,7 @@ read_std_num <- function(s, d) {
   if (!grepl(std_num_re, t)) return(list(v = NA_real_, ok = FALSE))
   t2 <- chartr("dD", "ee", t)
   v <- as.numeric(t2)
-  #
+  # implied decimals also apply to E notation without a decimal point ('1e3' with 8.2 is 10)
   if (!is.na(d) && d > 0 && !grepl(".", t, fixed = TRUE)) v <- v / 10^d
   if (!is.finite(v)) return(list(v = NA_real_, ok = FALSE))
   list(v = v, ok = TRUE)
@@ -994,7 +992,7 @@ read_num_field <- function(s, fmt) {
     e8601dt = , is8601dt = read_iso_dt(t),
     datetime = read_datetime(t),
     time = {
-      #
+      # a leading minus sign is allowed; digits alone (no separator) are invalid
       neg <- startsWith(t, "-")
       tt <- if (neg) substring(t, 2L) else t
       if (grepl("^[0-9]+$", tt)) NA_real_ else {
@@ -1091,7 +1089,7 @@ read_char_field <- function(s, fmt, keep_lead = FALSE) {
 # $HEXw.: two hex digits per byte, so w gives w/2 bytes of output; an odd
 # number of digits is completed with 0.  A non-hex field is invalid data: the
 # INPUT function gives a blank, _ERROR_ and "Invalid argument to function
-#
+# INPUT" without the mathematical-operations NOTE.  list(v, ok).
 hex_field <- function(s, fmt) {
   w <- fmt$w
   if (is.na(w)) w <- nchar(strip_both(s))
@@ -1197,7 +1195,7 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
   if (is.numeric(s)) s <- sas_fmt_best(s, 12L)
   w <- fmt$w
   is_char <- fmt$char || isTRUE(user_fmt(fmt$name, TRUE, "invalue")$char)
-  #
+  # an informat without a width reads its default width (YYMMDD. reads 6 columns)
   if (is.na(w) && is.null(user_fmt(fmt$name, fmt$char, "invalue"))) w <- registry_defw("informat", fmt)
   vals <- vector(if (is_char) "character" else "numeric", length(s))
   bad <- FALSE
@@ -1210,7 +1208,7 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
   }
   if (bad && qq != "??") {
     rt_error(if (qq == "?") NULL else paste0("NOTE: Invalid argument to function INPUT", at_text(.at), "."))
-    #
+    # the call is also listed in the "Mathematical operations could not be performed" NOTE
     # (not for a character informat such as $HEX)
     if (qq == "" && !is.null(.at) && !is_char) rt_count("math", .at)
   }
@@ -1251,7 +1249,7 @@ putn_spec <- function(text, w, d) {
 #' @export
 sas_f_inputn <- function(s, fmt, w = NULL, d = NULL, .at = NULL) {
   for (sp in Filter(function(t) !is.na(t) && nzchar(trimws(t)), unique(fmt))) putn_check(putn_spec(sp, w, d), "informat")
-  #
+  # invalid data: missing result, only the mathematical-operations NOTE and _ERROR_
   out <- vapply(seq_along(s), function(i) {
     f <- putn_spec(rep_len(fmt, length(s))[i], w, d)
     v <- as.numeric(sas_f_input(s[i], f, qq = "??"))

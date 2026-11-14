@@ -42,16 +42,16 @@ at_text <- function(.at) {
 
 arg_ord <- c("first", "second", "third", "fourth", "fifth")
 
-#
-# characters ("'abababababab'[12 of 200 characters shown]").
+# A character argument in an invalid-argument NOTE: at most 12 characters are
+# shown ("'abababababab'[12 of 200 characters shown]").
 note_chr <- function(v, trim = TRUE) {
   t <- if (trim) sas_rtrim(v) else v
   if (nchar(t) > 12) return(sprintf("'%s'[12 of %d characters shown]", substr(t, 1L, 12L), nchar(v)))
   paste0("'", if (nzchar(t)) gsub("'", "''", t, fixed = TRUE) else " ", "'")
 }
 
-#
-# arguments of the failing call, e.g. "Invalid argument to function LOG(-1)".
+# `args`/`bad`: the argument values and the failing elements; the NOTE shows
+# the arguments of the failing call, e.g. "Invalid argument to function LOG(-1)".
 note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = NULL, numbered = FALSE, math = TRUE,
                              trim = TRUE) {
   if (numbered) {
@@ -151,7 +151,7 @@ sas_iter_dump <- function(pdv, spec, inf = NULL) {
 }
 
 # Pack `var=value` items into log lines of at most `ls` columns.  An item that
-#
+# is itself wider than the line is cut at the line size and ends the dump.
 dump_wrap <- function(items, ls) {
   lines <- character()
   cur <- ""
@@ -161,7 +161,7 @@ dump_wrap <- function(items, ls) {
       cur <- ""
     }
     if (nchar(it) > ls) {
-      #
+      # an item wider than the line continues on the next lines, cut every `ls` columns
       if (nzchar(cur)) lines <- c(lines, cur)
       starts <- seq(1L, nchar(it), by = ls)
       chunks <- substring(it, starts, pmin(starts + ls - 1L, nchar(it)))

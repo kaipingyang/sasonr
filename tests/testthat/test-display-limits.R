@@ -48,7 +48,7 @@ test_that("SAS exception: SELECT whens and otherwise are traversed", {
 test_that("PROC SQL: math-error NOTEs fail loud instead of being dropped, the runtime state is restored", {
   expect_error(sas_run("data one; x = 0; run; proc sql; create table t as select 1 / x as y from one; quit;"),
                class = "sasonr_unsupported")
-  #
+  # PROC SQL writes no missing-value NOTE
   expect_silent(sas_run("data one; x = .; run; proc sql; create table t as select x + 1 as y from one; quit;"))
   # the session's run-time state is reset when the SQL statement fails loud:
   # the next submission writes no stale NOTE

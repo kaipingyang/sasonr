@@ -42,6 +42,6 @@ test_that("an exact tie at the 15th digit fails loud on every platform", {
   expect_error(sasonr:::sci_dec_text(123456789012345, 13L), class = "sasonr_unsupported")
 
   # 2^-21 is also an exact 15-digit tie, but rounding to E10. gives the same
-  # digits in both directions: SAS's output is unambiguous
+  # digits in both directions: the text is unambiguous
   expect_identical(trimws(sas_f_putn(2^-21, "E10.")), "4.768E-07")
 })

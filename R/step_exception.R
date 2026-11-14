@@ -1,6 +1,6 @@
-# A SAS 9.4 exception (a crash inside SAS, e.g. CONSTANT('EXACTINT', 1E300)):
-#
-#
+# A SAS exception (an internal failure, e.g. CONSTANT('EXACTINT', 1E300)): the
+# exception block is written twice, the DATA step stops and its output data
+# sets keep the observations written so far.  sasonr supports
 # it for a step that runs once without writing an observation before the
 # failing statement (no SET/MERGE/UPDATE/MODIFY/INFILE/INPUT, no OUTPUT, no
 # DO loop): the outputs are left with 0 observations.  Anything else fails

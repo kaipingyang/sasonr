@@ -216,7 +216,7 @@ expr_type <- function(e, st) {
       if (is.null(spec) || spec$type == "num") return(num)
       if (identical(spec$len, "arg")) {
         a <- expr_type(e$args[[1]], st)
-        #
+        # SUBSTRN of a number: length 8; others: the BEST12. text
         return(list(type = "char", len = if (a$type == "char") a$len else if (e$name == "substrn") 8L else 12L))
       }
       list(type = "char", len = spec$len)
@@ -249,8 +249,8 @@ an_expr <- function(e, st) {
     binary = {
       e$lhs <- an_expr(e$lhs, st)
       e$rhs <- an_expr(e$rhs, st)
-      #
-      # row where the DATA step value (truncated to 32767) is compared; not
+      # a WHERE concatenation longer than 32767 characters selects no row
+      # where the DATA step value (truncated to 32767) is compared; not
       # implemented
       if (e$op == "||" && identical(st$context, "where") && expr_type(e, st)$len > 32767L) {
         abort_unsupported("a WHERE concatenation of more than 32767 characters (not supported)", e$line)
@@ -311,7 +311,7 @@ an_call <- function(e, st) {
   }
   if (e$name %in% c("put", "input")) {
     f <- e$fmt
-    #
+    # PUT(char, name.) with only a character user format $NAME: $NAME applies
     if (e$name == "put" && !f$char && nzchar(f$name) && is.null(user_fmt(f$name, FALSE)) &&
         !is.null(user_fmt(f$name, TRUE)) && expr_type(e$args[[1]], st)$type == "char") {
       f$char <- TRUE
@@ -371,7 +371,7 @@ an_call <- function(e, st) {
     if (!isTRUE(e$construct)) feature_check("function", e$name, e$line, st$context)
     if (identical(st$context, "where") && !isTRUE(e$construct)) where_arg_types(e, st)
     nargs <- sum(vapply(e$args, function(a) if (a$node == "of") 2L else 1L, integer(1)))
-    #
+    # the accepted argument counts (feature registry, from the SAS inventory): more or fewer is a compile-time ERROR
     sas_n <- registry_arg_counts(e$name)
     if (!is.null(sas_n)) {
       if (!is.na(sas_n[2]) && length(e$args) > sas_n[2]) {
@@ -385,7 +385,7 @@ an_call <- function(e, st) {
       abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line)
     }
     if (length(e$args) > spec$max) {
-      #
+      # optional arguments beyond those implemented here are not supported
       abort_unsupported(paste0("more than ", spec$max, " arguments to ", toupper(e$name)), e$line)
     }
     if (length(e$args) < spec$min && nargs < spec$min) {
@@ -424,9 +424,9 @@ an_call <- function(e, st) {
   e
 }
 
-#
-# value with BEST12. (right-aligned), and a character argument passed where it
-# expects a number as if read with the BEST32. informat (invalid data sets
+# A numeric argument passed where a function expects a character value is
+# converted with BEST12. (right-aligned), and a character argument passed where
+# it expects a number is read as with the BEST32. informat (invalid data sets
 # _ERROR_).  Only functions whose argument types are listed in fn_arg_types
 # convert; for the others a mismatch keeps the previous behaviour.
 convert_fn_args <- function(e, st) {
@@ -444,8 +444,8 @@ convert_fn_args <- function(e, st) {
   })
 }
 
-#
-#
+# A character value as an IF condition is converted to numeric (a
+# conversion NOTE at compile time), which sasonr does not support.  Checked
 # here so that the step fails loud whether or not the IF runs.
 an_cond <- function(e, st, line) {
   e <- an_expr(e, st)
@@ -465,7 +465,7 @@ check_format <- function(fmt, line) {
 check_format_width <- function(fmt, line) {
   if (fmt$char || !is.null(user_fmt(fmt$name, fmt$char))) return(invisible())
   nm <- if (nzchar(fmt$name)) fmt$name else "w"
-  #
+  # format widths outside the SAS range are an error ("Width specified for format X is invalid")
   rng <- num_fmt_width_range[[nm]]
   if (is.null(rng) && !is.null(fmt_base_name(nm)$sep)) rng <- c(2, 10)
   if (!is.null(rng) && !is.na(fmt$w) && (fmt$w < rng[1] || fmt$w > rng[2])) {
@@ -536,7 +536,7 @@ an_stmt <- function(s, st) {
         s$value <- an_expr(s$value, st)
       } else if (s$target$node == "var") {
         # the value is compiled first: in `s = s || w;` the first reference to s
-        #
+        # is on the right-hand side, which makes s numeric
         existed <- !is.null(st$info[[s$target$name]])
         s$value <- an_expr(s$value, st)
         if (!existed && !is.null(st$info[[s$target$name]]) && is.na(st$info[[s$target$name]]$type)) {
@@ -593,7 +593,7 @@ an_stmt <- function(s, st) {
       if (!is.null(s[["else"]])) s[["else"]] <- an_stmt(s[["else"]], st)
     },
     # ref_only: errors.R's stand-in that only registers the variables a failed
-    #
+    # statement references (not a condition that runs)
     subset_if = s$cond <- if (isTRUE(s$ref_only)) an_expr(s$cond, st) else an_cond(s$cond, st, line),
     where = {
       s$cond <- an_where(s$cond, st)
@@ -876,7 +876,7 @@ an_array <- function(s, st) {
   }
   if (!s$char && length(elems) > 0) {
     # without $, an array of variables already defined as character is a
-    #
+    # character array (it takes the type of the existing variables)
     known <- vapply(elems, function(v) st$info[[v]]$type %||% NA_character_, "")
     if (any(known %in% "char", na.rm = TRUE)) {
       if (anyNA(known)) abort_unsupported(paste("array", s$name, "of existing character and new variables without $"), line)

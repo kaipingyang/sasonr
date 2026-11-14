@@ -76,7 +76,7 @@ test_that("arithmetic on special missing values and overflow yields ordinary mis
 test_that("SUBSTR: nonpositive length returns the remainder, invalid position a blank", {
   log <- sas_run("data _null_; a = substr('hello', 2, -1); b = substr('hello', 0, 2); c = substr('hello', 9); d = substr('hello', 2, 9);
     put '[' a '][' b '][' c '][' d ']'; run;")$log
-  #
+  # a blank character value is dumped as one blank ("b=  c=")
   expect_equal(grep("^NOTE", log, value = TRUE, invert = TRUE), c("[ello ][ ][ ][ello ]", "a=ello b=  c=  d=ello _ERROR_=1 _N_=1"))
 })
 
@@ -101,7 +101,7 @@ data m; merge a b; by k; run;"
 })
 
 test_that("MERGE walks observations when both inputs repeat a BY group", {
-  #
+  # A many-to-many MERGE pairs the two inputs
   # observation by observation (the shorter input falls back to missing) and a
   # common non-BY variable keeps the value from the last data set named.
   code <- "data a; input k x; datalines;
@@ -174,7 +174,7 @@ test_that("SUBSTR assignment to an undeclared variable creates it with length 8"
   #
   expect_error(sas_run("data d; substr(t,2,2)='XY'; run;", on_error = "abort"), class = "sasonr_unsupported")
   #
-  # left-hand SUBSTR target with a default length of 8
+  # is compiled with a default length of 8
   withr::local_options(sasonr.sas_version = "SAS 9.4", sasonr.strict = FALSE)
   res <- sas_run("data d; substr(t,2,2)='XY'; v=vlength(t); l=lengthn(t); r=t; rv=vlength(r); run;")
   expect_equal(res$work$d$v, 8)

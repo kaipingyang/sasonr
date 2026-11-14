@@ -116,8 +116,8 @@ test_that("the SUBSTR statement goes through feature_check()", {
   expect_identical(sas_run(code)$work$a$t, "aXYdef")
 })
 
-test_that("PROC DATASETS DELETE _ALL_ fails loud (not supported)", {
-  # after DELETE _ALL_ every member still exists
+test_that("PROC DATASETS DELETE _ALL_ fails loud", {
+  # not supported
   expect_error(sas_run("data a; v = 1; run; proc datasets library=work nolist; delete _all_; run; quit;"),
                class = "sasonr_unsupported")
 })

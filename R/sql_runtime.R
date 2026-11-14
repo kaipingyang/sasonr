@@ -124,8 +124,8 @@ sql_duck_query <- function(eng, frames, sql) {
   DBI::dbGetQuery(con, sql)
 }
 
-# Candidate row pairs of an equi-join: missing values match missing values
-#
+# Candidate row pairs of an equi-join: missing values match missing values,
+# character keys compare without trailing blanks.
 sql_duck_pairs <- function(eng, lkeys, rkeys) {
   nl <- if (length(lkeys)) length(lkeys[[1]]) else 0L
   nr <- if (length(rkeys)) length(rkeys[[1]]) else 0L
@@ -165,7 +165,7 @@ sql_agg_sql <- function(fn, col, distinct) {
 
 # Grouped aggregation: `gid` group of each row (1..G), `aggs` list of
 # list(fn, arg (vector or NULL for *), distinct). Returns a list of vectors of
-#
+# length G.  `order_known`: the rows are in the order in which they are read
 # (see sql_select()); otherwise order-dependent statistics fail loud unless
 # their value does not depend on the order.
 sql_duck_aggregate <- function(eng, gid, G, aggs, order_known = TRUE, line = NULL) {
@@ -197,8 +197,7 @@ sql_duck_aggregate <- function(eng, gid, G, aggs, order_known = TRUE, line = NUL
   out <- lapply(seq_along(aggs), function(k) {
     a <- aggs[[k]]
     sql_stat_gate(a$fn, line)
-    #
-    # accumulates differently)
+    # moments in R (stats_exact.R; DuckDB accumulates differently)
     if (a$fn %in% sql_moment_fns && is.numeric(a$arg)) {
       return(sql_r_moment(a$fn, as.numeric(a$arg), gid, G, order_known && !isTRUE(a$distinct), isTRUE(a$distinct), line))
     }
@@ -246,7 +245,7 @@ sql_r_moment <- function(fn, v, gid, G, order_known = TRUE, distinct = FALSE, li
     }
     out[g] <- stats_sql_moment(fn, x)
   }
-  #
+  # an overflowed SUM is missing (the sum of 1e308 and 1e308); other
   # overflows are not supported and fail loud
   if (fn == "sum") out[is.infinite(out)] <- NA_real_
   stats_finite_check(out, "a PROC SQL summary function result")

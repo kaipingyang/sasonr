@@ -227,7 +227,7 @@ test_that("unsupported SQL fails loud", {
   expect_error(run_sql(c(base_data, "proc sql; select id from a, b; quit;")), class = "sasonr_syntax_error")
 })
 
-test_that("PROC SQL gives computed character columns their lengths", {
+test_that("PROC SQL sets the lengths of computed character columns", {
   # CATS of constants: the length of the value
   r0 <- sas_run("data one; x = 1; run; proc sql; create table w as select cats('x', 12.5) as c from one; quit;")
   expect_equal(r0$meta$w$len$c, 5)

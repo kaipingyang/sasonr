@@ -1,6 +1,6 @@
 # The SAS session: every piece of mutable state a SAS program can change.
 #
-#
+# A `SasSession` (R6) owns the state kept between steps and between
 # submissions: the WORK library and its metadata, the user format catalog,
 # the macro symbol tables and macro definitions, system options, titles,
 # filerefs, `_LAST_`, the SQL back-end connection, the cumulative log and
@@ -39,7 +39,7 @@ SasSession <- R6::R6Class("SasSession",
     work = NULL,
     # meta: WORK metadata: member -> list(vars, type, len, formats, disp, ...).
     meta = NULL,
-    #
+    # unordered: WORK members without a defined row order (PROC SQL without ORDER BY).
     unordered = NULL,
     # views: PROC SQL views: name -> query (re-run on each reference).
     views = NULL,
@@ -222,7 +222,7 @@ session_leave <- function(session) {
 }
 
 # Set `_LAST_` (a WORK member name) and the SYSLAST / SYSDSN automatic macro
-#
+# variables with it.  `_LAST_` is the last output data set of a
 # DATA step, PROC SORT, MEANS, FREQ, TRANSPOSE or CONTENTS OUT=; a table or
 # view PROC SQL creates (CREATE TABLE / VIEW, ALTER TABLE); the BASE= data set
 # of APPEND.

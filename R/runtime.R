@@ -209,10 +209,10 @@ sas_div <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FA
 #' @export
 sas_pow <- function(a, b, .at = NULL, .exact = TRUE) {
   # ** records its place also when an operand is a generated missing value
-  #
+  # ((a + b) ** 2)
   if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
   out <- sas_num(a^b, .at)
-  out[is.na(a) | is.na(b) | (a == 0 & b <= 0)] <- NA_real_ #
+  out[is.na(a) | is.na(b) | (a == 0 & b <= 0)] <- NA_real_ # 0**0 and 0**-n are missing
   out
 }
 
@@ -260,7 +260,7 @@ args_matrix <- function(args) {
 sas_f_sum <- function(...) {
   m <- args_matrix(list(...))
   # sequential double sum in argument order; a missing argument counts as +0
-  #
+  # for the sign of a zero result (SUM(., -0) is +0)
   out <- as.numeric(apply(m, 1, function(r) {
     if (all(is.na(r))) return(0)
     r[is.na(r)] <- 0
@@ -268,7 +268,7 @@ sas_f_sum <- function(...) {
   }))
   none <- rowSums(!is.na(m)) == 0
   out[none] <- NA_real_
-  #
+  # all arguments missing: SUM(.A) is .A; mixed missing kinds are not supported
   for (i in which(none)) {
     codes <- unique(sas_miss_code(m[i, ]))
     if (length(codes) == 1L && codes != 1L) out[i] <- m[i, 1]
@@ -283,12 +283,12 @@ sas_f_nmiss <- function(...) as.numeric(rowSums(is.na(args_matrix(list(...)))))
 #' @export
 sas_f_mean <- function(...) {
   m <- args_matrix(list(...))
-  # sequential double sum (rowMeans accumulates in long double; SAS 9.4: MEAN(-0) is -0)
+  # sequential double sum (rowMeans accumulates in long double; MEAN(-0) is -0)
   out <- apply(m, 1, function(r) {
     v <- r[!is.na(r)]
     if (length(v) == 0) return(NA_real_)
-    #
-    #
+    # all values are zero: the result has the first non-missing argument's sign
+    # (MEAN(-0, 0) is -0, MEAN(0, -0) is +0)
     if (all(v == 0)) return(v[1])
     Reduce(`+`, v) / length(v)
   })
@@ -297,7 +297,7 @@ sas_f_mean <- function(...) {
 #' @export
 sas_f_min <- function(...) {
   m <- args_matrix(list(...))
-  #
+  # ties keep the first non-missing argument (its zero sign)
   out <- apply(m, 1, function(r) {
     v <- r[!is.na(r)]
     if (length(v) == 0) return(NA_real_)
@@ -356,7 +356,7 @@ sas_f_log <- function(x, .at = NULL) log_base(x, log, "log", .at)
 sas_f_log10 <- function(x, .at = NULL) log_base(x, log10, "log10", .at)
 #' @export
 sas_f_log2 <- function(x, .at = NULL) {
-  #
+  # powers of 2 give the exact exponent; other values log(x) * (1/log(2))
   log_base(x, function(v) {
     e <- log2(v)
     ifelse(e == round(e) & 2^round(e) == v, round(e), v * 0 + log(v) * (1 / log(2)))
@@ -374,7 +374,7 @@ sas_f_mod <- function(a, b, .at = NULL) {
   # fuzz: a remainder within 1e-12 (relative) of 0 or of the divisor is 0
   tol <- 1e-12 * pmax(abs(a), abs(b), 1, na.rm = TRUE)
   near <- !is.na(out) & (abs(out) < tol | abs(abs(out) - abs(b)) < tol)
-  # SAS's fuzz also moves other remainders by a few ulps toward the decimal
+  # the fuzz also moves other remainders by a few ulps toward the decimal
   # result; only exact remainders are in the supported domain
   mod_domain_check("MOD", a, b, exact_only = TRUE, fuzz_zero = near)
   out[near] <- 0
@@ -436,7 +436,7 @@ cat_num_text <- function(a) {
 cat_item <- function(a, trim) if (is.numeric(a)) cat_num_text(a) else trim(a)
 
 # A result longer than the target variable (`.len`, 200 for a new variable):
-# blank result and _ERROR_ = 1, no NOTE (SAS 9.4; CATX also writes a NOTE).
+# blank result and _ERROR_ = 1, no NOTE (CATX also writes a NOTE).
 cat_fit <- function(out, .len) {
   if (is.null(.len)) return(out)
   # the CAT functions build their value in a 200-byte buffer: a longer value is
@@ -551,8 +551,7 @@ sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
 # EXIST(member <, type>): 1 when the member exists, 0 otherwise.  WORK and
 # SASHELP are the libraries sasonr knows (R/sashelp.R).  The type argument is a
 # member type: 'DATA' is supported, an explicit 'ANY' is not a valid member type
-# in SAS and returns 0, and any other type fails loud because it is not
-# supported.
+# and gives 0, and any other type fails loud because it is not supported.
 #' @export
 sas_f_exist <- function(name, type = NULL, .work = NULL, .at = NULL) {
   n <- max(length(name), if (is.null(type)) 1L else length(type))
@@ -566,7 +565,7 @@ sas_exist_one <- function(nm, type, .work, .at) {
   if (is.na(nm) || !nzchar(nm)) {
     abort_unsupported("EXIST() of a missing or blank member name (not supported)")
   }
-  # in SAS an explicit TYPE='ANY' is not a valid member type: EXIST returns 0
+  # an explicit TYPE='ANY' is not a valid member type: EXIST returns 0
   if (!is.na(type) && identical(type, "ANY")) return(0)
   if (!is.na(type) && !identical(type, "DATA")) {
     abort_unsupported(paste0("EXIST() with TYPE='", type, "' (only DATA is supported)"))
@@ -586,8 +585,8 @@ sas_exist_one <- function(nm, type, .work, .at) {
     return(as.numeric(mem %in% tolower(ls(.work, all.names = TRUE))))
   }
   if (lib == "sashelp") {
-    # a member missing from the SASHELP directory may still exist in SAS:
-    # not knowable here, so only a member found there answers (1)
+    # a member missing from the SASHELP directory may still be a SASHELP
+    # member: only a member found there answers (1)
     if (sashelp_has(mem)) return(1)
     abort_unsupported(paste0("EXIST('SASHELP.", toupper(mem), "'): the member is not in the SASHELP directory ",
                              "(EXIST cannot tell whether it is a SASHELP member)"))
@@ -603,7 +602,7 @@ sas_f_index <- function(x, s) {
 }
 #' @export
 sas_f_indexc <- function(x, ...) {
-  #
+  # the characters of all excerpts form one set (INDEXC(source, excerpt-1, ..., excerpt-n))
   ab <- do.call(recycle_n, c(list(as_sas_chr(x)), lapply(list(...), as_sas_chr)))
   vapply(seq_along(ab[[1]]), function(i) {
     set <- unlist(lapply(ab[-1], function(e) strsplit(e[i], "")[[1]]))
@@ -680,7 +679,7 @@ to_date <- function(x) sas_epoch + floor(x)
 # SAS calendar ------------------------------------------------------------------
 #
 # Proleptic Gregorian calendar, except that the years divisible by 4000 have
-#
+# no 29 February (DAY('31DEC20000'd) is 31; R's Date would be 5 days
 # off).  `g` counts Gregorian days from 1960-01-01; SAS day = g minus the
 # skipped 29 Februaries before it.
 greg_days <- function(y, m, d) {
@@ -796,7 +795,8 @@ strip_zeros <- function(s) ifelse(grepl(".", s, fixed = TRUE), sub("\\.?0+$", ""
 
 # 15 digits of v (a leading "0" counts as a digit): the first 15 digits of
 # the display value fl(|v| * (1 + 2^-52)), truncated (just below the next
-#
+# 15-digit decimal, the digits round up exactly when the display value reaches
+# it).
 best_digits15 <- function(v, w) {
   a <- abs(v)
   intd <- if (a < 1) 1L else nchar(sprintf("%.0f", floor(a)))
@@ -836,7 +836,7 @@ sas_fmt_best <- function(x, w = 12L) {
                                "): the narrow-width rules are not supported"))
     }
     if (w > 16 && v != trunc(v) && abs(v) >= 1e-5) {
-      #
+      # at most 15 digits are written (a leading 0 counts), truncating unless
       # the value lies within the display fuzz below the next digit
       v <- best_digits15(v, w)
     }
@@ -845,7 +845,7 @@ sas_fmt_best <- function(x, w = 12L) {
       s <- sprintf("%.0f", v)
       if (nchar(s) > w) s <- NA_character_
     }
-    #
+    # at most 15 significant digits are shown
     dmax <- if (v == 0) w - 1L else max(0L, 15L - as.integer(floor(log10(abs(v)))) - 1L)
     if (is.na(s)) {
       for (d in seq(min(w - 1L, dmax), 0L)) {
@@ -854,7 +854,7 @@ sas_fmt_best <- function(x, w = 12L) {
         # above 15 columns a value below 1E-5 is written in E notation (below)
         if (w > 15L && abs(v) < 1e-5) break
         if (w > 16L) {
-          # above 16 columns v already holds SAS's 15 digits (best_digits15):
+          # above 16 columns v already holds the 15 digits (best_digits15):
           # written as they are; dropping some of them is not supported
           cand <- display_fixed(v, d, exact = TRUE)
           if (as.numeric(cand) != v) {
@@ -877,8 +877,8 @@ sas_fmt_best <- function(x, w = 12L) {
     if (is.na(s) && abs(v) >= 1 && w <= 15L) {
       # too large for fixed notation: the E form of w.d (integer mantissa allowed)
       sci <- sci_fit(v, w)
-      #
-      # with BEST6. for 2500000: the BEST choice there is not supported
+      # w.d writes an integer mantissa ("25E5"); for BEST6. of 2500000 the
+      # choice between that and "2.5E6" is not supported
       if (!is.na(sci) && grepl("^-?[0-9]{2,}E", sci)) {
         abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), " in E notation with an integer mantissa (",
                                  sci, "): not supported"))
@@ -948,9 +948,8 @@ sas_fmt_best <- function(x, w = 12L) {
       }
     }
     # tiny values: E notation when it shows at least as many significant digits
-    #
-    # rule holds for BEST8.-BEST12. and is applied at every width; at widths
-    # above 15 a value below 1E-5 is written in E notation)
+    # (BEST12. of 1E-6 is 1E-6; below 1E-5 the E form wins a tie at every
+    # width; at widths above 15 a value below 1E-5 is written in E notation)
     if (!is.na(sci) && (is.na(s) || sig(sci) > sig(s) || (abs(v) < 1e-5 && sig(sci) >= sig(s)) ||
                         (w > 15L && abs(v) < 1e-5))) s <- sci
     out[i] <- if (is.na(s)) strrep("*", w) else s
@@ -1395,7 +1394,7 @@ sas_idx <- function(i, lo, dim) {
 }
 
 #' Normalise an arithmetic result: special missing values and overflow
-#'
+#' (infinite results) become the ordinary missing value.
 #' @export
 #' @keywords internal
 sas_num <- function(x, .at = NULL) {

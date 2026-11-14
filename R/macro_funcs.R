@@ -113,7 +113,7 @@ mp_function <- function(nm, src, ses, mode) {
         abort_runtime(paste0("Argument 3 to macro function %", toupper(nm), " is out of range"), line)
       }
       if (pos + len - 1 > nchar(x)) {
-        #
+        # a WARNING is written and the rest of the value is returned
         mac_warn(paste0("Argument 3 to macro function %", toupper(nm), " is out of range."))
         len <- nchar(x) - pos + 1
       }
@@ -212,7 +212,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
     if (!startsWith(rest, ",")) abort_syntax("invalid %SYSFUNC argument", line)
     fmt <- mac_parse_format(trimws(substring(rest, 2L)), line)
   }
-  #
+  # functions that cannot be used in %SYSFUNC
   if (fname %in% c("missing")) {
     abort_runtime(paste0("The function ", toupper(fname), " referenced by %SYSFUNC, %QSYSFUNC, or %SYSCALL cannot be used ",
                          "within the MACRO function/call-routine interfaces."), line)
@@ -254,7 +254,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
     putn = sas_format(vals[[1]], vals[[2]]),
     putc = sas_format(vals[[1]], vals[[2]]),
     if (fname %in% names(fn_policy)) {
-      #
+      # invalid arguments: one NOTE for the %SYSFUNC call, not the DATA step NOTEs
       old <- list(err = rt$err, notes = rt$notes, math = rt$math, mv = rt$mv)
       r <- do.call(sas_fcall, c(list(fname, f), vals))
       bad <- isTRUE(rt$err) && !isTRUE(old$err)
@@ -294,7 +294,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
   )
   if (is.numeric(res)) {
     if (!is.null(fmt)) return(sas_format(res, fmt))
-    #
+    # numeric results without a format: BEST32. without blanks (15 significant digits)
     return(trimws(sas_fmt_best(res, 32L)))
   }
   if (!is.null(fmt)) return(sas_format(res, fmt))

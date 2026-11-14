@@ -1,5 +1,5 @@
 # WHERE expressions do not convert function arguments between character and
-#
+# numeric: a character value where the function
 # expects a number is "ERROR: Function ABS requires a numeric expression as
 # argument 1." (and the converse with "character expression"); the step stops.
 # Declared argument types come from the SAS 9.4 function inventory (feature

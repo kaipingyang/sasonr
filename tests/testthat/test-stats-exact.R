@@ -1,4 +1,4 @@
-#
+# Moment statistics (R/stats_exact.R).
 
 hex <- function(x) paste(rev(as.character(writeBin(x, raw()))), collapse = "")
 
@@ -91,7 +91,7 @@ test_that("PROC MEANS: nearly constant data use a zero mean shift", {
   # the same with weights other than 1: not supported
   expect_error(means_out(hex_data(c("4038851EB851EB93", "4038851EB851EB9F"), c(2, 1)), "weight w;", "css=css"),
                class = "sasonr_unsupported")
-  # a mean shift between 9.98E-15 and 1.0006E-14 of the first value: rule not determined
+  # a mean shift between 9.98E-15 and 1.0006E-14 of the first value: not supported
   expect_error(stats_moments(c(1, 1 + 2e-14), "means", need = "css"), class = "sasonr_unsupported")
 })
 

@@ -38,7 +38,7 @@ test_that("comments are skipped, statement comments only at statement start", {
   expect_equal(tok("%* macro ; x=1;"), c("name:x", "op:=", "num:1", "semi:;"))
 })
 
-test_that("an unmatched quote in a comment swallows the rest", {
+test_that("an unmatched quote in a comment swallows the rest of the program", {
   expect_warning(t <- sas_lex("%* it's ;\nx = 1;"), class = "sasonr_unmatched_quote_in_comment")
   expect_equal(nrow(t), 0)
 })

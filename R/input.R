@@ -341,7 +341,7 @@ sas_input_iter_end <- function(inf) {
 #' @export
 #' @keywords internal
 sas_input_at_end <- function(inf) {
-  #
+  # in-stream data are read unbuffered: END= is never set to 1 for DATALINES
   if (inf$instream) return(0)
   as.numeric(inf$r >= inf$nrec)
 }

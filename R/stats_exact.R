@@ -1,10 +1,10 @@
-#
+# Moment statistics computed with a fixed sequence of double operations:
 #
 # * Sums are plain sequential double additions in observation order (PROC
 #   MEANS, PROC SQL).  R's sum()/cumsum() accumulate in long double and differ.
 # * PROC SQL keeps, per group, the first non-missing value c0 and the
-#   sequential sums Sd = sum(x - c0) and Sdd = sum((x - c0)^2); SAS 9.4 is built
-#   with fused multiply-add, so
+#   sequential sums Sd = sum(x - c0) and Sdd = sum((x - c0)^2), and closes them
+#   with fused multiply-adds:
 #     MEAN = fma(n, c0, Sd) / n
 #     CSS  = fma(-Sd, Sd / n, Sdd),  VAR = CSS / (n - 1),  STD = sqrt(VAR)
 #     USS  = fma(c0, fma(n, c0, 2 * Sd), Sdd)
@@ -78,7 +78,7 @@ fma_max_factor <- 2^995
 fma_min_product <- 2^-960
 
 # Fail loud: an intermediate value of the moment arithmetic left the range in
-#
+# which the emulated arithmetic is exact.
 stats_range_fail <- function(what) {
   abort_unsupported(paste0("moment statistics: ", what,
                            " (outside the range of exact arithmetic; not supported)"))
@@ -190,8 +190,7 @@ stats_sql_moment <- function(fn, x) {
     uss = k$uss,
     var = k$var,
     std = k$std,
-    #
-    # `approximate` in the PROC statistics registry
+    # not exact: `approximate` in the PROC statistics registry
     stderr = k$stderr,
     cv = k$cv,
     abort_unsupported(paste0("summary function ", toupper(fn), "()"))
@@ -199,7 +198,7 @@ stats_sql_moment <- function(fn, x) {
 }
 
 # Can an order-dependent statistic be computed without knowing the order in
-#
+# which the rows are read?  Integer values whose sums (of values, squares) are
 # exact give the same SUM, MEAN and USS in every order.
 stats_order_free <- function(fn, x) {
   if (!fn %in% c("sum", "avg", "mean", "uss")) return(FALSE)
@@ -213,8 +212,8 @@ stats_order_free <- function(fn, x) {
 #
 # One kernel for N, SUM, MEAN, CSS, USS, VAR, STD, STDERR, CV, SKEWNESS and
 # KURTOSIS, shared by the DATA step functions, the PROC SQL summary functions
-#
-# moments (`method`):
+# and PROC MEANS / SUMMARY.  The callers differ only in how the moments are
+# derived (`method`):
 #   datastep  `m` is a matrix with one group per row (the arguments in order,
 #             NA = missing), vectorised over the rows.  MEAN = SUM / N;
 #             CSS = sum of fma(d, d, .) over d = x - MEAN; USS = sequential
@@ -268,7 +267,7 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
     mean <- sum / n
     d <- m - mean
     css <- stats_row_fma_sq(d)
-    #
+    # plain squares: an underflowed square adds 0 (USS(1E-300, 2, 3))
     uss <- stats_row_seq_sum(m * m)
   } else {
     c0 <- apply(m, 1L, function(r) r[!is.na(r)][1L])
@@ -324,9 +323,9 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
 
 # ---- PROC MEANS / SUMMARY --------------------------------------------------------
 #
-#
-# them (also with FREQ, WEIGHT, VARDEF=, CLASS and BY groups, zero-weight
-# first observations and nearly constant data).
+# The moment statistics of one cell and how they are accumulated (also with
+# FREQ, WEIGHT, VARDEF=, CLASS and BY groups, zero-weight first observations
+# and nearly constant data).
 # `x` are the values of the observations that take part (non-missing value,
 # non-missing weight, frequency >= 1) in observation order, `freq` their
 # frequencies (NULL: no FREQ statement) and `weight` their weights (NULL: no
@@ -337,9 +336,9 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
 #   S1 = sequential sum of wd          S2 = sequential sum of t2
 #   S3 = sequential sum of t3          S4 = fma(t3, d, S4)
 # MEAN = S / W and q = MEAN - c0 (the shift of the provisional to the final
-#
+# mean), set to 0 when |q| <= 9.9751031807342009E-15 |c0| (kept from
 # 1.0005986172898007E-14 on; in between fails loud).  The central sums are a
-# polynomial in q evaluated by Horner's rule with SAS's fused multiply-adds:
+# polynomial in q evaluated by Horner's rule with fused multiply-adds:
 #   CSS = fma(q, W q - 2 S1, S2)       (0 when S2 = 0; missing when negative,
 #                                       and then USS, VAR, STD, STDERR and CV
 #                                       are missing too)
@@ -414,7 +413,7 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
   out$var <- var
   out$std <- std
   out$cv <- if (!is.na(std) && mean != 0) 100 * std / mean else NA_real_
-  #
+  # a zero CV of a negative mean is +0
   if (!is.na(out$cv) && out$cv == 0) out$cv <- 0
   if (vardef == "df" && n > 1 && !is.na(var)) out$stderr <- sqrt(var / W)
   if (any(need %in% c("skew", "kurt")) && !is.na(std) && std > 0) {
@@ -438,8 +437,8 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
         out$kurt <- m4 / vv / n - 3
       }
     } else if (vardef %in% c("df", "n")) {
-      #
-      # registry has no supported SKEWNESS / KURTOSIS with WEIGHT: gated)
+      # WEIGHT: the documented formulas, not exact (the registry has no
+      # supported SKEWNESS / KURTOSIS with WEIGHT: gated)
       z <- (x - mean) / std
       s3w <- sum(f * w^1.5 * z^3)
       s4w <- sum(f * w^2 * z^4)
@@ -522,7 +521,7 @@ stats_means_checked <- function(out) {
   out
 }
 
-#
+# STD (and CV) are reported as 0 when VAR (with the VARDEF= divisor) is
 # negligible against the squared mean: STD 0 up to VAR/MEAN**2 =
 # 1.1965683145884955E-26 and STD kept from 1.4312245245430491E-26 on.  Below
 # STD_CUT_MIN the statistics that depend on STD fail loud, as they do between
@@ -531,7 +530,7 @@ STD_CUT_MIN <- 2.2713562904522125e-33
 STD_CUT_ZERO <- 1.1965683145884955e-26
 STD_CUT_KEEP <- 1.4312245245430491e-26
 
-#
+# In the cut-off region STD is 0 but VAR is kept; the statistics that
 # follow from them are supported there only under these conditions (FREQ /
 # WEIGHT statement and VARDEF=).  Others fail loud.
 STD_CUT_SUPPORTED <- list(

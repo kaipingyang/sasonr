@@ -1,4 +1,4 @@
-#
+# sas_run(on_error = "sas"): the batch-mode error handling after an ERROR.
 
 run_sas_mode <- function(code) {
   withr::local_options(sasonr.step_notes = TRUE)

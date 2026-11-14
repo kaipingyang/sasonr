@@ -2,11 +2,11 @@
 
 #' Create a persistent SAS session
 #'
-#' A session holds what a SAS session keeps between submissions: the WORK
+#' A session holds the state kept between submissions: the WORK
 #' library and its metadata, macro variables and macro definitions, user
 #' formats (PROC FORMAT), system options set with `OPTIONS`, titles,
 #' filerefs and `_LAST_`. Pass it to [sas_run()] several times to run a
-#'
+#' program in several submissions.
 #' [sas_run()] without `session` runs in a fresh session that is discarded
 #' afterwards.
 #'

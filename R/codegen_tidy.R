@@ -235,7 +235,7 @@ gen_call <- function(e, cx) {
   if (e$name == "symget") args <- c(".symtab", args)
   in_sql <- identical(cx$an$context, "sql")
   if (e$name %in% names(fn_policy) && (!is.null(e$col) || in_sql)) {
-    #
+    # missing / invalid arguments: log NOTEs and _ERROR_ (fn_policy.R).
     # In PROC SQL the expressions carry no line/column; the invalid-argument
     # NOTE of PROC SQL does not use them either (diag.R).
     at_arg <- if (!is.null(e$col)) sprintf(", .at = c(%dL, %dL)", as.integer(e$line), as.integer(e$col)) else ""

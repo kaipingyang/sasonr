@@ -483,8 +483,7 @@ engine_datasets <- function(eng, step) {
             name = it$name,
             prefix = members[startsWith(members, it$prefix)],
             range = expand_numbered_range(it$from, it$to, s$line),
-            #
-            # WARNING; the rule is not known
+            # DELETE _ALL_: not supported
             special = abort_unsupported(paste0("DELETE ", toupper(it$name), " in PROC DATASETS (not supported)"), s$line),
             abort_unsupported("DELETE list form", s$line))
           for (nm in nms) {

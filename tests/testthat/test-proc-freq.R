@@ -55,7 +55,7 @@ test_that("TABLES grouping syntax and LIST / n-way tables", {
 })
 
 test_that("unsupported statistics fail loud by default", {
-  # EXPECTED on a one-way table is accepted and ignored by SAS, so it is
+  # EXPECTED on a one-way table is accepted and ignored, so it is
   # not in this list
   for (src in c("proc freq data=d; by s; tables trt*resp / relrisk; weight n; run;",
                 "proc freq data=d; tables trt*resp; exact relrisk; weight n; run;",
@@ -505,8 +505,7 @@ test_that("listing of statistics and fail-loud surfaces", {
   expect_true(any(startsWith(l, "Two-sided Pr <= P")))
   # one-way tables accept and ignore the cell statistics options
   expect_silent(sas_run(paste(freq_data, "proc freq data=d; tables trt / expected; run;")))
-  #
-  # from the documented tail-method score statistic, so it fails loud
+  # EXACT RELRISK is not supported, so it fails loud
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / relrisk(cl=(wald score)); exact relrisk; weight n; run;")),
                class = "sasonr_unsupported")
   expect_error(sas_run(paste(freq_data, "proc freq data=d; tables trt; output out=o binomial; run;")), class = "sasonr_unsupported")

@@ -1,5 +1,4 @@
-#
-# displays them.
+# ROUND family, INT/FLOOR/CEIL and w.d-type formats: values and display.
 
 hex <- function(x) toupper(paste(as.character(writeBin(x, raw(), size = 8L, endian = "big")), collapse = ""))
 
@@ -29,7 +28,7 @@ test_that("a unit that is not a normal double is an invalid argument", {
   #
   expect_error(sas_f_round(1, 2.2e-308), class = "sasonr_unsupported")
   #
-  # the first and rejects the second with "Argument 2 ... is invalid"
+  # unit, the second is rejected with "Argument 2 ... is invalid"
   withr::local_options(sasonr.sas_version = "SAS 9.4")
   expect_identical(sas_f_round(1, 2.3e-308), 1)
   expect_true(is.na(suppressWarnings(sas_f_round(1, 2.2e-308))))

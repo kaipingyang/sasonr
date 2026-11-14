@@ -1,6 +1,7 @@
 # Pratt (precedence-climbing) expression parser for SAS expressions.
 #
-#
+# Binding powers follow the documented operator precedence (Table 6.6 of
+# SAS 9.4 Language Reference: Concepts; larger binds tighter):
 #   1 OR |          2 AND &          3 comparisons, IN (chains allowed)
 #   4 ||            5 + -            6 * /
 #   7 Group I: ** >< <> and prefix + - NOT (right associative)
@@ -19,7 +20,7 @@ new_parser <- function(tokens) {
   p$arrays <- character()
   p$where_ctx <- FALSE
   # variables named so far (recorded only during the statement-level error
-  # recovery of errors.R: the variables SAS has compiled when a statement fails)
+  # recovery of errors.R: the variables compiled when a statement fails)
   p$seen <- NULL
   p
 }

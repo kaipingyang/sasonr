@@ -20,7 +20,7 @@ ct_conversion <- function(kind, line, col) {
   invisible()
 }
 
-#
+# The places are listed by line, and within a line by the column as text
 # ("95:143 95:195 95:25"), each in a 9-column field.
 conversion_notes <- function() {
   ct <- ct_diag()
@@ -52,7 +52,7 @@ rt_count <- function(slot, .at, n = 1L) {
   invisible()
 }
 
-#
+# Functions whose missing numeric arguments are reported in the
 # "Missing values were generated" NOTE (ROUND family, INT/FLOOR/CEIL family,
 # INTCK, INTNX).
 mv_note_fns <- c("round", "rounde", "roundz", "int", "intz", "floor", "floorz", "ceil", "ceilz", "intck", "intnx")
@@ -68,7 +68,7 @@ sas_mv_args <- function(.at, ..., .exact = TRUE) {
   args
 }
 
-#
+# Functions whose missing *result* is counted in the NOTE (ABS, MIN, MAX, SUM,
 # MEAN; SUM/MIN/... ignore missing arguments, so only an all-missing call is
 # counted)
 mv_result_fns <- c("abs", "min", "max", "sum", "mean")
@@ -77,7 +77,7 @@ mv_result_fns <- c("abs", "min", "max", "sum", "mean")
 #' @export
 #' @keywords internal
 sas_mv_res <- function(res, .at, .exact = TRUE) {
-  #
+  # a special missing result (SUM(.A) is .A) is not counted
   if (anyNA(res)) {
     plain <- ifelse(sas_miss_code(res) %in% 1L, res, 0)
     sas_mv_count(.at, plain, .exact = .exact)
@@ -130,7 +130,7 @@ sorted_places <- function(keys) {
 }
 
 place_lines <- function(entries) {
-  #
+  # the places go on lines of at most LINESIZE columns, indented by 6
   out <- character()
   cur <- "     "
   ls <- rt_linesize()
@@ -256,7 +256,7 @@ stmt_assigns_all <- function(s) {
   c(out, unlist(lapply(stmt_children(s), stmt_assigns_all)))
 }
 
-# SAS-like text of a WHERE expression (for the "WHERE ...;" line of a NOTE).
+# The text of a WHERE expression (for the "WHERE ...;" line of a NOTE).
 where_text <- function(e) {
   w <- function(x, top = FALSE) {
     switch(x$node,
@@ -274,7 +274,7 @@ where_text <- function(e) {
         }
       },
       compare = {
-        #
+        # a variable compared with anything but a variable is written first
         # ("x+1 = y" is echoed "y=x+1", "2 = y" "y=2", "abs(x) < y" "y>ABS(x)",
         # "(x*2) >= y" "y<=x*2"); two non-variable operands keep their order
         # ("x+1=ABS(y)", "SUBSTR(s,1,3)='van'"); a constant compared with an
@@ -312,9 +312,9 @@ where_text <- function(e) {
       contains = paste0(w(x$lhs), if (isTRUE(x$negate)) " not contains " else " contains ", w(x$rhs)),
       is_missing = paste0(w(x$lhs), if (isTRUE(x$negate)) " is not null" else " is null"),
       call = if (x$name != "sqllike" && length(x$args) && all(vapply(x$args, function(a) a$node %in% c("num", "str", "missing"), logical(1)))) {
-        #
-        # clause and prints the value ("contains trim('smith')" is echoed
-        # "contains 'smith'"); that folding is not implemented
+        # a call with constant arguments is evaluated when the WHERE clause is
+        # compiled and the NOTE shows the value ("contains trim('smith')" is
+        # echoed "contains 'smith'"); that folding is not implemented
         abort_unsupported(paste0("the WHERE note of ", toupper(x$name), "() with constant arguments (the folded value is not supported)"))
       } else if (x$name == "sqllike") paste0(w(x$args[[1]]), " like ", w(x$args[[2]])) else paste0(toupper(x$name), "(", paste(vapply(x$args, function(a) if (a$node == "of") "of" else w(a), ""), collapse = ", "), ")"),
       "?"

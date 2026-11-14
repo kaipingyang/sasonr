@@ -2,7 +2,7 @@
 #
 # For a function listed in `fn_policy`, translated code calls
 # sas_fcall(name, f, args, .at): the implementation computes the values; the
-#
+# wrapper writes the log NOTEs and sets _ERROR_:
 #   miss   a missing value (any kind) in one of the positions `pos` (default:
 #          every numeric argument):
 #            "mv"    result missing, "Missing values were generated" NOTE
@@ -91,7 +91,7 @@ dom_stat <- function(need, zero_var = FALSE, zero_mean = FALSE) {
 
 # probability functions: parameters outside their domain give the
 # mathematical-operations NOTE (non-finite R results); huge or tiny arguments
-#
+# are not supported
 dom_prob <- function(args) {
   out <- rep("ok", max(lengths(args)))
   for (k in seq_along(args)) {
@@ -122,8 +122,8 @@ fn_policy <- list(
   cos = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   sin = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   tan = fpol("mv", dom = function(a) {
-    # TAN(1.5707963267948966), the double nearest pi/2, is an invalid argument
-    # in SAS 9.4.  Other arguments whose cosine is that close to 0 (below 1E-15
+    # TAN(1.5707963267948966), the double nearest pi/2, is an invalid
+    # argument.  Other arguments whose cosine is that close to 0 (below 1E-15
     # in magnitude) are not supported: fail loud.
     x <- dom_n(a, 1)
     dom_or(dom_huge(x, 1e10), code_if(abs(x) == 1.5707963267948966, "inv"), code_if(abs(cos(x)) < 1e-15, "?"))
@@ -138,7 +138,7 @@ fn_policy <- list(
   sqrt = fpol("mv", dom = function(a) code_if(dom_n(a, 1) < 0, "inv")),
   gamma = fpol("mv", dom = function(a) {
     x <- dom_n(a, 1)
-    #
+    # GAMMA(171) is a number and GAMMA(172) an invalid argument;
     # arguments in between are not supported (fail loud)
     dom_or(code_if(x <= 0 & is_int(x), "inv"), code_if(x >= 172, "inv"), code_if(x > 171 & x < 172, "?"),
            code_if(x > 0 & x <= 1e-300, "inv"),
@@ -399,7 +399,7 @@ kth_dom <- function(a, count_missing) {
   # no non-missing value at all: missing result with the missing-values NOTE
   dom_or(code_if(!count_missing & n == 0 & int_ok(k) & k >= 1, "mv"), code_if(!int_ok(k) | k < 1 | k > n, "math"))
 }
-#
+# values above 1e100 or below 1e-100 (other than 0) are not supported
 mean_extreme <- function(a) {
   m <- args_matrix(lapply(a, as.numeric))
   code_if(apply(m, 1, function(r) {
@@ -454,7 +454,7 @@ choose_dom <- function(a) {
 #' Used by translated code for the functions in the internal policy table:
 #' counts the log NOTEs ("Missing values were generated", "Invalid argument
 #' to function", "Mathematical operations could not be performed"), sets
-#'
+#' `_ERROR_` and gives the missing results that the policy table defines.
 #' @param .name Function name.
 #' @param .f Implementation.
 #' @param ... Arguments.

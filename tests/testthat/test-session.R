@@ -1,6 +1,6 @@
 # SasSession: run state lives in a session object; successive
-#
-# session; nothing a run changes is package-global.
+# sas_run(session = s) calls are successive submissions to one session;
+# nothing a run changes is package-global.
 
 test_that("WORK, macro variables, formats, options and titles persist across submissions", {
   s <- sas_session(work = list(inp = data.frame(x = c(1, 2))))

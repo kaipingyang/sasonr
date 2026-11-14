@@ -197,10 +197,10 @@ test_that("CLASS tables repeat the fixed columns in every panel", {
   expect_equal(rules_of(res), c(rep(strrep("-", 129), 2L), rep(strrep("-", 59), 2L)))
 })
 
-test_that("undetermined panel layouts fail loud instead of printing a wrong rule", {
+test_that("unsupported panel layouts fail loud instead of printing a wrong rule", {
   expect_error(sas_run(paste(panel_data, "proc means data=p fw=8 n mean std min max; var x; run;")),
                class = "sasonr_unsupported")
-  #
+  # a CLASS column keeps its declared length; narrowing one that does not fit is not supported
   expect_error(sas_run("data q; length c $200; do i = 1 to 10; c = 'A'; x = i; output; end; drop i; run;
     proc means data=q n mean std stderr min max median q1 q3 sum var cv; class c; var x; run;"),
                class = "sasonr_unsupported")

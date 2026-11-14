@@ -227,8 +227,8 @@ test_that("an OPTIONS statement inside a step applies to the macro code after it
            "\nquit;\n%let e = %sysfunc(mdy(2, 30, 2024));\ndata b; x = 1; run;")
   }
   let <- "%let d = %sysfunc(mdy(2, 30, 2024));"
-  #
-  # it, before the macro code after it in the step; the session keeps it
+  # the OPTIONS statement applies when it is compiled,
+  # before the macro code after it in the step; the session keeps it
   expect_identical(sas_run(step(paste("options linesize=max;", let)))$log, c(note, note))
   # macro code before the OPTIONS statement runs under the LINESIZE before it
   expect_identical(sas_run(step(paste(let, "options linesize=max;")))$log, c(note132, note))

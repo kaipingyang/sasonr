@@ -4,8 +4,9 @@
 #
 # Scalar expressions are evaluated in R with the DATA step runtime
 # (sql_expr.R); DuckDB computes join candidate pairs and grouped aggregates
-#
-# BY, DISTINCT, GROUP BY, set operators without ALL, single-table scans);
+# (sql_runtime.R). Result rows are in a defined order where the query defines
+# one (ORDER BY, DISTINCT, GROUP BY, set operators without ALL, single-table
+# scans);
 # results of joins without ORDER BY are flagged as unordered.
 
 # Relations -----------------------------------------------------------------------
@@ -406,7 +407,7 @@ sql_select <- function(q, eng, outer) {
       gid <- gid[ord]
       rows_gid <- gid
       sql_note(eng, "NOTE: The query requires remerging summary statistics back with the original data.")
-      #
+      # remerging does not keep the input order within a group
       if (length(group) > 0) rel$ordered <- FALSE
     } else {
       rel <- sql_rel_rows(rel, first)
@@ -470,7 +471,7 @@ sql_select <- function(q, eng, outer) {
     const_args <- e$node == "call" && length(e$args) > 0 &&
       all(vapply(e$args, function(a) a$node %in% c("num", "str", "missing"), logical(1)))
     if (ty$type == "char" && is.null(it$length) && const_args && e$name %in% sql_fold_fns) {
-      #
+      # constant arguments: the call is evaluated once; the column has the length of the value
       col$len <- max(1L, nchar(v[1] %||% ""))
     } else if (ty$type == "char" && is.null(it$length) && const_args && identical(fn_table[[e$name]]$len, 200L) &&
                e$name %in% sql_200_fns) {
@@ -706,5 +707,5 @@ sql_outer_union <- function(a, b, q, eng) {
 # the DATA step default of 200
 sql_fold_fns <- c("cat", "strip", "trim", "compbl", "compress", "scan", "substr")
 sql_200_fns <- c("tranwrd")
-#
+# functions whose DATA step length is the fixed 200, also in SQL
 sql_200_fixed <- c("cat", "cats", "catt", "catx")

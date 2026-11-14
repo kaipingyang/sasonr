@@ -272,7 +272,7 @@ sas_proc_store <- function(work, outs) {
 
 # Listing tables --------------------------------------------------------------------
 
-# Split a column heading. `parts` are SAS's preferred split points (e.g.
+# Split a column heading. `parts` are the preferred split points (e.g.
 # c("N", "Obs")); the heading is one line when it fits `width`.
 heading_lines <- function(parts, width) {
   full <- paste(parts, collapse = " ")

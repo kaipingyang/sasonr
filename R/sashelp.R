@@ -10,7 +10,7 @@
 #                         with haven (Suggests), together with
 #   <member>_meta.csv     its DICTIONARY.COLUMNS rows (name, type, length,
 #                         format, informat, label), which give the declared
-#
+#                         character lengths that values are padded to.
 # When a member, its column attributes or haven are missing, the program stops
 # loudly instead of guessing.
 
@@ -53,8 +53,8 @@ sashelp_member <- function(name, line = NULL) {
 }
 
 # A SASHELP data set copied by PROC COPY, with the declared character lengths
-#
-#
+# of its DICTIONARY.COLUMNS rows (character values are padded to them, which
+# LENGTHC()/SUBSTR()/comparisons depend on).
 sashelp_read_sas7bdat <- function(path, meta_path, name = basename(path), line = NULL) {
   if (!requireNamespace("haven", quietly = TRUE)) {
     abort_unsupported(paste0("SASHELP.", toupper(name), " (reading the local .sas7bdat copy needs the haven package)"), line)

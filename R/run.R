@@ -78,7 +78,7 @@ engine_exec_steps <- function(eng, text, line) {
     # the AST of the step being compiled / run (errors.R derives from it what an ERROR leaves in WORK)
     eng$cur_step <- step
     if (isTRUE(eng$sc_pending) && step$type != "global") {
-      #
+      # after an ERROR in a global statement syntax-check mode starts at the
       # next step, here a DATA step (also DATA _NULL_, also with a TITLE
       # statement in between; engine_global_error()), unless OPTIONS
       # NOSYNTAXCHECK came in between
@@ -164,7 +164,7 @@ engine_exec_steps <- function(eng, text, line) {
     # run-wide state the vectorised attempt may change before a re-run (PRXPARSE ids)
     prx0 <- rt$prx
     # Vectorised code evaluates every IF/SELECT branch on every row, so a branch
-    #
+    # that never runs can fail loud or raise a SAS exception: the step is re-run
     # row by row (L3), where only the taken branches run; a genuine unsupported
     # value or exception is raised there again.  A construct that is unsupported
     # whatever the values (sasonr_unsupported_construct) fails loud at once.
@@ -177,7 +177,7 @@ engine_exec_steps <- function(eng, text, line) {
     if (!branch && !is.environment(env)) next
     if (branch || (vec && (rt$err || isTRUE(rt$mv_rerun)))) {
       # A data error in vectorised code: re-run the step row by row (L3) so
-      #
+      # that _ERROR_, the NOTEs and the PDV dump follow the row-by-row execution.
       rt$prx <- prx0
       tr <- translate_step(step, eng$session$meta, "L3")
       tr$reasons <- c(if (branch) "unsupported value or SAS exception in vectorised code (re-run row by row)" else
@@ -198,10 +198,10 @@ engine_exec_steps <- function(eng, text, line) {
     }
     stopped <- step$type == "data" && isTRUE(rt$stop_step)
     if (stopped) {
-      #
+      # An execution-time ERROR that stops the step (SYMGET): the step ends
       # after the current observation and keeps what was written ("WARNING: The
-      # data set ... may be incomplete").  Only a one-observation step is known
-      #
+      # data set ... may be incomplete").  Only a one-observation step is
+      # supported; a longer step would have to stop part-way through.
       big <- vapply(tr$outputs, function(nm) NROW(get0(nm, envir = eng$session$work, inherits = FALSE)) > 1L, logical(1))
       if (any(big)) abort_unsupported("an execution-time ERROR that stops a DATA step with more than one observation", step$line)
       env$.log <- c(env$.log, "NOTE: The SAS System stopped processing this step because of errors.")
@@ -232,7 +232,7 @@ engine_exec_steps <- function(eng, text, line) {
 }
 
 # A PROC step that reads `_LAST_` when `_LAST_` is a PROC SQL view: sasonr
-#
+# reads views only in PROC SQL, so it fails loud.
 engine_check_last_view <- function(eng, step) {
   if (isTRUE(eng$session$last_view) && is.null(step$options$data) &&
       step$name %in% c("sort", "print", "means", "summary", "freq", "transpose", "contents")) {
@@ -261,7 +261,7 @@ engine_check_last_view <- function(eng, step) {
 #   * PROC PRINT, printing PROC FREQ, PROC DELETE, PROC DATASETS DELETE / KILL
 #     and an in-place PROC SORT change nothing, also not _LAST_;
 # SYSERR is 3 after every step but PROC MEANS.  Other steps and forms (PROC
-# TRANSPOSE, which runs with 0 observations in SAS, PROC FORMAT, PROC
+# TRANSPOSE, which would run with 0 observations, PROC FORMAT, PROC
 # SUMMARY, several OUT= data sets, FREQ OUTPUT, data set options on OUT=,
 # other DATASETS statements ...) fail loud, and so does anything these rules
 #
@@ -373,7 +373,7 @@ engine_check_step <- function(eng, step) {
 }
 
 # Numeric variables stored with LENGTH < 8 keep only the first bytes of the
-#
+# IEEE 754 value (the mantissa is truncated when the observation is written).
 engine_store_numlen <- function(eng, outputs) {
   for (nm in outputs) {
     m <- eng$session$meta[[nm]]
@@ -446,7 +446,7 @@ engine_global <- function(eng, g) {
     o <- eng$session$options
     if (!is.null(g$ls)) o$linesize <- g$ls
     # the positive and negative forms apply in the order written: the last one
-    #
+    # wins
     for (opt in g$opts) {
       switch(opt,
         notes = o$notes <- TRUE, nonotes = o$notes <- FALSE,
@@ -481,10 +481,10 @@ engine_quote_at <- function(text, line, g) {
   if (q %in% c("'", "\"")) q else NULL
 }
 
-#
-#
-# OPTIONS LINESIZE=MAX and NONOTES inside PROC DATASETS before and after a
-# %SYSFUNC call that writes a NOTE, and LINESIZE=MAX inside PROC SQL).  sasonr
+# An OPTIONS statement inside a step takes effect when it is compiled, so the
+# macro code after it in the same step runs under the new options (OPTIONS
+# LINESIZE=MAX and NONOTES inside PROC DATASETS before and after a %SYSFUNC
+# call that writes a NOTE, and LINESIZE=MAX inside PROC SQL).  sasonr
 # runs the statements of a step when the step is complete (PROC DATASETS is
 # the step that accepts OPTIONS; PROC SQL runs its statements one by one), so
 # the code sink hands the statement over
@@ -563,11 +563,12 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #' @inheritParams sas_translate
 #' @param on_error What a SAS ERROR does (a syntax error, an unknown function,
 #'   a missing input data set, an ERROR in PROC SQL ...). `"sas"` (the
-#'
-#'   step is not run, SAS's syntax-check mode (OBS=0) applies to the rest of the
-#'   program (later steps are compiled but not run; global statements and the
-#'   macro language still are), `SYSERR`/`SYSCC` are set and the result has
-#'
+#'   default; option `sasonr.on_error`) uses the batch-mode error handling: the
+#'   failing step is not run, syntax-check mode (OBS=0) applies to the rest of
+#'   the program (later steps are compiled but not run; global statements and
+#'   the macro language still are), `SYSERR`/`SYSCC` are set and the result has
+#'   `status = "error"`, the ERROR lines in `$log` and WORK as the failing step
+#'   leaves it.
 #'   `"abort"` stops with the classed R condition instead. Features sasonr does
 #'   not support (`sasonr_unsupported`) always stop the run: they are not SAS
 #'   errors.
@@ -665,13 +666,13 @@ engine_run_partial <- function(code) {
 }
 
 # Append procedure output to the listing of the submission.  sasonr writes
-#
-# PAGESIZE=MAX.  Under other values SAS
-# centres the lines (CENTER), writes a header line with the date or page
-# number (DATE, NUMBER), a delimiter line instead of each new page after the
-# first (FORMDLIM=), or breaks a long output into pages with repeated
-# headings (PAGESIZE=): output written under them fails loud.  An output of at
-# most PAGESIZE - 3 lines fits on one page (margin for the title lines).
+# the listing in the layout of NOCENTER NODATE NONUMBER FORMDLIM=' '
+# PAGESIZE=MAX.  Other values centre the lines (CENTER), add a header line
+# with the date or page number (DATE, NUMBER), a delimiter line instead of
+# each new page after the first (FORMDLIM=), or break a long output into
+# pages with repeated headings (PAGESIZE=): output written under them fails
+# loud.  An output of at most PAGESIZE - 3 lines fits on one page (margin for
+# the title lines).
 engine_add_listing <- function(eng, lst, line = NULL) {
   if (length(lst) == 0) return(invisible())
   o <- eng$session$options

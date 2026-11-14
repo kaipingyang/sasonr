@@ -1,8 +1,8 @@
 # SAS rounding and truncation functions: ROUND, ROUNDE, ROUNDZ, INT, INTZ,
 # FLOOR, FLOORZ, CEIL, CEILZ.
 #
-#
-#
+# Rules:
+#  * subnormal arguments count as zero (denormals-are-zero);
 #  * q = x / unit (double); the multiple k = |q| rounded, with a fuzz below a
 #    half-integer (ROUND: away from zero, the fuzz W = min(1E-12 |q|, 1E-6)
 #    added to |q| + 0.5; ROUNDE: an exact or fuzzed tie within
@@ -17,7 +17,7 @@
 #    integer; FLOOR returns +0 for a zero result, CEIL(x) = -FLOOR(-x),
 #    INT(x) = FLOOR(x) for x > 0 and -FLOOR(-x) otherwise; FLOORZ / CEILZ
 #    have no fuzz.
-# Points where these rules do not determine the SAS result fail loud
+# Points where these rules do not determine the result fail loud
 # (`sasonr_unsupported`): for ROUNDE a quotient within 0.8-1.25 times the
 # fuzz width below a half-integer (also anything up to 2E-6 below it once
 # 1.1E-12 |q| > 1E-6), a fractional unit that is not a power of ten with a
@@ -113,17 +113,16 @@ round_one <- function(x, unit, mode, fname) {
                              "): x/unit of 2^49 or more with a fractional unit is not supported"))
   }
   if (mode == "round") {
-    #
+    # ROUND rounds up exactly when floor(fl(fl(|q| + 0.5) + W)) > floor(|q|),
     # W = min(1E-12 |q|, 1E-6) - the fuzz is added to |q| + 0.5 in double
-    # precision.  The rule holds for |q| from 2^-2 to 2^52 and the units 1, 10,
-    # 0.5, 0.25, 0.1, 0.01, 0.001, 1E-5 and 1/3.
+    # precision.
     if (floor((a + 0.5) + min(1e-12 * a, 1e-6)) > k) k <- k + 1
   } else {
     d <- (a - k) - 0.5
     w <- if (mode == "zero") 0 else min(1.1e-12 * a, 2e-6)
     # ROUNDE: the window W = min(1.1E-12 |q|, 2E-6); its edges fail loud.  The
-    # fuzz of ROUND is capped at 1E-6 (above); whether ROUNDE has the same cap
-    # is not known, so every value up to 2E-6 below a half point fails loud
+    # fuzz of ROUND is capped at 1E-6 (above); a cap for ROUNDE is not
+    # implemented, so every value up to 2E-6 below a half point fails loud
     # once 1.1E-12 |q| > 1E-6
     if (w > 0 && ((d <= -0.8 * w && d >= -1.25 * w) || (1.1e-12 * a > 1e-6 && d >= -2e-6 && d < 0))) {
       abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
@@ -146,7 +145,7 @@ round_family <- function(x, unit, mode, fname, .at = NULL, note = TRUE) {
   unit <- rep_len(as.numeric(unit), n)
   # missing arguments (special missing values included) give an ordinary missing
   out <- rep(NA_real_, n)
-  #
+  # a unit that is not a normal double is invalid too: ROUND(1, 2.3e-308) is
   # 1 while ROUND(1, 2.2e-308) is ". " with "Argument 2 ... is invalid",
   # because 2.2e-308 is subnormal (ROUNDE/ROUNDZ behave the same).
   sub <- !is.na(unit) & unit > 0 & unit < .Machine$double.xmin
@@ -156,7 +155,7 @@ round_family <- function(x, unit, mode, fname, .at = NULL, note = TRUE) {
   }
   bad <- !is.na(unit) & (unit <= 0 | sub)
   if (any(bad) && note) {
-    #
+    # ROUND writes "Argument 2 ... is invalid"; ROUNDE/ROUNDZ only count the place
     if (fname == "round") note_invalid_arg(fname, 2L, .at, list(x, unit), bad, numbered = TRUE) else note_math(.at, sum(bad))
   }
   ok <- !is.na(x) & !is.na(unit) & !bad
@@ -264,7 +263,7 @@ display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0
     list(ip = substr(s, 1L, dot - 1L), fr = substr(s, dot + 1L, nchar(s)))
   }
   if (a == floor(a) && a >= 1 && !exact) {
-    #
+    # integers are written with their exact digits (32. of
     # 9.39586291501115E17 is 939586291501115008)
     # (no decimals: supported below 1E18; from 1E18 to 1E21 only at the point
     # 32. of 2.6745296926266266E19 = 26745296926266265600; elsewhere fail loud,
@@ -402,7 +401,7 @@ exact_significant_digits <- function(a) {
 
 # Signed fixed-point display text of v with d decimals (the one display
 # engine, display_round_text): "-" for a negative value, also when it rounds
-#
+# to zero ("-0.00").  Values of 1E17 or more have no
 # supported fixed-point text: fail loud.
 display_fixed <- function(v, d, edge = "abort", exact = FALSE) {
   t <- display_round_text(v, d, edge = edge, exact = exact)
@@ -420,7 +419,7 @@ display_fixed <- function(v, d, edge = "abort", exact = FALSE) {
 sci_dec_text <- function(v, k, edge = "abort") {
   a <- abs(v)
   if (k >= 13L) {
-    #
+    # at most 14 significant digits (32. of the largest double is 1.7976931348623E308)
     g <- e14_digits(NULL, v, k)
     ex <- g$ex
     keep <- paste0(g$keep, strrep("0", k - 13L))
@@ -449,7 +448,7 @@ sci_dec_text <- function(v, k, edge = "abort") {
   r <- round_k(dg, ex)
   # An exact tie at the 15th digit (2^-21 = 4.76837158203125E-7): if the exact
   # binary value ends at 15 significant digits with a trailing 5, the 14-digit
-  #
+  # rounding step is ambiguous (no direction is implemented) - fail loud when
   # the two directions give different digits.  Detect it from exact arithmetic:
   # sprintf beyond 17 significant digits is exact only on glibc, the Windows
   # UCRT prints the tail from a truncated approximation (a value ending in
@@ -486,7 +485,7 @@ sci_dec_text <- function(v, k, edge = "abort") {
        mant = m, ex = ex)
 }
 
-#
+# The E form written for a value that does not fit in w columns in fixed
 # notation: the decimal-mantissa form with as many digits as fit, unless it
 # shows fewer than three significant digits and an integer mantissa
 # ("123E9") shows more.  NA when nothing fits.

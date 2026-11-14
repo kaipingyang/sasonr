@@ -93,9 +93,9 @@ sas_lex <- function(text) {
     NA_integer_
   }
 
-  #
-  # swallows the rest of the program) or a `*...;` statement comment, where
-  #
+  # Skip a `%*...;` comment (quotes honoured: an unmatched quote swallows the
+  # rest of the program) or a `*...;` statement comment, where quotes have no
+  # special meaning.
   skip_comment_to_semi <- function(j, what, quotes = TRUE) {
     while (j <= n) {
       c <- cp[j]
