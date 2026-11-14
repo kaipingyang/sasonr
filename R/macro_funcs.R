@@ -135,7 +135,7 @@ mp_function <- function(nm, src, ses, mode) {
       if (nzchar(x) && !is.na(suppressWarnings(as.numeric(x)))) "NUMERIC" else "CHAR"
     },
     sysfunc = ,
-    qsysfunc = requote(mac_sysfunc(mp_paren_text(src, ses, nm), line)),
+    qsysfunc = requote(mac_sysfunc(mp_paren_text(src, ses, nm), line, ses)),
     abort_unsupported(paste0("macro function %", toupper(nm)), line)
   )
 }
@@ -190,7 +190,7 @@ mac_parse_format <- function(text, line = NULL) {
   f
 }
 
-mac_sysfunc <- function(text, line = NULL) {
+mac_sysfunc <- function(text, line = NULL, ses = NULL) {
   rt <- rt_diag()
   cp <- utf8ToInt(text)
   lp <- match(40L, cp)
@@ -264,8 +264,28 @@ mac_sysfunc <- function(text, line = NULL) {
           abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") for SAS 9.4 ",
                                    sas_target_version(), " (not in its expected results)"), line)
         }
+        # The NOTE is wrapped at the LINESIZE in effect: the session's, or that
+        # of an OPTIONS statement compiled earlier in the current step
+        # (`step_opts`, engine_step_options()).  Whether NONOTES suppresses
+        #
+        so <- ses$step_opts
+        if (isTRUE(so$unknown)) {
+          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") after an OPTIONS ",
+                                   "statement of the step that sasonr cannot apply before the step runs (line ",
+                                   so$line, ")"), line)
+        }
+        if (!is.null(ses$options_unknown)) {
+          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") after the OPTIONS ",
+                                   "statements of a PROC DATASETS step in syntax-check mode (line ", ses$options_unknown,
+                                   "; SAS executes them, sasonr does not)"), line)
+        }
+        if (!(if (is.null(so)) rt_notes_on() else isTRUE(so$notes))) {
+          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") under OPTIONS ",
+                                   "NONOTES (not in the expected results)"), line)
+        }
         rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
-                                  "The result of the operations have been set to a missing value.")))
+                                  "The result of the operations have been set to a missing value."),
+                            ls = so$linesize %||% rt_linesize()))
       }
       r
     } else {

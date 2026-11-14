@@ -41,6 +41,7 @@ new_engine <- function(session, level, execute) {
   eng$sql_opts <- list()
   ses <- session$macro
   ses$exec <- function(text, line) engine_exec(eng, text, line)
+  ses$on_step_options <- function(text, line) engine_step_options(eng, text, line)
   ses$line <- 1L
   ses$frames <- list()
   rt <- session$rt
@@ -199,6 +200,14 @@ engine_exec_steps <- function(eng, text, line) {
 # but not run; a DATA step creates its output data sets with 0 observations.
 engine_check_step <- function(eng, step) {
   if (step$type == "proc") {
+    # SAS still executes the global statements of the step; sasonr does not
+    # apply the OPTIONS statements of a PROC DATASETS step it only checks, so
+    # the options a later macro-time NOTE depends on are not known
+    # (mac_sysfunc() fails loud)
+    if (step$name == "datasets" &&
+        any(vapply(step$stmts, function(s) identical(s$type, "global") && identical(s$kind, "options"), logical(1)))) {
+      eng$session$macro$options_unknown <- step$line
+    }
     if (step$name != "datasets") translate_proc(step, eng$session$meta, eng$session$last)
     err_set_macro(eng, syserr = 3)
     return(invisible())
@@ -298,6 +307,36 @@ engine_global <- function(eng, g) {
       eng$session$titles <- eng$session$titles[-length(eng$session$titles)]
     }
   }
+  invisible()
+}
+
+#
+#
+# Global Statements: Reference), so the macro code after it in the same step
+# runs under the new options.  sasonr runs the statements of a step when the
+# step is complete (PROC DATASETS is the step that accepts OPTIONS; PROC SQL
+# runs its statements one by one), so the code sink hands the statement over
+# at its semicolon and the macro processor keeps the options of the step's
+# OPTIONS statements so far (`step_opts`: LINESIZE and NOTES, what a macro-time
+# NOTE depends on, mac_sysfunc()); the session options change when the step
+# runs, as before.  A statement that does not parse here leaves them unknown
+# (a macro-time NOTE then fails loud); the step reports the error when it runs.
+engine_step_options <- function(eng, text, line) {
+  ses <- eng$session$macro
+  if (isTRUE(ses$step_opts$unknown)) return(invisible())
+  st <- tryCatch(sas_parse(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE)$steps,
+                 error = function(e) NULL)
+  g <- if (length(st) == 1L) st[[1]] else NULL
+  if (is.null(g) || !identical(g$type, "global") || !identical(g$kind, "options")) {
+    ses$step_opts <- list(unknown = TRUE, line = line)
+    return(invisible())
+  }
+  o <- ses$step_opts %||% list(unknown = FALSE, linesize = eng$session$options$linesize,
+                               notes = isTRUE(eng$session$options$notes))
+  if (!is.null(g$ls)) o$linesize <- g$ls
+  if ("nonotes" %in% g$opts) o$notes <- FALSE
+  if ("notes" %in% g$opts) o$notes <- TRUE
+  ses$step_opts <- o
   invisible()
 }
 

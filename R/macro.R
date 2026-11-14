@@ -194,6 +194,20 @@ datalines_stmt_words <- c("datalines", "cards", "lines", "datalines4", "cards4",
 
 # The compiler-bound sink: tracks statements (outside quotes and comments) and
 # cuts complete steps out of the text.
+#
+# Global statements take effect as soon as they are complete ("Global
+# statements are not executable statements; they are declarative statements
+#
+# Global Statements: Reference), interleaved with macro execution: OPTIONS
+# MINOPERATOR and OPTIONS SASAUTOS= apply to the macro call that follows them
+#
+#
+# is handed to the executor when its semicolon is seen, before the macro
+# processor runs the code after it; PROC SQL statements run one by one too.
+# Inside a DATA or PROC step sasonr runs the statements with the step, when it
+# is complete; an OPTIONS statement of the step is also handed to
+# `ses$on_step_options` at its semicolon (engine_step_options(), run.R), which
+# keeps the options the macro code after it in the step sees (`ses$step_opts`).
 code_sink <- function(ses) {
   s <- new.env(parent = emptyenv())
   s$compiler <- TRUE
@@ -208,6 +222,10 @@ code_sink <- function(ses) {
   s$dl <- FALSE
   s$dl4 <- FALSE
   s$sql <- FALSE
+  # inside a DATA or PROC step other than PROC SQL (from its DATA / PROC
+  # statement to its RUN / QUIT, the end of its data lines or the next step)
+  s$step <- FALSE
+  ses$step_opts <- NULL
 
   flush_upto <- function(p) {
     text <- substr(s$acc, 1L, p)
@@ -215,6 +233,10 @@ code_sink <- function(ses) {
     line <- s$chunk_line
     s$chunk_line <- if (nzchar(trimws(s$acc))) s$stmt_line else NA_integer_
     if (nzchar(trimws(text))) ses$exec(text, if (is.na(line)) 1L else line)
+  }
+  step_done <- function() {
+    s$step <- FALSE
+    ses$step_opts <- NULL
   }
 
   stmt_end <- function(pos) {
@@ -230,6 +252,7 @@ code_sink <- function(ses) {
     if (first %in% c("run", "quit") && rest %in% c("", "cancel")) {
       if (first == "quit") s$sql <- FALSE
       flush_upto(pos)
+      step_done()
       return(pos)
     } else if (first %in% datalines_stmt_words && rest == "" && !s$sql) {
       s$dl <- TRUE
@@ -240,16 +263,31 @@ code_sink <- function(ses) {
         flush_upto(begin - 1L)
         shift <- begin - 1L
       }
+      step_done()
       # PROC SQL executes each statement as soon as it is complete
       s$sql <- first == "proc" && first_word(rest) == "sql"
       if (s$sql) {
         flush_upto(pos - shift)
         return(pos)
       }
+      s$step <- TRUE
       return(shift)
     } else if (s$sql) {
       flush_upto(pos)
       return(pos)
+    } else if (!s$step && nzchar(first)) {
+      # a global statement in open code: executed now (text before it is
+      # blank, comments or null statements)
+      shift <- 0L
+      if (!is.na(begin) && begin > 1L) {
+        flush_upto(begin - 1L)
+        shift <- begin - 1L
+      }
+      flush_upto(pos - shift)
+      return(pos)
+    } else if (s$step && first %in% c("options", "option") && !startsWith(rest, "=") &&
+               is.function(ses$on_step_options)) {
+      ses$on_step_options(substr(s$acc, begin, pos), s$stmt_line)
     }
     0L
   }
@@ -305,9 +343,11 @@ code_sink <- function(ses) {
     s$stmt <- integer()
     s$stmt_begin <- NA_integer_
     flush_upto(nchar(s$acc))
+    step_done()
   }
   s$finish <- function() {
     if (nzchar(trimws(s$acc))) flush_upto(nchar(s$acc))
+    step_done()
   }
   s
 }

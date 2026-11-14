@@ -192,3 +192,68 @@ data _null_; c = \"&q2\"; put c=; run;"
   expect_equal(mlog(code), c("a='ATRESOLVED'", "b='AT&t'", "c='ATCHANGED'"))
   expect_equal(mlog("%let x=abc; %put %bquote('&x') '&x';"), "'abc' '&x'")
 })
+
+test_that("global statements take effect before the macro code that follows them", {
+  note <- paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
+                "The result of the operations have been set to a missing value.")
+  # a global statement applies to the macro code after it with
+  #
+  #
+  #
+  expect_identical(sas_run("options linesize=max;\n%let d = %sysfunc(mdy(2, 30, 2024));")$log, note)
+  expect_identical(sas_run("%macro m; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); %mend; %m")$log, note)
+  # PROC SQL runs its statements one by one
+  expect_true(note %in% sas_run("proc sql; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); quit;")$log)
+  # the session keeps the option for the next submission
+  s <- sas_session()
+  sas_run("options linesize=max;", session = s)
+  expect_identical(sas_run("%let d = %sysfunc(mdy(2, 30, 2024));", session = s)$log, note)
+  # an unsupported option fails loud at its own statement, before the macro call after it runs
+  expect_error(sas_run("options minoperator; %macro m; %if a in a b %then %put yes; %mend; %m"),
+               class = "sasonr_unsupported", regexp = "system option MINOPERATOR")
+  expect_error(sas_run("footnote 'f'; %put after;"), class = "sasonr_unsupported", regexp = "FOOTNOTE")
+  # the line of an error in an open-code statement after macro code
+  e <- tryCatch(sas_run("data a; x = 1;\nrun;\n%put y;\n\noptions\n  linesize=abc;\n"), error = identity)
+  expect_s3_class(e, "sasonr_syntax_error")
+  expect_equal(e$sas_line, 5)
+})
+
+test_that("an OPTIONS statement inside a step applies to the macro code after it in the step", {
+  note <- paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
+                "The result of the operations have been set to a missing value.")
+  note132 <- c(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
+                     "The result of the operations have been set"), "      to a missing value.")
+  #
+  expect_identical(sas_run("data a; x = 1; run;
+    proc datasets lib=work nolist; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); quit;")$log, note)
+  # macro code before the OPTIONS statement runs under the LINESIZE before it
+  expect_identical(sas_run("data a; x = 1; run;
+    proc datasets lib=work nolist; %let d = %sysfunc(mdy(2, 30, 2024)); options linesize=max; quit;")$log, note132)
+  # after the step, the session has the option
+  expect_identical(sas_run("data a; x = 1; run;
+    proc datasets lib=work nolist; options linesize=max; quit; %let d = %sysfunc(mdy(2, 30, 2024));")$log, note)
+  # a variable named OPTIONS is not an OPTIONS statement
+  r <- sas_run("data a; options = 1; %let d = %sysfunc(mdy(2, 30, 2024)); run;")
+  expect_identical(r$log, note132)
+  expect_equal(r$work$a$options, 1)
+})
+
+test_that("the %SYSFUNC NOTE fails loud where the options in effect are not known", {
+  # an OPTIONS statement of the step that does not parse before the step runs
+  expect_error(sas_run("data a; x = 1; run;
+    proc datasets lib=work nolist; options minoperator; %let d = %sysfunc(mdy(2, 30, 2024)); quit;"),
+    class = "sasonr_unsupported", regexp = "cannot apply before the step runs")
+  # syntax-check mode: SAS executes the OPTIONS statements of a step it only checks
+  expect_error(sas_run("data a; x = 1; run; data b; set a y = 2; run;
+    proc datasets lib=work nolist; options linesize=max; quit;
+    %let d = %sysfunc(mdy(2, 30, 2024));", on_error = "sas"),
+    class = "sasonr_unsupported", regexp = "syntax-check mode")
+  #
+  expect_error(sas_run("options nonotes; %let d = %sysfunc(mdy(2, 30, 2024));"),
+               class = "sasonr_unsupported", regexp = "NONOTES")
+  expect_error(sas_run("options nonotes; data _null_; run; %let d = %sysfunc(mdy(2, 30, 2024));"),
+               class = "sasonr_unsupported", regexp = "NONOTES")
+  expect_error(sas_run("data a; x = 1; run;
+    proc datasets lib=work nolist; options nonotes; %let d = %sysfunc(mdy(2, 30, 2024)); quit;"),
+    class = "sasonr_unsupported", regexp = "NONOTES")
+})
