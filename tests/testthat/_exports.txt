@@ -216,6 +216,7 @@ public sas_translate
 public sas_work
 internal sas_and
 internal sas_arith
+internal sas_between
 internal sas_carry
 internal sas_chain
 internal sas_char

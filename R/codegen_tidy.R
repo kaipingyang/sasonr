@@ -129,10 +129,7 @@ gen_expr <- function(e, cx) {
     },
     chain = sprintf("sas_chain(list(%s), %s)", paste(vapply(e$args, g, ""), collapse = ", "), r_chr_vec(e$ops)),
     "in" = negate_if(sprintf("sas_in(%s, %s)", g(e$lhs), gen_in_values(e)), e$negate),
-    between = {
-      x <- g(e$lhs)
-      negate_if(sprintf("sas_and(sas_ge(%s, %s), sas_le(%s, %s))", x, g(e$lo), x, g(e$hi)), e$negate)
-    },
+    between = negate_if(sprintf("sas_between(%s, %s, %s)", g(e$lhs), g(e$lo), g(e$hi)), e$negate),
     contains = negate_if(sprintf("as.numeric(sas_f_index(%s, sas_rtrim(%s)) > 0)", g(e$lhs), g(e$rhs)), e$negate),
     is_missing = negate_if(sprintf("sas_f_missing(%s)", g(e$lhs)), e$negate),
     call = gen_call(e, cx),

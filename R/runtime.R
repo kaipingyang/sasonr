@@ -163,6 +163,26 @@ sas_chain <- function(args, ops) {
   as.numeric(res)
 }
 
+#' BETWEEN-AND `x between lo and hi`
+#'
+#' The range runs from the smaller bound to the larger one, so the bounds may
+#' come in either order (missing values sort lowest); every operand is
+#' evaluated once.
+#' @export
+#' @keywords internal
+sas_between <- function(x, lo, hi) {
+  n <- if (length(x) == 0 || length(lo) == 0 || length(hi) == 0) 0L else max(length(x), length(lo), length(hi))
+  x <- rep_len(x, n)
+  lo <- rep_len(lo, n)
+  hi <- rep_len(hi, n)
+  sw <- sas_cmp(lo, hi) > 0L
+  l <- lo
+  h <- hi
+  l[sw] <- hi[sw]
+  h[sw] <- lo[sw]
+  as.numeric(sas_cmp(x, l) >= 0L & sas_cmp(x, h) <= 0L)
+}
+
 #' @export
 sas_in <- function(x, values) {
   res <- rep(FALSE, length(x))

@@ -220,3 +220,14 @@ proc means data=d noprint; var x; output out=o sum=s mean=mn min=mi max=ma; run;
   expect_identical(hex(r2$work$o$mi), "8000000000000000")  # first value is -0
   expect_identical(hex(r2$work$o$ma), "8000000000000000")
 })
+
+test_that("BETWEEN takes its bounds in either order", {
+  r <- sas_run("data t; do a = 1 to 4; output; end; run;
+data w; set t; where a between 3 and 1; run;
+data m; set t; where a between 3 and .; run;
+proc sql; create table s as select a, a between 3 and 1 as r, a not between 3 and 1 as n from t; quit;")
+  expect_identical(r$work$w$a, c(1, 2, 3))
+  expect_identical(r$work$m$a, c(1, 2, 3))
+  expect_identical(r$work$s$r, c(1, 1, 1, 0))
+  expect_identical(r$work$s$n, c(0, 0, 0, 1))
+})
