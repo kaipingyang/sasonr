@@ -42,12 +42,14 @@ parse_global_stmt <- function(p, open_code = FALSE) {
   if (low == "filename") {
     advance(p)
     #
+    # logical assign for filename 'text'." (with the quotes written, "..." for
     #
     #
-    if (tk_type(p) %in% c("str", "str_macro") && tk_type(p, 1L) == "semi" && !grepl("'", tk_val(p), fixed = TRUE)) {
+    if (tk_type(p) %in% c("str", "str_macro") && tk_type(p, 1L) == "semi" && !grepl("['\"]", tk_val(p))) {
       text <- tk_val(p)
+      col <- tk_col(p)
       advance(p, 2L)
-      return(list(type = "global", kind = "filename_noref", text = text, line = line))
+      return(list(type = "global", kind = "filename_noref", text = text, col = col, line = line))
     }
     if (tk_type(p) != "name") g_err("expected a fileref after FILENAME")
     ref <- tk_low(p)

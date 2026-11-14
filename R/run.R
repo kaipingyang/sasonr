@@ -80,15 +80,23 @@ engine_exec_steps <- function(eng, text, line) {
     if (isTRUE(eng$sc_pending) && step$type != "global") {
       #
       #
+      #
+      #
       if (step$type != "data") {
         abort_unsupported("a PROC step after an ERROR in a global statement (supported: a DATA step)", step$line)
       }
       eng$sc_pending <- FALSE
-      eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
-                   "      This prevents execution of subsequent data modification statements.")
-      eng$syntax_check <- TRUE
+      if (!isTRUE(eng$session$options$nosyntaxcheck)) {
+        eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
+                     "      This prevents execution of subsequent data modification statements.")
+        eng$syntax_check <- TRUE
+      }
+    }
+    if (isTRUE(eng$syntax_check) && isTRUE(eng$sql_noexec) && step$type %in% c("data", "proc")) {
+      abort_unsupported("a PROC SQL step in syntax-check mode that ends without QUIT (not supported)", step$line)
     }
     if (step$type == "global") {
+      if (identical(step$kind, "filename_noref")) step$quote <- engine_quote_at(text, line, step)
       engine_global(eng, step)
       next
     }
@@ -96,13 +104,13 @@ engine_exec_steps <- function(eng, text, line) {
       eng$sql_opts <- step$options
       if (isTRUE(eng$syntax_check)) {
         # PROC SQL in syntax-check mode runs as with NOEXEC: no statement runs,
+        # SQLOBS and SQLRC are 0, the step ends "stopped" with SYSERR 1012
         #
         if (sas_target_version() != "SAS 9.4") {
           abort_unsupported(paste0("PROC SQL in syntax-check mode for SAS 9.4 ", sas_target_version(), " (not in its expected results)"), step$line)
         }
         eng$log <- c(eng$log, "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.")
         eng$sql_noexec <- TRUE
-        mac_auto_unknown(eng$session$macro, "sqlrc", paste0("PROC SQL in syntax-check mode (SAS line ", step$line, ")"))
       }
       next
     }
@@ -110,13 +118,14 @@ engine_exec_steps <- function(eng, text, line) {
       if (isTRUE(eng$sql_noexec)) {
         eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
         eng$sql_noexec <- FALSE
+        if (isTRUE(eng$syntax_check)) err_set_macro(eng, syserr = 1012)
       }
       next
     }
     if (step$type == "sql") {
       if (isTRUE(eng$sql_noexec) || isTRUE(eng$syntax_check)) {
         if (isTRUE(eng$sql_noexec)) eng$log <- c(eng$log, "NOTE: Statement not executed due to NOEXEC option.")
-        if (isTRUE(eng$syntax_check)) assign("sqlobs", "0", envir = eng$session$macro$globals)
+        if (isTRUE(eng$syntax_check)) sql_set_status(eng, 0, 0)
         next
       }
       eng$steps <- c(eng$steps, list(list(code = paste0("# PROC SQL ", toupper(step$stmt$kind), " (SAS line ", step$line,
@@ -242,15 +251,22 @@ engine_check_last_view <- function(eng, step) {
 #
 #   * PROC CONTENTS runs: its listing as usual, OUT= (new or existing) with 0
 #
-#   * PROC SORT OUT=, PROC MEANS NOPRINT with one OUTPUT OUT=, PROC FREQ
-#     NOPRINT with one OUT= and PROC APPEND BASE= create a new data set with 0
-#     observations and 0 variables (MEANS: as a stopped step), which becomes
+#   * PROC SORT OUT=, PROC FREQ TABLES OUT= and PROC APPEND BASE= create a new
 #
-#   * PROC PRINT, PROC DELETE, PROC DATASETS DELETE / KILL and an in-place PROC
 #
-# all with SYSERR 3.  Other steps (PROC TRANSPOSE, which runs with 0
-# observations in SAS, PROC FORMAT, printing PROC MEANS / FREQ, other DATASETS
-# statements, an existing OUT= ...) fail loud, and so does anything these
+#
+#   * PROC MEANS (printing or not) stops: "stopped processing this step", an
+#     OUTPUT OUT= data set as in a stopped step (new: 0 observations and 0
+#     variables, "may be incomplete", it becomes _LAST_; existing: also "not
+#
+#
+#   * PROC PRINT, printing PROC FREQ, PROC DELETE, PROC DATASETS DELETE / KILL
+#
+#
+# SYSERR is 3 after every step but PROC MEANS.  Other steps and forms (PROC
+# TRANSPOSE, which runs with 0 observations in SAS, PROC FORMAT, PROC
+# SUMMARY, several OUT= data sets, FREQ OUTPUT, data set options on OUT=,
+# other DATASETS statements ...) fail loud, and so does anything these rules
 #
 # Returns TRUE when the caller runs the step (PROC CONTENTS), FALSE otherwise.
 engine_check_step <- function(eng, step) {
@@ -267,24 +283,31 @@ engine_check_step <- function(eng, step) {
     for (t in step$titles) engine_global(eng, t)
     exists_ds <- function(nm) exists(nm, envir = eng$session$work, inherits = FALSE)
     notes_on <- isTRUE(eng$session$options$notes) && eng$step_notes
-    # a new output data set with 0 observations and 0 variables
-    empty_out <- function(nm, stopped = FALSE) {
+    # an output data set: a new one gets 0 observations and 0 variables and
+    # becomes _LAST_, an existing one is kept; `stopped`: as in a stopped step
+    out_ds <- function(nm, stopped = FALSE) {
       SAS 9.4()
-      engine_empty_dataset(eng, nm, list(vars = character(), type = list(), len = list(), formats = list(), disp = list()))
       if (stopped) {
-        eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.", sprintf(
+        eng$log <- c(eng$log, sprintf(
           "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and 0 variables.",
           toupper(nm)))
       } else if (notes_on) {
         eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and 0 variables.", toupper(nm)))
       }
+      if (exists_ds(nm)) {
+        eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because %s.", toupper(nm),
+                                      if (stopped) "this step was stopped" else "new file is incomplete"))
+        return(invisible())
+      }
+      engine_empty_dataset(eng, nm, list(vars = character(), type = list(), len = list(), formats = list(), disp = list()))
       session_set_last(eng$session, nm)
     }
+    syserr <- 3
     if (step$name == "datasets") {
       if (identical(step$origin, "append")) {
         s <- step$stmts[[1]]
         if (length(s$base$options) || length(s$data$options) || !exists_ds(s$data$name)) unsupported("this PROC APPEND")
-        if (!exists_ds(s$base$name)) empty_out(s$base$name)
+        if (!exists_ds(s$base$name)) out_ds(s$base$name)
       } else if (!identical(step$origin, "delete")) {
         for (s in step$stmts) {
           if (identical(s$type, "global")) {
@@ -300,26 +323,32 @@ engine_check_step <- function(eng, step) {
     } else {
       tr <- translate_proc(step, eng$session$meta, eng$session$last)
       outs <- tr$outputs
-      one_new <- length(outs) == 1L && !exists_ds(outs)
+      if (length(outs) > 1L) unsupported(paste0("PROC ", toupper(step$name), " with several output data sets"))
       if (step$name == "sort") {
-        if (is.null(step$options$out)) {
-          #
-          mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
-                           paste0("an in-place PROC SORT in syntax-check mode (SAS line ", step$line, ")"))
-        } else {
-          if (!one_new || length(step$options$out$options)) unsupported("PROC SORT with an existing or optioned OUT= data set")
-          empty_out(outs)
+        #
+        if (!is.null(step$options$out)) {
+          if (length(step$options$out$options)) unsupported("PROC SORT with data set options on OUT=")
+          out_ds(outs)
         }
-      } else if (step$name %in% c("means", "freq")) {
-        if (!isTRUE(step$options$noprint) || !one_new) {
-          unsupported(paste0("PROC ", toupper(step$name), " other than NOPRINT with one new OUT= data set"))
+      } else if (step$name == "freq") {
+        if (any(vapply(step$stmts, function(x) identical(x$stmt, "output"), logical(1)))) unsupported("PROC FREQ OUTPUT")
+        if (any(vapply(step$stmts, function(x) length(x$opts$out$options) > 0, logical(1)))) {
+          unsupported("PROC FREQ with data set options on OUT=")
         }
-        empty_out(outs, stopped = step$name == "means")
+        if (length(outs)) out_ds(outs)
+      } else if (step$name == "means") {
+        if (any(vapply(step$stmts, function(x) identical(x$stmt, "output") && length(x$out$options) > 0, logical(1)))) {
+          unsupported("PROC MEANS with data set options on OUT=")
+        }
+        SAS 9.4()
+        eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
+        if (length(outs)) out_ds(outs, stopped = TRUE)
+        syserr <- 1012
       } else if (step$name != "print") {
         unsupported(paste0("PROC ", toupper(step$name)))
       }
     }
-    err_set_macro(eng, syserr = 3)
+    err_set_macro(eng, syserr = syserr)
     return(FALSE)
   }
   tr <- translate_step(step, eng$session$meta, eng$level)
@@ -412,7 +441,8 @@ engine_global <- function(eng, g) {
     assign("sysfilrc", if (file.exists(g$path)) "0" else "1", envir = eng$session$macro$globals)
   }
   if (g$kind == "filename_noref") {
-    if (eng$step_notes) eng$log <- c(eng$log, paste0("WARNING: No logical assign for filename '", g$text, "'."))
+    q <- g$quote %||% abort_unsupported("FILENAME with a quoted name and no physical path", g$line)
+    if (eng$step_notes) eng$log <- c(eng$log, paste0("WARNING: No logical assign for filename ", q, g$text, q, "."))
     assign("sysfilrc", "-20004", envir = eng$session$macro$globals)
   }
   if (g$kind == "options") {
@@ -441,6 +471,17 @@ engine_global <- function(eng, g) {
     }
   }
   invisible()
+}
+
+# The quote character of the quoted string of global statement `g` (its
+# `col`) in the chunk `text` that starts at program line `line`: ' or ", or
+# NULL when the position does not hold one.
+engine_quote_at <- function(text, line, g) {
+  src <- strsplit(text, "\n", fixed = TRUE)[[1]]
+  k <- g$line - line + 1L
+  if (is.null(g$col) || k < 1L || k > length(src)) return(NULL)
+  q <- substr(src[k], g$col, g$col)
+  if (q %in% c("'", "\"")) q else NULL
 }
 
 #
