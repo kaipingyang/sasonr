@@ -61,3 +61,19 @@ test_that("on_error = 'abort' keeps the classed condition; fail loud always abor
   r <- sas_run("data a; x = 1; run;", on_error = "sas")
   expect_identical(r$status, "ok")
 })
+
+test_that("an assignment without its semicolon: the rest of the statement adds its variables", {
+  r <- run_sas_mode("data one;\n  x = 1\n  y = z + 2;\nrun;")
+  expect_identical(r$status, "error")
+  expect_identical(names(r$work$one), c("x", "y", "z"))
+  expect_identical(nrow(r$work$one), 0L)
+  expect_true(paste("WARNING: The data set WORK.ONE may be incomplete.  When this step was stopped there were",
+                    "0 observations and 3 variables.") %in% r$log)
+  expect_identical(names(run_sas_mode("data one;\n  x = 1\n  y = 2;\nrun;")$work$one), c("x", "y"))
+  expect_identical(names(run_sas_mode("data one;\n  x = 1\n  y;\nrun;")$work$one), c("x", "y"))
+  expect_identical(names(run_sas_mode("data one;\n  x = 1\n  2 w;\nrun;")$work$one), c("x", "w"))
+  # the rest starts a statement: nothing of it is added
+  expect_identical(names(run_sas_mode("data one;\n  x = 1\n  if x then w = 3;\nrun;")$work$one), "x")
+  # a rest with a character constant is not supported
+  expect_error(run_sas_mode("data one;\n  x = 1\n  y = 'abc';\nrun;"), class = "sasonr_unsupported")
+})

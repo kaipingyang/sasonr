@@ -22,7 +22,11 @@
 # statements replaced by what they contribute at compile time, and the output
 # metadata of that translation (names, types, lengths, formats) is used.  What
 # a failing statement contributes:
-#   assignment  its target and the variables named before the error
+#   assignment  its target and the variables named before the error; when the
+#               value is complete and the statement goes on (`x = 1 y = 2;`, a
+#               missing semicolon or operator), also the variables named in the
+#               rest of the statement (numeric when new), except when the rest
+#               starts with IF (err_assign_rest())
 #   SET / MERGE nothing; the statement is ignored
 #   PROC SORT   the OUT= data set, with 0 variables
 # Any other failing statement or PROC fails loud (sasonr_unsupported): what
@@ -97,6 +101,11 @@ err_parse_recover <- function(text) {
     if (is.null(s)) return(NULL)
     if (inherits(s, "condition")) {
       kind <- if (p$type[start] == "name" && start < p$n && p$type[start + 1L] == "op" && p$value[start + 1L] == "=") "assign" else p$low[start]
+      if (kind == "assign") {
+        rest <- err_assign_rest(p, start)
+        if (is.null(rest)) return(NULL)
+        seen <- c(seen, rest)
+      }
       stmts <- c(stmts, list(list(stmt = "failed", kind = kind, vars = unique(seen), line = p$line[start])))
       while (!at_eof(p) && tk_type(p) != "semi") advance(p)
       advance(p)
@@ -107,6 +116,52 @@ err_parse_recover <- function(text) {
     if (s$stmt == "datalines") break
   }
   list(type = "data", line = line, null = any(is_null), outputs = if (any(is_null)) list() else outputs, stmts = stmts)
+}
+
+# Words that begin DATA step statements (and the step boundaries).
+err_stmt_words <- c("abort", "array", "attrib", "by", "call", "cards", "cards4", "continue", "data", "datalines",
+                    "datalines4", "delete", "dm", "do", "drop", "else", "end", "endsas", "error", "file", "filename",
+                    "footnote", "format", "goto", "if", "infile", "informat", "input", "keep", "label", "leave", "length",
+                    "libname", "link", "list", "lines", "lines4", "lostcard", "merge", "missing", "modify", "options",
+                    "otherwise", "output", "proc", "put", "putlog", "remove", "rename", "replace", "retain", "return",
+                    "run", "select", "set", "stop", "then", "title", "update", "when", "where", "window")
+
+# The variables that the rest of a failing assignment adds, when the value is
+# complete and the statement goes on without a semicolon (`x = 1 y = z + 2;`):
+# the rest is compiled as part of the value, so every variable it names is
+# added (numeric when new), in order; a rest that starts with IF adds nothing.
+# Only rests of names, numeric constants, + - * / = and parentheses that start
+# with a name or a number are supported: NULL (fail loud) for any other rest,
+# character() when the value itself is not complete.
+err_assign_rest <- function(p, start) {
+  pos0 <- p$pos
+  on.exit(p$pos <- pos0)
+  p$pos <- start
+  complete <- tryCatch({
+    if (tk_type(p, 1L) %in% c("lbrace", "lparen")) parse_array_ref(p) else advance(p)
+    if (!is_op(p, "=")) stop("not an assignment")
+    advance(p)
+    parse_expr(p)
+    TRUE
+  }, error = function(e) FALSE)
+  if (!complete || at_eof(p) || tk_type(p) == "semi") return(character())
+  k <- p$pos
+  end <- k
+  while (end <= p$n && p$type[end] != "semi") end <- end + 1L
+  if (end > p$n) return(NULL)
+  ty <- p$type[k:(end - 1L)]
+  low <- p$low[k:(end - 1L)]
+  val <- p$value[k:(end - 1L)]
+  if (ty[1] == "name" && low[1] == "if") return(character())
+  if (!ty[1] %in% c("name", "num") || (ty[1] == "name" && low[1] %in% err_stmt_words)) return(NULL)
+  if (!all(ty %in% c("name", "num", "op", "lparen", "rparen")) || !all(val[ty == "op"] %in% c("=", "+", "-", "*", "/"))) {
+    return(NULL)
+  }
+  nm <- low[ty == "name"]
+  if (any(nm %in% c(names(mnemonic_cmp), "and", "or", "not", "in", "min", "max"))) return(NULL)
+  # a name before '(' is a function call or an array element
+  if (length(ty) > 1L && any(ty[-length(ty)] == "name" & ty[-1L] == "lparen")) return(NULL)
+  unique(nm)
 }
 
 # What a failing DATA step statement contributes at compile time: a list of
