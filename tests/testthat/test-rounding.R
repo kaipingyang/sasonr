@@ -139,3 +139,12 @@ test_that("Ew.: positive values use the sign column for a decimal in E7.", {
   expect_equal(f(-0.5, "E7."), "-5.E-01")
   expect_equal(f(0.125, "E8."), " 1.3E-01")
 })
+
+test_that("the exact decimal expansion is platform independent (UCRT printf is not exact beyond 17 digits)", {
+  sig <- sasonr:::exact_significant_digits
+  expect_identical(sig(123456789012345)$digits, "123456789012345")
+  expect_identical(sig(123456789012345)$ex, 14L)
+  expect_identical(sig(2^-21)$digits, "476837158203125")
+  expect_identical(sig(0.1)$digits, "1000000000000000055511151231257827021181583404541015625")
+  expect_identical(sig(0.1)$ex, -1L)
+})
