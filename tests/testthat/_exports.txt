@@ -293,3 +293,4 @@ internal sas_substr_assign
 internal sas_symput
 internal sas_true
 internal sas_trunc_chars
+internal sas_where_cond

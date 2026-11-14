@@ -147,3 +147,16 @@ test_that("WHERE NOTEs: MIN / MAX, one-value IN lists, chains, prefix signs", {
   expect_identical(where_line("a & + b < c"), "WHERE a and (b<c);")
   expect_identical(where_line("- - a + b < c"), "WHERE c>a+b;")
 })
+
+test_that("WHERE conditions write no missing-value NOTE and no NOTE for invalid ** arguments", {
+  r <- run_notes(c("data a; a = 0; b = .; c = 0; v = 1; run;",
+                   "data w; set a; where (a * b is missing) = v and (a ** c in (.)) = v; e = _error_; run;"))
+  expect_false(any(grepl("Missing values were generated", r$log, fixed = TRUE)))
+  expect_false(any(grepl("exponential operator", r$log, fixed = TRUE)))
+  expect_identical(nrow(r$work$w), 1L)
+  expect_identical(r$work$w$e, 0)
+  # in an assignment the same operations are reported
+  r <- run_notes("data a; a = 0; b = .; c = 0; x = a * b; y = a ** c; run;")
+  expect_true(any(startsWith(r$log, "NOTE: Missing values were generated")))
+  expect_true(any(startsWith(r$log, "NOTE: Invalid argument(s) to the exponential operator")))
+})

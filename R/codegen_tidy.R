@@ -359,13 +359,13 @@ ds_code <- function(d, an, obs_col = FALSE, wheres = list()) {
   code <- sprintf("sas_ds(%s)", paste(args, collapse = ", "))
   if (obs_col) code <- paste0(code, " |> dplyr::mutate(.obs = dplyr::row_number())")
   if (!is.null(o$where)) {
-    code <- sprintf("%s |> dplyr::filter(sas_true(%s))", code, gen_expr(o$where, new_cx("vec", an)))
+    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(o$where, new_cx("vec", an)))
   }
   # WHERE statement conditions apply to every input data set without a WHERE=
   # option (the data set option takes precedence), before FIRSTOBS=/OBS=
   if (length(wheres) > 0 && is.null(o$where)) {
     cx <- new_cx("vec", an)
-    conds <- vapply(wheres, function(w) sprintf("sas_true(%s)", gen_expr(w, cx)), "")
+    conds <- vapply(wheres, function(w) sprintf("sas_where_cond(sas_true(%s))", gen_expr(w, cx)), "")
     code <- sprintf("%s |> dplyr::filter(%s)", code, paste(conds, collapse = " & "))
   }
   # FIRSTOBS= / OBS= count observations that satisfy WHERE= and WHERE
