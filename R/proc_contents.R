@@ -584,6 +584,10 @@ engine_datasets <- function(eng, step) {
         r <- sas_proc_contents(eng$session$work, ref$name, m, sp)
         if (length(r$listing) > 0) lst <- c(lst, if (length(lst) == 0) eng$session$titles, if (length(lst) == 0 && length(eng$session$titles)) "", r$listing)
         eng$session$meta[names(r$out)] <- sas_proc_store(eng$session$work, r$out)
+        if (length(r$out)) {
+          mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
+                           paste0("a PROC DATASETS CONTENTS statement with OUT= (SAS line ", s$line, ")"))
+        }
         for (nm in names(r$out)) notes <- c(notes, dataset_note(nm, get(nm, envir = eng$session$work)))
       },
       append = {
@@ -614,6 +618,8 @@ datasets_append <- function(eng, s) {
   if (!exists(bn, envir = eng$session$work, inherits = FALSE)) {
     assign(bn, dd, envir = eng$session$work)
     eng$session$meta[[bn]] <- dm[setdiff(names(dm), c("sortedby", "memlabel"))]
+    #
+    session_set_last(eng$session, bn)
     return(c(notes, sprintf("NOTE: BASE data set does not exist. DATA file is being copied to BASE file."),
              sprintf("NOTE: There were %d observations read from the data set WORK.%s.", nrow(dd), toupper(dn)),
              dataset_note(bn, dd)))
@@ -640,6 +646,7 @@ datasets_append <- function(eng, s) {
   assign(bn, tibble::as_tibble(out), envir = eng$session$work)
   bm$sortedby <- NULL
   eng$session$meta[[bn]] <- bm
+  session_set_last(eng$session, bn)
   c(notes, sprintf("NOTE: There were %d observations read from the data set WORK.%s.", nrow(dd), toupper(dn)),
     sprintf("NOTE: %d observations added.", nrow(dd)),
     sprintf("NOTE: The data set WORK.%s has %d observations and %d variables.", toupper(bn), nrow(out), ncol(out)))

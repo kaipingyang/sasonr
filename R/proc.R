@@ -41,11 +41,21 @@ parse_global_stmt <- function(p, open_code = FALSE) {
   }
   if (low == "filename") {
     advance(p)
+    #
+    #
+    #
+    if (tk_type(p) %in% c("str", "str_macro") && tk_type(p, 1L) == "semi" && !grepl("'", tk_val(p), fixed = TRUE)) {
+      text <- tk_val(p)
+      advance(p, 2L)
+      return(list(type = "global", kind = "filename_noref", text = text, line = line))
+    }
     if (tk_type(p) != "name") g_err("expected a fileref after FILENAME")
     ref <- tk_low(p)
     advance(p)
     if (!tk_type(p) %in% c("str", "str_macro")) abort_unsupported("FILENAME without a quoted physical path", line)
     path <- tk_val(p)
+    #
+    if (!nzchar(path) || grepl("[*?]", path)) abort_unsupported("FILENAME with an empty or wildcard physical path", line)
     advance(p)
     while (tk_type(p) == "name" && tk_low(p) %in% c("encoding", "lrecl", "recfm", "termstr")) {
       advance(p)

@@ -119,13 +119,19 @@ mp_function <- function(nm, src, ses, mode) {
       }
       requote(substr(x, pos, pos + len - 1))
     },
-    symexist = if (!is.null(mv_find(ses, tolower(trimws(mq_unmask(mp_paren_text(src, ses, nm))))))) "1" else "0",
+    symexist = {
+      v <- tolower(trimws(mq_unmask(mp_paren_text(src, ses, nm))))
+      mac_auto_read(ses, v)
+      if (!is.null(mv_find(ses, v))) "1" else "0"
+    },
     symglobl = {
       v <- tolower(trimws(mq_unmask(mp_paren_text(src, ses, nm))))
+      mac_auto_read(ses, v)
       if (exists(v, envir = ses$globals, inherits = FALSE)) "1" else "0"
     },
     symlocal = {
       v <- tolower(trimws(mq_unmask(mp_paren_text(src, ses, nm))))
+      mac_auto_read(ses, v)
       e <- mv_find(ses, v)
       if (!is.null(e) && !identical(e, ses$globals)) "1" else "0"
     },

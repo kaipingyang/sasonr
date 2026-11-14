@@ -43,8 +43,10 @@ SasSession <- R6::R6Class("SasSession",
     unordered = NULL,
     # views: PROC SQL views: name -> query (re-run on each reference).
     views = NULL,
-    # last: `_LAST_`: the most recently created data set.
+    # last: `_LAST_`: the most recently created data set (set with session_set_last()).
     last = NULL,
+    # last_view: TRUE when `_LAST_` is a PROC SQL view.
+    last_view = FALSE,
     # titles: TITLE1-TITLE10 text.
     titles = NULL,
     # footnotes: FOOTNOTE1-FOOTNOTE10 text (FOOTNOTE statements still fail loud).
@@ -214,6 +216,21 @@ session_leave <- function(session) {
   rt$on_error <- NULL
   rt$on_note <- NULL
   session$busy <- FALSE
+  invisible(session)
+}
+
+# Set `_LAST_` (a WORK member name) and the SYSLAST / SYSDSN automatic macro
+#
+#
+# SORT, MEANS, FREQ, TRANSPOSE or CONTENTS OUT=; a table or view PROC SQL
+# creates (CREATE TABLE / VIEW, ALTER TABLE); the BASE= data set of APPEND.
+# PRINT, FORMAT, SQL INSERT / UPDATE / DELETE / DROP / SELECT, DATASETS DELETE
+# / CHANGE / MODIFY / KILL and PROC DELETE leave it, also when they delete or
+# rename the member it names.
+session_set_last <- function(session, name, view = FALSE) {
+  session$last <- name
+  session$last_view <- view
+  mac_set_last(session$macro, name)
   invisible(session)
 }
 

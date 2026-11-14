@@ -239,6 +239,7 @@ engine_step_error <- function(eng, e, text) {
                  "      This prevents execution of subsequent data modification statements.")
     eng$syntax_check <- TRUE
   }
+  kept <- FALSE
   for (nm in names(rec$outputs)) {
     old <- get0(nm, envir = eng$session$work, inherits = FALSE)
     m <- rec$outputs[[nm]]
@@ -246,9 +247,20 @@ engine_step_error <- function(eng, e, text) {
       "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and %d variables.",
       toupper(nm), length(m$vars)))
     if (!is.null(old)) {
+      kept <- TRUE
       eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because this step was stopped.", toupper(nm)))
     } else {
       engine_empty_dataset(eng, nm, m)
+    }
+  }
+  #
+  #
+  if (length(rec$outputs)) {
+    if (identical(rec$kind, "data") && !kept) {
+      session_set_last(eng$session, names(rec$outputs)[length(rec$outputs)])
+    } else {
+      mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"), paste0("a step that stopped with an ERROR (SAS line ",
+                                                                         e$sas_line %||% "?", ")"))
     }
   }
   err_set_macro(eng, syserr = 1012, syscc = if (identical(rec$kind, "proc")) 3000 else 1012)

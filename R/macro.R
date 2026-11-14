@@ -44,11 +44,98 @@ new_macro_session <- function(exec = NULL) {
     sysdate = toupper(format(now, "%d%b%y")), sysdate9 = toupper(format(now, "%d%b%Y")),
     sysday = format(now, "%A"), systime = format(now, "%H:%M"), sysver = "9.4",
     sysvlong = "9.04.01M7P080520", sysscp = "LIN X64", sysscpl = "Linux", syserr = "0",
-    syscc = "0", sysrc = "0", sysmacroname = "", sysindex = "0", sysncpu = "1"
+    syscc = "0", sysrc = "0", sysmacroname = "", sysindex = "0", sysncpu = "1",
+    #
+    sysfilrc = "0"
   )
   for (nm in names(auto)) assign(nm, auto[[nm]], envir = ses$globals)
+  # automatic variables whose value sasonr does not know (mac_auto_unknown())
+  ses$auto_unknown <- list()
+  mac_set_last(ses, NULL)
   class(ses) <- c("sasonr_macro_session", class(ses))
   ses
+}
+
+# Automatic macro variables ------------------------------------------------------
+
+# SAS 9.4 automatic macro variables (Macro Language: Reference, Fifth Edition,
+# Table 12.9 "Automatic Macro Variables", with SYSODSGRAPHICS from the
+# dictionary): the read-and-write ones, then the read-only ones.  sasonr keeps
+# the values of `mac_auto_implemented`; a reference to any other one fails
+# loud, and so does an assignment to any of them (%LET, %DO, INTO, CALL
+# SYMPUT, %GLOBAL, %LOCAL, %SYMDEL, a macro parameter) except a %LET of the
+#
+# is local to a macro defined with PARMBUFF and an ordinary variable there.
+mac_auto_rw <- c("sysbuffr", "syscc", "syscmd", "sysdevic", "sysdmg", "sysdsn", "sysfilrc", "syslast",
+                 "syslckrc", "syslibrc", "sysmsg", "sysparm", "syspbuff", "sysrc")
+mac_auto_ro <- c("sysaddrbits", "syscharwidth", "sysdatastepphase", "sysdate", "sysdate9", "sysday", "sysencoding",
+                 "sysendian", "sysenv", "syserr", "syserrortext", "syshostinfolong", "syshostname",
+                 "sysincludefiledevice", "sysincludefiledir", "sysincludefilefileref", "sysincludefilename",
+                 "sysindex", "sysinfo", "sysjobid", "syslogapplname", "sysmacroname", "sysmaxlong", "sysmenv",
+                 "sysncpu", "sysnobs", "sysodsescapechar", "sysodsgraphics", "sysodspath", "sysprinttolist",
+                 "sysprinttolog", "sysprocessid", "sysprocessmode", "sysprocessname", "sysprocname", "sysscp",
+                 "sysscpl", "syssite", "syssizeoflong", "syssizeofptr", "syssizeofunicode", "sysstartid",
+                 "sysstartname", "systcpiphostname", "systime", "systimezone", "systimezoneident",
+                 "systimezoneoffset", "sysuserid", "sysver", "sysvlong", "sysvlong4", "syswarningtext")
+mac_auto_implemented <- c("sysdate", "sysdate9", "sysday", "systime", "sysver", "sysvlong", "sysscp", "sysscpl",
+                          "syserr", "syscc", "sysrc", "sysmacroname", "sysindex", "sysncpu",
+                          "syslast", "sysdsn", "sysfilrc")
+# Macro variables PROC SQL sets that sasonr does not set (SQL Procedure
+# User's Guide): a reference fails loud.  SQLOBS and SQLRC are set; before the
+#
+mac_sql_unset <- c("sqloops", "sqlexitcode", "sqlxrc", "sqlxmsg")
+
+# A reference to `name`, which is not in any symbol table (found = FALSE) or
+# found in table `e`.
+mac_auto_read <- function(ses, name, e = NULL) {
+  auto <- name %in% c(mac_auto_rw, mac_auto_ro) && !name %in% c(mac_auto_implemented, "syspbuff")
+  if (auto || name %in% mac_sql_unset) {
+    abort_unsupported(paste0("the ", if (auto) "automatic " else "PROC SQL ", "macro variable ", toupper(name),
+                             " (not implemented)"), ses$line)
+  }
+  why <- ses$auto_unknown[[name]]
+  if (!is.null(why) && identical(e, ses$globals)) {
+    abort_unsupported(paste0("&", toupper(name), " after ", why, " (its value there is not supported)"), ses$line)
+  }
+  if (name %in% c("syslast", "sysdsn", "sysfilrc") && identical(e, ses$globals) && sas_target_version() != "SAS 9.4") {
+    abort_unsupported(paste0("&", toupper(name), " for SAS 9.4 ", sas_target_version(), " (not in its expected results)"), ses$line)
+  }
+  invisible()
+}
+
+# An assignment of `name` (`how`: the statement), see mac_auto_rw.
+mac_auto_write <- function(ses, name, how) {
+  if (!name %in% c(mac_auto_rw, mac_auto_ro) || name == "syspbuff") return(invisible())
+  if (how == "%LET" && name %in% c("syscc", "sysrc", "sysfilrc")) return(invisible())
+  abort_unsupported(paste0(how, " of the automatic macro variable ", toupper(name),
+                           if (name %in% mac_auto_ro) " (read-only in SAS)" else " (not implemented)"), ses$line)
+}
+
+# SYSLAST / SYSDSN from `_LAST_` (`name`, a WORK member, or NULL): "WORK." and
+# the member name padded to 32, and libref and member name padded to 8 and 32;
+# `_NULL_` (SYSDSN: 8 blanks, _NULL_, 26 blanks) before a data set is created
+#
+mac_set_last <- function(ses, name) {
+  if (is.null(name)) {
+    syslast <- "_NULL_"
+    sysdsn <- paste0(strrep(" ", 8L), "_NULL_", strrep(" ", 26L))
+  } else {
+    m <- toupper(name)
+    syslast <- sprintf("WORK.%-32s", m)
+    sysdsn <- sprintf("%-8s%-32s", "WORK", m)
+  }
+  assign("syslast", syslast, envir = ses$globals)
+  assign("sysdsn", sysdsn, envir = ses$globals)
+  ses$auto_unknown[c("syslast", "sysdsn")] <- NULL
+  invisible()
+}
+
+# The value of automatic variables `names` is not known after `why` (a step
+#
+# set again.
+mac_auto_unknown <- function(ses, names, why) {
+  for (nm in names) ses$auto_unknown[[nm]] <- why
+  invisible()
 }
 
 mv_valid_name <- function(name) {
@@ -67,6 +154,7 @@ mv_find <- function(ses, name) {
 mv_get <- function(ses, name) {
   name <- tolower(name)
   e <- mv_find(ses, name)
+  mac_auto_read(ses, name, e)
   if (is.null(e)) NULL else get(name, envir = e, inherits = FALSE)
 }
 
@@ -75,9 +163,10 @@ mv_current <- function(ses) {
   if (k == 0) ses$globals else ses$frames[[k]]$vars
 }
 
-mv_let <- function(ses, name, value) {
+mv_let <- function(ses, name, value, how = "%LET") {
   name <- tolower(name)
   if (!mv_valid_name(name)) abort_syntax(paste0("Invalid symbolic variable name ", toupper(name)))
+  mac_auto_write(ses, name, how)
   e <- mv_find(ses, name) %||% mv_current(ses)
   assign(name, value, envir = e)
   invisible()
@@ -89,6 +178,7 @@ mv_let <- function(ses, name, value) {
 mv_symput <- function(ses, name, value, scope = NULL) {
   name <- tolower(name)
   if (!mv_valid_name(name)) abort_runtime(paste0("Symbolic variable name ", toupper(name), " is invalid"))
+  mac_auto_write(ses, name, "CALL SYMPUT")
   scope <- toupper(scope %||% "")
   target <- NULL
   if (scope == "G") {

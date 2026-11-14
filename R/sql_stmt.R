@@ -6,7 +6,7 @@ sql_note <- function(eng, lines) {
   invisible()
 }
 
-sql_set_mvar <- function(eng, name, value) mv_let(eng$session$macro, name, value)
+sql_set_mvar <- function(eng, name, value) mv_let(eng$session$macro, name, value, how = "INTO")
 
 sql_set_status <- function(eng, sqlobs, sqlrc = 0) {
   assign("sqlobs", as.character(sqlobs), envir = eng$session$macro$globals)
@@ -27,6 +27,7 @@ engine_sql <- function(eng, st) {
     create_table = sql_stmt_create(eng, st),
     create_view = {
       eng$session$views[[st$table]] <- st$query
+      session_set_last(eng$session, st$table, view = TRUE)
       sql_note(eng, sprintf("NOTE: SQL view WORK.%s has been defined.", toupper(st$table)))
     },
     create_like = {
@@ -168,10 +169,12 @@ sql_rel_to_table <- function(eng, res, line, warn_dups = TRUE) {
   list(data = tibble::as_tibble(d), meta = meta)
 }
 
-sql_store <- function(eng, name, d, meta, ordered = TRUE) {
+# `last`: the statement sets _LAST_ (CREATE TABLE, ALTER TABLE; not INSERT,
+#
+sql_store <- function(eng, name, d, meta, ordered = TRUE, last = TRUE) {
   assign(name, tibble::as_tibble(d), envir = eng$session$work)
   eng$session$meta[[name]] <- meta
-  eng$session$last <- name
+  if (last) session_set_last(eng$session, name)
   eng$session$unordered <- if (ordered) setdiff(eng$session$unordered, name) else union(eng$session$unordered, name)
   invisible()
 }
@@ -256,7 +259,7 @@ sql_stmt_insert <- function(eng, st) {
     } else if (type == "char") rep(strrep(" ", len), nrows) else rep(NA_real_, nrows)
   }
   d <- dplyr::bind_rows(tg$data, tibble::as_tibble(add, .rows = nrows))
-  sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$session$unordered)
+  sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$session$unordered, last = FALSE)
   sql_note(eng, sprintf("NOTE: %d %s inserted into WORK.%s.", nrows, if (nrows == 1) "row was" else "rows were", toupper(st$table)))
   sql_set_status(eng, nrows)
 }
@@ -284,7 +287,7 @@ sql_stmt_update <- function(eng, st) {
       d[[v]][idx] <- sql_coerce_col(vals[[k]], type, tg$meta$len[[v]] %||% 8L, v, st$line)
     }
   }
-  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered)
+  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered, last = FALSE)
   sql_note(eng, sprintf("NOTE: %d %s updated in WORK.%s.", length(idx), if (length(idx) == 1) "row was" else "rows were", toupper(st$table)))
   sql_set_status(eng, length(idx))
 }
@@ -295,7 +298,7 @@ sql_stmt_delete <- function(eng, st) {
   hit <- if (is.null(st$where)) rep(TRUE, nrow(rel$data)) else sas_true(sql_eval(st$where, sql_ctx(eng, rel)))
   d <- tg$data[!hit, , drop = FALSE]
   k <- sum(hit)
-  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered)
+  sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered, last = FALSE)
   sql_note(eng, sprintf("NOTE: %d %s deleted from WORK.%s.", k, if (k == 1) "row was" else "rows were", toupper(st$table)))
   sql_set_status(eng, k)
 }

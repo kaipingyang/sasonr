@@ -22,6 +22,7 @@ mp_percent <- function(nm, raw, src, ses, sink, mode, in_dq) {
       r <- mp_scan_text(src, ses, stop = list(chars = 59L, nodepth = TRUE))
       mp_expect_semi(src, "%SYMDEL")
       for (v in strsplit(trimws(mq_unmask(r$text)), "[[:space:]]+")[[1]]) {
+        if (nzchar(v)) mac_auto_write(ses, tolower(v), "%SYMDEL")
         if (nzchar(v) && exists(tolower(v), envir = ses$globals, inherits = FALSE)) rm(list = tolower(v), envir = ses$globals)
       }
     },
@@ -90,6 +91,7 @@ mp_scope_stmt <- function(nm, src, ses) {
   names <- tolower(strsplit(txt, "[[:space:]]+")[[1]])
   names <- names[nzchar(names)]
   for (v in names) if (!mv_valid_name(v)) abort_syntax(paste0("Invalid macro variable name ", toupper(v)), line)
+  for (v in names) mac_auto_write(ses, v, paste0("%", toupper(nm)))
   if (nm == "local") {
     if (length(ses$frames) == 0) abort_syntax("%LOCAL is not valid in open code", line)
     tab <- mv_current(ses)
@@ -346,14 +348,14 @@ mp_do <- function(src, ses, sink, mode) {
   e <- raw_find_end(src, body_a)
   if (is.null(e)) abort_syntax("%DO without a matching %END", line)
   src$i <- e$after
-  mv_let(ses, var, mac_num_text(from))
+  mv_let(ses, var, mac_num_text(from), how = "%DO")
   for (iter in seq_len(mac_max_iter + 1)) {
     if (iter > mac_max_iter) abort_unsupported("a %DO loop of more than 10000 iterations", line)
     cur <- mac_eval_int(mv_get(ses, var) %||% "", "%DO index")
     if ((by > 0 && cur > to) || (by < 0 && cur < to)) break
     mp_scan(mp_sub(src, body_a, e$end - 1L), ses, sink, mode = mode)
     cur <- mac_eval_int(mv_get(ses, var) %||% "", "%DO index")
-    mv_let(ses, var, mac_num_text(cur + by))
+    mv_let(ses, var, mac_num_text(cur + by), how = "%DO")
   }
   invisible()
 }
@@ -379,6 +381,7 @@ mp_define <- function(src, ses) {
         eq <- regexpr("=", p, fixed = TRUE)
         pname <- tolower(trimws(if (eq > 0) substr(p, 1L, eq - 1L) else p))
         if (!mv_valid_name(pname)) abort_syntax(paste0("invalid macro parameter ", p), line)
+        mac_auto_write(ses, pname, "a macro parameter named")
         params[[length(params) + 1L]] <- list(
           name = pname, keyword = eq > 0,
           default = if (eq > 0) trimws(substr(p, eq + 1L, nchar(p))) else ""

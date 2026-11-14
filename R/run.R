@@ -131,13 +131,14 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "proc") {
       for (t in step$titles) engine_global(eng, t)
+      engine_check_last_view(eng, step)
       tr <- translate_proc(step, eng$session$meta, eng$session$last)
     } else {
       tr <- translate_step(step, eng$session$meta, eng$level)
     }
     eng$session$meta[names(tr$meta)] <- tr$meta
     eng$session$unordered <- setdiff(eng$session$unordered, tr$outputs)
-    if (length(tr$outputs) > 0) eng$session$last <- tr$outputs[length(tr$outputs)]
+    if (length(tr$outputs) > 0) session_set_last(eng$session, tr$outputs[length(tr$outputs)])
     eng$steps <- c(eng$steps, list(tr))
     if (!eng$execute) next
     vec <- step$type == "data" && tr$level %in% c("L1", "L2")
@@ -207,6 +208,16 @@ engine_exec_steps <- function(eng, text, line) {
   invisible()
 }
 
+# A PROC step that reads `_LAST_` when `_LAST_` is a PROC SQL view: sasonr
+#
+engine_check_last_view <- function(eng, step) {
+  if (isTRUE(eng$session$last_view) && is.null(step$options$data) &&
+      step$name %in% c("sort", "print", "means", "summary", "freq", "transpose", "contents")) {
+    abort_unsupported(paste0("PROC ", toupper(step$name), " reading _LAST_, the PROC SQL view WORK.",
+                             toupper(eng$session$last)), step$line)
+  }
+}
+
 # Syntax-check mode (after an ERROR, on_error = "sas"): the step is compiled
 # but not run; a DATA step creates its output data sets with 0 observations.
 engine_check_step <- function(eng, step) {
@@ -219,11 +230,16 @@ engine_check_step <- function(eng, step) {
         any(vapply(step$stmts, function(s) identical(s$type, "global") && identical(s$kind, "options"), logical(1)))) {
       eng$session$macro$options_unknown <- step$line
     }
-    if (step$name != "datasets") translate_proc(step, eng$session$meta, eng$session$last)
+    tr <- if (step$name != "datasets") translate_proc(step, eng$session$meta, eng$session$last)
+    if (length(tr$outputs) || any(vapply(step$stmts, function(s) identical(s$stmt, "append"), logical(1)))) {
+      mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
+                       paste0("PROC ", toupper(step$name), " in syntax-check mode (SAS line ", step$line, ")"))
+    }
     err_set_macro(eng, syserr = 3)
     return(invisible())
   }
   tr <- translate_step(step, eng$session$meta, eng$level)
+  old <- vapply(tr$outputs, function(nm) exists(nm, envir = eng$session$work, inherits = FALSE), logical(1))
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
     vars <- m$vars %||% character()
@@ -231,6 +247,13 @@ engine_check_step <- function(eng, step) {
     if (isTRUE(eng$session$options$notes) && eng$step_notes) {
       eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and %d variables.", toupper(nm), length(vars)))
     }
+  }
+  #
+  if (length(tr$outputs) && !any(old)) {
+    session_set_last(eng$session, tr$outputs[length(tr$outputs)])
+  } else if (any(old)) {
+    mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
+                     paste0("a DATA step in syntax-check mode writing an existing data set (SAS line ", step$line, ")"))
   }
   err_set_macro(eng, syserr = 3)
   invisible()
@@ -295,7 +318,16 @@ engine_eval <- function(eng, code, stage = FALSE) {
 }
 
 engine_global <- function(eng, g) {
-  if (g$kind == "filename") eng$session$filerefs[[g$ref]] <- g$path
+  if (g$kind == "filename") {
+    eng$session$filerefs[[g$ref]] <- g$path
+    # SYSFILRC: 0 when the file or directory exists, 1 when it does not, also
+    #
+    assign("sysfilrc", if (file.exists(g$path)) "0" else "1", envir = eng$session$macro$globals)
+  }
+  if (g$kind == "filename_noref") {
+    if (eng$step_notes) eng$log <- c(eng$log, paste0("WARNING: No logical assign for filename '", g$text, "'."))
+    assign("sysfilrc", "-20004", envir = eng$session$macro$globals)
+  }
   if (g$kind == "options") {
     o <- eng$session$options
     if (!is.null(g$ls)) o$linesize <- g$ls
@@ -542,8 +574,7 @@ engine_flush <- function(eng) {
 }
 
 # Automatic macro variables (not listed among the user's global macro variables).
-macro_auto_vars <- c("sysdate", "sysdate9", "sysday", "systime", "sysver", "sysvlong", "sysscp", "sysncpu",
-                     "sysscpl", "syserr", "syscc", "sysrc", "sysmacroname", "sysindex")
+macro_auto_vars <- mac_auto_implemented
 
 # The sasonr_result of an engine.
 engine_result <- function(eng) {
