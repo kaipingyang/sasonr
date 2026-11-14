@@ -2,7 +2,7 @@
 % Please edit documentation in R/runtime.R
 \name{sas_between}
 \alias{sas_between}
-\title{BETWEEN-AND \code{x between lo and hi}}
+\title{BETWEEN-AND \verb{x between lo and hi}}
 \usage{
 sas_between(x, lo, hi)
 }
