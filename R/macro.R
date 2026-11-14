@@ -207,7 +207,9 @@ datalines_stmt_words <- c("datalines", "cards", "lines", "datalines4", "cards4",
 # Inside a DATA or PROC step sasonr runs the statements with the step, when it
 # is complete; an OPTIONS statement of the step is also handed to
 # `ses$on_step_options` at its semicolon (engine_step_options(), run.R), which
-# keeps the options the macro code after it in the step sees (`ses$step_opts`).
+# keeps the options the macro code after it in the step sees (`ses$step_opts`;
+#
+#
 code_sink <- function(ses) {
   s <- new.env(parent = emptyenv())
   s$compiler <- TRUE
@@ -285,8 +287,10 @@ code_sink <- function(ses) {
       }
       flush_upto(pos - shift)
       return(pos)
-    } else if (s$step && first %in% c("options", "option") && !startsWith(rest, "=") &&
-               is.function(ses$on_step_options)) {
+    } else if (s$step && first %in% c("options", "option") && is.function(ses$on_step_options) &&
+               !substr(rest, 1L, 1L) %in% c("=", "+", "{", "(", "[")) {
+      # not an assignment, sum statement or array element named OPTIONS
+      # (the same distinction as parse_statement())
       ses$on_step_options(substr(s$acc, begin, pos), s$stmt_line)
     }
     0L

@@ -286,15 +286,18 @@ engine_eval <- function(eng, code, stage = FALSE) {
 engine_global <- function(eng, g) {
   if (g$kind == "filename") eng$session$filerefs[[g$ref]] <- g$path
   if (g$kind == "options") {
-    if (!is.null(g$ls)) eng$session$options$linesize <- g$ls
-    if ("nonotes" %in% g$opts) eng$session$options$notes <- FALSE
-    if ("notes" %in% g$opts) eng$session$options$notes <- TRUE
-    if ("nosyntaxcheck" %in% g$opts) eng$session$options$nosyntaxcheck <- TRUE
-    if ("syntaxcheck" %in% g$opts) eng$session$options$nosyntaxcheck <- FALSE
     o <- eng$session$options
-    for (k in c("center", "date", "number")) {
-      if (k %in% g$opts) o[[k]] <- TRUE
-      if (paste0("no", k) %in% g$opts) o[[k]] <- FALSE
+    if (!is.null(g$ls)) o$linesize <- g$ls
+    # the positive and negative forms apply in the order written: the last one
+    #
+    for (opt in g$opts) {
+      switch(opt,
+        notes = o$notes <- TRUE, nonotes = o$notes <- FALSE,
+        syntaxcheck = o$nosyntaxcheck <- FALSE, nosyntaxcheck = o$nosyntaxcheck <- TRUE,
+        center = o$center <- TRUE, nocenter = o$center <- FALSE,
+        date = o$date <- TRUE, nodate = o$date <- FALSE,
+        number = o$number <- TRUE, nonumber = o$number <- FALSE
+      )
     }
     if (!is.null(g$ps)) o$pagesize <- g$ps
     if (!is.null(g$formdlim)) o$formdlim <- g$formdlim
@@ -311,23 +314,27 @@ engine_global <- function(eng, g) {
 }
 
 #
+# macro code after it in the same step runs under the new options (SAS 9.4
 #
-# Global Statements: Reference), so the macro code after it in the same step
-# runs under the new options.  sasonr runs the statements of a step when the
-# step is complete (PROC DATASETS is the step that accepts OPTIONS; PROC SQL
-# runs its statements one by one), so the code sink hands the statement over
+#
+# LINESIZE=MAX inside PROC SQL, s05).  sasonr runs the statements of a step when
+# the step is complete (PROC DATASETS is the step that accepts OPTIONS; PROC
+# SQL runs its statements one by one), so the code sink hands the statement over
 # at its semicolon and the macro processor keeps the options of the step's
 # OPTIONS statements so far (`step_opts`: LINESIZE and NOTES, what a macro-time
 # NOTE depends on, mac_sysfunc()); the session options change when the step
-# runs, as before.  A statement that does not parse here leaves them unknown
-# (a macro-time NOTE then fails loud); the step reports the error when it runs.
+#
+# another LINESIZE= value or NOTES, or one that does not parse here, leaves
+# them unknown (a macro-time NOTE then fails loud); the step reports a parse
+# error when it runs.
 engine_step_options <- function(eng, text, line) {
   ses <- eng$session$macro
   if (isTRUE(ses$step_opts$unknown)) return(invisible())
   st <- tryCatch(sas_parse(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE)$steps,
                  error = function(e) NULL)
   g <- if (length(st) == 1L) st[[1]] else NULL
-  if (is.null(g) || !identical(g$type, "global") || !identical(g$kind, "options")) {
+  if (is.null(g) || !identical(g$type, "global") || !identical(g$kind, "options") ||
+      (!is.null(g$ls) && g$ls != 256L) || "notes" %in% g$opts) {
     ses$step_opts <- list(unknown = TRUE, line = line)
     return(invisible())
   }
@@ -335,7 +342,6 @@ engine_step_options <- function(eng, text, line) {
                                notes = isTRUE(eng$session$options$notes))
   if (!is.null(g$ls)) o$linesize <- g$ls
   if ("nonotes" %in% g$opts) o$notes <- FALSE
-  if ("notes" %in% g$opts) o$notes <- TRUE
   ses$step_opts <- o
   invisible()
 }

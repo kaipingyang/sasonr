@@ -258,34 +258,34 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
         #
+        # An argument to the function MDY referenced by the %SYSFUNC or
+        #
         #
         #
         if (sas_target_version() != "SAS 9.4") {
           abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") for SAS 9.4 ",
                                    sas_target_version(), " (not in its expected results)"), line)
         }
-        # The NOTE is wrapped at the LINESIZE in effect: the session's, or that
-        # of an OPTIONS statement compiled earlier in the current step
-        # (`step_opts`, engine_step_options()).  Whether NONOTES suppresses
+        # The NOTE is wrapped at the LINESIZE in effect and suppressed under
+        # NONOTES: the session's options, or those of an OPTIONS statement
+        # compiled earlier in the current step (`step_opts`,
         #
         so <- ses$step_opts
         if (isTRUE(so$unknown)) {
           abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") after an OPTIONS ",
-                                   "statement of the step that sasonr cannot apply before the step runs (line ",
-                                   so$line, ")"), line)
+                                   "statement inside the step (line ", so$line, ") whose effect before the step runs ",
+                                   "is not supported (supported: LINESIZE=MAX, NONOTES)"), line)
         }
         if (!is.null(ses$options_unknown)) {
           abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") after the OPTIONS ",
                                    "statements of a PROC DATASETS step in syntax-check mode (line ", ses$options_unknown,
                                    "; SAS executes them, sasonr does not)"), line)
         }
-        if (!(if (is.null(so)) rt_notes_on() else isTRUE(so$notes))) {
-          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") under OPTIONS ",
-                                   "NONOTES (not in the expected results)"), line)
+        if (if (is.null(so)) rt_notes_on() else isTRUE(so$notes)) {
+          rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
+                                    "The result of the operations have been set to a missing value."),
+                              ls = so$linesize %||% rt_linesize()))
         }
-        rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
-                                  "The result of the operations have been set to a missing value."),
-                            ls = so$linesize %||% rt_linesize()))
       }
       r
     } else {

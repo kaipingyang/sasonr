@@ -223,37 +223,64 @@ test_that("an OPTIONS statement inside a step applies to the macro code after it
                 "The result of the operations have been set to a missing value.")
   note132 <- c(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
                      "The result of the operations have been set"), "      to a missing value.")
+  step <- function(body) {
+    paste0("data a; x = 1; run;\nproc datasets lib=work nolist;\n", body,
+           "\nquit;\n%let e = %sysfunc(mdy(2, 30, 2024));\ndata b; x = 1; run;")
+  }
+  let <- "%let d = %sysfunc(mdy(2, 30, 2024));"
   #
-  expect_identical(sas_run("data a; x = 1; run;
-    proc datasets lib=work nolist; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); quit;")$log, note)
-  # macro code before the OPTIONS statement runs under the LINESIZE before it
-  expect_identical(sas_run("data a; x = 1; run;
-    proc datasets lib=work nolist; %let d = %sysfunc(mdy(2, 30, 2024)); options linesize=max; quit;")$log, note132)
-  # after the step, the session has the option
-  expect_identical(sas_run("data a; x = 1; run;
-    proc datasets lib=work nolist; options linesize=max; quit; %let d = %sysfunc(mdy(2, 30, 2024));")$log, note)
-  # a variable named OPTIONS is not an OPTIONS statement
+  # it, before the macro code after it in the step; the session keeps it
+  expect_identical(sas_run(step(paste("options linesize=max;", let)))$log, c(note, note))
+  # s02: macro code before the OPTIONS statement runs under the LINESIZE before it
+  expect_identical(sas_run(step(paste(let, "options linesize=max;")))$log, c(note132, note))
+  # s03 / s04: NONOTES suppresses the NOTE, in the step after the statement and after the step
+  withr::local_options(sasonr.step_notes = TRUE)
+  a_note <- "NOTE: The data set WORK.A has 1 observations and 1 variables."
+  expect_identical(sas_run(step(paste("options nonotes;", let)))$log, a_note)
+  expect_identical(sas_run(step(paste(let, "options nonotes;")))$log, c(a_note, note132))
+  # ... and in open code (s03, s04: the %SYSFUNC call after the step)
+  expect_identical(sas_run("options nonotes; %let d = %sysfunc(mdy(2, 30, 2024));")$log, character())
+  withr::local_options(sasonr.step_notes = FALSE)
+  # a variable, an array element or a sum statement named OPTIONS is not an OPTIONS statement
   r <- sas_run("data a; options = 1; %let d = %sysfunc(mdy(2, 30, 2024)); run;")
   expect_identical(r$log, note132)
   expect_equal(r$work$a$options, 1)
+  r <- sas_run("data a; array options{2} o1 o2; options{1} = 5; %let d = %sysfunc(mdy(2, 30, 2024)); run;")
+  expect_identical(r$log, note132)
+  expect_equal(r$work$a$o1, 5)
+  r <- sas_run("data a; option + 1; %let d = %sysfunc(mdy(2, 30, 2024)); run;")
+  expect_identical(r$log, note132)
+  expect_equal(r$work$a$option, 1)
 })
 
 test_that("the %SYSFUNC NOTE fails loud where the options in effect are not known", {
+  in_step <- function(opt) {
+    paste("data a; x = 1; run; proc datasets lib=work nolist;", opt, "%let d = %sysfunc(mdy(2, 30, 2024)); quit;")
+  }
   # an OPTIONS statement of the step that does not parse before the step runs
-  expect_error(sas_run("data a; x = 1; run;
-    proc datasets lib=work nolist; options minoperator; %let d = %sysfunc(mdy(2, 30, 2024)); quit;"),
-    class = "sasonr_unsupported", regexp = "cannot apply before the step runs")
+  expect_error(sas_run(in_step("options minoperator;")), class = "sasonr_unsupported", regexp = "not supported")
+  #
+  expect_error(sas_run(in_step("options linesize=100;")), class = "sasonr_unsupported", regexp = "not supported")
+  expect_error(sas_run(in_step("options nonotes notes;")), class = "sasonr_unsupported", regexp = "not supported")
   # syntax-check mode: SAS executes the OPTIONS statements of a step it only checks
   expect_error(sas_run("data a; x = 1; run; data b; set a y = 2; run;
     proc datasets lib=work nolist; options linesize=max; quit;
     %let d = %sysfunc(mdy(2, 30, 2024));", on_error = "sas"),
     class = "sasonr_unsupported", regexp = "syntax-check mode")
+})
+
+test_that("positive and negative system options apply in the order written", {
+  withr::local_options(sasonr.step_notes = TRUE)
   #
-  expect_error(sas_run("options nonotes; %let d = %sysfunc(mdy(2, 30, 2024));"),
-               class = "sasonr_unsupported", regexp = "NONOTES")
-  expect_error(sas_run("options nonotes; data _null_; run; %let d = %sysfunc(mdy(2, 30, 2024));"),
-               class = "sasonr_unsupported", regexp = "NONOTES")
-  expect_error(sas_run("data a; x = 1; run;
-    proc datasets lib=work nolist; options nonotes; %let d = %sysfunc(mdy(2, 30, 2024)); quit;"),
-    class = "sasonr_unsupported", regexp = "NONOTES")
+  r <- sas_run("options notes nonotes; data a; x = 1; run; options nonotes notes; data b; x = 1; run;")
+  expect_identical(r$log, "NOTE: The data set WORK.B has 1 observations and 1 variables.")
+  #
+  r <- sas_run("options syntaxcheck nosyntaxcheck; data a; x = 1; run; data b; set a y = 2; run;
+    data c; x = 1; run;", on_error = "sas")
+  expect_identical(r$status, "error")
+  expect_identical(nrow(r$work$c), 1L)
+  #
+  expect_error(sas_run("data a; x = 1; run; options nocenter center; proc print data=a; run;"),
+               class = "sasonr_unsupported", regexp = "CENTER")
+  expect_no_error(sas_run("data a; x = 1; run; options center nocenter date nodate number nonumber; proc print data=a; run;"))
 })
