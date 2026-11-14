@@ -6,6 +6,12 @@ mp_paren_text <- function(src, ses, nm, strip = TRUE, ...) {
   line <- src_line(src)
   j <- src_skip_ws(src)
   if (src_at(src, j) != 40L) abort_syntax(paste0("%", toupper(nm), " requires a parenthesised argument"), line)
+  # a quotation mark marked with % (%' %") in the argument is not supported
+  # here (%STR and %NRSTR have their own scanner)
+  e <- raw_match_paren(src, j)
+  if (!is.na(e) && e > j + 1L && grepl("%['\"]", src_text(src, j + 1L, e - 1L))) {
+    abort_unsupported(paste0("a %' or %\" in the argument of %", toupper(nm)), line)
+  }
   src$i <- j + 1L
   r <- mp_scan_text(src, ses, stop = list(chars = 41L), ...)
   if (r$reason != "char") abort_syntax(paste0("unclosed argument list for %", toupper(nm)), line)

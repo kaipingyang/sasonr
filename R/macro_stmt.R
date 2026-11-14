@@ -132,7 +132,9 @@ raw_match_paren <- function(src, k) {
 # Skip a quoted literal, a comment or the argument of %STR / %NRSTR / %QUOTE /
 # %NRQUOTE (where %' %" %( %) mark a quotation mark or parenthesis that is not
 # matched) starting at k; returns the next position or NA when k does not start
-# one.
+# one.  A %' or %" anywhere else (in %BQUOTE, %NRBQUOTE or in plain macro text)
+# is not supported: the extent of the statement or block it stands in is not
+# known.
 raw_skip_opaque <- function(src, k) {
   c <- src$cp[k]
   n <- src$n
@@ -146,6 +148,10 @@ raw_skip_opaque <- function(src, k) {
       }
     }
     return(NA_integer_)
+  }
+  if (c == 37L && src_at(src, k + 1L) %in% c(39L, 34L)) {
+    abort_unsupported(paste0("a %", intToUtf8(src_at(src, k + 1L)),
+                             " outside the argument of %STR, %NRSTR, %QUOTE or %NRQUOTE in macro code"), src_line(src, k))
   }
   if (c == 39L || c == 34L) {
     j <- k + 1L
