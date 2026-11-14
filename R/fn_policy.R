@@ -1,6 +1,4 @@
-# SAS run-time behaviour of function calls with missing or invalid arguments
-#
-#
+# SAS run-time behaviour of function calls with missing or invalid arguments.
 #
 # For a function listed in `fn_policy`, translated code calls
 # sas_fcall(name, f, args, .at): the implementation computes the values; the
@@ -16,8 +14,8 @@
 #            "none"  nothing (the implementation decides)
 #   dom    function(args) giving, per row, "ok", "inv" (invalid argument),
 #          "math" (mathematical operations NOTE only), "mv" (result missing,
-#          missing-values NOTE) or "?" (SAS behaviour not determined: the
-#          program stops with sasonr_unsupported)
+#          missing-values NOTE) or "?" (not supported: the program stops
+#          with sasonr_unsupported)
 #   nan    what a non-finite or missing result for non-missing, valid
 #          arguments means ("inv", "math", "mv", "none")
 #   math   FALSE: an invalid argument is not counted in the mathematical-
@@ -71,9 +69,8 @@ dom_datetime <- function(args) {
   ifelse(is.na(x) | sas_date_ok(x / 86400), "ok", ifelse(abs(x) >= 1e15, "inv", "?"))
 }
 
-# descriptive statistics: an argument of magnitude 1E300 is an invalid argument
-#
-#
+# descriptive statistics: an argument of magnitude 1E300 is an invalid argument;
+# arguments between 1E150 and 1E300 are not supported and fail loud ("?";
 # below 1E150 the squares of CSS/USS/VAR cannot overflow); fewer than `need`
 # non-missing values give a missing result with the missing-values NOTE
 dom_stat <- function(need, zero_var = FALSE, zero_mean = FALSE) {
@@ -125,9 +122,9 @@ fn_policy <- list(
   cos = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   sin = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   tan = fpol("mv", dom = function(a) {
-    #
-    # nearest pi/2, is an invalid argument.  Other arguments whose cosine is
-    #
+    # TAN(1.5707963267948966), the double nearest pi/2, is an invalid argument
+    # in SAS 9.4.  Other arguments whose cosine is that close to 0 (below 1E-15
+    # in magnitude) are not supported: fail loud.
     x <- dom_n(a, 1)
     dom_or(dom_huge(x, 1e10), code_if(abs(x) == 1.5707963267948966, "inv"), code_if(abs(cos(x)) < 1e-15, "?"))
   }),
@@ -142,7 +139,7 @@ fn_policy <- list(
   gamma = fpol("mv", dom = function(a) {
     x <- dom_n(a, 1)
     #
-    #
+    # arguments in between are not supported (fail loud)
     dom_or(code_if(x <= 0 & is_int(x), "inv"), code_if(x >= 172, "inv"), code_if(x > 171 & x < 172, "?"),
            code_if(x > 0 & x <= 1e-300, "inv"),
            code_if(x > 1e-300 & x < 1e-15, "?"), code_if(x < -170, "?"))
@@ -354,14 +351,14 @@ fn_policy <- list(
   choosec = fpol("mv", pos = 1L, dom = function(a) choose_dom(a), nan = "none", math = FALSE)
 )
 
-#
+# letters outside ASCII: case mapping depends on the session encoding (not supported)
 case_dom <- function(a) {
   x <- as_sas_chr(a[[1]])
   code_if(grepl("[^\\x01-\\x7f]", x, perl = TRUE), "?")
 }
 for (nm in c("upcase", "lowcase", "propcase")) fn_policy[[nm]] <- fpol(dom = case_dom, nan = "none", math = FALSE)
 fn_policy$indexw <- fpol(dom = function(a) {
-  #
+  # delimiters that also occur in the word: not supported
   if (length(a) < 3) return(rep("ok", max(lengths(a))))
   w <- strip_both(as_sas_chr(a[[2]]))
   d <- as_sas_chr(a[[3]])
@@ -419,7 +416,7 @@ width_dom <- function(a, char, code = "err") {
     if (k > length(a) || is.null(a[[k]])) next
     w <- dom_n(a, k)
     if (k == 4) {
-      #
+      # decimals: truncated; negative values not supported
       out <- dom_or(out, ifelse(is.na(w) | w >= 0, "ok", "?"))
       next
     }
@@ -480,7 +477,7 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   if (p$miss != "none") dom[miss] <- "ok"
   if (any(dom == "exc")) sas_step_exception(.at)
   if (any(dom == "?")) {
-    abort_unsupported(sprintf("%s with these arguments (SAS 9.4 behaviour not supported)", toupper(.name)),
+    abort_unsupported(sprintf("%s with these arguments (not supported)", toupper(.name)),
                       .at[1] %||% NULL)
   }
   num <- !identical(fn_table[[.name]]$type, "char")

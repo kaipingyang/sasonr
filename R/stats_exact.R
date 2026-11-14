@@ -1,8 +1,5 @@
 #
 #
-#
-# random size and magnitude, presented sorted, reversed and shuffled):
-#
 # * Sums are plain sequential double additions in observation order (PROC
 #   MEANS, PROC SQL).  R's sum()/cumsum() accumulate in long double and differ.
 # * PROC SQL keeps, per group, the first non-missing value c0 and the
@@ -11,8 +8,8 @@
 #     MEAN = fma(n, c0, Sd) / n
 #     CSS  = fma(-Sd, Sd / n, Sdd),  VAR = CSS / (n - 1),  STD = sqrt(VAR)
 #     USS  = fma(c0, fma(n, c0, 2 * Sd), Sdd)
-# * PROC MEANS / SUMMARY: see stats_means_moments() (every moment statistic
-#
+# * PROC MEANS / SUMMARY: see stats_means_moments(); every moment statistic is
+#   exact except SKEWNESS, which is approximate.
 # The fused multiply-add is emulated exactly in double arithmetic (Dekker's
 # product and Boldo-Melquiond rounding to odd); it is exact when no partial
 # product overflows or underflows: stats_fma() checks its arguments and fails
@@ -166,7 +163,7 @@ stats_fma_accumulate <- function(a, b) {
   stats_finite_check(acc, "a fused multiply-add sum")
 }
 
-#
+# Values for which the moment statistics are supported (magnitudes 0 or
 # 1E-140..1E140; the guards above catch what still leaves the exact range).
 stats_fma_range_ok <- function(x) {
   ax <- abs(x[!is.na(x)])
@@ -217,17 +214,16 @@ stats_order_free <- function(fn, x) {
 # One kernel for N, SUM, MEAN, CSS, USS, VAR, STD, STDERR, CV, SKEWNESS and
 # KURTOSIS, shared by the DATA step functions, the PROC SQL summary functions
 #
-#
+# moments (`method`):
 #   datastep  `m` is a matrix with one group per row (the arguments in order,
 #             NA = missing), vectorised over the rows.  MEAN = SUM / N;
 #             CSS = sum of fma(d, d, .) over d = x - MEAN; USS = sequential
 #             sum of x * x; STDERR = sqrt(CSS / (N (N - 1))); CV = STD / MEAN * 100
-#
-#             non-missing arguments; with 10 to 12 some CSS differ in the last
-#             bit, so the CSS-based DATA step functions run up to 9 values).
+#             (exact for at most 9 non-missing arguments; with more, the last
+#             bit of CSS can differ, so the CSS-based DATA step functions run
+#             up to 9 values).
 #   sql       `m` as for datastep.  Shifted sums: MEAN = fma(N, c0, Sd) / N,
-#             CSS = fma(-Sd, Sd / N, Sdd), USS = fma(c0, fma(N, c0, 2 Sd), Sdd)
-#
+#             CSS = fma(-Sd, Sd / N, Sdd), USS = fma(c0, fma(N, c0, 2 Sd), Sdd).
 #   means     `m` the values of one PROC MEANS cell, see stats_means_moments().
 # VAR = CSS / div (div = N - 1 unless the caller passes its divisor),
 # STD = sqrt(VAR).  The emulated fma is exact only inside its range
@@ -280,7 +276,7 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
     sd <- stats_row_seq_sum(d)
     sdd <- stats_row_seq_sum(stats_mul(d, d))
     css <- stats_fma(-sd, sd / n, sdd)
-    #
+    # a negative CSS (cancellation) is not supported for PROC SQL
     if (any(!is.na(css) & css < 0)) stats_range_fail("PROC SQL CSS of nearly constant values came out negative")
     mean <- stats_fma(n, c0, sd) / n
     uss <- stats_fma(c0, stats_fma(n, c0, 2 * sd), sdd)
@@ -290,15 +286,14 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
   std <- sqrt(var)
   stderr <- if (method == "datastep") ifelse(n > 1, sqrt(css / (n * (n - 1))), NA_real_) else ifelse(n > 1, std / sqrt(n), NA_real_)
   cv <- ifelse(!is.na(std) & mean != 0, if (method == "datastep") std / mean * 100 else 100 * std / mean, NA_real_)
-  #
+  # a zero CV of negative values is +0 in the DATA step
   if (method == "datastep") cv[!is.na(cv) & cv == 0] <- 0
-  #
-  # arguments): r = (N - 1) / CSS; SKEWNESS = N A3 / ((N - 1)(N - 2)) with A3
-  #
-  #
+  # skewness and kurtosis (VARDEF=DF), DATA step (at most 9 arguments):
+  # r = (N - 1) / CSS; SKEWNESS = N A3 / ((N - 1)(N - 2)) with A3 the sum of
+  # fma(z z, z, .) over z = d sqrt(r) (see also sas_f_skewness());
   # KURTOSIS = fma(N (N + 1) / ((N - 1)(N - 2)(N - 3)), A4, -3 (N - 1)**2 /
   # ((N - 2)(N - 3))) with A4 the sum of fma(t, t, .) over t = d (d r)
-  # (487 of 523 rows: approximate).  Only the DATA step functions use them.
+  # (approximate).  Only the DATA step functions use them.
   skew <- kurt <- rep(NA_real_, nrow(m))
   ok <- method == "datastep" & !is.na(std) & std > 0
   if (any(ok)) {
@@ -330,10 +325,8 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
 # ---- PROC MEANS / SUMMARY --------------------------------------------------------
 #
 #
-#
-# integer data with exact sums, the same patterns at 14 offsets, decimals with
-# missing values, FREQ, WEIGHT, VARDEF=, CLASS x BY, n up to 100,000, and
-#
+# them (also with FREQ, WEIGHT, VARDEF=, CLASS and BY groups, zero-weight
+# first observations and nearly constant data).
 # `x` are the values of the observations that take part (non-missing value,
 # non-missing weight, frequency >= 1) in observation order, `freq` their
 # frequencies (NULL: no FREQ statement) and `weight` their weights (NULL: no
@@ -345,12 +338,11 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
 #   S3 = sequential sum of t3          S4 = fma(t3, d, S4)
 # MEAN = S / W and q = MEAN - c0 (the shift of the provisional to the final
 #
-#
-#
-# evaluated by Horner's rule with SAS's fused multiply-adds:
-#   CSS = fma(q, W q - 2 S1, S2)       (0 when S2 = 0; missing when negative:
-#
-#                                       with USS, VAR, STD, STDERR, CV missing)
+# 1.0005986172898007E-14 on; in between fails loud).  The central sums are a
+# polynomial in q evaluated by Horner's rule with SAS's fused multiply-adds:
+#   CSS = fma(q, W q - 2 S1, S2)       (0 when S2 = 0; missing when negative,
+#                                       and then USS, VAR, STD, STDERR and CV
+#                                       are missing too)
 #   M3  = fma(q, fma(q, 3 S1 - W q, -3 S2), S3)
 #   M4  = fma(q, q fma(q, W q - 4 S1, 6 S2) - 4 S3, S4)
 #   USS = fma(S, MEAN, CSS)
@@ -385,7 +377,7 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
     rq <- abs(q) / abs(c0)
     if (rq <= 9.9751031807342009e-15) {
       if (any(wt != 1)) {
-        abort_unsupported("PROC MEANS moment statistics of nearly constant weighted data (SAS's rounding of the mean shift supported only without weights)")
+        abort_unsupported("PROC MEANS moment statistics of nearly constant weighted data (the rounding of the mean shift is supported only without weights)")
       }
       q <- 0
     } else if (rq < 1.0005986172898007e-14) {
@@ -437,17 +429,17 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
       vs <- stats_mul(var, std)
       vv <- stats_mul(var, var)
       if (vardef == "df") {
-        #
+        # SKEWNESS approximate (registry); KURTOSIS exact
         if (n > 2) out$skew <- n * m3 / ((n - 1) * (n - 2)) / vs
         if (n > 3) out$kurt <- stats_fma(n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)), m4 / vv, -3 * (n - 1)^2 / ((n - 2) * (n - 3)))
       } else {
-        #
+        # VARDEF=N
         out$skew <- m3 / stats_mul(n, vs)
         out$kurt <- m4 / vv / n - 3
       }
     } else if (vardef %in% c("df", "n")) {
       #
-      #
+      # registry has no supported SKEWNESS / KURTOSIS with WEIGHT: gated)
       z <- (x - mean) / std
       s3w <- sum(f * w^1.5 * z^3)
       s4w <- sum(f * w^2 * z^4)
@@ -467,14 +459,13 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
 
 #
 #
+# differ in USS):
 #   MEAN = SUM / n,  q = MEAN - c0,  CSS = S2 - q (2 S1 - n q),
 #   USS = CSS + SUM * MEAN,  VAR = CSS / (n - 1 | n),  STDERR = sqrt(VAR / n)
-#
-#
-#
-# VARDEF=DF or N, outside the nearly-constant region (|q| < 1.01E-14 |c0|)
-# and the STD cut-off region (VAR <= 1.4312245245430491E-26 MEAN**2):
-#
+# Supported only without WEIGHT / FREQ, with VARDEF=DF or N, outside the
+# nearly-constant region (|q| < 1.01E-14 |c0|) and the STD cut-off region
+# (VAR <= 1.4312245245430491E-26 MEAN**2): everything else fails loud, as do
+# SKEWNESS and KURTOSIS.
 stats_means_moments_ts1m2 <- function(x, freq, weight, vardef, need) {
   css_family <- c("css", "uss", "var", "std", "stderr", "cv", "skew", "kurt", "t", "prt", "lclm", "uclm")
   moments <- c("sum", "mean", "sumwgt", css_family)
@@ -483,7 +474,7 @@ stats_means_moments_ts1m2 <- function(x, freq, weight, vardef, need) {
   else if (!vardef %in% c("df", "n")) why <- paste0("VARDEF=", toupper(vardef))
   else if (any(need %in% c("skew", "kurt"))) why <- "SKEWNESS / KURTOSIS"
   if (!is.null(why) && any(need %in% moments)) {
-    abort_unsupported(paste0("PROC MEANS moment statistics with ", why, " for SAS 9.4 (no expected result for SAS 9.4)"))
+    abort_unsupported(paste0("PROC MEANS moment statistics with ", why, " for SAS 9.4 (not supported)"))
   }
   if (!stats_fma_range_ok(x) && any(need %in% moments)) {
     abort_unsupported("PROC MEANS moment statistics of values beyond 1E140 or below 1E-140 in magnitude (not supported)")
@@ -505,10 +496,10 @@ stats_means_moments_ts1m2 <- function(x, freq, weight, vardef, need) {
   s2 <- stats_seq_sum(stats_mul(d, d))
   q <- mean - c0
   if (s2 != 0 && q != 0 && abs(q) < 1.01e-14 * abs(c0)) {
-    abort_unsupported("PROC MEANS moment statistics of nearly constant data for SAS 9.4 (no expected result for SAS 9.4)")
+    abort_unsupported("PROC MEANS moment statistics of nearly constant data for SAS 9.4 (not supported)")
   }
   css <- if (s2 == 0) 0 else s2 - stats_mul(q, 2 * s1 - stats_mul(n, q))
-  if (css < 0) abort_unsupported("PROC MEANS CSS of nearly constant data came out negative (SAS 9.4 not supported)")
+  if (css < 0) abort_unsupported("PROC MEANS CSS of nearly constant data came out negative (not supported for SAS 9.4)")
   out$css <- css
   out$uss <- css + stats_mul(S, mean)
   div <- if (vardef == "df") n - 1 else n
@@ -516,7 +507,7 @@ stats_means_moments_ts1m2 <- function(x, freq, weight, vardef, need) {
   std <- sqrt(var)
   if (!is.na(var) && var > 0 && mean != 0 && var / stats_mul(mean, mean) <= STD_CUT_KEEP &&
       any(need %in% c("std", "cv", "stderr", "t", "prt", "lclm", "uclm"))) {
-    abort_unsupported("PROC MEANS STD of a variance negligible against the squared mean for SAS 9.4 (cut-off to 0 not in the expected results for SAS 9.4)")
+    abort_unsupported("PROC MEANS STD of a variance negligible against the squared mean for SAS 9.4 (the cut-off to 0 is not supported)")
   }
   out$var <- var
   out$std <- std
@@ -532,31 +523,30 @@ stats_means_checked <- function(out) {
 }
 
 #
-#
-#
-# 1.1965683145884955E-26 and STD kept from 1.4312245245430491E-26 on (the
-# smallest ratio seen with STD 0 is 2.2713562904522125E-33). Below it the
-# statistics that depend on STD fail loud, as they do between the two limits.
+# negligible against the squared mean: STD 0 up to VAR/MEAN**2 =
+# 1.1965683145884955E-26 and STD kept from 1.4312245245430491E-26 on.  Below
+# STD_CUT_MIN the statistics that depend on STD fail loud, as they do between
+# the two limits.
 STD_CUT_MIN <- 2.2713562904522125e-33
 STD_CUT_ZERO <- 1.1965683145884955e-26
 STD_CUT_KEEP <- 1.4312245245430491e-26
 
 #
-#
-# (condition: FREQ / WEIGHT statement and VARDEF=).  Others fail loud.
-STD_CUT_EXPECTED <- list(
-  "df" = c("std", "cv", "stderr", "t", "skew", "kurt"),            #
-  "n" = c("std", "cv", "stderr", "skew", "kurt"),                  #
-  "weight/df" = c("std", "cv", "stderr", "t", "prt", "lclm", "uclm"), #
-  "freq/weight/df" = c("std", "cv", "stderr"),                     #
-  "weight/wdf" = c("std", "cv"),                                   #
-  "weight/weight" = c("std", "cv")                                 #
+# follow from them are supported there only under these conditions (FREQ /
+# WEIGHT statement and VARDEF=).  Others fail loud.
+STD_CUT_SUPPORTED <- list(
+  "df" = c("std", "cv", "stderr", "t", "skew", "kurt"),
+  "n" = c("std", "cv", "stderr", "skew", "kurt"),
+  "weight/df" = c("std", "cv", "stderr", "t", "prt", "lclm", "uclm"),
+  "freq/weight/df" = c("std", "cv", "stderr"),
+  "weight/wdf" = c("std", "cv"),
+  "weight/weight" = c("std", "cv")
 )
 
 stats_std_cut_check <- function(need, freq, weight, vardef) {
   key <- paste(c(if (!is.null(freq)) "freq", if (!is.null(weight)) "weight", vardef), collapse = "/")
   dependent <- c("std", "cv", "stderr", "t", "prt", "lclm", "uclm", "skew", "kurt")
-  open <- setdiff(intersect(need, dependent), STD_CUT_EXPECTED[[key]])
+  open <- setdiff(intersect(need, dependent), STD_CUT_SUPPORTED[[key]])
   if (length(open)) {
     abort_unsupported(paste0("PROC MEANS ", paste(toupper(open), collapse = ", "),
                              " of data whose STD is cut to 0 (not supported under ",

@@ -477,7 +477,7 @@ sql_select <- function(q, eng, outer) {
       col$len <- 200L
     } else if (ty$type == "char" && is.null(it$length) && !const_args && e$node == "call" && e$name %in% sql_200_fixed) {
       # the CAT family keeps its DATA step 200 length in SQL even though the
-      #
+      # value is built from column arguments
       col$len <- 200L
     } else if (ty$type == "char" && is.null(it$length) && e$node == "call" && identical(fn_table[[e$name]]$len, 200L)) {
       col$len <- max(1L, nchar(sas_rtrim(v)))
@@ -531,7 +531,7 @@ sql_select <- function(q, eng, outer) {
 # Does PROC SQL read the rows of each group in the order of `rel`?  Without
 # GROUP BY it reads a single table in its stored order; with GROUP BY it sorts
 # the rows (not stably) unless the data set is flagged as sorted by the group
-#
+# columns.
 sql_group_order_known <- function(rel, group, ctx) {
   if (!isTRUE(rel$ordered)) return(FALSE)
   if (length(group) == 0) return(TRUE)
@@ -702,8 +702,8 @@ sql_outer_union <- function(a, b, q, eng) {
   list(data = d, cols = cols, ordered = TRUE)
 }
 
-#
-# matrix): the value's length, or the DATA step default of 200
+# PROC SQL lengths of calls with constant arguments: the value's length, or
+# the DATA step default of 200
 sql_fold_fns <- c("cat", "strip", "trim", "compbl", "compress", "scan", "substr")
 sql_200_fns <- c("tranwrd")
 #

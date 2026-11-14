@@ -22,7 +22,7 @@ test_that("w.d integer zeros: only inside the supported domain and at the known 
 })
 
 test_that("ROUNDE and ROUNDZ fail loud from |x/unit| = 2^49 as ROUND does", {
-  # ROUND(507561523905906.125, 0.25) = 507561523905906 (not the nearest multiple)
+  #
   expect_error(sas_f_round(507561523905906.125, 0.25), class = "sasonr_unsupported")
   expect_error(sas_f_rounde(507561523905906.125, 0.25), class = "sasonr_unsupported")
   expect_error(sas_f_roundz(507561523905906.125, 0.25), class = "sasonr_unsupported")

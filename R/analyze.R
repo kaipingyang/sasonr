@@ -250,8 +250,8 @@ an_expr <- function(e, st) {
       e$lhs <- an_expr(e$lhs, st)
       e$rhs <- an_expr(e$rhs, st)
       #
-      #
-      #
+      # row where the DATA step value (truncated to 32767) is compared; not
+      # implemented
       if (e$op == "||" && identical(st$context, "where") && expr_type(e, st)$len > 32767L) {
         abort_unsupported("a WHERE concatenation of more than 32767 characters (not supported)", e$line)
       }
@@ -572,7 +572,7 @@ an_stmt <- function(s, st) {
         #
         if (sas_target_version() != "SAS 9.4") {
           abort_unsupported(paste0("SUBSTR assignment to an undeclared variable for SAS 9.4 ", sas_target_version(),
-                                   " (no expected result)"), line)
+                                   " (not supported for this release)"), line)
         }
         reg_var(st, s$var, "char", 8L, disp = s$var_text %||% s$var)
       }

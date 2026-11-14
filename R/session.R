@@ -16,7 +16,7 @@
 # helpers read it through `sas_rt_active()` / `rt_diag()` / `ct_diag()`.
 # The only package-level mutable object is that binding slot (`.active`): it
 # holds a reference to the bound session, never run state of its own.  There
-# is no default session (spec 04 §4.7): a function-layer call outside any
+# is no default session: a function-layer call outside any
 # submission (`sas_f_round()` in the user's own code) runs without hidden
 # state - its diagnostics go to a throw-away state (rt_diag(), ct_diag()), it
 # sees no user formats and no filerefs (a fileref fails loud), uses the
@@ -116,14 +116,14 @@ SasSession <- R6::R6Class("SasSession",
 )
 
 # System options of a session, set by OPTIONS statements (engine_global()).
-#
-# NODATE NONUMBER FORMDLIM=' ' PAGESIZE=MAX); other values fail loud when a
+# The listing layout starts at NOCENTER NODATE NONUMBER FORMDLIM=' '
+# PAGESIZE=MAX, the only layout implemented; other values fail loud when a
 # procedure writes output under them (engine_add_listing()).  Options whose
 # only implemented value is the SAS default are not session fields: other
 # values fail loud in the OPTIONS statement (YEARCUTOFF=1940, ERRORS=20,
-# MISSING=.).  The session encoding (spec 04 §4.8) is not implemented: the
-#
-# input.R; PROC CONTENTS reports UTF-8, proc_contents.R).
+# MISSING=.).  The session encoding is not implemented: fixed values are used
+# where it matters (INFILE reads latin1 bytes, input.R; PROC CONTENTS reports
+# UTF-8, proc_contents.R).
 new_session_options <- function(sas_version) {
   o <- new.env(parent = emptyenv())
   o$linesize <- 132L
@@ -223,9 +223,9 @@ session_leave <- function(session) {
 
 # Set `_LAST_` (a WORK member name) and the SYSLAST / SYSDSN automatic macro
 #
-#
-# SORT, MEANS, FREQ, TRANSPOSE or CONTENTS OUT=; a table or view PROC SQL
-# creates (CREATE TABLE / VIEW, ALTER TABLE); the BASE= data set of APPEND.
+# DATA step, PROC SORT, MEANS, FREQ, TRANSPOSE or CONTENTS OUT=; a table or
+# view PROC SQL creates (CREATE TABLE / VIEW, ALTER TABLE); the BASE= data set
+# of APPEND.
 # PRINT, FORMAT, SQL INSERT / UPDATE / DELETE / DROP / SELECT, DATASETS DELETE
 # / CHANGE / MODIFY / KILL and PROC DELETE leave it, also when they delete or
 # rename the member it names.

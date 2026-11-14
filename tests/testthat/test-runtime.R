@@ -101,7 +101,7 @@ data m; merge a b; by k; run;"
 })
 
 test_that("MERGE walks observations when both inputs repeat a BY group", {
-  # a many-to-many MERGE pairs the two inputs
+  #
   # observation by observation (the shorter input falls back to missing) and a
   # common non-BY variable keeps the value from the last data set named.
   code <- "data a; input k x; datalines;

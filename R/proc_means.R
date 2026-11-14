@@ -336,11 +336,11 @@ translate_proc_means <- function(step, meta, last) {
     abort_runtime("Neither the PRINT option nor a valid output statement has been given.", step$line)
   }
   if (length(stats) == 0) stats <- c("n", "mean", "std", "min", "max")
-  # The panel layout is implemented in means_listing(); the one part of it that
+  # The panel layout is implemented in means_listing() except the heading
   #
+  # multi-word headings ("Std Error" -> "Std"/"Error") and abbreviates single
+  # words ("Minimum" -> "Min", "Coefficient of Variation" -> "Coeff of"/
   #
-  # "Std"/"Error") and abbreviates single words ("Minimum" -> "Min",
-  # "Coefficient of Variation" -> "Coeff of"/"Variation"), which sasonr does not
   #
   if (printing && !is.null(o$fw) && o$fw < 12L) {
     abort_unsupported("PROC MEANS listing with FW= below the default 12 (re-split and abbreviated column headings are not supported)", step$line)
@@ -412,7 +412,7 @@ means_stat_gate <- function(spec, line) {
   qstats <- c("median", "p50", "q1", "p25", "q3", "p75", "qrange", "p1", "p5", "p10", "p20", "p30", "p40",
               "p60", "p70", "p80", "p90", "p95", "p99")
   vstats <- c("std", "var", "stderr", "cv", "css", "uss", "skew", "kurt", "t", "prt", "lclm", "uclm")
-  #
+  # a statistic must be supported under every condition that applies
   for (s in unique(stats)) {
     conds <- c(if (!is.null(spec$weight)) "weight", if (!is.null(spec$freq)) "freq",
                if (isTRUE(spec$exclnpwgt)) "exclnpwgt",
@@ -462,7 +462,6 @@ means_quantile <- function(x, p, def = 5L) {
     "4" = if (j < 1) x[1] else if (j >= n) x[n] else (1 - g) * at(j) + g * at(j + 1L),
     # SAS 9.4 interpolates x[j] + gamma * (x[j+1] - x[j]) with gamma 1 or 1/2,
     # so a quantile that falls on x[j+1] can differ from it in the last bits
-    #
     "5" = if (j < 1) x[1] else if (j >= n) x[n] else at(j) + (if (g == 0) 0.5 else 1) * (at(j + 1L) - at(j))
   )
 }
@@ -514,9 +513,8 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
   val <- list(n = n, nmiss = nmiss)
   if (n > 0) {
     # Moment statistics: the moment kernel (stats_exact.R, stats_moments()
-    #
-    #
-    #
+    # with the PROC MEANS derivation, also with FREQ and WEIGHT).  It fails
+    # loud outside its supported domain (magnitudes, intermediate overflow or
     # underflow, nearly constant data, the STD cut-off region).
     k <- stats_moments(xv, "means", freq = if (is.null(sp$freq)) NULL else fv, weight = w_used, vardef = sp$vardef,
                        need = stats)
@@ -524,7 +522,6 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     val$sumwgt <- sw
     val$sum <- k$sum
     # the sign of zero: SUM and MEAN are always +0, MIN / MAX keep the sign of
-    #
     #
     if (!is.na(val$sum[1]) && val$sum[1] == 0) val$sum <- 0
     val$min <- xv[which(xv == min(xv))[1L]]
@@ -827,18 +824,15 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 
 # Listing --------------------------------------------------------------------------
 
-# Default decimals of the printed table with the default FW=12 and no MAXDEC=.
+# Default decimals of the printed table with the default FW=12 and no MAXDEC=
 #
-#
-#
-# outside the display engine's fail-loud domain) is identical line for line.
 means_default_text <- function(v, w) {
   if (v == 0) return("0")
   a <- abs(v)
   if (a < .Machine$double.xmin) {
-    # SAS's own output of a subnormal statistic is not part of the 155-point
     #
-    # guess.
+    # ("0.00000E-309" for the smallest subnormal); the rule is not known, so
+    # do not guess.
     abort_unsupported("PROC MEANS default display of a subnormal statistic value (not supported; use MAXDEC=)")
   }
   neg <- v < 0
@@ -881,11 +875,9 @@ means_num_text <- function(v, w, maxdec) {
   if (!is.null(maxdec)) {
     # too wide: fewer decimals first (12345678.500 with MAXDEC=4), then BEST
     for (dd in seq(maxdec, 0L)) {
-      #
-      #
-      #
-      # 0 differences, where half up on the exact binary value differed in 11
-      # cases).  The width is probed first, so only the text written fails loud.
+      # MAXDEC= text is the w.d display engine (MAXDEC=, PUT w.d and PROC
+      # PRINT w.d write the same text).  The width is probed first, so only
+      # the text written fails loud.
       s <- display_fixed(v, dd, edge = "up")
       if (nchar(s) <= w) return(display_fixed(v, dd))
     }
@@ -893,17 +885,12 @@ means_num_text <- function(v, w, maxdec) {
   }
   if (v == 0) return("0")
   if (identical(as.integer(w), 12L)) {
-    # The default decimals of the printed table (FW=12, no MAXDEC=) are
-    #
-    # one-observation CLASS groups (155 exactly known doubles,
-    #
-    #
-    #
+    # the default decimals of the printed table (FW=12, no MAXDEC=)
     return(means_default_text(v, w))
   }
   if (v != trunc(v) && (abs(v) >= 1e6 || abs(v) < 1e-4)) {
     #
-    # 0.000012500); the rule is not derived yet for other field widths
+    # other field widths is not implemented
     abort_unsupported("PROC MEANS default decimals for a non-integer statistic of 1E6 or more or below 1E-4 (not supported; use MAXDEC=)")
   }
   dec <- max(0L, as.integer(round((w - 2) * 0.7)))
@@ -931,12 +918,11 @@ means_stat_col <- function(s, cells, sp, by_nw = NULL) {
 }
 
 #
+# field for the whole data set, not for the counts of the group (13
 #
 #
-#
-#
-# and when every analysis variable is non-missing in as many digits as there
-# are observations; otherwise a wider data set fails loud.
+# is non-missing in as many digits as there are observations; otherwise a
+# wider data set fails loud.
 means_count_width <- function(cells, by_nw) {
   w <- max(c(1L, nchar(cells)))
   if (is.null(by_nw) || by_nw$w <= w) return(w)
@@ -957,9 +943,8 @@ means_by_count_width <- function(d, sp, k) {
 #
 #
 #
-#
-#
-# statistics, LINESIZE=132).  The line is filled left to right as follows.
+# 16) and MAXDEC= 0 to 7, with and without CLASS.  The line is filled left to
+# right as follows.
 #
 #  * Every statistic column is a field of FW= columns (default 12), except
 #    N / N Miss (as wide as the printed counts) and t Value / Pr > |t|; a
@@ -1111,8 +1096,7 @@ means_listing <- function(d, sp, cells_by, print_types) {
         if (has_label) fixed[[length(fixed) + 1L]] <- list(parts = "Label", width = max(5L, nchar(lab_cells)), right = FALSE, cells = lab_cells)
       }
       scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp, by_nw))
-      #
-      #
+      # panel layout (means_panel_layout())
       ls <- rt_linesize()
       panels <- means_panel_layout(vapply(scols, function(c) as.integer(c$width), 1L),
                                    vapply(fixed, function(c) as.integer(c$width), 1L), ls)
@@ -1124,13 +1108,14 @@ means_listing <- function(d, sp, cells_by, print_types) {
         abort_unsupported("PROC MEANS listing wider than LINESIZE= (narrowing the class/fixed columns is not supported)")
       }
       if (length(fixed) > 0 && (length(panels) >= 3L || ls < 120L)) {
+        # The fixed columns follow this layout for one or two panels.  The rule
+        # holds for LINESIZE= 120 to 200 and one or two CLASS variables of
+        # length 1, 4 or 8; other line sizes of 120 or more and other lengths
+        # use it as well.  Below LINESIZE=120 and across three or more
         #
-        # 120..200 (CLASS length 1, 4 and 8, one or two CLASS variables, the 38
-        #
-        #
-        # fixed part (the "N Obs" field and the gaps around the CLASS columns)
-        # in a way these measurements do not determine: at LINESIZE=100 a
-        # 12-statistic CLASS table is 92 columns wide where this layout gives 94.
+        # gaps around the CLASS columns) by a rule that is not implemented: at
+        # LINESIZE=100 a 12-statistic CLASS table is 92 columns wide where this
+        # layout gives 94.
         abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not determined)")
       }
       for (p in panels) {

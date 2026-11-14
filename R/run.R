@@ -79,9 +79,9 @@ engine_exec_steps <- function(eng, text, line) {
     eng$cur_step <- step
     if (isTRUE(eng$sc_pending) && step$type != "global") {
       #
-      #
-      #
-      #
+      # next step, here a DATA step (also DATA _NULL_, also with a TITLE
+      # statement in between; engine_global_error()), unless OPTIONS
+      # NOSYNTAXCHECK came in between
       if (step$type != "data") {
         abort_unsupported("a PROC step after an ERROR in a global statement (supported: a DATA step)", step$line)
       }
@@ -107,7 +107,7 @@ engine_exec_steps <- function(eng, text, line) {
         # SQLOBS and SQLRC are 0, the step ends "stopped" with SYSERR 1012
         #
         if (sas_target_version() != "SAS 9.4") {
-          abort_unsupported(paste0("PROC SQL in syntax-check mode for SAS 9.4 ", sas_target_version(), " (not in its expected results)"), step$line)
+          abort_unsupported(paste0("PROC SQL in syntax-check mode for SAS 9.4 ", sas_target_version(), " (not supported for this release)"), step$line)
         }
         eng$log <- c(eng$log, "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.")
         eng$sql_noexec <- TRUE
@@ -193,7 +193,7 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (isTRUE(eng$syntax_check)) {
       # PROC CONTENTS in syntax-check mode (engine_check_step()): OUT= has 0
-      #
+      # observations
       for (nm in tr$outputs) assign(nm, get(nm, envir = eng$session$work)[0, , drop = FALSE], envir = eng$session$work)
     }
     stopped <- step$type == "data" && isTRUE(rt$stop_step)
@@ -243,26 +243,23 @@ engine_check_last_view <- function(eng, step) {
 
 # Syntax-check mode (after an ERROR, on_error = "sas"): the step is compiled
 #
-# a09):
-#
-#
+#   * the global statements of a step run: TITLE in any PROC step, OPTIONS in
+#     PROC DATASETS;
 #   * a DATA step creates each new output data set with 0 observations and
 #     the variables compiled; an existing one is not replaced ("not replaced
-#
+#     because this step was stopped"); _LAST_ names the new data set;
 #   * PROC CONTENTS runs: its listing as usual, OUT= (new or existing) with 0
-#
+#     observations; it is run by the caller (TRUE is returned);
 #   * PROC SORT OUT=, PROC FREQ TABLES OUT= and PROC APPEND BASE= create a new
-#
-#
-#
+#     data set with 0 observations and 0 variables, which becomes _LAST_; an
+#     existing OUT= data set is "not replaced because new file is incomplete",
+#     an existing BASE= is left alone;
 #   * PROC MEANS (printing or not) stops: "stopped processing this step", an
 #     OUTPUT OUT= data set as in a stopped step (new: 0 observations and 0
 #     variables, "may be incomplete", it becomes _LAST_; existing: also "not
-#
-#
+#     replaced because this step was stopped"), SYSERR 1012;
 #   * PROC PRINT, printing PROC FREQ, PROC DELETE, PROC DATASETS DELETE / KILL
-#
-#
+#     and an in-place PROC SORT change nothing, also not _LAST_;
 # SYSERR is 3 after every step but PROC MEANS.  Other steps and forms (PROC
 # TRANSPOSE, which runs with 0 observations in SAS, PROC FORMAT, PROC
 # SUMMARY, several OUT= data sets, FREQ OUTPUT, data set options on OUT=,
@@ -325,7 +322,7 @@ engine_check_step <- function(eng, step) {
       outs <- tr$outputs
       if (length(outs) > 1L) unsupported(paste0("PROC ", toupper(step$name), " with several output data sets"))
       if (step$name == "sort") {
-        #
+        # in place: nothing happens
         if (!is.null(step$options$out)) {
           if (length(step$options$out$options)) unsupported("PROC SORT with data set options on OUT=")
           out_ds(outs)
@@ -369,7 +366,7 @@ engine_check_step <- function(eng, step) {
       engine_empty_dataset(eng, nm, m)
     }
   }
-  #
+  # _LAST_: the new output data set; an existing one leaves it
   if (length(tr$outputs) && !any(old)) session_set_last(eng$session, tr$outputs[length(tr$outputs)])
   err_set_macro(eng, syserr = 3)
   FALSE
@@ -437,7 +434,7 @@ engine_global <- function(eng, g) {
   if (g$kind == "filename") {
     eng$session$filerefs[[g$ref]] <- g$path
     # SYSFILRC: 0 when the file or directory exists, 1 when it does not, also
-    #
+    # when its directory does not
     assign("sysfilrc", if (file.exists(g$path)) "0" else "1", envir = eng$session$macro$globals)
   }
   if (g$kind == "filename_noref") {
@@ -485,16 +482,16 @@ engine_quote_at <- function(text, line, g) {
 }
 
 #
-# macro code after it in the same step runs under the new options (SAS 9.4
 #
-#
-# LINESIZE=MAX inside PROC SQL, s05).  sasonr runs the statements of a step when
-# the step is complete (PROC DATASETS is the step that accepts OPTIONS; PROC
-# SQL runs its statements one by one), so the code sink hands the statement over
+# OPTIONS LINESIZE=MAX and NONOTES inside PROC DATASETS before and after a
+# %SYSFUNC call that writes a NOTE, and LINESIZE=MAX inside PROC SQL).  sasonr
+# runs the statements of a step when the step is complete (PROC DATASETS is
+# the step that accepts OPTIONS; PROC SQL runs its statements one by one), so
+# the code sink hands the statement over
 # at its semicolon and the macro processor keeps the options of the step's
 # OPTIONS statements so far (`step_opts`: LINESIZE and NOTES, what a macro-time
 # NOTE depends on, mac_sysfunc()); the session options change when the step
-#
+# runs, as before.  Only the supported settings are kept: a statement with
 # another LINESIZE= value or NOTES, or one that does not parse here, leaves
 # them unknown (a macro-time NOTE then fails loud); the step reports a parse
 # error when it runs.
@@ -648,8 +645,8 @@ macro_error_unsupported <- function(e) {
 # sas_run(code, on_error = "abort") that keeps what ran before an error:
 # list(result, error).  `result` is the sasonr_result of the steps run before
 # the error (NULL when it cannot be built), `error` the condition (NULL on
-#
-# a failing case need no second run).
+# success).  Not called inside the package: it is kept for callers that use
+# it as sasonr:::engine_run_partial().
 engine_run_partial <- function(code) {
   session <- SasSession$new()
   on.exit(session$close(), add = TRUE)
@@ -669,7 +666,7 @@ engine_run_partial <- function(code) {
 
 # Append procedure output to the listing of the submission.  sasonr writes
 #
-#
+# PAGESIZE=MAX.  Under other values SAS
 # centres the lines (CENTER), writes a header line with the date or page
 # number (DATE, NUMBER), a delimiter line instead of each new page after the
 # first (FORMDLIM=), or breaks a long output into pages with repeated

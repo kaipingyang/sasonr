@@ -484,7 +484,7 @@ engine_datasets <- function(eng, step) {
             prefix = members[startsWith(members, it$prefix)],
             range = expand_numbered_range(it$from, it$to, s$line),
             #
-            #
+            # WARNING; the rule is not known
             special = abort_unsupported(paste0("DELETE ", toupper(it$name), " in PROC DATASETS (not supported)"), s$line),
             abort_unsupported("DELETE list form", s$line))
           for (nm in nms) {
@@ -618,7 +618,7 @@ datasets_append <- function(eng, s) {
   if (!exists(bn, envir = eng$session$work, inherits = FALSE)) {
     assign(bn, dd, envir = eng$session$work)
     eng$session$meta[[bn]] <- dm[setdiff(names(dm), c("sortedby", "memlabel"))]
-    #
+    # APPEND sets _LAST_ to the BASE= data set, new or not
     session_set_last(eng$session, bn)
     return(c(notes, sprintf("NOTE: BASE data set does not exist. DATA file is being copied to BASE file."),
              sprintf("NOTE: There were %d observations read from the data set WORK.%s.", nrow(dd), toupper(dn)),

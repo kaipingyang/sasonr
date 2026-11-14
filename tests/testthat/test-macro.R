@@ -230,14 +230,14 @@ test_that("an OPTIONS statement inside a step applies to the macro code after it
   #
   # it, before the macro code after it in the step; the session keeps it
   expect_identical(sas_run(step(paste("options linesize=max;", let)))$log, c(note, note))
-  # s02: macro code before the OPTIONS statement runs under the LINESIZE before it
+  # macro code before the OPTIONS statement runs under the LINESIZE before it
   expect_identical(sas_run(step(paste(let, "options linesize=max;")))$log, c(note132, note))
-  # s03 / s04: NONOTES suppresses the NOTE, in the step after the statement and after the step
+  # NONOTES suppresses the NOTE, in the step after the statement and after the step
   withr::local_options(sasonr.step_notes = TRUE)
   a_note <- "NOTE: The data set WORK.A has 1 observations and 1 variables."
   expect_identical(sas_run(step(paste("options nonotes;", let)))$log, a_note)
   expect_identical(sas_run(step(paste(let, "options nonotes;")))$log, c(a_note, note132))
-  # ... and in open code (s03, s04: the %SYSFUNC call after the step)
+  # ... and in open code (the %SYSFUNC call after the step)
   expect_identical(sas_run("options nonotes; %let d = %sysfunc(mdy(2, 30, 2024));")$log, character())
   withr::local_options(sasonr.step_notes = FALSE)
   # a variable, an array element or a sum statement named OPTIONS is not an OPTIONS statement
@@ -257,10 +257,10 @@ test_that("the %SYSFUNC NOTE fails loud where the options in effect are not know
     paste("data a; x = 1; run; proc datasets lib=work nolist;", opt, "%let d = %sysfunc(mdy(2, 30, 2024)); quit;")
   }
   # an OPTIONS statement of the step that does not parse before the step runs
-  expect_error(sas_run(in_step("options minoperator;")), class = "sasonr_unsupported", regexp = "not supported")
+  expect_error(sas_run(in_step("options minoperator;")), class = "sasonr_unsupported", regexp = "whose effect before the step runs")
   # inside a step only LINESIZE=MAX and NONOTES are supported
-  expect_error(sas_run(in_step("options linesize=100;")), class = "sasonr_unsupported", regexp = "not supported")
-  expect_error(sas_run(in_step("options nonotes notes;")), class = "sasonr_unsupported", regexp = "not supported")
+  expect_error(sas_run(in_step("options linesize=100;")), class = "sasonr_unsupported", regexp = "whose effect before the step runs")
+  expect_error(sas_run(in_step("options nonotes notes;")), class = "sasonr_unsupported", regexp = "whose effect before the step runs")
 })
 
 test_that("positive and negative system options apply in the order written", {

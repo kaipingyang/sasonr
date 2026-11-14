@@ -45,7 +45,7 @@ new_macro_session <- function(exec = NULL) {
     sysday = format(now, "%A"), systime = format(now, "%H:%M"), sysver = "9.4",
     sysvlong = "9.04.01M7P080520", sysscp = "LIN X64", sysscpl = "Linux", syserr = "0",
     syscc = "0", sysrc = "0", sysmacroname = "", sysindex = "0", sysncpu = "1",
-    #
+    # SYSFILRC before any FILENAME statement
     sysfilrc = "0"
   )
   for (nm in names(auto)) assign(nm, auto[[nm]], envir = ses$globals)
@@ -64,7 +64,7 @@ new_macro_session <- function(exec = NULL) {
 # the values of `mac_auto_implemented`; a reference to any other one fails
 # loud, and so does an assignment to any of them (%LET, %DO, INTO, CALL
 # SYMPUT, %GLOBAL, %LOCAL, %SYMDEL, a macro parameter) except a %LET of the
-#
+# read-and-write SYSCC, SYSRC or SYSFILRC.  SYSPBUFF
 # is local to a macro defined with PARMBUFF and an ordinary variable there.
 mac_auto_rw <- c("sysbuffr", "syscc", "syscmd", "sysdevic", "sysdmg", "sysdsn", "sysfilrc", "syslast",
                  "syslckrc", "syslibrc", "sysmsg", "sysparm", "syspbuff", "sysrc")
@@ -82,7 +82,7 @@ mac_auto_implemented <- c("sysdate", "sysdate9", "sysday", "systime", "sysver", 
                           "syslast", "sysdsn", "sysfilrc")
 # Macro variables PROC SQL sets that sasonr does not set (SQL Procedure
 # User's Guide): a reference fails loud.  SQLOBS and SQLRC are set; before the
-#
+# first PROC SQL statement they do not exist.
 mac_sql_unset <- c("sqloops", "sqlexitcode", "sqlxrc", "sqlxmsg")
 
 # A reference to `name`, which is not in any symbol table (found = FALSE) or
@@ -98,7 +98,7 @@ mac_auto_read <- function(ses, name, e = NULL) {
     abort_unsupported(paste0("&", toupper(name), " after ", why, " (its value there is not supported)"), ses$line)
   }
   if (name %in% c("syslast", "sysdsn", "sysfilrc") && identical(e, ses$globals) && sas_target_version() != "SAS 9.4") {
-    abort_unsupported(paste0("&", toupper(name), " for SAS 9.4 ", sas_target_version(), " (not in its expected results)"), ses$line)
+    abort_unsupported(paste0("&", toupper(name), " for SAS 9.4 ", sas_target_version(), " (not supported for this release)"), ses$line)
   }
   invisible()
 }
@@ -114,7 +114,7 @@ mac_auto_write <- function(ses, name, how) {
 # SYSLAST / SYSDSN from `_LAST_` (`name`, a WORK member, or NULL): "WORK." and
 # the member name padded to 32, and libref and member name padded to 8 and 32;
 # `_NULL_` (SYSDSN: 8 blanks, _NULL_, 26 blanks) before a data set is created
-#
+# (Macro Language: Reference).
 mac_set_last <- function(ses, name) {
   if (is.null(name)) {
     syslast <- "_NULL_"
@@ -131,8 +131,8 @@ mac_set_last <- function(ses, name) {
 }
 
 # The value of automatic variables `names` is not known after `why` (a step
-#
-# set again.
+# whose effect on them sasonr does not model): a reference fails loud until
+# they are set again.
 mac_auto_unknown <- function(ses, names, why) {
   for (nm in names) ses$auto_unknown[[nm]] <- why
   invisible()
@@ -290,15 +290,13 @@ datalines_stmt_words <- c("datalines", "cards", "lines", "datalines4", "cards4",
 #
 # Global Statements: Reference), interleaved with macro execution: OPTIONS
 # MINOPERATOR and OPTIONS SASAUTOS= apply to the macro call that follows them
-#
-#
+# with no step boundary in between.  So every statement outside a step (open code)
 # is handed to the executor when its semicolon is seen, before the macro
 # processor runs the code after it; PROC SQL statements run one by one too.
 # Inside a DATA or PROC step sasonr runs the statements with the step, when it
 # is complete; an OPTIONS statement of the step is also handed to
 # `ses$on_step_options` at its semicolon (engine_step_options(), run.R), which
 # keeps the options the macro code after it in the step sees (`ses$step_opts`;
-#
 #
 code_sink <- function(ses) {
   s <- new.env(parent = emptyenv())

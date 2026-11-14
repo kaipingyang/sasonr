@@ -45,8 +45,7 @@ negate_if <- function(code, negate) if (isTRUE(negate)) paste0("sas_not(", code,
 # (SAS records the next operation again: (a ** 2) + 1 has 2 places), nor is a
 # function result (abs(a) + 1: 2 places).  Inside the arguments of a function
 # call nothing is skipped: every operation records its place
-#
-#
+# (int((a - 1) / 7): 3 places).
 gen_missing_node <- function(x, cx) {
   if (isTRUE(cx$fn_arg)) return(FALSE)
   x$node == "binary" && x$op %in% c("+", "-", "*", "/") || x$node == "unary" && identical(x$op, "-")
@@ -65,8 +64,7 @@ gen_expr <- function(e, cx) {
         # SAS records the place of a unary minus at the operand's position; the
         # minus itself is not recorded when the operand is a generated missing
         # value (gen_missing_node(): -(a + b) records the "+" only, -(a ** 2)
-        #
-        #
+        # records the "**" and the minus)
         at <- if (!is.null(e$arg$col)) at_code(list(line = e$arg$line, col = e$arg$col)) else ""
         if (gen_missing_node(e$arg, cx)) at <- paste0(at, ", .gen_a = TRUE")
         if (isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")

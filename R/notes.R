@@ -53,8 +53,8 @@ rt_count <- function(slot, .at, n = 1L) {
 }
 
 #
-#
-# INT/FLOOR/CEIL family, INTCK, INTNX).
+# "Missing values were generated" NOTE (ROUND family, INT/FLOOR/CEIL family,
+# INTCK, INTNX).
 mv_note_fns <- c("round", "rounde", "roundz", "int", "intz", "floor", "floorz", "ceil", "ceilz", "intck", "intnx")
 
 #' Arguments of a function call; missing numeric arguments are counted for the
@@ -69,8 +69,8 @@ sas_mv_args <- function(.at, ..., .exact = TRUE) {
 }
 
 #
-# MAX, SUM, MEAN; SUM/MIN/... ignore missing arguments, so only an all-missing
-# call is counted)
+# MEAN; SUM/MIN/... ignore missing arguments, so only an all-missing call is
+# counted)
 mv_result_fns <- c("abs", "min", "max", "sum", "mean")
 
 #' Count missing results of a function call for the missing-value NOTE
@@ -275,11 +275,10 @@ where_text <- function(e) {
       },
       compare = {
         #
-        #
-        # "y=x+1", "2 = y" "y=2", "abs(x) < y" "y>ABS(x)", "(x*2) >= y"
-        # "y<=x*2"); two non-variable operands keep their order ("x+1=ABS(y)",
-        # "SUBSTR(s,1,3)='van'"); a constant compared with an expression other
-        #
+        # ("x+1 = y" is echoed "y=x+1", "2 = y" "y=2", "abs(x) < y" "y>ABS(x)",
+        # "(x*2) >= y" "y<=x*2"); two non-variable operands keep their order
+        # ("x+1=ABS(y)", "SUBSTR(s,1,3)='van'"); a constant compared with an
+        # expression other than a call, and colon comparisons, are not supported
         is_var <- function(y) identical(y$node, "var")
         is_const <- function(y) y$node %in% c("num", "str", "missing") || (identical(y$node, "unary") && y$arg$node == "num")
         if (!is_var(x$lhs)) {

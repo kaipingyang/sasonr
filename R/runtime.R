@@ -375,12 +375,12 @@ sas_f_mod <- function(a, b, .at = NULL) {
   tol <- 1e-12 * pmax(abs(a), abs(b), 1, na.rm = TRUE)
   near <- !is.na(out) & (abs(out) < tol | abs(abs(out) - abs(b)) < tol)
   # SAS's fuzz also moves other remainders by a few ulps toward the decimal
-  #
+  # result; only exact remainders are in the supported domain
   mod_domain_check("MOD", a, b, exact_only = TRUE, fuzz_zero = near)
   out[near] <- 0
   out <- fuzz_int(out)
   # a zero remainder of integer arguments has the sign of a (MOD(-1, 1) is -0),
-  #
+  # otherwise it is +0
   z <- !is.na(out) & out == 0
   out[z] <- ifelse(a[z] < 0 & a[z] == trunc(a[z]) & b[z] == trunc(b[z]), -0, 0)
   out
@@ -550,9 +550,9 @@ sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
 #' @export
 # EXIST(member <, type>): 1 when the member exists, 0 otherwise.  WORK and
 # SASHELP are the libraries sasonr knows (R/sashelp.R).  The type argument is a
-#
-#
-#
+# member type: 'DATA' is supported, an explicit 'ANY' is not a valid member type
+# in SAS and returns 0, and any other type fails loud because it is not
+# supported.
 #' @export
 sas_f_exist <- function(name, type = NULL, .work = NULL, .at = NULL) {
   n <- max(length(name), if (is.null(type)) 1L else length(type))
@@ -566,7 +566,7 @@ sas_exist_one <- function(nm, type, .work, .at) {
   if (is.na(nm) || !nzchar(nm)) {
     abort_unsupported("EXIST() of a missing or blank member name (not supported)")
   }
-  # an explicit TYPE='ANY' is not a valid member type, EXIST returns 0
+  # in SAS an explicit TYPE='ANY' is not a valid member type: EXIST returns 0
   if (!is.na(type) && identical(type, "ANY")) return(0)
   if (!is.na(type) && !identical(type, "DATA")) {
     abort_unsupported(paste0("EXIST() with TYPE='", type, "' (only DATA is supported)"))
@@ -586,10 +586,10 @@ sas_exist_one <- function(nm, type, .work, .at) {
     return(as.numeric(mem %in% tolower(ls(.work, all.names = TRUE))))
   }
   if (lib == "sashelp") {
-    #
-    # not knowable here, so only an exported member answers (1)
+    # a member missing from the SASHELP directory may still exist in SAS:
+    # not knowable here, so only a member found there answers (1)
     if (sashelp_has(mem)) return(1)
-    abort_unsupported(paste0("EXIST('SASHELP.", toupper(mem), "'): the member is not in the SASHELP export ",
+    abort_unsupported(paste0("EXIST('SASHELP.", toupper(mem), "'): the member is not in the SASHELP directory ",
                              "(EXIST cannot tell whether it is a SASHELP member)"))
   }
   abort_unsupported(paste0("EXIST('", toupper(lib), ".", toupper(mem), "') for a library other than WORK or SASHELP (not supported)"))
@@ -795,9 +795,7 @@ sas_lag_vec <- function(x, n = 1L) {
 strip_zeros <- function(s) ifelse(grepl(".", s, fixed = TRUE), sub("\\.?0+$", "", s), s)
 
 # 15 digits of v (a leading "0" counts as a digit): the first 15 digits of
-#
-# (172 BEST32. values, rounding_100.md): this explains every value of the
-# former fail-loud window (r between 1.96E-16 and 2.75E-16 below the next
+# the display value fl(|v| * (1 + 2^-52)), truncated (just below the next
 #
 best_digits15 <- function(v, w) {
   a <- abs(v)
@@ -857,7 +855,7 @@ sas_fmt_best <- function(x, w = 12L) {
         if (w > 15L && abs(v) < 1e-5) break
         if (w > 16L) {
           # above 16 columns v already holds SAS's 15 digits (best_digits15):
-          #
+          # written as they are; dropping some of them is not supported
           cand <- display_fixed(v, d, exact = TRUE)
           if (as.numeric(cand) != v) {
             abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), ": fewer than its 15 digits in fixed ",
@@ -879,9 +877,8 @@ sas_fmt_best <- function(x, w = 12L) {
     if (is.na(s) && abs(v) >= 1 && w <= 15L) {
       # too large for fixed notation: the E form of w.d (integer mantissa allowed)
       sci <- sci_fit(v, w)
-      # w.d writes an integer mantissa ("25E5"); BESTw. wrote "2.5E6" in
       #
-      #
+      # with BEST6. for 2500000: the BEST choice there is not supported
       if (!is.na(sci) && grepl("^-?[0-9]{2,}E", sci)) {
         abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), " in E notation with an integer mantissa (",
                                  sci, "): not supported"))
@@ -892,10 +889,9 @@ sas_fmt_best <- function(x, w = 12L) {
       # on), k <= 12 sci_dec_text; a text that still does not fit fails loud
       ex0 <- as.integer(sub("^.*e", "", sprintf("%.13e", abs(v))))
       k <- w - (v < 0) - 3L - (ex0 < 0) - nchar(as.character(abs(ex0)))
-      #
-      #
-      #
-      # 1.234E-7, 1E-10) has mantissas of at most 4 significant digits, where
+      # BEST16.-BEST19. and k = 13: the choice of k and the 14th-digit carry
+      # are not supported (fail loud), except for mantissas of at most 4
+      # significant digits (BEST16. of -1E15, 1E20, 1.234E-7, 1E-10), where
       # every k >= 3 and every carry rule give the same text
       if ((w <= 19L || k == 13L) && nchar(sub("0+$", "", gsub("[^0-9]", "", sub("e.*$", "", sprintf("%.14e", abs(v)))))) > 4L) {
         abort_unsupported(paste0("BEST", w, ". of ", format(v, digits = 17), " in E notation",
@@ -918,14 +914,15 @@ sas_fmt_best <- function(x, w = 12L) {
     } else if (is.na(s) || (v != 0 && abs(v) < 1e-5)) {
       # the E form of w.d (sci_fit): as many mantissa decimals as fit, or an
       # integer mantissa when fewer than three digits fit and it shows more
-      #
+      # (BEST8.: -1.0240438392976625E-12 is -102E-14,
       # -1.5996737032134217E-12 is -16E-13)
       sci <- sci_fit(v, w)
       if (!is.na(sci) && abs(v) < 1) {
-        #
-        # has room for fewer than three digits (trailing zeros counted), an
-        # integer mantissa with a negative exponent that shows more digits, or
-        # as many in fewer columns, is written instead (-102E-14, -16E-13)
+        # below 1: when the decimal mantissa has room for fewer than three
+        # digits (trailing zeros counted), an integer mantissa with a negative
+        # exponent that shows more digits, or as many in fewer columns, is
+        # written instead (-102E-14, -16E-13); the rule holds for
+        # BEST8.-BEST12. and is applied at every width that reaches here
         kfit <- -1L
         for (k in seq(min(w - 2L, 12L), 0L)) {
           e <- sci_dec_text(v, k)
@@ -952,7 +949,8 @@ sas_fmt_best <- function(x, w = 12L) {
     }
     # tiny values: E notation when it shows at least as many significant digits
     #
-    # at widths above 15 a value below 1E-5 is written in E notation)
+    # rule holds for BEST8.-BEST12. and is applied at every width; at widths
+    # above 15 a value below 1E-5 is written in E notation)
     if (!is.na(sci) && (is.na(s) || sig(sci) > sig(s) || (abs(v) < 1e-5 && sig(sci) >= sig(s)) ||
                         (w > 15L && abs(v) < 1e-5))) s <- sci
     out[i] <- if (is.na(s)) strrep("*", w) else s
@@ -974,7 +972,7 @@ sas_put_value <- function(value, fmt = NULL) {
 sas_put_named <- function(name, value, fmt = NULL) {
   if (length(value) == 0) return(character())
   out <- sas_put_value(value, fmt)
-  #
+  # a blank character value is written as one blank ("r=  next=...")
   if (is.character(value)) out[!nzchar(out)] <- " "
   paste0(name, "=", out)
 }

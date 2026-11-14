@@ -684,7 +684,7 @@ prx_compile <- function(re, rt = .active$rt, fname = "PRX") {
 }
 
 #
-#
+# ("ERROR: Unmatched [ before HERE mark in regex ..." for PRXMATCH and
 #
 prx_invalid_note <- function(fname, args, .at) {
   abort_unsupported(sprintf("%s() of an invalid regular expression (the Perl diagnostic in the log is not supported)",
@@ -742,7 +742,8 @@ sas_f_prxchange <- function(re, times, x, .at = NULL, session = NULL) {
     if (is.na(n)) return("")
     if (n == -1 || n >= 2^31) return(gsub(p$pattern, p$repl, s, perl = TRUE, ignore.case = p$icase))
     if (n < 0) {
-      # ERROR, blank result, the step continues (-1E300 and below: invalid argument, see fn_policy)
+      #
+      # (-1E300 and below: invalid argument, see fn_policy)
       if (n > -1e300) {
         rt_error(sprintf("ERROR: Argument 2 to the routine PRXCHANGE, the maximum number of replacements, must be nonnegative but the value is %s.",
                          trimws(sas_fmt_best(n, 12L))))
@@ -784,7 +785,7 @@ sas_f_modz <- function(a, b, .at = NULL) {
 }
 
 #
-#
+# multiply-add).
 mod_exact <- function(a, b) {
   q <- trunc(a / b)
   out <- rep(NA_real_, length(a))
@@ -793,7 +794,7 @@ mod_exact <- function(a, b) {
   out
 }
 
-#
+# Supported domain of MOD and MODZ (registry status partial).  MODZ: the
 # arguments lie within 1E-140..1E140 in magnitude and a / b is not an integer
 #
 # remainder is a few ulps).  MOD (`exact_only`) additionally needs arguments
@@ -830,12 +831,11 @@ mod_domain_check <- function(fname, a, b, exact_only, fuzz_zero = NULL) {
 sas_f_median <- function(...) row_stat(function(v) if (length(v) == 0) NA_real_ else stats::median(v), ...)
 # DATA step moment functions: the moment kernel (stats_exact.R) with the
 # DATA step derivation.  CSS and what follows from it (VAR, STD, STDERR, CV,
-#
-#
-#
-# off): other rows fail loud.  USS (a plain sequential sum of squares) has no
-# such limit.  Rows with an argument of magnitude 1E300 or more are invalid
-# (fn_policy.R sets them to missing) and are not computed.
+# SKEWNESS, KURTOSIS) are supported only for at most 9 non-missing arguments
+# of magnitude 0 or 1E-140..1E140: other rows fail loud.  USS (a plain
+# sequential sum of squares) has no such limit.  Rows with an argument of
+# magnitude 1E300 or more are invalid (fn_policy.R sets them to missing) and
+# are not computed.
 ds_moments <- function(fname, m, css_based = TRUE) {
   if (!nrow(m) || !ncol(m)) return(stats_moments(matrix(numeric(), 0, 1), "datastep"))
   m[rowSums(abs(m) >= 1e300, na.rm = TRUE) > 0, ] <- NA_real_
@@ -877,21 +877,18 @@ sas_f_geomean <- function(...) row_stat(function(v) {
 #' @export
 sas_f_harmean <- function(...) row_stat(function(v) {
   if (length(v) == 0 || any(v < 0)) return(NA_real_)
-  if (any(v == 0)) return(0) # a zero value gives 0
-  #
+  if (any(v == 0)) return(0) #
+  # sequential double sum
   length(v) / stats_seq_sum(1 / v)
 }, ...)
 #' @export
 sas_f_skewness <- function(...) {
   sk <- ds_moments("skewness", num_args(...))$skew
   #
-  #
-  # (600 symmetric lists, shuffled or with one value perturbed; at most 9
-  #
-  #
-  # the result separates them; every row with SAS's result non-zero agrees bit
-  #
-  # therefore fail loud.
+  # argument lists where the kernel leaves a rounding residue of about 1E-15,
+  # but it also keeps residues as small as 9.99E-16 (n = 3), so no threshold on
+  # the result separates them.  Results below 1E-12 in magnitude therefore fail
+  # loud.
   if (any(!is.na(sk) & sk != 0 & abs(sk) < 1e-12)) {
     abort_unsupported("SKEWNESS() with a result below 1E-12 in magnitude (possibly a rounding residue of 0; not supported)")
   }
@@ -952,7 +949,7 @@ sas_f_perm <- function(n, r = NULL) if (is.null(r)) factorial(n) else factorial(
 sas_f_gamma <- function(x, .at = NULL) {
   bad <- !is.na(x) & x <= 0 & x == trunc(x)
   out <- suppressWarnings(gamma(x))
-  #
+  # negative arguments by the reflection formula
   neg <- !is.na(x) & x < 0 & !bad
   if (any(neg)) out[neg] <- pi / (sin(pi * x[neg]) * suppressWarnings(gamma(1 - x[neg])))
   out[bad | is.infinite(out)] <- NA_real_
@@ -1088,7 +1085,7 @@ sas_f_probt <- function(x, df, nc = 0, .at = NULL) {
 }
 
 # Noncentral t distribution function.  R's pnt() stops at an absolute error of
-#
+# about 1e-13 (pt(-40, 100, 5) is 2.3e-13 where the true value is 7.5e-88, and
 # pt(-1000, 100, 5) equals pt(-1e6, 1000, 5)), so the function is computed here
 # instead.  Following the structure of Boost's non_central_t:
 #   t >= 0, nc >= 0:  P = Phi(-nc) + S/2, where S is the noncentral beta
@@ -1100,13 +1097,12 @@ sas_f_probt <- function(x, df, nc = 0, .at = NULL) {
 #                     the s^(df-1) singularity at 0 disappears for df < 1 and
 #                     the result keeps its relative accuracy far from 1.
 # Every other sign combination follows from P(T <= t; nc) = 1 - P(T <= -t; -nc).
-# Checked against 528 SAS 9.4 points (t = -40..40, df = 0.5..1e10, nc = 0..5):
-# largest relative difference 5.4e-13, median 2.8e-16.
+# The accuracy is established for t = -40..40, df = 0.5..1E10 and nc = 0..5.
 pnt_cdf <- function(t, v, nc) {
   if (is.na(t) || is.na(v) || is.na(nc) || v <= 0) return(NA_real_)
   if (nc == 0) {
     # Central t through the incomplete beta: R's pt() loses up to ~2000 ulp
-    #
+    # for large df (pt(-0.5, 10000) for example).
     y <- v / (v + t * t)
     iy <- stats::pbeta(y, v / 2, 0.5)
     return(if (t < 0) 0.5 * iy else 1 - 0.5 * iy)
@@ -1255,15 +1251,14 @@ mills_corr <- function(x) {
 # min(s/sqrt(v), 1/(|t|(|t| s + d))) (the chi-square and normal curvatures),
 # and 16-node Gauss rules on those panels reach machine precision with ~250
 # nodes: median 1 ulp, p90 3 ulp, max 14 ulp against a 32001-node Simpson
-# reference on the 150 tail points of the SAS grid where that reference is
-# itself converged (the old 12002-node rule was 0-115 ulp away from it).
+# reference on tail points where that reference is itself converged (the old
+# 12002-node rule was 0-115 ulp away from it).
 # Beyond the first s with P(S > s) < 1e-19 the chi-square factor is 1 to double
 # precision, so that part is not integrated at all: it is exactly
 # Phi(-(|t| s + d)).  That is what removes the long, slowly decaying normal
-# tail, whose panels were the accuracy bottleneck of an earlier attempt.
-# Against the 459 SAS 9.4 reference points of the accuracy grid this gives
-# median 2 ulp / p90 32 ulp / max 178 ulp, i.e. the same as the 12002-node
-# rule (2 / 35 / 178), at 0.38 instead of 3.5 ms per point on bench.R.
+# tail, whose panels were the accuracy bottleneck of an earlier attempt.  The
+# result is at least as accurate as the 12002-node rule, at 0.38 instead of
+# 3.5 ms per point.
 pnt_tail <- function(t, v, d) {
   at <- abs(t)
   al <- v / 2
@@ -1579,7 +1574,7 @@ sas_f_yrdif <- function(start, end, basis = "AGE") {
     if (bs == "AGE") {
       #
       #
-      #
+      # are in the supported domain
       sgn <- 1
       if (b < a) {
         t <- a
@@ -1593,7 +1588,7 @@ sas_f_yrdif <- function(start, end, basis = "AGE") {
       db <- doy365(pb)
       yrs <- pb$y - pa$y - as.numeric(db < da)
       if ((db - da) %% 365 != 0) {
-        abort_unsupported("YRDIF with basis 'AGE' for dates that are not a whole number of years apart (the fraction differs in the last bits)")
+        abort_unsupported("YRDIF with basis 'AGE' for dates that are not a whole number of years apart (the last bits of the fraction are not exact)")
       }
       return(sgn * (yrs + ((db - da) %% 365) / 365))
     }
@@ -1613,7 +1608,7 @@ sas_f_yrdif <- function(start, end, basis = "AGE") {
     ylen <- function(y) from_ymd(y + 1, 1, 1) - from_ymd(y, 1, 1)
     if (ya == yb) return(sgn * (b - a) / ylen(ya))
     if (a != from_ymd(ya, 1, 1) || b != from_ymd(yb, 1, 1)) {
-      abort_unsupported("YRDIF with basis 'ACT/ACT' for dates in different years that are not both 1 January (the sum of the year fractions differs in the last bits)")
+      abort_unsupported("YRDIF with basis 'ACT/ACT' for dates in different years that are not both 1 January (the last bits of the sum of the year fractions are not exact)")
     }
     sgn * (yb - ya)
   }, start, end, basis, type = numeric(1))
@@ -1644,7 +1639,7 @@ parse_interval <- function(x) {
   list(base = base, mult = mult, shift = shift, dt = dt)
 }
 
-#
+# intervals supported only in their plain form, with the default INTCK method
 # and the default INTNX alignment
 interval_narrow <- c("weekday", "tenday", "semimonth")
 
@@ -1655,15 +1650,14 @@ interval_or_fail <- function(x, fname, .at) {
                                "r445mon", "r454mon", "r544mon", "week1", "dtweekv", "dtyearv")) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "'"))
   }
-  # WEEKDAYdaysW (weekend days, e.g. WEEKDAY17W) is a valid SAS interval
-  #
+  # WEEKDAYdaysW (weekend days, e.g. WEEKDAY17W) is a valid SAS interval: not
+  # implemented, so never "invalid"
   if (is.null(iv) && grepl("^(dt)?weekday[0-9]*w([0-9.]*)$", tolower(strip_both(x)))) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (weekend days)"))
   }
   if (is.null(iv)) return(NULL)
-  #
-  #
-  #
+  # WEEKDAY / TENDAY / SEMIMONTH: only the plain date interval is supported;
+  # multipliers, shift indexes and the DT forms fail loud
   if (iv$base %in% interval_narrow && (iv$mult != 1 || iv$shift != 1 || iv$dt)) {
     abort_unsupported(paste0(toupper(fname), " interval '", strip_both(x), "' (multiplier, shift index or DT form)"))
   }
@@ -1844,7 +1838,7 @@ sas_f_intnx <- function(interval, start, n, align = "b", .at = NULL) {
       note_invalid_arg("intnx", 1L, .at, args, numbered = TRUE)
       return(NA_real_)
     }
-    #
+    # an explicit 'B' is the default
     if (iv$base %in% interval_narrow && has_al && !tolower(strip_both(al)) %in% c("b", "beginning")) {
       abort_unsupported(paste0("INTNX with the ", toupper(iv$base), " interval and an alignment other than the default (not supported)"))
     }
@@ -1952,7 +1946,7 @@ fn_table <- utils::modifyList(fn_table, list(
 ))
 
 # Argument types of functions that convert mismatched arguments (see
-#
+# convert_fn_args()).
 fn_arg_types <- list(
   substr = c("char", "num", "num"), scan = c("char", "num", "char", "char"),
   compress = c("char", "char", "char"), index = c("char", "char"), round = c("num", "num"),

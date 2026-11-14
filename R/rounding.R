@@ -3,11 +3,11 @@
 #
 #
 #
-#
-#  * q = x / unit (double); the multiple k = |q| rounded, with a fuzz window
-#    W = min(1.1e-12 * |q|, 2e-6) below a half-integer (ROUND: away from
-#    zero; ROUNDE: an exact or fuzzed tie goes to the even multiple; ROUNDZ:
-#    no fuzz, ties to even);
+#  * q = x / unit (double); the multiple k = |q| rounded, with a fuzz below a
+#    half-integer (ROUND: away from zero, the fuzz W = min(1E-12 |q|, 1E-6)
+#    added to |q| + 0.5; ROUNDE: an exact or fuzzed tie within
+#    W = min(1.1e-12 * |q|, 2e-6) goes to the even multiple; ROUNDZ: no fuzz,
+#    ties to even);
 #  * the result is the double nearest to k times the decimal value of the
 #    unit when the unit has at most 15 significant digits (ROUND(x, 0.1) gives
 #    the literal 0.3, not 3 * 0.1), k / n when the unit is 1/n, and the
@@ -17,12 +17,13 @@
 #    integer; FLOOR returns +0 for a zero result, CEIL(x) = -FLOOR(-x),
 #    INT(x) = FLOOR(x) for x > 0 and -FLOOR(-x) otherwise; FLOORZ / CEILZ
 #    have no fuzz.
-#
-# a quotient within 0.8-1.25 times the fuzz width below a half-integer
-# (ROUNDE: also anything up to 2E-6 below it once 1.1E-12 |q| > 1E-6), a
-# fractional unit that is not a power of ten with a non-integer
-# 1e15 <= |x| < 2^53, a fractional unit with a non-integer |x/unit| >= 2^49
-# (ROUND, ROUNDE, ROUNDZ), and a unit that is neither a short decimal nor 1/n.
+# Points where these rules do not determine the SAS result fail loud
+# (`sasonr_unsupported`): for ROUNDE a quotient within 0.8-1.25 times the
+# fuzz width below a half-integer (also anything up to 2E-6 below it once
+# 1.1E-12 |q| > 1E-6), a fractional unit that is not a power of ten with a
+# non-integer 1e15 <= |x| < 2^53, a fractional unit with a non-integer
+# |x/unit| >= 2^49 (ROUND, ROUNDE, ROUNDZ), and a unit that is neither a short
+# decimal nor 1/n.
 
 sas_tiny <- 2.2250738585072014e-308
 
@@ -105,28 +106,28 @@ round_one <- function(x, unit, mode, fname) {
   # nearest multiple (exact half points rounded down at random: ROUND(
   # 507561523905906.125, 0.25) is 507561523905906, ROUND(399931701399944.05,
   # 0.1) rounds down; ROUND(269284231226460.16, 1/3) is not k/3): fail loud
-  # for ROUND, ROUNDE and ROUNDZ (rounding_100.md section 3), as for |x| >=
-  # 1E15 above, unless x/unit is an integer (x is a multiple: ROUND(
-  #
+  # for ROUND, ROUNDE and ROUNDZ, as for |x| >= 1E15 above, unless x/unit is
+  # an integer (x is a multiple: ROUND(123456789012.5, 1E-4)).
   if (unit != floor(unit) && a >= 2^49 && a != k) {
     abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
                              "): x/unit of 2^49 or more with a fractional unit is not supported"))
   }
   if (mode == "round") {
     #
-    # exponent from 2^-2 to 2^52, units 1 10 0.5 0.25 0.1 0.01 0.001 1E-5 1/3):
-    # up exactly when floor(fl(fl(|q| + 0.5) + W)) > floor(|q|), W =
-    # min(1E-12 |q|, 1E-6) - the fuzz is added to |q| + 0.5 in double precision.
+    # W = min(1E-12 |q|, 1E-6) - the fuzz is added to |q| + 0.5 in double
+    # precision.  The rule holds for |q| from 2^-2 to 2^52 and the units 1, 10,
+    # 0.5, 0.25, 0.1, 0.01, 0.001, 1E-5 and 1/3.
     if (floor((a + 0.5) + min(1e-12 * a, 1e-6)) > k) k <- k + 1
   } else {
     d <- (a - k) - 0.5
     w <- if (mode == "zero") 0 else min(1.1e-12 * a, 2e-6)
-    #
-    #
-    # value up to 2E-6 below a half point fails loud once 1.1E-12 |q| > 1E-6
+    # ROUNDE: the window W = min(1.1E-12 |q|, 2E-6); its edges fail loud.  The
+    # fuzz of ROUND is capped at 1E-6 (above); whether ROUNDE has the same cap
+    # is not known, so every value up to 2E-6 below a half point fails loud
+    # once 1.1E-12 |q| > 1E-6
     if (w > 0 && ((d <= -0.8 * w && d >= -1.25 * w) || (1.1e-12 * a > 1e-6 && d >= -2e-6 && d < 0))) {
       abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
-                               "): the value lies at the edge of the SAS fuzz window (not determined by the expected results)"))
+                               "): the value lies at the edge of the SAS fuzz window (not supported)"))
     }
     if (abs(d) <= w) {
       if (k %% 2 != 0) k <- k + 1
@@ -216,8 +217,7 @@ sas_f_intz <- function(x) {
 }
 
 # Display rounding of w.d-type formats (w.d, Z, COMMA, DOLLAR, PERCENT, ...)
-#
-#
+# and BESTw.: SAS 9.4's decimal conversion:
 #
 #   t = fl( fl(|x| + h) * (1 + 2^-52) ),  h = the double nearest 0.5 * 10^-d
 #
@@ -225,33 +225,31 @@ sas_f_intz <- function(x) {
 # truncated to d decimals - but to at most 15 significant digits for
 # |x| >= 1 (the integer digits always) and at most 14 - E decimals for
 # |x| < 1 (E = the decimal exponent; 14 for 0.1 <= |x| < 1), the rest
+# written as zeros.  PERCENT applies the same closed form to fl(100 |x|).
+# Integers are written with their exact digits (32. of 9.39586291501115E17 is
+# 939586291501115008).
 #
-#
-# (every binary exponent from 2^-61 to 2^53, d = 0..17, 1 in 4 negative),
-# PERCENT (fl(100 |x|), 2,799 points).  Integers are written with their exact
-# digits (32. of 9.39586291501115E17 is 939586291501115008).
-#
-#
+# Supported domain (outside it: fail loud, or NA for the E form):
 #  * |x| >= 1, non-integer, below 1E15: every d; 1E15 or more: d <= 3;
 #  * integers: no decimals below 1E18, d <= 3 below 2^53, any d below 1E15;
 #  * |x| < 1: d <= 14, and d <= 16 when |x| < 0.01 (decimal exponent <= -3).
 #    At 0.01 <= |x| < 0.1 with d >= 15 and 0.1 <= |x| < 1 with d >= 16 SAS
 #    drops the last digits in a way that depends on the binary exponent
 #    (0.0711077156197605 in 32.15 keeps 14 decimals, 0.0703075513494065 in
-#    32.16 keeps 13), and values with more decimals are only sparsely scanned.
+#    32.16 keeps 13); values with more decimals are not supported.
 #
 # Returns the absolute value with exactly `d` decimals (digits, ".", no
 # sign), or NA when |v| >= 1e17 (the callers write the E form).  `exact =
 # TRUE`: half away from zero on the exact binary value without the display
 # adjustment (PROC MEANS MAXDEC=).  `edge` ("abort", "up", "down"): what an
-#
-# same length.  `down_rel` is accepted for compatibility and ignored (PERCENT
-# follows the same rule on fl(100 |x|)).
+# unsupported rounding does - fail loud, or (callers that only need the width)
+# give a text of the same length.  `down_rel` is accepted for compatibility and
+# ignored (PERCENT follows the same rule on fl(100 |x|)).
 display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0) {
   a <- abs(v)
   if (!is.finite(a)) return(NA_character_)
   if (a == 0) return(paste0("0", if (d > 0L) paste0(".", strrep("0", d))))
-  unsupported <- function(why) {
+  not_supported <- function(why) {
     if (!identical(edge, "abort")) return(TRUE)
     abort_unsupported(paste0("format rounding of ", format(v, digits = 17), " to ", d, " decimals: ", why))
   }
@@ -268,18 +266,18 @@ display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0
   if (a == floor(a) && a >= 1 && !exact) {
     #
     # 9.39586291501115E17 is 939586291501115008)
-    #
-    # point 32. of 2.6745296926266266E19 = 26745296926266265600 - owner
-    # decision 2026-11-13: fail loud elsewhere; a width probe gets the digits)
+    # (no decimals: supported below 1E18; from 1E18 to 1E21 only at the point
+    # 32. of 2.6745296926266266E19 = 26745296926266265600; elsewhere fail loud,
+    # and callers that only need the width get the digits)
     if ((d == 0L && a < 1e18) || a < 1e15 || (d <= 3L && a < 2^53) || (d == 0L && a == 26745296926266265600)) {
       return(paste0(sprintf("%.0f", a), if (d > 0L) paste0(".", strrep("0", d))))
     }
     if (d == 0L && a < 1e21) {
-      unsupported("an integer from 1E18 to 1E21 without decimals is not supported")
+      not_supported("an integer from 1E18 to 1E21 without decimals is not supported")
       return(sprintf("%.0f", a))
     }
     if (a < 1e17) {
-      unsupported("an integer of 16 or more digits with more than 3 decimals is not supported")
+      not_supported("an integer of 16 or more digits with more than 3 decimals is not supported")
       return(paste0(sprintf("%.0f", a), ".", strrep("0", d)))
     }
   }
@@ -291,13 +289,13 @@ display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0
     return(fmt_d(if (f >= 0.5) incr_decimal(keep) else keep))
   }
   if (a >= 1e15 && d > 3L) {
-    unsupported("a non-integer of 1E15 or more with more than 3 decimals is not supported")
+    not_supported("a non-integer of 1E15 or more with more than 3 decimals is not supported")
   }
   if (a < 1) {
     ea <- floor(log10(a))
     if (10^(ea + 1) <= a) ea <- ea + 1 # log10 rounding at a power of ten
     if (d >= 15L && !(d <= 16L && ea <= -3L)) {
-      unsupported("15 or more decimals of a value below 0.01 in magnitude (16 or more below 1) are not supported")
+      not_supported("15 or more decimals of a value below 0.01 in magnitude (16 or more below 1) are not supported")
     }
   }
   h <- as.numeric(paste0("5e-", d + 1L))
@@ -310,16 +308,16 @@ display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0
   } else {
     et <- -attr(regexpr("^0*", p$fr), "match.length") - 1L
     keep_dec <- if (et == -1L) 14L else 14L - et
-    if (et <= -2L && d >= 15L && et > -3L) unsupported("the decimal exponent changes when the value is rounded")
+    if (et <= -2L && d >= 15L && et > -3L) not_supported("the decimal exponent changes when the value is rounded")
   }
   k <- min(d, keep_dec)
   fr <- paste0(substr(p$fr, 1L, k), strrep("0", d - k))
   fmt_d(paste0(ip, fr))
 }
 
-# The value SAS 9.4 formats: |x| * (1 + 2^-52) rounded to a double (the
-#
-# rounding to 0 decimals is exact on it).
+# The value SAS 9.4 formats: |x| * (1 + 2^-52) rounded to a double (BEST32.
+# and 32.30 show its first 15 digits truncated, and rounding to 0 decimals is
+# exact on it).
 display_value <- function(a) {
   b <- a * (1 + .Machine$double.eps)
   ifelse(is.finite(b), b, a) # the largest double: the product overflows
@@ -405,7 +403,7 @@ exact_significant_digits <- function(a) {
 # Signed fixed-point display text of v with d decimals (the one display
 # engine, display_round_text): "-" for a negative value, also when it rounds
 #
-#
+# supported fixed-point text: fail loud.
 display_fixed <- function(v, d, edge = "abort", exact = FALSE) {
   t <- display_round_text(v, d, edge = edge, exact = exact)
   if (is.na(t)) {
@@ -431,11 +429,11 @@ sci_dec_text <- function(v, k, edge = "abort") {
     return(list(text = paste0(if (v < 0) "-", ms, "E", if (ex < 0) "-", abs(ex)), sig = nchar(gsub(".", "", ms, fixed = TRUE)),
                 mant = m, ex = ex))
   }
-  #
-  # to 2^60, 19,308 points): the value rounded to 14 significant digits
-  # (correctly, from its exact binary value), then those digits rounded half
-  # up to k mantissa decimals - a double rounding: 6.6464999999999970E-19 is
-  # 6.6465000000000E-19 at 14 digits and 6.647E-19 in E10.
+  # SAS 9.4 (Ew. with w = 7..19, values from 2^-61 to 2^60): the value rounded
+  # to 14 significant digits (correctly, from its exact binary value), then
+  # those digits rounded half up to k mantissa decimals - a double rounding:
+  # 6.6464999999999970E-19 is 6.6465000000000E-19 at 14 digits and 6.647E-19
+  # in E10.
   s <- sprintf("%.13e", a)
   ex <- as.integer(sub("^.*e", "", s))
   dg <- gsub(".", "", sub("e.*$", "", s), fixed = TRUE)
@@ -474,7 +472,7 @@ sci_dec_text <- function(v, k, edge = "abort") {
       if (!identical(r_lo, r_hi)) {
         if (identical(edge, "abort")) {
           abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with ", k, " mantissa decimals: an exact tie ",
-                                   "at the 15th significant digit is not determined by the expected results"))
+                                   "at the 15th significant digit is not supported"))
         }
         r <- r_hi
       }
@@ -498,7 +496,7 @@ sci_fit <- function(v, w) {
     dec <- sci_dec_text(v, k)
     if (dec$sig >= 3L) return(dec$text)
     # an integer mantissa with more digits ("1.23E11" -> "123E9"); when two
-    #
+    # lengths fit, sasonr fails loud
     fit_int <- character()
     for (nd in seq(3L, dec$sig + 1L)) {
       if (nd <= dec$sig) break
@@ -512,7 +510,7 @@ sci_fit <- function(v, w) {
     }
     if (length(unique(fit_int)) > 1L) {
       abort_unsupported(paste0("E notation of ", format(v, digits = 17), " in ", w,
-                               " columns: the integer-mantissa length is not determined by the expected results"))
+                               " columns: the integer-mantissa length is not supported"))
     }
     for (nd in seq(3L, dec$sig + 1L)) {
       if (nd <= dec$sig) break
@@ -537,7 +535,7 @@ sci_fit <- function(v, w) {
 # exponent, rest = the digits after the 14th as a fraction of the 14th)
 sig15 <- function(a) {
   # the first 15 digits of the display value fl(a * (1 + 2^-52)), truncated
-  #
+  # (as BEST32. and 32.30 show them)
   s <- sprintf("%.*e", 40L, display_value(a))
   ex <- as.integer(sub("^.*e", "", s))
   dg <- gsub(".", "", sub("e.*$", "", s), fixed = TRUE)

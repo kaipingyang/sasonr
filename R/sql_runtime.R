@@ -205,7 +205,7 @@ sql_duck_aggregate <- function(eng, gid, G, aggs, order_known = TRUE, line = NUL
     v <- res[[paste0("v", k)]]
     full <- if (is.character(v)) rep(NA_character_, G) else rep(NA_real_, G)
     if (!is.character(v)) {
-      #
+      # an overflow is not supported in PROC SQL: fail loud, never a silent missing value
       v <- stats_finite_check(as.numeric(v), "a PROC SQL summary function result")
     }
     full[res$g] <- v
@@ -247,7 +247,7 @@ sql_r_moment <- function(fn, v, gid, G, order_known = TRUE, distinct = FALSE, li
     out[g] <- stats_sql_moment(fn, x)
   }
   #
-  #
+  # overflows are not supported and fail loud
   if (fn == "sum") out[is.infinite(out)] <- NA_real_
   stats_finite_check(out, "a PROC SQL summary function result")
 }

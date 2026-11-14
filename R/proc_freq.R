@@ -11,9 +11,8 @@ freq_output_kw <- c("n", "nmiss", "pchi", "lrchi", "ajchi", "mhchi", "chisq", "p
 # through the PROC statistics registry (inst/registry/proc_stats.csv, rows with
 # proc FREQ; proc_stat_check(), the same strict gate as every other PROC
 # statistic and function).  CHISQ, FISHER, EXACT FISHER, BINOMIAL, ALPHA and the
-#
-#
-# and fail loud with sasonr.strict = TRUE.
+# crosstab cell statistics are supported (values and listing); the others are
+# unsupported and fail loud with sasonr.strict = TRUE.
 freq_stat_gate <- function(k, line) {
   k <- tolower(k)
   if (k == "bin") k <- "binomial"
@@ -196,7 +195,7 @@ freq_parse_cl_types <- function(p, line, what) {
 }
 
 # RELRISK <( relrisk-options )>: CL= and COLUMN=1 are implemented; COLUMN=2,
-#
+# the tests (EQUAL, EQUIV, NONINF, SUP), MARGIN= and METHOD= are not supported
 # and fail loud.
 parse_freq_relrisk_opts <- function(p, line) {
   opts <- list(cl = NULL, column = 1L, printall = FALSE)
@@ -235,7 +234,7 @@ parse_freq_relrisk_opts <- function(p, line) {
 }
 
 # RISKDIFF <( riskdiff-options )>: CL= and COLUMN=1 are implemented; COLUMN=2,
-#
+# CORRECT, NORISKS, COMMON and the risk-difference tests are not supported and
 # fail loud.
 parse_freq_riskdiff_opts <- function(p, line) {
   opts <- list(cl = NULL, column = 1L, correct = FALSE, norisks = FALSE)
@@ -295,7 +294,7 @@ freq_parse_num_list <- function(p, line) {
 
 # CHISQ <( chisq-options )>: the one-way goodness-of-fit null frequencies and
 # proportions TESTF= and TESTP= (manual: TABLES statement, CHISQ option).  The
-#
+# other chisq-options (DF=, LRCHI, WARN=) are not supported and fail loud.
 parse_freq_chisq_opts <- function(p, line) {
   opts <- list(testp = NULL, testf = NULL)
   expect_type(p, "lparen", "'(' after CHISQ")
@@ -367,7 +366,7 @@ parse_freq_tables <- function(p) {
           o$alpha <- as.numeric(parse_opt_value(p, k, kl))
         } else if (k == "scores") {
           # SCORES= chooses the row/column scores of the score-based tests and
-          #
+          # the CMH statistics (manual: "Scores"); TABLE and RANK are supported
           # for the multiway CMH listing, RIDIT types are not.
           freq_stat_gate("scores", kl)
           v <- tolower(parse_opt_value(p, k, kl))
@@ -378,8 +377,8 @@ parse_freq_tables <- function(p) {
           if (v != "none") abort_unsupported(paste0("TABLES option PLOTS=", toupper(v)), kl)
         } else if (k == "testp" || k == "testf") {
           #
-          #
-          # proportions / frequencies of the one-way goodness-of-fit test
+          # to CHISQ; they give the null proportions / frequencies of the
+          # one-way goodness-of-fit test
           freq_stat_gate(k, kl)
           if (is.null(o$chisq_opts)) o$chisq_opts <- list(testp = NULL, testf = NULL)
           o$chisq_opts[[k]] <- freq_parse_num_list(p, kl)
@@ -459,7 +458,7 @@ translate_proc_freq <- function(step, meta, last) {
     if (kv != 2 && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is supported)", rq$line)
     }
-    #
+    # --- option combinations whose listing layout is not supported ----------
     if (isTRUE(rq$opts$missprint) && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("MISSPRINT with RELRISK / RISKDIFF (the combination is not supported)", rq$line)
     }
@@ -483,8 +482,8 @@ translate_proc_freq <- function(step, meta, last) {
       abort_unsupported("TABLES option ALPHA= with CMH / RELRISK / RISKDIFF (only the binomial confidence limits are supported)", rq$line)
     }
     # SCORES= affects the Mantel-Haenszel chi-square of a two-way table and the
-    # score-based statistics; only the multiway CMH listing with RANK scores is
-    #
+    # score-based statistics; it is supported for multiway tables only, and
+    # SCORES=RANK only for the CMH summary without CHISQ / FISHER
     if (!is.null(rq$opts$scores) && kv < 3) {
       abort_unsupported(paste0("TABLES option SCORES=", toupper(rq$opts$scores),
                                " for a one-way or two-way table (only the multiway CMH listing is supported)"), rq$line)
@@ -516,9 +515,8 @@ translate_proc_freq <- function(step, meta, last) {
   stat_opts <- c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff")
   if (!is.null(by) && (length(exact) > 0 ||
                        any(vapply(requests, function(r) any(c("binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff") %in% names(r$opts)), logical(1))))) {
-    #
-    #
-    #
+    # only the per-BY-group CHISQ / FISHER listing on a 2x2 table is supported;
+    # the other statistics and shapes have unsupported BY layouts
     abort_unsupported("PROC FREQ statistics with BY groups (only CHISQ / FISHER per BY group is supported)", by$line)
   }
   if (!is.null(by) &&
@@ -653,7 +651,7 @@ sas_proc_freq <- function(d, sp) {
     if (sp$print && length(glst) > 0 && (sp$nlevels || any(!vapply(sp$requests, function(r) isTRUE(r$opts$noprint), TRUE)))) {
       if (!is.null(sp$by)) {
         # each BY group starts its own page: the procedure title goes after the
-        #
+        # BY line of every group
         glst <- append(glst, c("The FREQ Procedure", ""), after = 3L)
       } else if (!titled) {
         glst <- append(glst, c("The FREQ Procedure", ""), after = 0L)
@@ -705,9 +703,9 @@ freq_one_request <- function(db, wt, rq, sp) {
   # two-way and multiway tables in the default crosstabulation cell format; the
   # manual states that they have no effect for one-way frequency tables, so
   #
-  #
-  # is gated by the statistics registry (freq_stat_gate, per SAS release).  The n-way (CROSSLIST-style) cell rows
-  # are not printed by sasonr yet, so that case still fails loud.
+  # is gated by the statistics registry (freq_stat_gate, per SAS release).  The
+  # n-way (CROSSLIST-style) cell rows are not printed by sasonr yet, so that
+  # case still fails loud.
   if (length(vars) == 2 && sas_target_version() == "SAS 9.4" && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
     #
     abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 cell rows for SAS 9.4 (only one-way tables are supported there)", rq$line)
@@ -779,7 +777,7 @@ freq_one_request <- function(db, wt, rq, sp) {
   }
   if (k == 2 && missprint && (nrow(stat_tab) != 2L || ncol(stat_tab) != 2L) &&
       (isTRUE(o$chisq) || isTRUE(o$fisher) || length(sp$exact) > 0)) {
-    #
+    # MISSPRINT statistics are supported for a non-missing 2x2 table only
     abort_unsupported("MISSPRINT with statistics for a table that is not 2x2 (only the 2x2 layout is supported)", rq$line)
   }
   res$stats <- freq_request_stats(stat_tab, stat_lv, vars, info, o, sp, nmiss)
@@ -935,7 +933,7 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   ct_ <- colSums(tab)
   #
   # (its cells show the observed counts) but excludes it from the totals,
-  #
+  # percentages and statistics
   missprint <- isTRUE(o$missprint) && !isTRUE(o$missing)
   missr <- if (missprint && nr > 0) freq_is_missing(lr$values) else rep(FALSE, nr)
   missc <- if (missprint && nc > 0) freq_is_missing(lc$values) else rep(FALSE, nc)
@@ -1402,9 +1400,9 @@ freq_cmh <- function(tab, lv, scores = "table") {
 # "Breslow-Day Test for Homogeneity of the Odds Ratios").  Tables that contain
 # a row or column with a total frequency of 0 are not part of the analysis
 # (the Breslow-Day section says so explicitly; the common estimates use the
-#
-# a nonempty stratum would need the documented 0.5 correction and its warning;
-#
+# same nonempty strata).  A zero cell in a nonempty stratum would need the
+# documented 0.5 correction and its warning; that case is not supported, so it
+# fails loud.
 freq_cmh_common <- function(tab, alpha) {
   dims <- dim(tab)
   k <- length(dims)
@@ -1503,8 +1501,7 @@ freq_cmh_common <- function(tab, alpha) {
 #
 # The risk estimates, risk differences and the odds ratio / relative risk table
 # follow the manual sections "Risks and Risk Differences" and "Odds Ratio and
-# Relative Risks" (docset procstat, FREQ chapter); the cell/layout details are
-#
+# Relative Risks" (docset procstat, FREQ chapter).
 # Exact unconditional confidence limits (the "Exact (Score)" rows) invert two
 # one-sided exact tests based on the per-table score statistic and eliminate the
 # nuisance parameter by the maximum p-value over it, exactly as the manual's
@@ -1819,7 +1816,7 @@ freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
   }
   if (any(tb < 0)) abort_unsupported("RELRISK / RISKDIFF with negative weights")
   if (any(abs(tb - round(tb)) > 1e-9)) {
-    abort_unsupported("RELRISK / RISKDIFF with non-integer weights (the expected results uses integer weights only)")
+    abort_unsupported("RELRISK / RISKDIFF with non-integer weights (only integer weights are supported)")
   }
   n <- sum(tb)
   n1 <- sum(tb[1, ])
@@ -1839,7 +1836,7 @@ freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
   if (isTRUE(o$riskdiff)) {
     rd <- o$riskdiff_opts %||% list()
     column <- rd$column %||% 1L
-    #
+    # only COLUMN=1 (the default) is supported; a COLUMN=2 table uses the
     # column 2 estimates and is not implemented yet, so fail loud
     if (!identical(as.integer(column), 1L)) abort_unsupported(paste0("RISKDIFF COLUMN=", column))
     if (isTRUE(rd$correct)) abort_unsupported("RISKDIFF option CORRECT")
@@ -1893,7 +1890,7 @@ freq_rr_rd_stats <- function(tab, lv, vars, info, o, sp) {
   if (isTRUE(o$relrisk)) {
     rel <- o$relrisk_opts %||% list()
     column <- rel$column %||% 1L
-    #
+    # only COLUMN=1 (the default) is supported; a COLUMN=2 table uses the
     # column 2 relative risk and is not implemented yet, so fail loud
     if (!identical(as.integer(column), 1L)) abort_unsupported(paste0("RELRISK COLUMN=", column))
     a <- tb[1, 1]
@@ -1949,7 +1946,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   if (length(want) == 0) return(st)
   if (any(as.numeric(tab) < 0)) abort_unsupported("statistics with negative weights")
   if (length(sp$by) > 0 && (k != 2L || nrow(tab) != 2L || ncol(tab) != 2L)) {
-    #
+    # only the 2x2 CHISQ / FISHER listing per BY group is supported
     abort_unsupported("PROC FREQ statistics with BY groups (only CHISQ / FISHER for a 2x2 table are supported)")
   }
   if ("binomial" %in% want) {
@@ -2024,8 +2021,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       keep_c <- colSums(tb) > 0
       if (sum(keep_r) < 2 || sum(keep_c) < 2) {
         #
-        #
-        # c32_degenerate_1x3)
+        # statistic and prints no statistics block at all
         st$nostat_structural <- TRUE
         return(st)
       }
@@ -2062,7 +2058,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
           }
           #
           # fractional (non-integer) frequencies: the chi-square table is still
-          #
+          # printed but has no Fisher block
         } else {
           st$fisher <- freq_fisher(tb[keep_r, keep_c, drop = FALSE])
         }
@@ -2075,7 +2071,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       abort_unsupported("CMH for a two-way table (only the multiway CMH summary listing is supported; use a multiway table request)")
     }
     if (any(abs(as.numeric(tab) - round(as.numeric(tab))) > 1e-9)) {
-      abort_unsupported("CMH statistics with non-integer weights (the expected results uses integer weights only)")
+      abort_unsupported("CMH statistics with non-integer weights (only integer weights are supported)")
     }
     scores <- if (identical(o$scores, "rank")) "rank" else "table"
     if (identical(scores, "table") && freq_table_score_na(lv)) {
@@ -2087,7 +2083,8 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
   if (any(c("riskdiff", "relrisk") %in% want)) {
     st <- c(st, freq_rr_rd_stats(tab, lv, vars, info, o, sp))
   }
-  #
+  # development hook: when getOption("sasonr.freq_capture") is an environment,
+  # the computed statistics are appended to its `stats` list
   cap <- getOption("sasonr.freq_capture")
   if (is.environment(cap)) cap$stats <- c(cap$stats, list(st))
   st
@@ -2174,8 +2171,7 @@ freq_binomial_listing <- function(st, info) {
 # The CMH summary block of a multiway table request: "The FREQ Procedure" (the
 # summary starts its own page), the three Cochran-Mantel-Haenszel statistics,
 # the common odds ratio / relative risks and the Breslow-Day test for
-#
-#
+# stratified 2x2 tables, closed by "Total Sample Size = n".
 freq_cmh_summary <- function(st, vars, info, o) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
@@ -2272,7 +2268,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
     }
     if (!is.null(st$exact_chisq)) {
       # EXACT CHISQ: one block per chi-square test with its exact conditional
-      #
+      # p-value
       ex <- st$exact_chisq
       blk <- function(lab, val, df, pval, pexact) {
         c(lab, strrep("-", 34),
@@ -2349,7 +2345,6 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
 # RISKDIFF: the column 1 / column 2 "Risk Estimates" tables, the difference row
 # with its exact limits when requested, and (for the selected column) the
 #
-#
 freq_riskdiff_listing <- function(st, info) {
   #
   #
@@ -2396,8 +2391,8 @@ freq_riskdiff_listing <- function(st, info) {
 }
 
 # RELRISK: the default "Odds Ratio and Relative Risks" table, or - when CL= is
-# given - the "Confidence Limits for the Relative Risk" table.  Layout:
 #
+# layout).
 freq_relrisk_listing <- function(st, info) {
   #
   #

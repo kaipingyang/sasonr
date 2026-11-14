@@ -1,6 +1,5 @@
 #
-# table of variable attributes shaped like DICTIONARY.COLUMNS. Used by the
-#
+# table of variable attributes shaped like DICTIONARY.COLUMNS.
 
 csv_field <- function(x) {
   x[is.na(x)] <- ""
@@ -34,7 +33,7 @@ export_values <- function(x, fmt) {
 #' @param res A `sasonr_result`.
 #' @param dir Output directory (created if needed).
 #' @param values Write the `<MEMNAME>.csv` value files (`FALSE`: only the
-#'
+#'   attribute table).
 #' @examples
 #' res <- sas_run("data a; x = 1.5; y = 'b'; run;")
 #' out <- file.path(tempdir(), "work_csv")

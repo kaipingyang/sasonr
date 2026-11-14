@@ -19,7 +19,7 @@ engine_sql <- function(eng, st) {
   rt <- rt_diag()
   rt_reset()
   on.exit({
-    #
+    # PROC SQL writes no "Missing values were generated" NOTE
     rt$mv <- integer()
     if (isTRUE(eng$step_notes)) sql_note(eng, step_end_notes())
   })
@@ -171,7 +171,7 @@ sql_rel_to_table <- function(eng, res, line, warn_dups = TRUE) {
 }
 
 # `last`: the statement sets _LAST_ (CREATE TABLE, ALTER TABLE; not INSERT,
-#
+# UPDATE or DELETE; session_set_last()).
 sql_store <- function(eng, name, d, meta, ordered = TRUE, last = TRUE) {
   assign(name, tibble::as_tibble(d), envir = eng$session$work)
   eng$session$meta[[name]] <- meta

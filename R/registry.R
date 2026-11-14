@@ -63,7 +63,7 @@ sas_feature_registry <- function(kind = c("functions", "formats"), sas_version =
 #' function, format and procedure statistic by its status for that release,
 #' and the code paths whose SAS behaviour differs between the releases (for
 #' example the PROC MEANS moment arithmetic) follow it. Nothing is carried
-#' over from one release to the other; a feature without evidence for the
+#' over from one release to the other; a feature without a status for the
 #' selected release is `unsupported` there.
 #'
 #' A SAS session ([sas_session()], or the throw-away session of a
@@ -78,14 +78,14 @@ sas_feature_registry <- function(kind = c("functions", "formats"), sas_version =
 #' options(old)
 NULL
 
+# ---- SAS 9.4 release ---------------------------------------------------------------
 #
-#
-# Verification is recorded per SAS release (registries: column `sas_version`).
+# Feature statuses are kept per SAS release (registries: column `sas_version`).
 #
 #
 # features (strict mode), and the code paths whose SAS behaviour differs
 # between the releases follow it.  Nothing is carried over from one release to
-# the other: a feature without evidence for the selected release is
+# the other: a feature without a status for the selected release is
 # `unsupported` there.
 sas_versions <- c("SAS 9.4", "SAS 9.4")
 
@@ -176,7 +176,7 @@ feature_status_text <- function(status) {
 #' @name sasonr_strict
 #' @aliases sasonr.strict
 #' @examples
-#'
+#' # PROBT() is approximate: some results may differ in the last bits
 #' try(sas_run("data a; y = probt(1.5, 10); run;"))
 #' old <- options(sasonr.strict = FALSE)
 #' res <- suppressWarnings(sas_run("data a; y = probt(1.5, 10); run;"))

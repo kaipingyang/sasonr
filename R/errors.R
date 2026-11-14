@@ -1,4 +1,4 @@
-# SAS error model of sas_run(on_error = "sas") (spec 01 §4.7, decision D4).
+# SAS error model of sas_run(on_error = "sas").
 #
 #
 # writes "NOTE: The SAS System stopped processing this step because of
@@ -20,12 +20,12 @@
 # analyzer, never from scanning tokens: the step's AST (or, after a syntax
 # error, a statement-level recovery parse) is translated with the failing
 #
+# translation (names, types, lengths, formats) is used.  What a failing
+# statement contributes:
+#   assignment  its target and the variables named before the error
 #
-#
-#
-#
-#
-#
+#   PROC SORT   the OUT= data set, with 0 variables
+# Any other failing statement or PROC fails loud (sasonr_unsupported): sasonr
 #
 
 err_message_lines <- function(e) {
@@ -110,7 +110,7 @@ err_parse_recover <- function(text) {
 }
 
 #
-#
+# statements, or NULL when that is not supported (fail loud).
 err_failed_stmt <- function(kind, vars, target, line) {
   if (kind %in% c("set", "merge")) return(list())
   if (kind != "assign" || is.null(target)) return(NULL)
@@ -185,14 +185,13 @@ err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
   }
 }
 
+# An ERROR in a global statement (`options ls=abc;` in open code, also when a
 #
-#
-#
-# writes no "stopped processing this step" NOTE, and enters syntax-check mode
-# at the next step, which writes "Due to ERROR(s) above, SAS set option OBS=0
-#
-# inside a step or PROC SQL, in syntax-check mode or under NOSYNTAXCHECK are
-#
+# and leaves SYSERR alone, writes no "stopped processing this step" NOTE, and
+# enters syntax-check mode at the next step, which writes "Due to ERROR(s)
+# above, SAS set option OBS=0 ..." (a DATA step; engine_exec_steps()).  Other
+# errors, an error inside a step or PROC SQL, in syntax-check mode or under
+# NOSYNTAXCHECK are not supported: fail loud.
 engine_global_error <- function(eng, e) {
   if (!identical(e$what, "linesize") || !isTRUE(e$open_code) || isTRUE(eng$sql_open) ||
       isTRUE(eng$syntax_check) || isTRUE(eng$sc_pending) || isTRUE(eng$session$options$nosyntaxcheck)) {
@@ -253,8 +252,8 @@ engine_step_error <- function(eng, e, text) {
       engine_empty_dataset(eng, nm, m)
     }
   }
-  #
-  #
+  # _LAST_: the new output of the stopped DATA step; after a data set that was
+  # kept, or the output of a stopped PROC: not supported
   if (length(rec$outputs)) {
     if (identical(rec$kind, "data") && !kept) {
       session_set_last(eng$session, names(rec$outputs)[length(rec$outputs)])

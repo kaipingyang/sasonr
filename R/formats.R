@@ -133,12 +133,11 @@ add_commas <- function(s) {
   paste0(ip, rest)
 }
 
+# Integers with decimal zeros beyond the supported domain that are written as
 #
-# domain (exact value, width, decimals, form): COMMA32.4 and DOLLAR32.4 of
-#
-#
-# D0186: as many zeros as fit).
-int_zeros_expected <- function(v, w, d, commas, dollar, zero, swap) {
+# DOLLAR32.4 of 1E15; 32.d with d = 15 to 18, 20, 25 or 30 of
+# 939586291501115008 and 26745296926266265600 (as many zeros as fit).
+int_zeros_listed <- function(v, w, d, commas, dollar, zero, swap) {
   if (v <= 0 || zero || swap || w != 32L) return(FALSE)
   (v == 1e15 && d == 4L && commas) ||
     (v %in% c(939586291501115008, 26745296926266265600) && d %in% c(15:18, 20L, 25L, 30L) && !commas && !dollar)
@@ -153,17 +152,17 @@ fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, sw
   #
   # (and fewer zeros when they do not fit: SAS 9.4, 32.15 of 939586291501115008
   # is 939586291501115008.0000000000000)
-  #
-  #
-  #
+  # Supported only where display_round_text is (below 1E15; 3 decimals below
+  # 2^53) and at the points of int_zeros_listed(); elsewhere fail loud when a
+  # fixed-point text could fit.
   if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21 &&
-      !(abs(v) < 1e15 || (d <= 3L && abs(v) < 2^53) || int_zeros_expected(v, w, d, commas, dollar, zero, swap)) &&
+      !(abs(v) < 1e15 || (d <= 3L && abs(v) < 2^53) || int_zeros_listed(v, w, d, commas, dollar, zero, swap)) &&
       nchar(sprintf("%.0f", abs(v))) + (v < 0) <= w) {
     abort_unsupported(paste0("format ", w, ".", d, " of the integer ", sprintf("%.0f", v),
                              ": an integer of 16 or more digits with more than 3 decimals is not supported"))
   }
   if (d > 0 && is.finite(v) && v == trunc(v) && abs(v) * 10^d >= 2^53 && abs(v) < 1e21 &&
-      (abs(v) < 1e15 || (d <= 3L && abs(v) < 2^53) || int_zeros_expected(v, w, d, commas, dollar, zero, swap))) {
+      (abs(v) < 1e15 || (d <= 3L && abs(v) < 2^53) || int_zeros_listed(v, w, d, commas, dollar, zero, swap))) {
     ip <- sprintf("%.0f", abs(v))
     for (dd in seq(d, 1L)) {
       forms <- c(if (commas && dd == d) paste0(add_commas(ip), ".", strrep("0", dd)), paste0(ip, ".", strrep("0", dd)))
@@ -257,16 +256,16 @@ fmt_e <- function(v, w, d) {
 # 14 significant digits of an E form with 13 or more mantissa decimals
 # (Ew. from E20., BESTw. above 16 columns, w.d written in E notation), from
 # the exact binary value: list(keep = 14 digits, ex = decimal exponent).
+# In E20.-E32. (values from 2^-61 to 2^60), SAS's 14th digit carries when the
+# rest r (the digits after the 14th, as a fraction of it) plus a fuzz of about
+# 1E-15 relative reaches the carry point - at 13 mantissa decimals (E20.) the
+# half point, at 14 or more the next digit (truncation).  The fuzz grows with
+# the mantissa (a rest of 0.97 carries for 1.x, 0.84 for 9.x) and is not a
+# function of r and the mantissa alone, so: 13 decimals - r < 0.30 truncated,
+# r >= 0.55 rounded up; 14 or more - truncated below the smallest rest that
+# carried for the same leading digit (0.965 for 1.x down to 0.838 for 9.x);
 #
-# to 2^60): SAS's 14th digit carries when the rest r (the digits after the
-# 14th, as a fraction of it) plus a fuzz of about 1E-15 relative reaches the
-# carry point - at 13 mantissa decimals (E20.) the half point, at 14 or more
-# the next digit (truncation).  The fuzz grows with the mantissa (a rest of
-# 0.97 carries for 1.x, 0.84 for 9.x) and is not a function of r and the
-# mantissa alone, so: 13 decimals - r < 0.30 truncated, r >= 0.55 rounded up;
-# 14 or more - truncated below the smallest rest that carried for the same
-# leading digit (0.965 for 1.x down to 0.838 for 9.x); the band above fails
-#
+# in BEST32.).
 e14_digits <- function(g, v, k = 14L) {
   a <- abs(v)
   s <- sprintf("%.*e", 40L, a)
@@ -277,14 +276,14 @@ e14_digits <- function(g, v, k = 14L) {
   up <- if (k == 13L) {
     if (r < 0.30) FALSE else if (r >= 0.55) TRUE else NA
   } else {
-    # the smallest rest that carried in the scan, per leading digit (less
-    # 0.001): every rest below it was truncated
+    # the smallest rest that carries, per leading digit (less 0.001): every
+    # rest below it is truncated
     lim <- c(0.965, 0.954, 0.927, 0.920, 0.895, 0.880, 0.849, 0.846, 0.838)[as.integer(substr(dg, 1L, 1L))]
     if (r < lim) FALSE else NA
   }
   if (is.na(up)) {
-    abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with 14 significant digits: whether it ",
-                             "carries into the 14th digit (rest ", format(r, digits = 3), ") is not determined by the expected results"))
+    abort_unsupported(paste0("E notation of ", format(v, digits = 17), " with 14 significant digits: the carry ",
+                             "into the 14th digit (rest ", format(r, digits = 3), ") is not supported"))
   }
   if (up) {
     keep <- incr_decimal(keep)
@@ -301,8 +300,8 @@ e14_digits <- function(g, v, k = 14L) {
 # negative value.
 fmt_percent <- function(v, w, d) {
   if (w < 4L) return(stars(w))
-  #
-  # d = 0..4, values from 2^-31 to 2^29)
+  # the w.d rule on fl(100 |x|) (PERCENTw.d with d = 0..4, values from 2^-31
+  # to 2^29)
   num <- trimws(fit_number(abs(v) * 100, w - 3L, d))
   if (v < 0) return(paste0("(", formatC(num, width = w - 3L), "%)"))
   paste0(" ", formatC(num, width = w - 3L), "% ")
@@ -447,7 +446,7 @@ sec_text <- function(s, nd) {
 # round half away from zero at nd decimals (on the decimal value of the binary
 # number) for the time and datetime formats.  The 1E-9 fuzz is checked against
 # the one display engine (display_round_text): where the two disagree (a value
-#
+# just below a half point) the rounding is not supported, so it fails loud.
 round_half_away <- function(v, nd) {
   if (is.na(v)) return(v)
   m <- 10^nd
@@ -600,6 +599,7 @@ sas_format <- function(x, fmt = NULL) {
         if (!is.na(w)) {
           cut <- nchar(inner) > w - 2L
           #
+          # rule is not known; fail loud
           if (any(cut & vapply(seq_along(inner), function(i) {
             if (!cut[i] || w < 3L) return(FALSE)
             k <- w - 2L
@@ -1092,7 +1092,6 @@ read_char_field <- function(s, fmt, keep_lead = FALSE) {
 # number of digits is completed with 0.  A non-hex field is invalid data: the
 # INPUT function gives a blank, _ERROR_ and "Invalid argument to function
 #
-#
 hex_field <- function(s, fmt) {
   w <- fmt$w
   if (is.na(w)) w <- nchar(strip_both(s))
@@ -1104,8 +1103,8 @@ hex_field <- function(s, fmt) {
   list(v = rawToChar(as.raw(hi)), ok = TRUE)
 }
 
-#
-# INPUT function is), so it fails loud
+# the INPUT statement: invalid $HEX data is not supported there (only in the
+# INPUT function), so it fails loud
 read_hex_field <- function(s, fmt) {
   r <- hex_field(s, fmt)
   if (!r$ok) abort_unsupported("invalid data for the $HEX informat in an INPUT statement (not supported)")
@@ -1212,7 +1211,7 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
   if (bad && qq != "??") {
     rt_error(if (qq == "?") NULL else paste0("NOTE: Invalid argument to function INPUT", at_text(.at), "."))
     #
-    #
+    # (not for a character informat such as $HEX)
     if (qq == "" && !is.null(.at) && !is_char) rt_count("math", .at)
   }
   if (is_char && !is.na(w)) vals <- sas_char(vals, w)
@@ -1221,7 +1220,7 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
 
 # PUTN/PUTC/INPUTN/INPUTC name their format at run time: the analyzer cannot
 # check it, so every distinct format is checked against the feature registry
-#
+# here (strict mode: an unsupported format fails loud; registry.R).
 putn_check <- function(f, kind) {
   if (is.null(user_fmt(f$name, f$char, if (kind == "informat") "invalue" else "value"))) {
     feature_check(kind, fmt_registry_name(f), context = "runtime")

@@ -113,7 +113,7 @@ mp_function <- function(nm, src, ses, mode) {
         abort_runtime(paste0("Argument 3 to macro function %", toupper(nm), " is out of range"), line)
       }
       if (pos + len - 1 > nchar(x)) {
-        # a WARNING, and the rest of the value is returned
+        #
         mac_warn(paste0("Argument 3 to macro function %", toupper(nm), " is out of range."))
         len <- nchar(x) - pos + 1
       }
@@ -264,18 +264,17 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
         #
-        # An argument to the function MDY referenced by the %SYSFUNC or
-        #
-        #
-        #
+        # the function MDY referenced by the %SYSFUNC or %QSYSFUNC macro
+        # function is out of range."; that WARNING is not written here.  Other
+        # releases are not supported: fail loud.
         if (sas_target_version() != "SAS 9.4") {
           abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") for SAS 9.4 ",
-                                   sas_target_version(), " (not in its expected results)"), line)
+                                   sas_target_version(), " (not supported for this release)"), line)
         }
         # The NOTE is wrapped at the LINESIZE in effect and suppressed under
         # NONOTES: the session's options, or those of an OPTIONS statement
         # compiled earlier in the current step (`step_opts`,
-        #
+        # engine_step_options()).
         so <- ses$step_opts
         if (isTRUE(so$unknown)) {
           abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") after an OPTIONS ",

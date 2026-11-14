@@ -5,8 +5,10 @@
 
 # System options OPTIONS accepts.  LINESIZE, NOTES, SYNTAXCHECK and the
 # listing layout options (CENTER, DATE, NUMBER, PAGESIZE, FORMDLIM) are kept in
-# the session (engine_global()); a listing written under layout values other
-#
+# the session (engine_global()); procedure output written under CENTER, DATE
+# or NUMBER, under a FORMDLIM= other than a blank (from the second output on)
+# or longer than one page of a finite PAGESIZE= fails loud
+# (engine_add_listing(), run.R).
 # PAGENO= only changes the page numbers, which are written only under NUMBER.
 #
 # MPRINT ...).
@@ -43,8 +45,8 @@ parse_global_stmt <- function(p, open_code = FALSE) {
     advance(p)
     #
     # logical assign for filename 'text'." (with the quotes written, "..." for
-    #
-    #
+    # a double-quoted name) and sets SYSFILRC to -20004; `col` locates the
+    # quote (engine_quote_at())
     if (tk_type(p) %in% c("str", "str_macro") && tk_type(p, 1L) == "semi" && !grepl("['\"]", tk_val(p))) {
       text <- tk_val(p)
       col <- tk_col(p)
@@ -56,7 +58,7 @@ parse_global_stmt <- function(p, open_code = FALSE) {
     advance(p)
     if (!tk_type(p) %in% c("str", "str_macro")) abort_unsupported("FILENAME without a quoted physical path", line)
     path <- tk_val(p)
-    #
+    # SYSFILRC is supported for paths of an existing or missing file or directory
     if (!nzchar(path) || grepl("[*?]", path)) abort_unsupported("FILENAME with an empty or wildcard physical path", line)
     advance(p)
     while (tk_type(p) == "name" && tk_low(p) %in% c("encoding", "lrecl", "recfm", "termstr")) {
@@ -87,8 +89,8 @@ parse_global_stmt <- function(p, open_code = FALSE) {
           ls <- if (identical(v, "max")) 256L else suppressWarnings(as.integer(v))
           if (is.na(ls) || ls < 64L || ls > 256L) {
             #
-            # than MAX is ERROR 18-12; other invalid values (a number outside
-            #
+            # ERROR 18-12; other invalid values (a number outside 64-256 ...)
+            # are not supported (engine_global_error() fails loud)
             if (tk_type(p) == "name") {
               g_err("Option value for SAS option LINESIZE must be between 64 and 256. (ERROR 18-12)", "linesize")
             }

@@ -237,7 +237,7 @@ text_cmp <- function(a, b) {
 
 # Integer macro values (%EVAL, %DO, %SYSEVALF INTEGER/CEIL/FLOOR) in full.
 # Other values had glibc's 15-digit rounding (%.15g), which is not SAS's
-#
+# display rounding, and are not supported: fail loud.
 mac_num_text <- function(x) {
   if (is.na(x)) return(".")
   if (x == trunc(x) && abs(x) < 1e15) return(sprintf("%.0f", x))
