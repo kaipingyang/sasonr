@@ -572,7 +572,6 @@ fmt_time_value <- function(v, base, w, d) {
 #' Numeric formats return right-justified fields of width `w`; character
 #' formats return left-justified fields (no width: the value unchanged).
 #' @param fmt Format spec (see `parse_format()`); `NULL` means BEST12. / `$`.
-#' @export
 #' @keywords internal
 sas_format <- function(x, fmt = NULL) {
   if (is.null(fmt)) {

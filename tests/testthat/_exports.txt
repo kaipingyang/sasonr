@@ -235,8 +235,6 @@ internal sas_err_sync
 internal sas_fcall
 internal sas_file_write
 internal sas_first
-internal sas_fmt_best
-internal sas_format
 internal sas_ge
 internal sas_gt
 internal sas_idx

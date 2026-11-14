@@ -814,7 +814,6 @@ best_digits15 <- function(v, w) {
 #' @param x Numeric vector.
 #' @param w Width.
 #' @keywords internal
-#' @export
 sas_fmt_best <- function(x, w = 12L) {
   w <- as.integer(w %||% 12L)
   code <- sas_miss_code(x)
