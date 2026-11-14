@@ -563,8 +563,8 @@ an_stmt <- function(s, st) {
     },
     substr_assign = {
       # the SUBSTR statement (left of =) is registered as its own context of
-      #
-      #
+      # SUBSTR (registry column contexts, "statement"); strict mode gates it
+      # like any other function use
       feature_check("function", "substr", line, "statement")
       if (is.null(st$info[[s$var]])) {
         # an undeclared target is created with length 8 when the statement is

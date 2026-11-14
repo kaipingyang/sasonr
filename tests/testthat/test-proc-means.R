@@ -2,7 +2,7 @@
 # stays on; the tests that request statistics which are `approximate` or not
 #
 # them through run_approx(): strict off for that one program, only its
-#
+# `sasonr_strict_warning` warnings muffled (the gate itself is tested in
 # test-stats-exact.R).
 run_approx <- function(code, ...) {
   withr::with_options(list(sasonr.strict = FALSE), withCallingHandlers(

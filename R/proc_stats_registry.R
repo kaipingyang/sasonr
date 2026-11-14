@@ -1,22 +1,21 @@
 # PROC statistics registry (inst/registry/proc_stats.csv): one row per
-#
-#
-# (never edited by hand).  Statuses:
-#
-#
-#                fail loud at run time in every mode
-#
-#
-#
+# procedure x statistic (x condition) with its status (a generated file, never
+# edited by hand).  Statuses:
+#   supported    the statistic runs
+#   partial      supported inside a domain; other inputs fail loud at run time
+#                in every mode
+#   approximate  some values may differ in the last bits
+#   unsupported  not supported yet
+# approximate / unsupported statistics are gated by `sasonr.strict` exactly like
 # functions (see ?sasonr_strict): TRUE (default) fails loud with a condition
-#
-#
+# of class `sasonr_strict_error` naming the procedure, the statistic and the
+# opt-out; FALSE runs with a `sasonr_strict_warning` warning.
 
 #' PROC statistics registry
 #'
 #' One row per procedure and statistic (and condition, such as a WEIGHT
-#'
-#' cases.
+#' statement) with its status (`supported`, `partial`, `approximate`,
+#' `unsupported`; see [sasonr_strict]).
 #' @return A data frame.
 #' @keywords internal
 sas_proc_stat_registry <- function() {
@@ -52,7 +51,7 @@ proc_stat_check <- function(proc, stat, line = NULL, condition = "default") {
   cond_txt <- if (identical(condition, "default")) "" else paste0(" (", condition, ")")
   what <- sprintf("PROC %s statistic %s%s %s", toupper(proc), toupper(stat), cond_txt, feature_status_text(st))
   if (!isFALSE(getOption("sasonr.strict", TRUE))) {
-    msg <- paste0("Unsupported: ", what, "; set options(sasonr.strict = FALSE) to run it anyway")
+    msg <- paste0(what, "; set options(sasonr.strict = FALSE) to use it")
     if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
     rlang::abort(msg, class = c("sasonr_strict_error", "sasonr_unsupported", "sasonr_error"), sas_line = line,
                  kind = "proc_statistic", proc = toupper(proc), name = toupper(stat), status = st)

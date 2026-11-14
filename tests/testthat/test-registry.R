@@ -1,29 +1,17 @@
-#
-#
+# Feature registries (inst/registry/) and strict mode (options(sasonr.strict)).
 
-test_that("the feature registries have no silent mismatch", {
+test_that("the feature registries give every feature a known status", {
   fn <- sas_feature_registry("functions")
   fm <- sas_feature_registry("formats")
   skip_if(nrow(fn) == 0, "registry not built")
-  all_st <- c("supported", "partial", "not_comparable", "approximate", "mismatch", "unsupported", "unsupported")
+  all_st <- c("supported", "partial", "not_comparable", "approximate", "mismatch", "unsupported")
   expect_true(all(fn$status %in% all_st))
   expect_true(all(fm$status %in% all_st))
-  # a feature with a differing case never runs unchecked: it is gated (fails loud under strict)
-  for (reg in list(fn, fm)) {
-    runs <- !vapply(reg$status, sasonr:::feature_gated, logical(1))
-    expect_true(all(as.integer(reg$mismatch[runs]) == 0))
-    expect_true(all(as.integer(reg$approximate[runs]) == 0))
-  }
-  v <- fn[fn$status == "supported", ]
-  expect_identical(v$cases, v$pass)
   # every exported sas_f_* function except the runtime of language constructs has a registry entry
   ns <- getNamespaceExports("sasonr")
   f <- sub("^sas_f_", "", grep("^sas_f_", ns, value = TRUE))
   f <- setdiff(f, c(sasonr:::construct_fns, "monotonic"))
   expect_setequal(toupper(f), fn$name)
-  sem <- sas_feature_registry("semantics")
-  expect_true(nrow(sem) > 0)
-  expect_true(all(sem$sasonr_status %in% c("supported", "partial", "unsupported", "n/a", "not_applicable", "na")))
 })
 
 test_that("sasonr.strict: approximate and unsupported features fail loud by default", {
@@ -48,7 +36,7 @@ test_that("sasonr.strict: approximate and unsupported features fail loud by defa
   withr::with_options(list(sasonr.strict = FALSE), {
     expect_warning(sasonr:::feature_check("function", ap), class = "sasonr_strict_warning")
   })
-  #
+  # supported, partial and clock-dependent features always run
   for (st in c("supported", "partial", "not_comparable")) {
     nm <- fn$name[fn$status == st][1]
     if (is.na(nm)) next

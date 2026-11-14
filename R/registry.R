@@ -1,25 +1,26 @@
 # Feature registries (inst/registry/functions.csv, formats.csv) and the
-# run-time verification check.
+# strict-mode check.
 #
-#
-#
-# asks feature_check() about every function, format and informat it accepts,
-# with the context of the call: "data" (DATA step), "where" (WHERE statement or
-# WHERE= option), "sql" (PROC SQL), "sysfunc" (%SYSFUNC/%QSYSFUNC); PUTN, PUTC,
-# INPUTN and INPUTC check the format named at run time ("runtime").  A feature
-# is gated by the option `sasonr.strict` when its status is `approximate` (some
-#
-# in any other way: value, display, log), `unsupported` (every case fails
-#
-# function also when the context of the call is not among its
-#
-#
+# The registries are generated files (never edited by hand): one row per
+# function, format or informat with its status, the contexts in which a
+# function is supported and the argument counts, argument types and default
+# widths of the SAS 9.4 inventory.  The analyzer asks feature_check() about
+# every function, format and informat it accepts, with the context of the
+# call: "data" (DATA step), "where" (WHERE statement or WHERE= option), "sql"
+# (PROC SQL), "sysfunc" (%SYSFUNC/%QSYSFUNC); PUTN, PUTC, INPUTN and INPUTC
+# check the format named at run time ("runtime").  A feature is gated by the
+# option `sasonr.strict` when its status is `approximate` (numeric results may
+# differ in the last bits), `unsupported`, any other status than `supported`,
+# `partial` and `not_comparable`, or when it is missing from the registry, and
+# a function also when the context of the call is not among its `contexts`
+# (format results do not depend on the context):
+#   TRUE (default)  fail loud: condition `sasonr_strict_error` (a subclass of
 #                   `sasonr_unsupported`) naming the feature, its status or
 #                   context and the opt-out
-#
-#
-#
-# input domain: its runtime guard fails loud (sasonr_unsupported) outside it in
+#   FALSE           run it, with a warning of class `sasonr_strict_warning`
+# `supported`, `partial` and `not_comparable` (clock-dependent) features run in
+# their contexts.  A `partial` feature runs only inside its supported input
+# domain: its runtime guard fails loud (sasonr_unsupported) outside it in
 # every mode.
 #
 # Internal call nodes for language constructs (PROC SQL CASE, IN lists, LIKE,
@@ -29,18 +30,18 @@
 
 registry_cache <- new.env(parent = emptyenv())
 
+#' Feature registry (functions, formats and informats) with the status of each feature
 #'
-#'
-#' @param kind `"functions"`, `"formats"` or `"semantics"` (SAS behaviours that
-#'   differ from R defaults -- missing values, fixed-length strings, PROC SQL
-#'   remerge ... -- each with the SAS cases that cover it).
-#' @return A data frame, one row per function, per format/informat or per
-#'
-#'   SAS 9.4.
+#' @param kind `"functions"` or `"formats"`.
+#' @return A data frame, one row per function or per format/informat: the
+#'   name, the kind, the status (`supported`, `partial`, `approximate`,
+#'   `unsupported`, `not_comparable`; see [sasonr_strict]), for functions the
+#'   contexts in which they are supported, and the argument counts, argument
+#'   types and default widths of the SAS 9.4 inventory.
 #' @param sas_version The SAS 9.4 release whose rows are returned (default:
 #'   the selected release, see [sasonr_sas_version]); `NULL` returns every row.
 #' @keywords internal
-sas_feature_registry <- function(kind = c("functions", "formats", "semantics"), sas_version = sas_target_version()) {
+sas_feature_registry <- function(kind = c("functions", "formats"), sas_version = sas_target_version()) {
   kind <- match.arg(kind)
   if (is.null(registry_cache[[kind]])) {
     f <- system.file("registry", paste0(kind, ".csv"), package = "sasonr")
@@ -63,7 +64,7 @@ sas_feature_registry <- function(kind = c("functions", "formats", "semantics"), 
 #' and the code paths whose SAS behaviour differs between the releases (for
 #' example the PROC MEANS moment arithmetic) follow it. Nothing is carried
 #' over from one release to the other; a feature without evidence for the
-#'
+#' selected release is `unsupported` there.
 #'
 #' A SAS session ([sas_session()], or the throw-away session of a
 #' [sas_run()] call) takes the release from the option when it is created
@@ -85,7 +86,7 @@ NULL
 # features (strict mode), and the code paths whose SAS behaviour differs
 # between the releases follow it.  Nothing is carried over from one release to
 # the other: a feature without evidence for the selected release is
-#
+# `unsupported` there.
 sas_versions <- c("SAS 9.4", "SAS 9.4")
 
 sas_target_version <- function() {
@@ -108,8 +109,8 @@ registry_version_rows <- function(reg, sas_version) {
   reg[reg$sas_version == sas_version, , drop = FALSE]
 }
 
-#
-#
+# Status of one feature: "supported", "partial", "approximate", "unsupported",
+# "not_comparable" or NA (not in the registry).
 feature_status <- function(kind, name) {
   reg <- sas_feature_registry(if (kind == "function") "functions" else "formats")
   hit <- reg$status[toupper(reg$name) == toupper(name) & reg$kind == kind]
@@ -126,7 +127,7 @@ fmt_registry_name <- function(fmt) {
 # Registry statuses that are gated by `sasonr.strict` (NA: not in the registry).
 feature_gated <- function(status) is.na(status) || !status %in% c("supported", "partial", "not_comparable")
 
-#
+# Contexts in which a function is supported ("data", "where", "sql", "sysfunc", "statement").
 feature_contexts <- function(name) {
   reg <- sas_feature_registry("functions")
   hit <- reg$contexts[toupper(reg$name) == toupper(name) & reg$kind == "function"]
@@ -141,39 +142,36 @@ feature_context_label <- function(context) {
 }
 
 feature_status_text <- function(status) {
-  v <- paste0("SAS 9.4 (", sas_target_version(), ")")
-  if (is.na(status)) return(paste0("is not in the feature registry (not supported against ", v, ")"))
+  if (is.na(status)) return("is not in the feature registry")
   switch(status,
-    approximate = paste0("is approximate (some results differ from ", v, " in the last bits)"),
-    unsupported = paste0("is not supported against ", v, " (no test cases)"),
-    mismatch = paste0("has results that differ from ", v),
-    unsupported = paste0("fails loud in every ", v, " test case"),
+    approximate = "is approximate",
+    unsupported = "is unsupported",
+    mismatch = "is unsupported",
     paste("has status", status)
   )
 }
 
+#' Strict mode: approximate and unsupported features fail loud
 #'
-#'
-#' Every function, format and informat that sasonr implements has a
-#'
-#'
-#'
+#' Every function, format and informat that sasonr implements has a status
+#' in the feature registry ([sas_feature_registry()]). The option
+#' `sasonr.strict` decides what happens when a program uses a feature that is
+#' not supported:
 #'
 #' * `TRUE` (the default): the program stops with a condition of class
-#'
+#'   `sasonr_strict_error` (a subclass of `sasonr_unsupported`) that names the
 #'   SAS feature, its status and the SAS line. This applies to `approximate`
-#'
-#'
-#'   case), features missing from the registry, and functions called in a
-#'   context (DATA step, WHERE, PROC SQL, `%SYSFUNC`) in which they have not
-#'
+#'   features (numeric results may differ in the last bits), `unsupported`
+#'   ones, features missing from the registry, and functions called in a
+#'   context (DATA step, WHERE, PROC SQL, `%SYSFUNC`) in which they are not
+#'   supported.
 #' * `FALSE`: the program runs; each such feature gives a warning of class
+#'   `sasonr_strict_warning`.
 #'
-#'
-#'
+#' `supported` features, `partial` ones (they run only inside their supported
 #' input domain; other inputs fail loud in both modes) and clock-dependent
 #' `not_comparable` functions (`TODAY()`, `DATE()`, `TIME()`, `DATETIME()`)
-#'
+#' run in the contexts in which they are supported.
 #'
 #' @name sasonr_strict
 #' @aliases sasonr.strict
@@ -191,13 +189,13 @@ feature_check <- function(kind, name, line = NULL, context = "data") {
   if (feature_gated(st)) {
     what <- sprintf("%s %s %s", kind, toupper(name), feature_status_text(st))
   } else if (kind == "function" && !context %in% (ctx <- feature_contexts(name))) {
-    what <- sprintf("function %s is not supported (%s) in %s (supported in: %s)", toupper(name), sas_target_version(),
+    what <- sprintf("function %s is unsupported in %s (supported in: %s)", toupper(name),
                     feature_context_label(context), if (length(ctx)) paste(vapply(ctx, feature_context_label, ""), collapse = ", ") else "no context")
   } else {
     return(invisible())
   }
   if (!isFALSE(getOption("sasonr.strict", TRUE))) {
-    msg <- paste0("Unsupported: ", what, "; set options(sasonr.strict = FALSE) to run it anyway")
+    msg <- paste0(what, "; set options(sasonr.strict = FALSE) to use it")
     if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
     rlang::abort(msg, class = c("sasonr_strict_error", "sasonr_unsupported", "sasonr_error"), sas_line = line,
                  kind = kind, name = toupper(name), status = st, context = context)
