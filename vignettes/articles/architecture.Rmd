@@ -1,0 +1,127 @@
+---
+title: "Architecture"
+---
+
+sasonr treats SAS as the only source language and R as the execution
+engine. Nothing is translated "once and handed over": the SAS program is
+parsed and executed every time, and the generated R code can be inspected.
+
+```
+SAS source
+  │
+  ├─ 1 Lexer (state machine)
+  │      strings, comments, name/date/hex literals, special missing values,
+  │      DATALINES blocks, macro tokens
+  │
+  ├─ 2 Macro processor (pull-based)
+  │      %LET, &&-resolution, %MACRO/%MEND, %IF/%DO, quoting functions,
+  │      global/local symbol tables. It yields one complete step at a time;
+  │      after the step runs, CALL SYMPUT(X) and SQL INTO: values are written
+  │      back before expansion continues.
+  │
+  ├─ 3 Parser → faithful AST
+  │      recursive descent for statements, Pratt parser for expressions with
+  │      the SAS operator precedence (including comparison chains, IN, ><, <>)
+  │      IF/ELSE, DO/END, SELECT/WHEN are kept as written; desugaring happens
+  │      in a separate lowering step.
+  │
+  ├─ 4 Execution
+  │      DATA step → generated tidyverse code (L1 / L2 / L3, see below)
+  │      PROC SQL  → own SQL parser; DuckDB for joins and grouping,
+  │                  SAS semantics (missing values, remerge, CALCULATED) in R
+  │      PROC SORT, PRINT, MEANS/SUMMARY, FREQ, TRANSPOSE, CONTENTS,
+  │      DATASETS, APPEND, DELETE, FORMAT → R implementations
+  │
+  └─ 5 Runtime: SAS value semantics, formats/informats, functions,
+         variable attributes, _ERROR_ and SAS-style log notes
+```
+
+## DATA step compilation levels
+
+What matters is the result of each step, not a replica of the program data
+vector, so each step is compiled to the fastest form that is provably
+equivalent to row-by-row execution:
+
+| Level | Used when | Generated code |
+|---|---|---|
+| **L1** | no cross-row state | `dplyr::mutate()`, `filter()`, `select()` |
+| **L2** | recognised patterns: BY groups with `FIRST.`/`LAST.`, `RETAIN` accumulators, baseline carry-forward, unconditional `LAG` | grouped vectorised code |
+| **L3** | anything else (conditional `LAG`, `OUTPUT` to several data sets, `DO` loops creating rows, ...) | an explicit row loop that follows the DATA step execution rules |
+
+The level is decided by analysing the AST. If a vectorised step meets a
+condition that needs row-by-row diagnostics (for example invalid data that
+sets `_ERROR_`), it is re-run as L3.
+
+## The SAS session
+
+Everything a SAS program can change lives in one session object
+(`SasSession`, an R6 class), never in package-level variables:
+
+| Component | Contents |
+|---|---|
+| WORK | data sets (tibbles), their metadata (types, lengths, formats, labels), PROC SQL views, `_LAST_` |
+| Format catalog | user formats and informats from PROC FORMAT |
+| Macro | global symbol table, local frames, macro definitions, automatic macro variables (`SYSCC`, `SYSERR`, `SQLOBS`, ...) |
+| Options | `LINESIZE`, `NOTES`, `SYNTAXCHECK`, the listing layout (`CENTER`, `DATE`, `NUMBER`, `PAGESIZE`, `FORMDLIM`) and the SAS 9.4 release; options whose only implemented value is the SAS default (`YEARCUTOFF=1940`, `ERRORS=20`, `MISSING=.`) are not stored, other values fail loud |
+| Titles, filerefs | `TITLE` lines, `FILENAME` assignments |
+| SQL back end | the DuckDB connection, opened on first use and closed with the session |
+| Sinks | the cumulative log and listing of all submissions |
+| Diagnostics | compile-time NOTEs of the step being translated; run-time state of the step being run (`_ERROR_` flag, data-error NOTEs, missing-value and math-error counters, observations read, PRXPARSE ids) |
+
+`sas_run(code)` creates a throw-away session; `sas_session()` creates one
+that several `sas_run(code, session = s)` calls share, one submission after
+another (each submission still starts outside syntax-check mode).
+`sas_work()`, `sas_meta()`, `sas_macro_vars()`,
+`sas_log()` and `sas_listing()` read a session.
+
+The generated step code does not take the session as an argument. The engine
+binds the session for the duration of a submission and restores the previous
+binding on exit; the run-time helpers that generated code calls
+(`sas_err_sync()`, `sas_put_line()`, the functions and formats) read the
+bound session. Two sessions used alternately therefore never see each
+other's state, and a `sas_run()` nested inside a running step gets its own
+session without disturbing the outer one; a nested submission to the
+*same* session is refused (it would rebind the running submission's log and
+macro executor).
+
+The listing has the layout of `NOCENTER NODATE NONUMBER FORMDLIM=' '
+PAGESIZE=MAX`. A procedure that writes output while `CENTER`,
+`DATE` or `NUMBER` is set, while `FORMDLIM=` is not a blank (from the
+second page on), or with more lines than fit on one page of a finite
+`PAGESIZE=` fails loud.
+
+### Semantics across submissions
+
+This state does not carry over from one submission to the next:
+
+| State | Behaviour |
+|---|---|
+| Syntax-check mode after an ERROR | reset at the start of each submission |
+| PRXPARSE ids | numbered from 1 in each submission |
+| Log line numbers | start at 1 in each submission |
+| PROC SQL without `QUIT;` | closed at the end of the submission |
+| PROC SQL options (`NUMBER`, `NOPRINT`, ...) | reset with each submission |
+
+Function-layer calls made outside
+any run (`sas_f_round()` in your own code) have no hidden state: there is no
+default session. Their data-error NOTEs are discarded, they see no user
+formats and no filerefs, use `LINESIZE=132` (or their `.ls` argument), and
+PRXPARSE ids need an explicit session (`sas_f_prxparse(re, session = s)`).
+
+Parsed programs, translations and results are plain S3 values; the function,
+format and procedure-option registries are built once at load time and are
+never changed by a run.
+
+## Why not regular expressions
+
+SAS syntax is not a regular language: nested `DO`/`END` blocks, nested
+parentheses, operator precedence, context-dependent keywords (`set`, `if`
+and `end` can be variable names) and macro expansion all require a real
+lexer and parser. Regex-based translators reach a ceiling quickly and need
+a fallback such as a language model; sasonr is fully deterministic instead.
+
+## Fail loud
+
+Every statement, option, function and procedure is either implemented or
+rejected with a `sasonr_unsupported` condition that names the feature and
+the SAS line. Silent approximation is treated as a bug.

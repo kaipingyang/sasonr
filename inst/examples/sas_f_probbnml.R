@@ -1,0 +1,7 @@
+# PROBBNML: each call is explained above it and followed by its result
+
+# P(X <= n) is always 1.
+sas_f_probbnml(0.2, 5, 5)  # probbnml(0.2, 5, 5) = 1
+
+# A missing probability gives a missing result.
+sas_f_probbnml(NA_real_, 5, 1)  # probbnml(., 5, 1) = .
