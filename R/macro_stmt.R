@@ -474,6 +474,12 @@ mp_call <- function(def, src, ses, sink) {
     vals[[pos_names[k_pos]]] <- mq_strip(a)
   }
   if (length(ses$frames) >= 400) abort_runtime("macro calls nest more than 400 levels deep", line)
+  #
+  #
+  #
+  # macro body (no line map) keeps the line of the outer call
+  call_line <- src_line(src, src$i - 1L)
+  if (!is.null(call_line)) ses$line <- call_line
   frame <- list(name = def$name, vars = new.env(parent = emptyenv()))
   for (nm in names(vals)) assign(nm, vals[[nm]], envir = frame$vars)
   if (def$parmbuff) assign("syspbuff", buff, envir = frame$vars)
