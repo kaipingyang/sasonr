@@ -6,8 +6,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^vignettes/articles$
-^inst/sashelp$
-^tools$
 ^CONTRIBUTING\.md$
 ^LICENSE\.md$
 ^AGENTS\.md$
