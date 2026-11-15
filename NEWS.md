@@ -26,7 +26,14 @@ the development version provides.
 * The exports are explicit: the user API plus the run-time helpers that
   translated code calls (documented as internal). `sas_format()` and
   `sas_fmt_best()` are internal; use `sas_f_putn()` and `sas_f_putc()`, which
-  take the format as text and check it.
+  take the format as text and check it. The PROC SQL helpers `sas_f_cvt_*()`
+  and `sas_f_sql*()` are internal exports as well, and `sas_titles_once()` and
+  `sas_untranslated()` are new internal exports.
+* Translated code calls only base R, package-prefixed functions and the
+  exported helpers. The code of PROC SQL and PROC DATASETS steps, which
+  sasonr runs itself, is a call of `sas_untranslated()` that stops with
+  `sasonr_unsupported`; the `sas_translate()` page describes the environment
+  in which the code of a step is evaluated.
 * SASHELP members are read from the directory given by
   `options(sasonr.sashelp_dir)` or the environment variable
   `SASONR_SASHELP_DIR` (`<member>.sas7bdat` with its column attributes in
@@ -53,8 +60,9 @@ the development version provides.
   an existing one; PROC MEANS stops with SYSERR 1012; PROC SQL writes the
   NOEXEC NOTEs, sets SQLOBS and SQLRC to 0 and ends with SYSERR 1012; the
   other steps set SYSERR to 3; a DATA step does not replace an existing data
-  set. PROC TRANSPOSE, PROC FORMAT, PROC SUMMARY and other combinations fail
-  loud.
+  set. PROC TRANSPOSE with DATA=, a new OUT= data set and a VAR statement runs
+  on its input with 0 observations. Other forms of PROC TRANSPOSE, PROC
+  FORMAT, PROC SUMMARY and other combinations fail loud.
 * An ERROR in a global statement is not handled like a step ERROR: for
   `LINESIZE=` set to a name other than MAX outside a step, sasonr writes
   `ERROR 18-12`, sets SYSCC to 1012 and enters syntax-check mode at the next
@@ -192,6 +200,14 @@ the development version provides.
   and invalid arguments write the log NOTEs, set `_ERROR_` and give missing
   results; arguments are converted between numeric and character, and the
   number of arguments is checked.
+* A direct call of a `sas_f_*` function from R code is checked as in a DATA
+  step: approximate and unsupported functions follow `sasonr.strict`
+  (`sasonr_strict_error`, or a `sasonr_strict_warning` with
+  `sasonr.strict = FALSE`), arguments outside the supported input domain fail
+  loud, and a data error (an invalid argument, invalid data) gives the SAS
+  result with a warning of class `sasonr_data_error` that carries the NOTE
+  text. `sas_f_put()` and `sas_f_input()` take the format or informat as text
+  (`"8.2"`) and check it against the registry.
 * Every `sas_f_*` function has a reference page with the SAS syntax,
   parameter descriptions, the differences from base R and examples.
 * `ROUND` rounds half away from zero with a small relative fuzz and returns

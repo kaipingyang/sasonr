@@ -205,8 +205,19 @@ test_that("what each step does in syntax-check mode", {
                     "WARNING: Data set WORK.M was not replaced because this step was stopped.",
                     "WARNING: Data set WORK.F was not replaced because new file is incomplete.") %in% r$log))
   expect_identical(trimws(utils::tail(r$log, 1)), "WORK.B")
+  # PROC TRANSPOSE runs on its input with 0 observations: one observation per
+  # VAR variable; the input keeps its observations
+  withr::local_options(sasonr.step_notes = TRUE)
+  r <- run("proc transpose data=a out=t; var x; run; %put 1 &syserr &syslast;")
+  expect_identical(r$work$t$`_name_`, "x")
+  expect_identical(nrow(r$work$a), 1L)
+  expect_true(all(c("NOTE: There were 0 observations read from the data set WORK.A.",
+                    "NOTE: The data set WORK.T has 1 observations and 1 variables.") %in% r$log))
+  expect_identical(trimws(grep("^1 ", r$log, value = TRUE)), "1 3 WORK.T")
+  withr::local_options(sasonr.step_notes = FALSE)
   # unsupported: fail loud
-  for (code in c("proc transpose data=a out=t; var x; run;", "proc format; value yn 1 = 'Yes'; run;",
+  for (code in c("proc transpose data=a out=t prefix=c; var x; run;", "proc transpose data=a out=a; var x; run;",
+                 "proc transpose data=a out=t; var x; by x; run;", "proc format; value yn 1 = 'Yes'; run;",
                  "proc summary data=a; var x; output out=m mean=mx; run;",
                  "proc means data=a; var x; output out=m1 mean=mx; output out=m2 max=xx; run;",
                  "proc freq data=a; tables x / out=f(keep=x); run;", "proc sort data=a out=s(keep=x); by x; run;",

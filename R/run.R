@@ -167,7 +167,9 @@ engine_exec_steps <- function(eng, text, line) {
     # row by row (L3), where only the taken branches run; a genuine unsupported
     # value or exception is raised there again.  A construct that is unsupported
     # whatever the values (sasonr_unsupported_construct) fails loud at once.
-    env <- tryCatch(engine_eval(eng, tr$code, stage = vec),
+    sc_empty <- eng$sc_empty %||% character()
+    eng$sc_empty <- NULL
+    env <- tryCatch(engine_eval(eng, tr$code, stage = vec, empty = sc_empty),
                     sasonr_step_exception = function(e) if (vec) e else engine_step_exception(eng, step, tr, e),
                     sasonr_unsupported = function(e) {
                       if (vec && !inherits(e, "sasonr_unsupported_construct")) e else stop(e)
@@ -190,7 +192,11 @@ engine_exec_steps <- function(eng, text, line) {
       # NOTEs that are not data errors (e.g. INPUT going to a new line)
       if (length(rt$notes) > 0 && isTRUE(eng$session$options$notes)) env$.log <- c(env$.log, rt$notes)
     }
-    if (isTRUE(eng$syntax_check)) {
+    if (length(sc_empty)) {
+      # PROC TRANSPOSE in syntax-check mode (engine_check_step()): run on its
+      # input with 0 observations
+      for (nm in tr$outputs) assign(nm, env$work[[nm]], envir = eng$session$work)
+    } else if (isTRUE(eng$syntax_check)) {
       # PROC CONTENTS in syntax-check mode (engine_check_step()): OUT= has 0
       # observations
       for (nm in tr$outputs) assign(nm, get(nm, envir = eng$session$work)[0, , drop = FALSE], envir = eng$session$work)
@@ -249,6 +255,9 @@ engine_check_last_view <- function(eng, step) {
 #     because this step was stopped"); _LAST_ names the new data set;
 #   * PROC CONTENTS runs: its listing as usual, OUT= (new or existing) with 0
 #     observations; it is run by the caller (TRUE is returned);
+#   * PROC TRANSPOSE DATA= OUT= with only a VAR statement and a new OUT= data
+#     set runs on its input with 0 observations (its OUT= has one observation
+#     per VAR variable); run by the caller (TRUE is returned);
 #   * PROC SORT OUT=, PROC FREQ TABLES OUT= and PROC APPEND BASE= create a new
 #     data set with 0 observations and 0 variables, which becomes _LAST_; an
 #     existing OUT= data set is "not replaced because new file is incomplete",
@@ -259,9 +268,8 @@ engine_check_last_view <- function(eng, step) {
 #     replaced because this step was stopped"), SYSERR 1012;
 #   * PROC PRINT, printing PROC FREQ, PROC DELETE, PROC DATASETS DELETE / KILL
 #     and an in-place PROC SORT change nothing, also not _LAST_;
-# SYSERR is 3 after every step but PROC MEANS.  Other steps and forms (PROC
-# TRANSPOSE, which would run with 0 observations, PROC FORMAT, PROC
-# SUMMARY, several OUT= data sets, FREQ OUTPUT, data set options on OUT=,
+# SYSERR is 3 after every step but PROC MEANS.  Other steps and forms (other
+# forms of PROC TRANSPOSE, PROC FORMAT, PROC SUMMARY, several OUT= data sets, FREQ OUTPUT, data set options on OUT=,
 # other DATASETS statements ...) fail loud, and so does anything these rules
 #
 # Returns TRUE when the caller runs the step (PROC CONTENTS), FALSE otherwise.
@@ -273,6 +281,18 @@ engine_check_step <- function(eng, step) {
   if (step$type == "proc") {
     if (step$name == "contents") {
       SAS 9.4()
+      return(TRUE)
+    }
+    if (step$name == "transpose") {
+      SAS 9.4()
+      o <- step$options
+      din <- o$data$name %||% ""
+      ok <- setequal(names(o), c("data", "out")) && !length(o$data$options) && !length(o$out$options) &&
+        nzchar(din) && exists(din, envir = eng$session$work, inherits = FALSE) &&
+        !exists(o$out$name, envir = eng$session$work, inherits = FALSE) && !length(step$titles) &&
+        all(vapply(step$stmts, function(x) identical(x$stmt, "var"), logical(1)))
+      if (!ok) unsupported("this PROC TRANSPOSE (supported: DATA=, a new OUT= data set and a VAR statement)")
+      eng$sc_empty <- din
       return(TRUE)
     }
     if (length(step$titles)) SAS 9.4()
@@ -400,13 +420,17 @@ sas_num_store <- function(x, len) {
 
 # Evaluate generated code; with `stage = TRUE` output data sets go to a scratch
 # copy of WORK (the caller commits them) and run-time NOTEs are discarded.
-engine_eval <- function(eng, code, stage = FALSE) {
+engine_eval <- function(eng, code, stage = FALSE, empty = character()) {
   rt <- eng$session$rt
   rt_reset(rt)
   env <- new.env(parent = asNamespace("sasonr"))
-  if (stage) {
+  # `empty`: data sets the step reads with 0 observations (a staged copy)
+  if (stage || length(empty)) {
     env$work <- new.env(parent = emptyenv())
-    for (nm in ls(eng$session$work, all.names = TRUE)) assign(nm, get(nm, envir = eng$session$work), envir = env$work)
+    for (nm in ls(eng$session$work, all.names = TRUE)) {
+      d <- get(nm, envir = eng$session$work)
+      assign(nm, if (nm %in% empty) d[0, , drop = FALSE] else d, envir = env$work)
+    }
   } else {
     env$work <- eng$session$work
   }
