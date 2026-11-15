@@ -12,7 +12,7 @@ test_that("every exported SAS function goes through the direct-call gate", {
   for (fn in fn_layer_exports()) {
     f <- getExportedValue("sasonr", fn)
     expect_identical(as.character(body(f)[[1]]), "fn_layer_call", info = fn)
-    expect_identical(formals(f), formals(environment(f)$impl), info = fn)
+    expect_identical(formals(f), formals(sasonr:::fn_layer_impl[[sub("^sas_f_", "", fn)]]), info = fn)
   }
 })
 

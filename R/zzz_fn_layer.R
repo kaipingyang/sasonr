@@ -22,7 +22,7 @@
 # This file is collated last: every exported sas_f_* function, except the
 # helpers of translated PROC SQL code listed in `fn_layer_internal`, is
 # replaced here by a wrapper with the same arguments that calls the
-# implementation through fn_layer_call().
+# implementation (kept in the table `fn_layer_impl`) through fn_layer_call().
 
 fn_layer_internal <- c("cvt_c2n", "cvt_n2c", "sqlcase", "sqlinlist", "sqllike", "sqlmonotonic", "sqlquant")
 
@@ -90,18 +90,21 @@ fn_layer_data_errors <- function(rt, name) {
 fn_layer_wrap <- function(name, impl) {
   f <- function() NULL
   formals(f) <- formals(impl)
-  body(f) <- bquote(fn_layer_call(.(name), impl, sys.call(), parent.frame()))
-  e <- new.env(parent = environment(impl))
-  e$impl <- impl
-  environment(f) <- e
+  body(f) <- bquote(fn_layer_call(.(name), fn_layer_impl[[.(name)]], sys.call(), parent.frame()))
+  environment(f) <- environment(impl)
   f
 }
+
+# the implementations, one table (each wrapper looks its implementation up)
+fn_layer_impl <- new.env(parent = emptyenv())
 
 local({
   ns <- topenv()
   for (fn in ls(ns, pattern = "^sas_f_")) {
     name <- sub("^sas_f_", "", fn)
     if (name %in% fn_layer_internal) next
-    assign(fn, fn_layer_wrap(name, get(fn, envir = ns)), envir = ns)
+    impl <- get(fn, envir = ns)
+    assign(name, impl, envir = fn_layer_impl)
+    assign(fn, fn_layer_wrap(name, impl), envir = ns)
   }
 })
