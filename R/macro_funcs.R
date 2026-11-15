@@ -270,9 +270,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
         #
-        # the function MDY referenced by the %SYSFUNC or %QSYSFUNC macro
-        # function is out of range."; that WARNING is not written here.  Other
-        # releases are not supported: fail loud.
+        # not.  Other releases fail loud.
         if (sas_target_version() != "SAS 9.4") {
           abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") for SAS 9.4 ",
                                    sas_target_version(), " (not supported for this release)"), line)

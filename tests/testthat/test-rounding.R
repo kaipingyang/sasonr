@@ -40,7 +40,7 @@ test_that("a subnormal literal: an ERROR in SAS 9.4, kept as-is in SAS 9.4", {
   #
   expect_error(sas_run("data a; x = 1e-310; run;"), class = "sasonr_syntax_error")
   #
-  # and ordinary arithmetic on it follows IEEE.
+  # it follows IEEE.
   withr::local_options(sasonr.sas_version = "SAS 9.4")
   res <- suppressWarnings(sas_run("data a; x = 1e-310; y = x * 1e10; run;"))
   expect_identical(hex(res$work$a$x), "000012688B70E62B")

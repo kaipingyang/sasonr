@@ -122,9 +122,8 @@ fn_policy <- list(
   cos = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   sin = fpol("mv", dom = function(a) dom_huge(dom_n(a, 1), 1e10)),
   tan = fpol("mv", dom = function(a) {
-    # TAN(1.5707963267948966), the double nearest pi/2, is an invalid
-    # argument.  Other arguments whose cosine is that close to 0 (below 1E-15
-    # in magnitude) are not supported: fail loud.
+    # TAN at the double nearest pi/2 returns missing with the
+    # invalid-argument NOTE; other x with |cos(x)| < 1E-15 fail loud.
     x <- dom_n(a, 1)
     dom_or(dom_huge(x, 1e10), code_if(abs(x) == 1.5707963267948966, "inv"), code_if(abs(cos(x)) < 1e-15, "?"))
   }),
@@ -227,8 +226,8 @@ fn_policy <- list(
   constant = fpol(dom = function(a) {
     nm <- tolower(strip_both(as_sas_chr(a[[1]])))
     p <- dom_n(a, 2)
-    # SAS 9.4 crashes for EXACTINT with an argument of 1E300 or more in magnitude
-    # ("ERROR:  An exception has been encountered.", the step stops): "exc"
+    # CONSTANT('EXACTINT', n) with |n| >= 1E300 is handled as a step
+    # exception (step_exception.R): "exc"; 1E15 <= |n| < 1E300 fails loud
     dom_or(code_if(length(a) > 1 & nm == "exactint" & abs(p) >= 1e300, "exc"),
            code_if(length(a) > 1 & nm == "exactint" & abs(p) >= 1e15, "?"),
            code_if(length(a) > 1 & !is.na(p) & nm != "exactint" & nm %in% c("big", "e", "euler", "logbig", "logmaceps",

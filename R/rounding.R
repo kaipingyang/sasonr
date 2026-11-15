@@ -102,12 +102,9 @@ round_one <- function(x, unit, mode, fname) {
   if (!is.finite(q) || abs(q) >= 2^52) return(x)
   a <- abs(q)
   k <- floor(a)
-  # From |q| = 2^49 on, a fractional unit gives results that are not the
-  # nearest multiple (exact half points rounded down at random: ROUND(
-  # 507561523905906.125, 0.25) is 507561523905906, ROUND(399931701399944.05,
-  # 0.1) rounds down; ROUND(269284231226460.16, 1/3) is not k/3): fail loud
-  # for ROUND, ROUNDE and ROUNDZ, as for |x| >= 1E15 above, unless x/unit is
-  # an integer (x is a multiple: ROUND(123456789012.5, 1E-4)).
+  # From |q| = 2^49 on, a fractional unit is not supported: fail loud for
+  # ROUND, ROUNDE and ROUNDZ, as for |x| >= 1E15 above, unless x/unit is an
+  # integer (x is a multiple: ROUND(123456789012.5, 1E-4)).
   if (unit != floor(unit) && a >= 2^49 && a != k) {
     abort_unsupported(paste0(toupper(fname), "(", format(x, digits = 17), ", ", format(unit, digits = 17),
                              "): x/unit of 2^49 or more with a fractional unit is not supported"))
@@ -145,9 +142,8 @@ round_family <- function(x, unit, mode, fname, .at = NULL, note = TRUE) {
   unit <- rep_len(as.numeric(unit), n)
   # missing arguments (special missing values included) give an ordinary missing
   out <- rep(NA_real_, n)
-  # a unit that is not a normal double is invalid too: ROUND(1, 2.3e-308) is
-  # 1 while ROUND(1, 2.2e-308) is ". " with "Argument 2 ... is invalid",
-  # because 2.2e-308 is subnormal (ROUNDE/ROUNDZ behave the same).
+  # a unit that is not a normal double (a subnormal unit) is invalid too
+  # (ROUND, ROUNDE and ROUNDZ).
   sub <- !is.na(unit) & unit > 0 & unit < .Machine$double.xmin
   if (any(sub) && sas_target_version() != "SAS 9.4") {
     #
@@ -225,17 +221,14 @@ sas_f_intz <- function(x) {
 # |x| >= 1 (the integer digits always) and at most 14 - E decimals for
 # |x| < 1 (E = the decimal exponent; 14 for 0.1 <= |x| < 1), the rest
 # written as zeros.  PERCENT applies the same closed form to fl(100 |x|).
-# Integers are written with their exact digits (32. of 9.39586291501115E17 is
-# 939586291501115008).
+# Integers are written with their exact digits.
 #
 # Supported domain (outside it: fail loud, or NA for the E form):
 #  * |x| >= 1, non-integer, below 1E15: every d; 1E15 or more: d <= 3;
 #  * integers: no decimals below 1E18, d <= 3 below 2^53, any d below 1E15;
-#  * |x| < 1: d <= 14, and d <= 16 when |x| < 0.01 (decimal exponent <= -3).
-#    At 0.01 <= |x| < 0.1 with d >= 15 and 0.1 <= |x| < 1 with d >= 16 SAS
-#    drops the last digits in a way that depends on the binary exponent
-#    (0.0711077156197605 in 32.15 keeps 14 decimals, 0.0703075513494065 in
-#    32.16 keeps 13); values with more decimals are not supported.
+#  * |x| < 1: d <= 14, and d <= 16 when |x| < 0.01 (decimal exponent <= -3);
+#    more decimals (0.01 <= |x| < 0.1 with d >= 15, 0.1 <= |x| < 1 with
+#    d >= 16) fail loud.
 #
 # Returns the absolute value with exactly `d` decimals (digits, ".", no
 # sign), or NA when |v| >= 1e17 (the callers write the E form).  `exact =
@@ -263,11 +256,9 @@ display_round_text <- function(v, d, edge = "abort", exact = FALSE, down_rel = 0
     list(ip = substr(s, 1L, dot - 1L), fr = substr(s, dot + 1L, nchar(s)))
   }
   if (a == floor(a) && a >= 1 && !exact) {
-    # integers are written with their exact digits (32. of
-    # 9.39586291501115E17 is 939586291501115008)
-    # (no decimals: supported below 1E18; from 1E18 to 1E21 only at the point
-    # 32. of 2.6745296926266266E19 = 26745296926266265600; elsewhere fail loud,
-    # and callers that only need the width get the digits)
+    # integers are written with their exact digits (no decimals: supported
+    # below 1E18; from 1E18 to 1E21 only at the listed point; elsewhere fail
+    # loud, and callers that only need the width get the digits)
     if ((d == 0L && a < 1e18) || a < 1e15 || (d <= 3L && a < 2^53) || (d == 0L && a == 26745296926266265600)) {
       return(paste0(sprintf("%.0f", a), if (d > 0L) paste0(".", strrep("0", d))))
     }
@@ -419,7 +410,7 @@ display_fixed <- function(v, d, edge = "abort", exact = FALSE) {
 sci_dec_text <- function(v, k, edge = "abort") {
   a <- abs(v)
   if (k >= 13L) {
-    # at most 14 significant digits (32. of the largest double is 1.7976931348623E308)
+    # at most 14 significant digits
     g <- e14_digits(NULL, v, k)
     ex <- g$ex
     keep <- paste0(g$keep, strrep("0", k - 13L))
@@ -428,11 +419,9 @@ sci_dec_text <- function(v, k, edge = "abort") {
     return(list(text = paste0(if (v < 0) "-", ms, "E", if (ex < 0) "-", abs(ex)), sig = nchar(gsub(".", "", ms, fixed = TRUE)),
                 mant = m, ex = ex))
   }
-  # SAS 9.4 (Ew. with w = 7..19, values from 2^-61 to 2^60): the value rounded
+  # Ew. with w = 7..19 (values from 2^-61 to 2^60): sasonr rounds the value
   # to 14 significant digits (correctly, from its exact binary value), then
-  # those digits rounded half up to k mantissa decimals - a double rounding:
-  # 6.6464999999999970E-19 is 6.6465000000000E-19 at 14 digits and 6.647E-19
-  # in E10.
+  # those digits half up to k mantissa decimals (a double rounding).
   s <- sprintf("%.13e", a)
   ex <- as.integer(sub("^.*e", "", s))
   dg <- gsub(".", "", sub("e.*$", "", s), fixed = TRUE)

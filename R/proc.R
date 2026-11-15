@@ -89,8 +89,8 @@ parse_global_stmt <- function(p, open_code = FALSE) {
           ls <- if (identical(v, "max")) 256L else suppressWarnings(as.integer(v))
           if (is.na(ls) || ls < 64L || ls > 256L) {
             #
-            # ERROR 18-12; other invalid values (a number outside 64-256 ...)
-            # are not supported (engine_global_error() fails loud)
+            # MAX (LINESIZE=ABC) is ERROR 18-12; other invalid values (a
+            # number outside 64-256 ...) fail loud (engine_global_error())
             if (tk_type(p) == "name") {
               g_err("Option value for SAS option LINESIZE must be between 64 and 256. (ERROR 18-12)", "linesize")
             }

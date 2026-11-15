@@ -38,7 +38,7 @@ test_that("noncentral F: accurate distribution function and quantile", {
 })
 
 test_that("PROBT: noncentral t beyond the range of R's pnt (1e-13)", {
-  # SAS probt(2,10,1) = 0.80761156253037503
+  # probt(2,10,1) = 0.80761156253037503
   expect_equal(sas_f_probt(2, 10, 1), 0.80761156253037503, tolerance = 1e-12)
   # R's pt() returns 2.3e-13 here; the true value is 7.5e-88, so compare the ratio.
   expect_equal(sas_f_probt(-40, 100, 5) / 7.5280904809890335e-88, 1, tolerance = 1e-11)

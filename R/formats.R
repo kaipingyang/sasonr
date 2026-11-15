@@ -134,9 +134,8 @@ add_commas <- function(s) {
 }
 
 # Integers with decimal zeros beyond the supported domain whose text is
-# supported (exact value, width, decimals, form): COMMA32.4 and
-# DOLLAR32.4 of 1E15; 32.d with d = 15 to 18, 20, 25 or 30 of
-# 939586291501115008 and 26745296926266265600 (as many zeros as fit).
+# supported (exact value, width, decimals, form): the points listed below (as
+# many zeros as fit); elsewhere fail loud.
 int_zeros_listed <- function(v, w, d, commas, dollar, zero, swap) {
   if (v <= 0 || zero || swap || w != 32L) return(FALSE)
   (v == 1e15 && d == 4L && commas) ||
@@ -149,9 +148,8 @@ int_zeros_listed <- function(v, w, d, commas, dollar, zero, swap) {
 # the dollar sign; then the E form (sci_fit); then asterisks.  A rounding at
 # the edge of the display fuzz only fails loud when the text would fit.
 fit_number <- function(v, w, d, commas = FALSE, dollar = FALSE, zero = FALSE, swap = FALSE, down_rel = 0) {
-  # an integer beyond 2^53 / 10^d: the decimals are zeros (COMMA32.4 of 1E15)
-  # (and fewer zeros when they do not fit: 32.15 of 939586291501115008
-  # is 939586291501115008.0000000000000)
+  # an integer beyond 2^53 / 10^d: the decimals are zeros (fewer zeros when
+  # they do not fit)
   # Supported only where display_round_text is (below 1E15; 3 decimals below
   # 2^53) and at the points of int_zeros_listed(); elsewhere fail loud when a
   # fixed-point text could fit.
@@ -256,15 +254,11 @@ fmt_e <- function(v, w, d) {
 # 14 significant digits of an E form with 13 or more mantissa decimals
 # (Ew. from E20., BESTw. above 16 columns, w.d written in E notation), from
 # the exact binary value: list(keep = 14 digits, ex = decimal exponent).
-# In E20.-E32. (values from 2^-61 to 2^60), the 14th digit carries when the
-# rest r (the digits after the 14th, as a fraction of it) plus a fuzz of about
-# 1E-15 relative reaches the carry point - at 13 mantissa decimals (E20.) the
-# half point, at 14 or more the next digit (truncation).  The fuzz grows with
-# the mantissa (a rest of 0.97 carries for 1.x, 0.84 for 9.x) and is not a
-# function of r and the mantissa alone, so: 13 decimals - r < 0.30 truncated,
-# r >= 0.55 rounded up; 14 or more - truncated below the smallest rest that
-# carries for the same leading digit (0.965 for 1.x down to 0.838 for 9.x);
-# the band above fails loud (there the carry is not monotone in r).
+# In E20.-E32. (values from 2^-61 to 2^60) sasonr decides the 14th digit from
+# the rest r (the digits after the 14th, as a fraction of it): with 13
+# mantissa decimals (E20.) r < 0.30 is truncated and r >= 0.55 rounded up;
+# with 14 or more, r below the per-digit limit in `lim` is truncated; the
+# bands in between fail loud.
 e14_digits <- function(g, v, k = 14L) {
   a <- abs(v)
   s <- sprintf("%.*e", 40L, a)

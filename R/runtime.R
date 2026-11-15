@@ -952,8 +952,6 @@ sas_fmt_best <- function(x, w = 12L) {
     } else if (is.na(s) || (v != 0 && abs(v) < 1e-5)) {
       # the E form of w.d (sci_fit): as many mantissa decimals as fit, or an
       # integer mantissa when fewer than three digits fit and it shows more
-      # (BEST8.: -1.0240438392976625E-12 is -102E-14,
-      # -1.5996737032134217E-12 is -16E-13)
       sci <- sci_fit(v, w)
       if (!is.na(sci) && abs(v) < 1) {
         # below 1: when the decimal mantissa has room for fewer than three

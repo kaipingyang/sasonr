@@ -129,7 +129,7 @@ test_that("PROC SUMMARY needs PRINT or OUTPUT; unsupported options fail loud", {
 # Printed-table geometry: every value field is FW= columns wide whatever the
 # value looks like, panels hold as many statistics as fit and the dashed rule is
 #
-# for these exact programs (24 observations, so N prints in two columns).
+# release setting (24 observations, so N prints in two columns).
 panel_data <- "
 data p;
   length g $8;

@@ -103,9 +103,9 @@ engine_exec_steps <- function(eng, text, line) {
     if (step$type == "sql_begin") {
       eng$sql_opts <- step$options
       if (isTRUE(eng$syntax_check)) {
-        # PROC SQL in syntax-check mode runs as with NOEXEC: no statement runs,
-        # SQLOBS and SQLRC are 0, the step ends "stopped" with SYSERR 1012
         #
+        # with NOEXEC no statement runs, SQLOBS and SQLRC are 0, the step ends
+        # "stopped" with SYSERR 1012
         if (sas_target_version() != "SAS 9.4") {
           abort_unsupported(paste0("PROC SQL in syntax-check mode for SAS 9.4 ", sas_target_version(), " (not supported for this release)"), step$line)
         }

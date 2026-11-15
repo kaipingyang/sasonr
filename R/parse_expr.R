@@ -539,8 +539,6 @@ expr_to_sexpr <- function(e) {
 
 # A numeric constant; values outside the double range are an error.  A
 #
-#
-# (1e-310 is 000012688B70E62B, ordinary IEEE arithmetic).
 sas_num_literal <- function(v, line = NULL) {
   val <- as.numeric(v)
   if (is.infinite(val)) abort_syntax(paste0("Invalid number ", v), line)
