@@ -228,7 +228,7 @@ translate_proc_contents <- function(step, meta, last) {
   sp <- Filter(Negate(is.null), sp)
   code <- c(sprintf("# ---- PROC CONTENTS (SAS line %d)", as.integer(step$line)),
             sprintf(".r <- sas_proc_contents(work, %s, %s, %s)", r_str(ref$name), r_lit(m), r_lit(sp)),
-            ".lst <- c(.lst, .titles_once(.titles, .r$listing))",
+            ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
             ".meta <- c(.meta, sas_proc_store(work, .r$out))")
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC CONTENTS", line = step$line,
        outputs = if (!is.null(o$out)) o$out$name else character(), meta = list())

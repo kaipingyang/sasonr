@@ -15,6 +15,18 @@ sas_translate(code, work = list(), level = c("auto", "L3"))
 }
 \value{
 A \code{sasonr_translation} object; \verb{$steps[[i]]$code} holds the R code.
+
+The code of a step calls base R, \verb{dplyr::}/\verb{tibble::} functions and the
+run-time helpers that sasonr exports (documented as internal). It is
+evaluated by \code{\link[=sas_run]{sas_run()}} in an environment that holds \code{work} (an
+environment with the WORK data sets as data frames), \code{.log} and \code{.lst}
+(character vectors the step appends its log and listing lines to), \code{.meta}
+(the variable attributes the step records), \code{.symtab} (the macro symbol
+table) and \code{.titles} (the current TITLE lines), with the session of the
+run bound for the log NOTEs and \verb{_ERROR_}. Steps that sasonr runs itself
+(PROC SQL, PROC DATASETS) have no R translation: their code is a call of
+\code{sas_untranslated()}, which stops with a condition of class
+\code{sasonr_unsupported}.
 }
 \description{
 The macro processor runs first; steps are translated in order. Nothing is

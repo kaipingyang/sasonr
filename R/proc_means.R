@@ -390,7 +390,7 @@ translate_proc_means <- function(step, meta, last) {
     header,
     paste0(".d <- ", proc_source_code(inp)),
     paste0(".r <- sas_proc_means(.d, ", r_lit(spec), ")"),
-    ".lst <- c(.lst, .titles_once(.titles, .r$listing))",
+    ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   outs <- vapply(outputs, `[[`, "", "name")
@@ -428,7 +428,13 @@ means_stat_gate <- function(spec, line) {
 # Run time ------------------------------------------------------------------------
 
 # Titles go above the first page of a procedure's output.
-.titles_once <- function(titles, lst) {
+#' TITLE lines and a blank line before a procedure's listing (none when the
+#' procedure writes no listing)
+#' @param titles The TITLE lines.
+#' @param lst The listing lines of the procedure.
+#' @export
+#' @keywords internal
+sas_titles_once <- function(titles, lst) {
   if (length(lst) == 0) return(character())
   c(titles, if (length(titles) > 0) "", lst)
 }

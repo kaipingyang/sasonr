@@ -539,7 +539,7 @@ translate_proc_freq <- function(step, meta, last) {
     header,
     paste0(".d <- ", proc_source_code(inp)),
     paste0(".r <- sas_proc_freq(.d, ", r_lit(spec), ")"),
-    ".lst <- c(.lst, .titles_once(.titles, .r$listing))",
+    ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   out_names <- c(unlist(lapply(requests, function(r) r$opts$out$name)), spec$output$name)

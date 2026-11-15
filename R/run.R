@@ -128,8 +128,7 @@ engine_exec_steps <- function(eng, text, line) {
         if (isTRUE(eng$syntax_check)) sql_set_status(eng, 0, 0)
         next
       }
-      eng$steps <- c(eng$steps, list(list(code = paste0("# PROC SQL ", toupper(step$stmt$kind), " (SAS line ", step$line,
-                                                            "): executed by the SQL engine"),
+      eng$steps <- c(eng$steps, list(list(code = untranslated_code(paste("PROC SQL", toupper(step$stmt$kind)), step$line),
                                           level = "SQL", reasons = "PROC SQL", line = step$line, outputs = character(), meta = list())))
       eng$phase <- "sql"
       if (eng$execute) engine_sql(eng, step$stmt)
@@ -139,7 +138,7 @@ engine_exec_steps <- function(eng, text, line) {
     if (isTRUE(eng$syntax_check) && !engine_check_step(eng, step)) next
     if (step$type == "proc" && step$name == "datasets") {
       for (t in step$titles) engine_global(eng, t)
-      eng$steps <- c(eng$steps, list(list(code = paste0("# PROC DATASETS (SAS line ", step$line, "): executed by the engine"),
+      eng$steps <- c(eng$steps, list(list(code = untranslated_code("PROC DATASETS", step$line),
                                           level = "PROC", reasons = "PROC DATASETS", line = step$line, outputs = character(), meta = list())))
       if (eng$execute) {
         rt_reset(rt)
@@ -514,6 +513,26 @@ engine_step_options <- function(eng, text, line) {
   invisible()
 }
 
+# The code of a step that the engine runs itself (PROC SQL, PROC DATASETS):
+# no R translation; evaluating it fails loud.
+untranslated_code <- function(what, line) {
+  paste0("# ", what, " (SAS line ", line, "): run by the sasonr engine, no R translation\n",
+         "sas_untranslated(", r_lit(what), ", ", as.integer(line), "L)")
+}
+
+#' Stop: a step that has no R translation
+#'
+#' Translated code of a step that sasonr runs itself (PROC SQL, PROC
+#' DATASETS) consists of this call: evaluating it outside [sas_run()] stops
+#' with a condition of class `sasonr_unsupported`.
+#' @param what The step ("PROC SQL CREATE", "PROC DATASETS").
+#' @param line Its SAS line.
+#' @export
+#' @keywords internal
+sas_untranslated <- function(what, line) {
+  abort_unsupported(paste0(what, " has no R translation: sasonr runs it in sas_run()"), line)
+}
+
 engine_program <- function(eng, code) {
   text <- paste(code, collapse = "\n")
   sink <- code_sink(eng$session$macro)
@@ -535,6 +554,18 @@ engine_program <- function(eng, code) {
 #' @param work Named list of input data frames available as `WORK` data sets.
 #' @param level `"auto"` (choose L1/L2/L3 per step) or `"L3"` (force row loops).
 #' @return A `sasonr_translation` object; `$steps[[i]]$code` holds the R code.
+#'
+#' The code of a step calls base R, `dplyr::`/`tibble::` functions and the
+#' run-time helpers that sasonr exports (documented as internal). It is
+#' evaluated by [sas_run()] in an environment that holds `work` (an
+#' environment with the WORK data sets as data frames), `.log` and `.lst`
+#' (character vectors the step appends its log and listing lines to), `.meta`
+#' (the variable attributes the step records), `.symtab` (the macro symbol
+#' table) and `.titles` (the current TITLE lines), with the session of the
+#' run bound for the log NOTEs and `_ERROR_`. Steps that sasonr runs itself
+#' (PROC SQL, PROC DATASETS) have no R translation: their code is a call of
+#' `sas_untranslated()`, which stops with a condition of class
+#' `sasonr_unsupported`.
 #' @examples
 #' tr <- sas_translate("data b; set a; y = round(x, 0.1); run;",
 #'                     work = list(a = data.frame(x = c(1.25, 2.35))))
