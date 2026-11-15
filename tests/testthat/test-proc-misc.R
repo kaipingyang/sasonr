@@ -1,5 +1,5 @@
 # Procedure and function details: PROC SQL function NOTEs, PROC FREQ cell
-# statistics per SAS release, the PROC MEANS N field with BY groups, the
+# statistics, the PROC MEANS N field with BY groups, the
 # WEEKDAY / TENDAY / SEMIMONTH intervals, the SUBSTR statement under strict
 # mode and PROC DATASETS DELETE _ALL_.
 
@@ -17,7 +17,7 @@ test_that("PROC SQL function NOTEs go through sql_function_notes()", {
   expect_true("NOTE: Invalid argument to function MDY. Missing values may be generated." %in% r$log)
 })
 
-test_that("EXPECTED / DEVIATION / CELLCHI2 go through the statistics registry per release", {
+test_that("EXPECTED / DEVIATION / CELLCHI2 go through the statistics registry", {
   code <- "data d; input a $ b $; datalines;
 x p
 x q
@@ -26,13 +26,6 @@ y q
 y q
 ;
 proc freq data=d; tables a*b / %s; run;"
-  #
-  withr::local_options(sasonr.sas_version = "SAS 9.4")
-  for (o in c("expected", "deviation", "cellchi2")) {
-    expect_error(sas_run(sprintf(code, o)), class = "sasonr_unsupported")
-  }
-  #
-  withr::local_options(sasonr.sas_version = "SAS 9.4")
   expect_no_error(sas_run(sprintf(code, "expected deviation cellchi2")))
 })
 
@@ -109,10 +102,7 @@ run;")
 
 test_that("the SUBSTR statement goes through feature_check()", {
   code <- "data a; length t $6; t = 'abcdef'; substr(t, 2, 2) = 'XY'; run;"
-  #
-  withr::with_options(list(sasonr.sas_version = "SAS 9.4"),
-                      expect_error(sas_run(code), class = "sasonr_strict_error"))
-  #
+  # supported as its own context
   expect_identical(sas_run(code)$work$a$t, "aXYdef")
 })
 

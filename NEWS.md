@@ -84,10 +84,7 @@ the development version provides.
   `not_comparable`) are available through `sas_feature_registry()` and
   `sas_proc_stat_registry()`. A `partial` feature runs only inside its
   supported input domain; other inputs fail loud.
-* Where behaviour depends on the SAS 9.4 release, sasonr uses the
-  release selected with `options(sasonr.sas_version = "SAS 9.4")` (the
-  default) or `"SAS 9.4"`; nothing is carried over between releases (see
-  `?sasonr_sas_version`).
+* sasonr targets SAS 9.4 and has one behaviour.
 
 ## DATA step
 

@@ -38,10 +38,8 @@ registry_cache <- new.env(parent = emptyenv())
 #'   `unsupported`, `not_comparable`; see [sasonr_strict]), for functions the
 #'   contexts in which they are supported, and the argument counts, argument
 #'   types and default widths of the SAS 9.4 inventory.
-#' @param sas_version The SAS 9.4 release whose rows are returned (default:
-#'   the selected release, see [sasonr_sas_version]); `NULL` returns every row.
 #' @keywords internal
-sas_feature_registry <- function(kind = c("functions", "formats"), sas_version = sas_target_version()) {
+sas_feature_registry <- function(kind = c("functions", "formats")) {
   kind <- match.arg(kind)
   if (is.null(registry_cache[[kind]])) {
     f <- system.file("registry", paste0(kind, ".csv"), package = "sasonr")
@@ -51,62 +49,7 @@ sas_feature_registry <- function(kind = c("functions", "formats"), sas_version =
       data.frame(name = character(), kind = character(), status = character(), stringsAsFactors = FALSE)
     }
   }
-  registry_version_rows(registry_cache[[kind]], sas_version)
-}
-
-#'
-#'
-#'
-#' the registries ([sas_feature_registry()]) have one block of rows per
-#'
-#'
-#' function, format and procedure statistic by its status for that release,
-#' and the code paths whose SAS behaviour differs between the releases (for
-#' example the PROC MEANS moment arithmetic) follow it. Nothing is carried
-#' over from one release to the other; a feature without a status for the
-#' selected release is `unsupported` there.
-#'
-#' A SAS session ([sas_session()], or the throw-away session of a
-#' [sas_run()] call) takes the release from the option when it is created
-#' and keeps it for all its submissions.
-#'
-#' @name sasonr_sas_version
-#' @aliases sasonr.sas_version
-#' @examples
-#'
-#' getOption("sasonr.sas_version")
-#' options(old)
-NULL
-
-# ---- SAS 9.4 release ---------------------------------------------------------------
-#
-# Feature statuses are kept per SAS release (registries: column `sas_version`).
-#
-# release: the registry rows of that release gate the
-# features (strict mode), and the code paths whose SAS behaviour differs
-# between the releases follow it.  Nothing is carried over from one release to
-# the other: a feature without a status for the selected release is
-# `unsupported` there.
-sas_versions <- c("SAS 9.4", "SAS 9.4")
-
-sas_target_version <- function() {
-  # inside a run: the release of the session (taken from the option when the
-  # session was created)
-  s <- .active$session
-  v <- if (is.null(s)) getOption("sasonr.sas_version", "SAS 9.4") else s$options$sas_version
-  if (!is.character(v) || length(v) != 1L || !toupper(v) %in% sas_versions) {
-    sasonr_abort(paste0("Unsupported: option sasonr.sas_version = ", format(v)[1], " (supported: ",
-                        paste(sas_versions, collapse = ", "), ")"), "sasonr_unsupported")
-  }
-  toupper(v)
-}
-
-# The rows of a registry for one SAS release (NULL: every row).  A registry
-#
-registry_version_rows <- function(reg, sas_version) {
-  if (is.null(sas_version)) return(reg)
-  if (is.null(reg$sas_version)) return(if (identical(sas_version, "SAS 9.4")) reg else reg[0, , drop = FALSE])
-  reg[reg$sas_version == sas_version, , drop = FALSE]
+  registry_cache[[kind]]
 }
 
 # Status of one feature: "supported", "partial", "approximate", "unsupported",

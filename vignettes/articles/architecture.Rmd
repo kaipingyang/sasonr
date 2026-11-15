@@ -62,7 +62,7 @@ Everything a SAS program can change lives in one session object
 | WORK | data sets (tibbles), their metadata (types, lengths, formats, labels), PROC SQL views, `_LAST_` |
 | Format catalog | user formats and informats from PROC FORMAT |
 | Macro | global symbol table, local frames, macro definitions, automatic macro variables (`SYSCC`, `SYSERR`, `SQLOBS`, ...) |
-| Options | `LINESIZE`, `NOTES`, `SYNTAXCHECK`, the listing layout (`CENTER`, `DATE`, `NUMBER`, `PAGESIZE`, `FORMDLIM`) and the SAS 9.4 release; options whose only implemented value is the SAS default (`YEARCUTOFF=1940`, `ERRORS=20`, `MISSING=.`) are not stored, other values fail loud |
+| Options | `LINESIZE`, `NOTES`, `SYNTAXCHECK`, the listing layout (`CENTER`, `DATE`, `NUMBER`, `PAGESIZE`, `FORMDLIM`); options whose only implemented value is the SAS default (`YEARCUTOFF=1940`, `ERRORS=20`, `MISSING=.`) are not stored, other values fail loud |
 | Titles, filerefs | `TITLE` lines, `FILENAME` assignments |
 | SQL back end | the DuckDB connection, opened on first use and closed with the session |
 | Sinks | the cumulative log and listing of all submissions |

@@ -28,7 +28,7 @@ sas_proc_stat_registry <- function() {
                  stringsAsFactors = FALSE)
     }
   }
-  registry_version_rows(registry_cache$proc_stats, sas_target_version())
+  registry_cache$proc_stats
 }
 
 # PROC SUMMARY shares the MEANS rows; a row with statistic "*" covers every

@@ -24,27 +24,14 @@ test_that("ROUND signs: a negative value rounding to zero gives -0, -0 and subno
   expect_true(is.na(sas_f_round(sas_missing(".A"))))
 })
 
-test_that("a unit that is not a normal double is an invalid argument", {
-  #
-  expect_error(sas_f_round(1, 2.2e-308), class = "sasonr_unsupported")
-  #
-  # unit, the second is rejected with "Argument 2 ... is invalid"
-  withr::local_options(sasonr.sas_version = "SAS 9.4")
+test_that("a subnormal rounding unit fails loud", {
+  # 2.3e-308 is normal, 2.2e-308 is subnormal
   expect_identical(sas_f_round(1, 2.3e-308), 1)
-  expect_true(is.na(suppressWarnings(sas_f_round(1, 2.2e-308))))
-  expect_true(is.na(suppressWarnings(lenient(sas_f_rounde(1, 1e-308)))))
-  expect_true(is.na(suppressWarnings(lenient(sas_f_roundz(1, 1e-308)))))
+  expect_error(sas_f_round(1, 2.2e-308), class = "sasonr_unsupported")
 })
 
-test_that("a subnormal literal: an ERROR in SAS 9.4, kept as-is in SAS 9.4", {
-  #
+test_that("a subnormal literal is a syntax error", {
   expect_error(sas_run("data a; x = 1e-310; run;"), class = "sasonr_syntax_error")
-  #
-  # it follows IEEE.
-  withr::local_options(sasonr.sas_version = "SAS 9.4")
-  res <- suppressWarnings(sas_run("data a; x = 1e-310; y = x * 1e10; run;"))
-  expect_identical(hex(res$work$a$x), "000012688B70E62B")
-  expect_identical(hex(res$work$a$y), "01A56E1FC2F8F346")
 })
 
 test_that("ROUND fails loud where the result is not determined", {

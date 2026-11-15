@@ -29,14 +29,14 @@ run;
 
 test_that("default statistics and the listing of one analysis variable", {
   res <- sas_run(paste(means_data, "proc means data=d; var x; run;"))
-  #
+  # a single-digit count prints in a one-column N field
   expect_equal(squish(res$listing), c(
     "The MEANS Procedure", "Analysis Variable : x",
     "N Mean Std Dev Minimum Maximum", strrep("-", 65),
     "5 30.0000000 15.8113883 10.0000000 50.0000000", strrep("-", 65)
   ))
   # a 2-column N field comes from BY groups (13 observations: see
-  # test-proc-misc.R), in both releases
+  # test-proc-misc.R)
 })
 
 test_that("OUTPUT OUT= with CLASS: _TYPE_ numbering, _FREQ_, missing class values excluded", {
@@ -128,8 +128,7 @@ test_that("PROC SUMMARY needs PRINT or OUTPUT; unsupported options fail loud", {
 
 # Printed-table geometry: every value field is FW= columns wide whatever the
 # value looks like, panels hold as many statistics as fit and the dashed rule is
-#
-# release setting (24 observations, so N prints in two columns).
+# exactly the table width (24 observations, so N prints in two columns).
 panel_data <- "
 data p;
   length g $8;
@@ -207,8 +206,7 @@ test_that("unsupported panel layouts fail loud instead of printing a wrong rule"
 })
 
 
-test_that("default decimals of the printed table (FW=12, no MAXDEC) follow the SAS 9.4 rule", {
-  #
+test_that("default decimals of the printed table (FW=12, no MAXDEC) follow the default-decimals rule", {
   n <- means_num_text
   expect_identical(n(42, 12L, NULL), "42.0000000")
   expect_identical(n(1.5, 12L, NULL), "1.5000000")

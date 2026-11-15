@@ -27,10 +27,9 @@
 # read-once caches, never written by a run): the registries
 # (`registry_cache`, registry.R), the SASHELP store (`sashelp_cache`,
 # sashelp.R), function/format tables (`fn_table`, `fn_policy`,
-# `sysfunc_table`, `.pnt_gl` ...).  R options read at the start of a session
-# (`sasonr.sas_version`) or per submission (`sasonr.step_notes`) or at use
-# (`sasonr.strict`, `sasonr.on_error`, `sasonr.sashelp_dir`) are user policy,
-# not SAS session state.
+# `sysfunc_table`, `.pnt_gl` ...).  R options read per submission
+# (`sasonr.step_notes`) or at use (`sasonr.strict`, `sasonr.on_error`,
+# `sasonr.sashelp_dir`) are user policy, not SAS session state.
 
 SasSession <- R6::R6Class("SasSession",
   cloneable = FALSE,
@@ -58,7 +57,7 @@ SasSession <- R6::R6Class("SasSession",
     # macro: Macro symbol tables (global table, local frames) and macro definitions.
     macro = NULL,
     # options: System options (environment): linesize, notes, nosyntaxcheck, the listing
-    #   layout (center, date, number, pagesize, formdlim) and sas_version.
+    #   layout (center, date, number, pagesize, formdlim).
     options = NULL,
     # sql: SQL back end: environment with the lazily opened DuckDB connection.
     sql = NULL,
@@ -75,8 +74,7 @@ SasSession <- R6::R6Class("SasSession",
     busy = FALSE,
 
     # A new session with an empty WORK library and SAS default options.
-    # `sas_version`: The SAS 9.4 release the session targets.
-    initialize = function(sas_version = getOption("sasonr.sas_version", "SAS 9.4")) {
+    initialize = function() {
       self$work <- new.env(parent = emptyenv())
       self$meta <- list()
       self$unordered <- character()
@@ -86,7 +84,7 @@ SasSession <- R6::R6Class("SasSession",
       self$formats <- new.env(parent = emptyenv())
       self$filerefs <- list()
       self$macro <- new_macro_session()
-      self$options <- new_session_options(sas_version)
+      self$options <- new_session_options()
       self$sql <- new.env(parent = emptyenv())
       self$log <- character()
       self$listing <- character()
@@ -124,7 +122,7 @@ SasSession <- R6::R6Class("SasSession",
 # MISSING=.).  The session encoding is not implemented: fixed values are used
 # where it matters (INFILE reads latin1 bytes, input.R; PROC CONTENTS reports
 # UTF-8, proc_contents.R).
-new_session_options <- function(sas_version) {
+new_session_options <- function() {
   o <- new.env(parent = emptyenv())
   o$linesize <- 132L
   o$notes <- TRUE
@@ -134,7 +132,6 @@ new_session_options <- function(sas_version) {
   o$number <- FALSE
   o$pagesize <- Inf
   o$formdlim <- " "
-  o$sas_version <- sas_version
   o
 }
 

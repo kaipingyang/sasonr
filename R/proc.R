@@ -88,7 +88,7 @@ parse_global_stmt <- function(p, open_code = FALSE) {
           v <- tk_low(p)
           ls <- if (identical(v, "max")) 256L else suppressWarnings(as.integer(v))
           if (is.na(ls) || ls < 64L || ls > 256L) {
-            #
+            # sasonr models LINESIZE= as follows: a name other than
             # MAX (LINESIZE=ABC) is ERROR 18-12; other invalid values (a
             # number outside 64-256 ...) fail loud (engine_global_error())
             if (tk_type(p) == "name") {

@@ -269,12 +269,8 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
       rt$math <- old$math
       rt$mv <- old$mv
       if (bad && is.function(rt$on_note)) {
-        #
-        # not.  Other releases fail loud.
-        if (sas_target_version() != "SAS 9.4") {
-          abort_unsupported(paste0("the log of an invalid %SYSFUNC argument (", toupper(fname), ") for SAS 9.4 ",
-                                   sas_target_version(), " (not supported for this release)"), line)
-        }
+        # sasonr writes this NOTE; the WARNING that goes with it is not
+        # written.
         # The NOTE is wrapped at the LINESIZE in effect and suppressed under
         # NONOTES: the session's options, or those of an OPTIONS statement
         # compiled earlier in the current step (`step_opts`,

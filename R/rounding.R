@@ -145,9 +145,9 @@ round_family <- function(x, unit, mode, fname, .at = NULL, note = TRUE) {
   # a unit that is not a normal double (a subnormal unit) is invalid too
   # (ROUND, ROUNDE and ROUNDZ).
   sub <- !is.na(unit) & unit > 0 & unit < .Machine$double.xmin
-  if (any(sub) && sas_target_version() != "SAS 9.4") {
-    #
-    abort_unsupported(paste0(toupper(fname), " with a subnormal rounding unit (not supported for SAS 9.4 ", sas_target_version(), ")"))
+  if (any(sub)) {
+    # a subnormal literal is an ERROR; a computed subnormal unit fails loud
+    abort_unsupported(paste0(toupper(fname), " with a subnormal rounding unit (not supported)"))
   }
   bad <- !is.na(unit) & (unit <= 0 | sub)
   if (any(bad) && note) {

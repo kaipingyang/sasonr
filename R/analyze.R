@@ -578,14 +578,8 @@ an_stmt <- function(s, st) {
       # like any other function use
       feature_check("function", "substr", line, "statement")
       if (is.null(st$info[[s$var]])) {
-        # an undeclared target is created with length 8 when the statement is
-        # compiled (SAS Functions and CALL Routines: "SUBSTR (left of =)");
-        #
-        if (sas_target_version() != "SAS 9.4") {
-          abort_unsupported(paste0("SUBSTR assignment to an undeclared variable for SAS 9.4 ", sas_target_version(),
-                                   " (not supported for this release)"), line)
-        }
-        reg_var(st, s$var, "char", 8L, disp = s$var_text %||% s$var)
+        # an undeclared target is not supported
+        abort_unsupported("SUBSTR assignment to an undeclared variable", line)
       }
       if (!identical(var_type(st, s$var), "char")) abort_unsupported("SUBSTR assignment to a numeric variable", line)
       st$uses <- c(st$uses, s$var)

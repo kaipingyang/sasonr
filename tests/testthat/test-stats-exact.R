@@ -209,24 +209,6 @@ test_that("HARMEAN sums the reciprocals in argument order", {
   expect_identical(sas_f_harmean(0.1, 0.2, 0.3), 3 / Reduce(`+`, 1 / c(0.1, 0.2, 0.3)))
 })
 
-test_that("PROC MEANS CSS for SAS 9.4: shifted sums closed without fma", {
-  withr::local_options(sasonr.sas_version = "SAS 9.4")
-  css <- function(x) stats_moments(x, "means", need = "css")$css
-  # S2 - q (2 S1 - n q) with q = SUM/n - c0
-  expect_identical(hex(css(c(0.1, 0.2, 0.3))), "3f947ae147ae147a")
-  expect_identical(hex(css(c(1, 2, 3, 4))), "4014000000000000")
-  expect_identical(css(5), 0)
-  #
-  expect_error(css(c(1, 1 + 2^-52, 1 + 3 * 2^-52)), class = "sasonr_unsupported")
-  expect_error(stats_moments(c(1, 2), "means", weight = c(1, 2), need = "css"), class = "sasonr_unsupported")
-  expect_error(stats_moments(c(1, 2, 4), "means", need = c("css", "skew")), class = "sasonr_unsupported")
-})
-
-test_that("the SAS version option is validated", {
-  withr::local_options(sasonr.sas_version = "SAS 9.4")
-  expect_error(sas_target_version(), class = "sasonr_unsupported")
-})
-
 test_that("PROC MEANS: CSS, VAR, STD, STDERR, CV and USS are exact", {
   code <- paste0(
     "data a; input g x; datalines;\n",

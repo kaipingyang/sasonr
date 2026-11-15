@@ -49,7 +49,6 @@ reference:
   - sas_session_accessors
   - sas_export_work
   - sasonr_strict
-  - sasonr_sas_version
 - title: Front end (lexer, parser, analysis)
   contents:
   - sas_lex

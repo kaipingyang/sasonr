@@ -528,7 +528,7 @@ means_cell_stats <- function(x, f, w, stats, sp, two_sided) {
     val$sumwgt <- sw
     val$sum <- k$sum
     # the sign of zero: SUM and MEAN are always +0, MIN / MAX keep the sign of
-    # the first value of the group on ties (for both supported releases)
+    # the first value of the group on ties
     if (!is.na(val$sum[1]) && val$sum[1] == 0) val$sum <- 0
     val$min <- xv[which(xv == min(xv))[1L]]
     val$max <- xv[which(xv == max(xv))[1L]]
@@ -830,8 +830,7 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
 
 # Listing --------------------------------------------------------------------------
 
-# Default decimals of the printed table with the default FW=12 and no MAXDEC=
-# (for both supported releases).
+# Default decimals of the printed table with the default FW=12 and no MAXDEC=.
 means_default_text <- function(v, w) {
   if (v == 0) return("0")
   a <- abs(v)
@@ -923,8 +922,8 @@ means_stat_col <- function(s, cells, sp, by_nw = NULL) {
 
 # N / N Miss: as wide as the printed counts.  With BY groups the field is
 # sized for the whole data set, not for the counts of the group (13
-# observations in single-digit BY groups give a 2-column field, for both
-# supported releases).  That is supported without CLASS and when every analysis variable
+# observations in single-digit BY groups give a 2-column field).  That is
+# supported without CLASS and when every analysis variable
 # is non-missing in as many digits as there are observations; otherwise a
 # wider data set fails loud.
 means_count_width <- function(cells, by_nw) {
@@ -945,7 +944,7 @@ means_by_count_width <- function(d, sp, k) {
 
 # Printed-table geometry ------------------------------------------------------------
 #
-# For both supported releases, with and without CLASS.  The line is filled
+# With and without CLASS.  The line is filled
 # left to right as follows.
 #
 #  * Every statistic column is a field of FW= columns (default 12), except

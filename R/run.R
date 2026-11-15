@@ -103,12 +103,9 @@ engine_exec_steps <- function(eng, text, line) {
     if (step$type == "sql_begin") {
       eng$sql_opts <- step$options
       if (isTRUE(eng$syntax_check)) {
-        #
-        # with NOEXEC no statement runs, SQLOBS and SQLRC are 0, the step ends
+        # sasonr models PROC SQL in syntax-check mode as follows: as with
+        # NOEXEC no statement runs, SQLOBS and SQLRC are 0, the step ends
         # "stopped" with SYSERR 1012
-        if (sas_target_version() != "SAS 9.4") {
-          abort_unsupported(paste0("PROC SQL in syntax-check mode for SAS 9.4 ", sas_target_version(), " (not supported for this release)"), step$line)
-        }
         eng$log <- c(eng$log, "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.")
         eng$sql_noexec <- TRUE
       }
@@ -247,7 +244,7 @@ engine_check_last_view <- function(eng, step) {
 }
 
 # Syntax-check mode (after an ERROR, on_error = "sas"): the step is compiled
-#
+# but not run.  sasonr models that mode as follows:
 #   * the global statements of a step run: TITLE in any PROC step, OPTIONS in
 #     PROC DATASETS;
 #   * a DATA step creates each new output data set with 0 observations and
@@ -269,22 +266,19 @@ engine_check_last_view <- function(eng, step) {
 #   * PROC PRINT, printing PROC FREQ, PROC DELETE, PROC DATASETS DELETE / KILL
 #     and an in-place PROC SORT change nothing, also not _LAST_;
 # SYSERR is 3 after every step but PROC MEANS.  Other steps and forms (other
-# forms of PROC TRANSPOSE, PROC FORMAT, PROC SUMMARY, several OUT= data sets, FREQ OUTPUT, data set options on OUT=,
-# other DATASETS statements ...) fail loud, and so does anything these rules
-#
+# forms of PROC TRANSPOSE, PROC FORMAT, PROC SUMMARY, several OUT= data sets,
+# FREQ OUTPUT, data set options on OUT=, other DATASETS statements ...) fail
+# loud.  PROC SQL: engine_exec_steps().
 # Returns TRUE when the caller runs the step (PROC CONTENTS), FALSE otherwise.
 engine_check_step <- function(eng, step) {
   unsupported <- function(what) {
     abort_unsupported(paste0(what, " in syntax-check mode (after an ERROR; not supported)"), step$line)
   }
-  SAS 9.4 <- function() if (sas_target_version() != "SAS 9.4") unsupported(paste("SAS 9.4", sas_target_version()))
   if (step$type == "proc") {
     if (step$name == "contents") {
-      SAS 9.4()
       return(TRUE)
     }
     if (step$name == "transpose") {
-      SAS 9.4()
       o <- step$options
       din <- o$data$name %||% ""
       ok <- setequal(names(o), c("data", "out")) && !length(o$data$options) && !length(o$out$options) &&
@@ -295,14 +289,12 @@ engine_check_step <- function(eng, step) {
       eng$sc_empty <- din
       return(TRUE)
     }
-    if (length(step$titles)) SAS 9.4()
     for (t in step$titles) engine_global(eng, t)
     exists_ds <- function(nm) exists(nm, envir = eng$session$work, inherits = FALSE)
     notes_on <- isTRUE(eng$session$options$notes) && eng$step_notes
     # an output data set: a new one gets 0 observations and 0 variables and
     # becomes _LAST_, an existing one is kept; `stopped`: as in a stopped step
     out_ds <- function(nm, stopped = FALSE) {
-      SAS 9.4()
       if (stopped) {
         eng$log <- c(eng$log, sprintf(
           "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and 0 variables.",
@@ -327,7 +319,6 @@ engine_check_step <- function(eng, step) {
       } else if (!identical(step$origin, "delete")) {
         for (s in step$stmts) {
           if (identical(s$type, "global")) {
-            SAS 9.4()
             engine_global(eng, s)
           } else if (!s$stmt %in% c("delete", "run")) {
             unsupported(paste("PROC DATASETS statement", toupper(s$stmt)))
@@ -356,7 +347,6 @@ engine_check_step <- function(eng, step) {
         if (any(vapply(step$stmts, function(x) identical(x$stmt, "output") && length(x$out$options) > 0, logical(1)))) {
           unsupported("PROC MEANS with data set options on OUT=")
         }
-        SAS 9.4()
         eng$log <- c(eng$log, "NOTE: sasonr stopped processing this step because of errors.")
         if (length(outs)) out_ds(outs, stopped = TRUE)
         syserr <- 1012
@@ -370,7 +360,6 @@ engine_check_step <- function(eng, step) {
   tr <- translate_step(step, eng$session$meta, eng$level)
   old <- vapply(tr$outputs, function(nm) exists(nm, envir = eng$session$work, inherits = FALSE), logical(1))
   if (any(old)) {
-    SAS 9.4()
     if (length(tr$outputs) > 1L) unsupported("a DATA step with several output data sets, one of them existing,")
   }
   for (nm in tr$outputs) {

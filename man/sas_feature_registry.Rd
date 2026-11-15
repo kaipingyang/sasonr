@@ -4,16 +4,10 @@
 \alias{sas_feature_registry}
 \title{Feature registry (functions, formats and informats) with the status of each feature}
 \usage{
-sas_feature_registry(
-  kind = c("functions", "formats"),
-  sas_version = sas_target_version()
-)
+sas_feature_registry(kind = c("functions", "formats"))
 }
 \arguments{
 \item{kind}{\code{"functions"} or \code{"formats"}.}
-
-\item{sas_version}{The SAS 9.4 release whose rows are returned (default:
-the selected release, see \link{sasonr_sas_version}); \code{NULL} returns every row.}
 }
 \value{
 A data frame, one row per function or per format/informat: the

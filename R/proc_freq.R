@@ -702,14 +702,10 @@ freq_one_request <- function(db, wt, rq, sp) {
   # The TABLES statement options EXPECTED / DEVIATION / CELLCHI2 apply to
   # two-way and multiway tables in the default crosstabulation cell format; the
   # manual states that they have no effect for one-way frequency tables, so
-  # they are accepted and ignored there (for both supported releases).  The request itself
-  # is gated by the statistics registry (freq_stat_gate, per SAS release).  The
+  # they are accepted and ignored there.  The request itself is gated by the
+  # statistics registry (freq_stat_gate).  The
   # n-way (CROSSLIST-style) cell rows are not printed by sasonr yet, so that
   # case still fails loud.
-  if (length(vars) == 2 && sas_target_version() == "SAS 9.4" && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
-    #
-    abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 cell rows for SAS 9.4 (only one-way tables are supported there)", rq$line)
-  }
   if (length(vars) > 2 && any(c("expected", "deviation", "cellchi2") %in% names(o))) {
     abort_unsupported("EXPECTED / DEVIATION / CELLCHI2 for an n-way table (only the two-way crosstab layout is supported)", rq$line)
   }
@@ -2344,10 +2340,8 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
 
 # RISKDIFF: the column 1 / column 2 "Risk Estimates" tables, the difference row
 # with its exact limits when requested, and (for the selected column) the
-#
+# "Confidence Limits for the Risk Difference" table.
 freq_riskdiff_listing <- function(st, info) {
-  #
-  if (sas_target_version() != "SAS 9.4") abort_unsupported(paste0("PROC FREQ RELRISK / RISKDIFF listing for SAS 9.4 ", sas_target_version()))
   rd <- st$rd
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   zlab <- paste0(format_pct_level(rd$alpha), "%")
@@ -2390,10 +2384,8 @@ freq_riskdiff_listing <- function(st, info) {
 }
 
 # RELRISK: the default "Odds Ratio and Relative Risks" table, or - when CL= is
-#
+# given - the "Confidence Limits for the Relative Risk" table.
 freq_relrisk_listing <- function(st, info) {
-  #
-  if (sas_target_version() != "SAS 9.4") abort_unsupported(paste0("PROC FREQ RELRISK / RISKDIFF listing for SAS 9.4 ", sas_target_version()))
   rel <- st$rel
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   zlab <- paste0(format_pct_level(rel$alpha), "%")

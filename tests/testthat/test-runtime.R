@@ -170,22 +170,11 @@ test_that("left-hand SUBSTR replaces part of a variable (SAS semantics)", {
   expect_equal(res3$work$d$e, 1)
   expect_true(any(grepl("Invalid second argument to function SUBSTR", res3$log)))
 })
-test_that("SUBSTR assignment to an undeclared variable creates it with length 8", {
-  #
+test_that("SUBSTR assignment to an undeclared variable fails loud", {
   expect_error(sas_run("data d; substr(t,2,2)='XY'; run;", on_error = "abort"), class = "sasonr_unsupported")
-  #
-  # is compiled with a default length of 8
-  withr::local_options(sasonr.sas_version = "SAS 9.4", sasonr.strict = FALSE)
-  res <- sas_run("data d; substr(t,2,2)='XY'; v=vlength(t); l=lengthn(t); r=t; rv=vlength(r); run;")
-  expect_equal(res$work$d$v, 8)
-  expect_equal(res$work$d$l, 3)     # " XY" after the trailing blanks are dropped
-  expect_equal(res$work$d$rv, 8)    # the assignment result inherits the length
   # a declared variable keeps its own length
   res2 <- sas_run("data d; length c $4; substr(c,2,2)='XY'; v=vlength(c); run;")
   expect_equal(res2$work$d$v, 4)
-  # a longer replacement is cut to the length argument
-  res3 <- sas_run("data d; substr(t,2,2)='XYZ'; l=lengthn(t); run;")
-  expect_equal(res3$work$d$l, 3)
 })
 test_that("the sign of zero in SUM / MEAN / MIN / MAX and PROC MEANS", {
   hex <- function(x) paste(rev(as.character(writeBin(x, raw()))), collapse = "")
