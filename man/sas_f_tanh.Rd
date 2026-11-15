@@ -21,6 +21,10 @@ Hyperbolic tangent. See the \href{https://documentation.sas.com/doc/en/lefunctio
 \examples{
 # TANH: each call is explained above it and followed by its result
 
+# TANH is approximate: in strict mode (the default) a direct call stops; these calls
+# run with options(sasonr.strict = FALSE) and a warning of class sasonr_strict_warning.
+old <- options(sasonr.strict = FALSE)
+
 # The hyperbolic tangent of 0 is 0.
 sas_f_tanh(0)  # tanh(0) = 0
 
@@ -33,6 +37,8 @@ sas_f_tanh(20)  # tanh(20) = 1
 
 # A missing argument gives a missing result.
 sas_f_tanh(NA_real_)  # tanh(.) = .
+
+options(old)
 }
 \seealso{
 Other numeric functions:

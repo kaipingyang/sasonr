@@ -21,6 +21,10 @@ Hyperbolic cosine. See the \href{https://documentation.sas.com/doc/en/lefunction
 \examples{
 # COSH: each call is explained above it and followed by its result
 
+# COSH is approximate: in strict mode (the default) a direct call stops; these calls
+# run with options(sasonr.strict = FALSE) and a warning of class sasonr_strict_warning.
+old <- options(sasonr.strict = FALSE)
+
 # The hyperbolic cosine of 0 is 1.
 sas_f_cosh(0)  # cosh(0) = 1
 
@@ -32,6 +36,8 @@ sas_f_cosh(-2)  # cosh(-2) = 3.76219569108363
 
 # A missing argument gives a missing result.
 sas_f_cosh(NA_real_)  # cosh(.) = .
+
+options(old)
 }
 \seealso{
 Other numeric functions:

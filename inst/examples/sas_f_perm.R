@@ -1,5 +1,9 @@
 # PERM: each call is explained above it and followed by its result
 
+# PERM is approximate: in strict mode (the default) a direct call stops; these calls
+# run with options(sasonr.strict = FALSE) and a warning of class sasonr_strict_warning.
+old <- options(sasonr.strict = FALSE)
+
 # The number of ordered arrangements of 2 items out of 5 is 5 * 4 = 20.
 sas_f_perm(5, 2)  # perm(5, 2) = 20
 
@@ -11,3 +15,5 @@ sas_f_perm(10, 0)  # perm(10, 0) = 1
 
 # A missing argument gives a missing result.
 sas_f_perm(NA_real_, 2)  # perm(., 2) = .
+
+options(old)

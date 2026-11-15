@@ -19,6 +19,10 @@ Kurtosis. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/
 \examples{
 # KURTOSIS: each call is explained above it and followed by its result
 
+# KURTOSIS is approximate: in strict mode (the default) a direct call stops; these calls
+# run with options(sasonr.strict = FALSE) and a warning of class sasonr_strict_warning.
+old <- options(sasonr.strict = FALSE)
+
 # KURTOSIS returns the sample excess kurtosis (about 0 for normal data); the
 # outlier 10 makes it large.
 sas_f_kurtosis(1, 2, 3, 4, 10)  # kurtosis(1, 2, 3, 4, 10) = 3.152
@@ -31,6 +35,8 @@ sas_f_kurtosis(1, 2, NA_real_, 3, 4, 8)  # kurtosis(1, 2, ., 3, 4, 8) = 2.021017
 
 # Values with zero variance have no defined kurtosis, so the result is missing.
 sas_f_kurtosis(1, 1, 1, 1)  # kurtosis(1, 1, 1, 1) = .
+
+options(old)
 }
 \seealso{
 Other descriptive functions:
