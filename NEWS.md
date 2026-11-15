@@ -102,6 +102,26 @@ the development version provides.
   context of `SUBSTR`; `CONSTANT('EXACTINT', 1E300)` stops the step with the
   SAS exception in a step that runs once and fails loud elsewhere.
 * Dates have no 29 February in years divisible by 4000.
+* Expressions of the DATA step, WHERE and PROC SQL are parsed with one
+  operator table. sasonr treats the following as described here:
+  `IN`, `NOT IN` and `IN:` bind tighter than the other comparison operators
+  in the DATA step (`a <= b in (0, 5)` is `a <= (b in (0, 5))`); in WHERE,
+  `-a ** b` is `(-a) ** b`, `**` binds tighter than `MIN` and `MAX`, and
+  `NOT` takes a `MIN`/`MAX` operand; in PROC SQL, `^` (NOT) takes a
+  comparison as its operand; colon comparisons (`=:`, `<:` ...) take part in
+  comparison chains; `BETWEEN` accepts constant numeric bounds in either
+  order; `||`, `LIKE` and `CONTAINS` in WHERE and PROC SQL take character
+  operands only (a numeric operand is an error); `**` with invalid arguments
+  (`0 ** 0`, a negative base with a fractional exponent) gives a missing value
+  with the invalid-argument NOTE, and with constant operands it is folded at
+  compile time; WHERE conditions are evaluated without data-error NOTEs.
+  These shapes now fail loud: `NOT` as an operand of `+ - * /` in WHERE, a
+  PROC SQL comparison chain that starts with a colon comparison, a chain of
+  three or more links with a colon comparison, `BETWEEN` with mixed or
+  descending character bounds, a function ERROR or a division by zero in a
+  WHERE condition, `%'` and `%"` outside `%STR`, `%NRSTR`, `%QUOTE` and
+  `%NRQUOTE`, and the remainders of a statement with a missing semicolon
+  other than the supported ones.
 
 ## Macro language
 
