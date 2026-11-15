@@ -87,7 +87,7 @@ engine_exec_steps <- function(eng, text, line) {
       }
       eng$sc_pending <- FALSE
       if (!isTRUE(eng$session$options$nosyntaxcheck)) {
-        eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
+        eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
                      "      This prevents execution of subsequent data modification statements.")
         eng$syntax_check <- TRUE
       }
@@ -116,7 +116,7 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "sql_end") {
       if (isTRUE(eng$sql_noexec)) {
-        eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
+        eng$log <- c(eng$log, "NOTE: sasonr stopped processing this step because of errors.")
         eng$sql_noexec <- FALSE
         if (isTRUE(eng$syntax_check)) err_set_macro(eng, syserr = 1012)
       }
@@ -204,7 +204,7 @@ engine_exec_steps <- function(eng, text, line) {
       # supported; a longer step would have to stop part-way through.
       big <- vapply(tr$outputs, function(nm) NROW(get0(nm, envir = eng$session$work, inherits = FALSE)) > 1L, logical(1))
       if (any(big)) abort_unsupported("an execution-time ERROR that stops a DATA step with more than one observation", step$line)
-      env$.log <- c(env$.log, "NOTE: The SAS System stopped processing this step because of errors.")
+      env$.log <- c(env$.log, "NOTE: sasonr stopped processing this step because of errors.")
     }
     if (step$type == "data") engine_store_numlen(eng, tr$outputs)
     notes_on <- isTRUE(eng$session$options$notes) && eng$step_notes
@@ -338,7 +338,7 @@ engine_check_step <- function(eng, step) {
           unsupported("PROC MEANS with data set options on OUT=")
         }
         SAS 9.4()
-        eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
+        eng$log <- c(eng$log, "NOTE: sasonr stopped processing this step because of errors.")
         if (length(outs)) out_ds(outs, stopped = TRUE)
         syserr <- 1012
       } else if (step$name != "print") {

@@ -31,7 +31,7 @@ test_that("an ERROR in a global statement enters syntax-check mode, other cases 
   expect_identical(r$error_line, 1L)
   expect_identical(r$log, c("ERROR 18-12: Option value for SAS option LINESIZE must be between 64 and 256.",
                             "g syserr=0 syscc=1012",
-                            "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
+                            "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
                             "      This prevents execution of subsequent data modification statements.",
                             "NOTE: The data set WORK.A has 0 observations and 1 variables.",
                             "e syserr=3 syscc=1012"))
@@ -195,7 +195,7 @@ test_that("what each step does in syntax-check mode", {
     proc means data=a; var x; output out=m mean=mx; run; %put 3 &syslast;")
   expect_identical(trimws(grep("^[1-3] ", r$log, value = TRUE)), c("1 1012 WORK.B", "2 3", "3 WORK.M"))
   expect_identical(r$listing, character())
-  expect_identical(sum(r$log == "NOTE: The SAS System stopped processing this step because of errors."), 3L)
+  expect_identical(sum(r$log == "NOTE: sasonr stopped processing this step because of errors."), 3L)
   # existing OUT= data sets are kept, _LAST_ stays
   r <- sas_run("data a; x = 1; run; data s; y = 1; run; data m; y = 2; run; data f; y = 3; run;
     data b; set a y = 2; run; proc sort data=a out=s; by x; run; proc means data=a noprint; var x; output out=m mean=mx; run;

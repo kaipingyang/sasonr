@@ -159,7 +159,7 @@ note_mv_lines <- function(entries) {
 step_end_notes <- function() {
   rt <- rt_diag()
   out <- character()
-  if (isTRUE(rt$flow_note)) out <- "NOTE: SAS went to a new line when INPUT statement reached past the end of a line."
+  if (isTRUE(rt$flow_note)) out <- "NOTE: sasonr went to a new line when INPUT statement reached past the end of a line."
   if (length(rt$mv) > 0) out <- c(out, note_mv_lines(count_entries(rt$mv)))
   if (length(rt$math) > 0) {
     head <- "NOTE: Mathematical operations could not be performed at the following places. The results of the operations have been set to missing values."

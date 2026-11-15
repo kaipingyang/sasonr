@@ -1,7 +1,7 @@
 # SAS error model of sas_run(on_error = "sas").
 #
 # The batch-mode model: a step that raises an ERROR is not executed (or
-# stops); the log gets "NOTE: The SAS System stopped processing this step
+# stops); the log gets "NOTE: sasonr stopped processing this step
 # because of errors." and, outside PROC SQL, syntax-check mode (OBS=0)
 # starts: the steps that follow are compiled but not run -- a DATA step
 # creates its output data sets with 0 observations, PROC steps produce
@@ -274,7 +274,7 @@ err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
 # macro generates the statement): the ERROR is written, SYSCC is set to 1012
 # and SYSERR left alone, no "stopped processing this step" NOTE is written,
 # and syntax-check mode starts at the next step, which writes "Due to ERROR(s)
-# above, SAS set option OBS=0 ..." (a DATA step; engine_exec_steps()).  Other
+# above, sasonr set option OBS=0 ..." (a DATA step; engine_exec_steps()).  Other
 # errors, an error inside a step or PROC SQL, in syntax-check mode or under
 # NOSYNTAXCHECK are not supported: fail loud.
 engine_global_error <- function(eng, e) {
@@ -317,9 +317,9 @@ engine_step_error <- function(eng, e, text) {
     err_set_macro(eng, syscc = 1012)
     return(invisible())
   }
-  eng$log <- c(eng$log, "NOTE: The SAS System stopped processing this step because of errors.")
+  eng$log <- c(eng$log, "NOTE: sasonr stopped processing this step because of errors.")
   if (!isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {
-    eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, SAS set option OBS=0, enabling syntax check mode.",
+    eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
                  "      This prevents execution of subsequent data modification statements.")
     eng$syntax_check <- TRUE
   }

@@ -40,7 +40,7 @@ engine_step_exception <- function(eng, step, tr, e) {
   eng$status <- "error"
   eng$errors <- c(eng$errors, "An exception has been encountered.")
   if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
-  eng$log <- c(eng$log, sas_exception_lines(), "NOTE: The SAS System stopped processing this step because of errors.")
+  eng$log <- c(eng$log, sas_exception_lines(), "NOTE: sasonr stopped processing this step because of errors.")
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
     old <- get0(nm, envir = eng$session$work, inherits = FALSE)

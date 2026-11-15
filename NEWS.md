@@ -102,6 +102,11 @@ the development version provides.
   context of `SUBSTR`; `CONSTANT('EXACTINT', 1E300)` stops the step with the
   SAS exception in a step that runs once and fails loud elsewhere.
 * Dates have no 29 February in years divisible by 4000.
+* Log messages that describe sasonr's own handling name sasonr as the
+  subject: "NOTE: sasonr stopped processing this step because of errors.",
+  "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax
+  check mode." and "NOTE: sasonr went to a new line when INPUT statement
+  reached past the end of a line."
 * Expressions of the DATA step, WHERE and PROC SQL are parsed with one
   operator table. sasonr treats the following as described here:
   `IN`, `NOT IN` and `IN:` bind tighter than the other comparison operators
