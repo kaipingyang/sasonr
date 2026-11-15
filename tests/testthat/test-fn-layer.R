@@ -147,3 +147,32 @@ test_that("calls inside a submission are not checked twice", {
   expect_identical(res$work$a$z, "    3.14")
   expect_true(any(grepl("Invalid argument to function SQRT", res$log)))
 })
+
+test_that("a direct call passes the arguments as written to the implementation", {
+  impl <- function(nm) sasonr:::fn_layer_impl[[nm]]
+  # an empty positional argument and the same argument by name
+  expect_identical(sas_f_collate(48, , 10), "0123456789")
+  expect_identical(sas_f_collate(48, len = 10), "0123456789")
+  expect_identical(sas_f_collate(len = 10, start = 48), "0123456789")
+  expect_identical(sas_f_collate(48, , 10), impl("collate")(48, , 10))
+  # named and positional arguments mixed, in any order
+  expect_identical(sas_f_substr(pos = 2, "abcdef"), impl("substr")(pos = 2, "abcdef"))
+  expect_identical(sas_f_substr("abcdef", len = 2, pos = 3), "cd")
+  expect_identical(sas_f_round(unit = 0.1, 2.45), impl("round")(unit = 0.1, 2.45))
+  # defaults of omitted arguments
+  expect_identical(sas_f_round(2.5), impl("round")(2.5))
+  expect_identical(sas_f_scan("a b c", 2), impl("scan")("a b c", 2))
+  # `...`: given directly, forwarded by another function, and with an empty
+  # element (an error, as for the implementation)
+  expect_identical(sas_f_cats("a ", " b", "c"), impl("cats")("a ", " b", "c"))
+  fwd <- function(...) sas_f_cats(...)
+  expect_identical(fwd("x ", " y"), "xy")
+  expect_error(sas_f_cats("a", , "b"))
+  expect_error(impl("cats")("a", , "b"))
+  expect_identical(sas_f_sum(1, NA, 3), impl("sum")(1, NA, 3))
+  # each argument is evaluated once
+  k <- 0
+  arg <- function() { k <<- k + 1; 4 }
+  expect_identical(sas_f_sqrt(arg()), 2)
+  expect_identical(k, 1)
+})

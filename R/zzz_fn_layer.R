@@ -41,12 +41,37 @@ fn_layer_call <- function(name, impl, call, env) {
     .active$fn_layer <- NULL
     .active$rt <- old_rt
   }, add = TRUE)
+  # the call as written (match.call() names the matched arguments and expands
+  # `...`), every non-empty argument evaluated once; empty arguments stay empty
   mc <- match.call(impl, call, expand.dots = TRUE, envir = env)
-  args <- lapply(as.list(mc)[-1L], eval, envir = env)
+  given <- as.list(mc)[-1L]
+  nms <- names(given) %||% rep("", length(given))
+  empty <- vapply(given, function(a) identical(a, quote(expr = )), TRUE)
+  vals <- vector("list", length(given))
+  for (i in which(!empty)) {
+    v <- eval(given[[i]], env)
+    if (!is.null(v)) vals[[i]] <- v
+  }
   feature_check("function", name, context = "data")
-  if (name %in% names(fn_layer_fmt_arg)) args$fmt <- fn_layer_fmt(args$fmt, fn_layer_fmt_arg[[name]])
+  if (name %in% names(fn_layer_fmt_arg)) {
+    k <- match("fmt", nms)
+    if (!is.na(k) && !empty[k]) vals[[k]] <- fn_layer_fmt(vals[[k]], fn_layer_fmt_arg[[name]])
+  }
+  exact <- mc
+  for (i in which(!empty)) exact[i + 1L] <- list(vals[[i]])
+  exact[[1L]] <- impl
+  run <- function(...) eval(exact, env)
   res <- tryCatch(
-    if (name %in% names(fn_policy)) do.call(sas_fcall, c(list(name, impl), args)) else do.call(impl, args),
+    if (name %in% names(fn_policy)) {
+      # the policy table reads the SAS arguments by position, as translated
+      # code passes them: formals in order, NULL for an empty or omitted one
+      # before a given one, `...` in place; the implementation gets the call
+      # as written
+      do.call(sas_fcall, c(list(name, run), fn_layer_positional(impl, nms, vals, empty),
+                           if (".at" %in% nms) list(.at = vals[[match(".at", nms)]])))
+    } else {
+      eval(exact, env)
+    },
     sasonr_step_exception = function(e) {
       abort_unsupported(sprintf("%s with these arguments outside a DATA step (a step exception, which stops the step)",
                                 toupper(name)))
@@ -54,6 +79,25 @@ fn_layer_call <- function(name, impl, call, env) {
   )
   fn_layer_data_errors(rt, name)
   res
+}
+
+# The SAS arguments of a call by position (see fn_layer_call()).
+fn_layer_positional <- function(impl, nms, vals, empty) {
+  out <- list()
+  last <- 0L
+  for (f in names(formals(impl))) {
+    if (f == "...") {
+      k <- which(!nms %in% names(formals(impl)))
+      for (i in k) out[length(out) + 1L] <- list(if (empty[i]) NULL else vals[[i]])
+      if (length(k)) last <- length(out)
+      next
+    }
+    if (startsWith(f, ".")) next
+    i <- match(f, nms)
+    out[length(out) + 1L] <- list(if (is.na(i) || empty[i]) NULL else vals[[i]])
+    if (!is.na(i) && !empty[i]) last <- length(out)
+  }
+  out[seq_len(last)]
 }
 
 # A format or informat of PUT()/INPUT() given as text ("8.2", "$char10.") or as
