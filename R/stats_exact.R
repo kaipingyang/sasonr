@@ -336,8 +336,9 @@ stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL,
 #   S1 = sequential sum of wd          S2 = sequential sum of t2
 #   S3 = sequential sum of t3          S4 = fma(t3, d, S4)
 # MEAN = S / W and q = MEAN - c0 (the shift of the provisional to the final
-# mean), set to 0 when |q| <= 9.9751031807342009E-15 |c0| (kept from
-# 1.0005986172898007E-14 on; in between fails loud).  The central sums are a
+# mean); sasonr sets q to 0 up to the lower limit (relative to |c0|, in the
+# code below) and keeps it from the upper limit on; between them it fails loud.
+# The central sums are a
 # polynomial in q evaluated by Horner's rule with fused multiply-adds:
 #   CSS = fma(q, W q - 2 S1, S2)       (0 when S2 = 0; missing when negative,
 #                                       and then USS, VAR, STD, STDERR and CV
@@ -462,9 +463,8 @@ stats_means_moments <- function(x, freq = NULL, weight = NULL, vardef = "df", ne
 #   MEAN = SUM / n,  q = MEAN - c0,  CSS = S2 - q (2 S1 - n q),
 #   USS = CSS + SUM * MEAN,  VAR = CSS / (n - 1 | n),  STDERR = sqrt(VAR / n)
 # Supported only without WEIGHT / FREQ, with VARDEF=DF or N, outside the
-# nearly-constant region (|q| < 1.01E-14 |c0|) and the STD cut-off region
-# (VAR <= 1.4312245245430491E-26 MEAN**2): everything else fails loud, as do
-# SKEWNESS and KURTOSIS.
+# nearly-constant region of q and the STD cut-off region (STD_CUT_KEEP):
+# everything else fails loud, as do SKEWNESS and KURTOSIS.
 stats_means_moments_ts1m2 <- function(x, freq, weight, vardef, need) {
   css_family <- c("css", "uss", "var", "std", "stderr", "cv", "skew", "kurt", "t", "prt", "lclm", "uclm")
   moments <- c("sum", "mean", "sumwgt", css_family)
@@ -522,8 +522,8 @@ stats_means_checked <- function(out) {
 }
 
 # STD (and CV) are reported as 0 when VAR (with the VARDEF= divisor) is
-# negligible against the squared mean: STD 0 up to VAR/MEAN**2 =
-# 1.1965683145884955E-26 and STD kept from 1.4312245245430491E-26 on.  Below
+# negligible against the squared mean: sasonr sets STD to 0 up to
+# VAR/MEAN**2 = STD_CUT_ZERO and keeps it from STD_CUT_KEEP on.  Below
 # STD_CUT_MIN the statistics that depend on STD fail loud, as they do between
 # the two limits.
 STD_CUT_MIN <- 2.2713562904522125e-33

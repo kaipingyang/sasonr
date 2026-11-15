@@ -702,7 +702,7 @@ freq_one_request <- function(db, wt, rq, sp) {
   # The TABLES statement options EXPECTED / DEVIATION / CELLCHI2 apply to
   # two-way and multiway tables in the default crosstabulation cell format; the
   # manual states that they have no effect for one-way frequency tables, so
-  #
+  # they are accepted and ignored there (for both supported releases).  The request itself
   # is gated by the statistics registry (freq_stat_gate, per SAS release).  The
   # n-way (CROSSLIST-style) cell rows are not printed by sasonr yet, so that
   # case still fails loud.
