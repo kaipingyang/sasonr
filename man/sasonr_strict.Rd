@@ -27,6 +27,15 @@ supported.
 input domain; other inputs fail loud in both modes) and clock-dependent
 \code{not_comparable} functions (\code{TODAY()}, \code{DATE()}, \code{TIME()}, \code{DATETIME()})
 run in the contexts in which they are supported.
+
+The same rules apply when a function of the function layer (\verb{sas_f_*()}) is
+called directly from R code: the function is checked as in a DATA step,
+\code{sas_f_put()} and \code{sas_f_input()} check their format or informat (given as
+text such as \code{"8.2"}), and arguments outside the supported input domain
+fail loud with \code{sasonr_unsupported}. Where the DATA step writes a data-error
+NOTE or set \verb{_ERROR_} (an invalid argument, invalid data), a direct call
+returns the SAS result and signals a warning of class \code{sasonr_data_error}
+that carries the NOTE text.
 }
 \examples{
 # PROBT() is approximate: the last bits of some results may not be exact

@@ -615,7 +615,9 @@ sas_f_symget <- function(symtab, name, .at = NULL) {
 # `session` there are no ids (NULL): a pattern text still works, an id fails.
 prx_state <- function(session) {
   if (!is.null(session)) return(check_session(session)$rt)
-  .active$rt
+  # outside a run there are no PRXPARSE ids (a direct call's diagnostic
+  # state, zzz_fn_layer.R, holds none)
+  if (is.null(.active$session)) NULL else .active$rt
 }
 
 prx_no_session <- function(fname) {

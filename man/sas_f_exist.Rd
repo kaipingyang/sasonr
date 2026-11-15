@@ -8,7 +8,7 @@
 
 \item{type}{Argument \code{type} of the SAS function.}
 
-\item{.work}{Argument \code{.work} of the SAS function.}
+\item{.work}{The WORK library to look in: an environment whose objects are the WORK data sets (for example \code{list2env(res$work)} for a result \code{res} of \code{\link[=sas_run]{sas_run()}}; translated code passes the one of the running program). Without it a WORK member fails loud; SASHELP members are looked up in the SASHELP directory.}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }

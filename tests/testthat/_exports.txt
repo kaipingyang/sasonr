@@ -52,8 +52,8 @@ public sas_f_countc
 public sas_f_countw
 public sas_f_css
 public sas_f_cv
-public sas_f_cvt_c2n
-public sas_f_cvt_n2c
+internal sas_f_cvt_c2n
+internal sas_f_cvt_n2c
 public sas_f_datdif
 public sas_f_date
 public sas_f_datejul
@@ -167,11 +167,11 @@ public sas_f_sin
 public sas_f_sinh
 public sas_f_skewness
 public sas_f_smallest
-public sas_f_sqlcase
-public sas_f_sqlinlist
-public sas_f_sqllike
-public sas_f_sqlmonotonic
-public sas_f_sqlquant
+internal sas_f_sqlcase
+internal sas_f_sqlinlist
+internal sas_f_sqllike
+internal sas_f_sqlmonotonic
+internal sas_f_sqlquant
 public sas_f_sqrt
 public sas_f_std
 public sas_f_stderr

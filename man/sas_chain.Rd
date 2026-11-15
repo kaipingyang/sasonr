@@ -7,6 +7,6 @@
 sas_chain(args, ops)
 }
 \description{
-An op ending in \verb{:} is a colon (truncated) comparison.
+An op ending in \code{:} is a colon (truncated) comparison.
 }
 \keyword{internal}

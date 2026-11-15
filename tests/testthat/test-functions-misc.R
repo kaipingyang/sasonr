@@ -28,24 +28,25 @@ test_that("JULDATE uses the YEARCUTOFF window for yyddd", {
 })
 
 test_that("LOGSDF/SDF/LOGCDF use the tails directly", {
-  expect_equal(sas_f_logsdf("NORMAL", 10), -53.23128515051247, tolerance = 1e-14)
-  expect_equal(sas_f_sdf("NORMAL", 1.96), 0.024997895148220439, tolerance = 1e-12)
+  expect_equal(lenient(sas_f_logsdf("NORMAL", 10)), -53.23128515051247, tolerance = 1e-14)
+  expect_equal(lenient(sas_f_sdf("NORMAL", 1.96)), 0.024997895148220439, tolerance = 1e-12)
 })
 
 test_that("noncentral F: accurate distribution function and quantile", {
-  expect_equal(sas_f_probf(1, 2, 10, 1), 0.4502696915707326, tolerance = 1e-14)
-  expect_equal(sas_f_finv(0.95, 2, 10, 1), 5.9925880338395423, tolerance = 1e-12)
+  expect_equal(lenient(sas_f_probf(1, 2, 10, 1)), 0.4502696915707326, tolerance = 1e-14)
+  expect_equal(lenient(sas_f_finv(0.95, 2, 10, 1)), 5.9925880338395423, tolerance = 1e-12)
 })
 
 test_that("PROBT: noncentral t beyond the range of R's pnt (1e-13)", {
   # probt(2,10,1) = 0.80761156253037503
-  expect_equal(sas_f_probt(2, 10, 1), 0.80761156253037503, tolerance = 1e-12)
+  expect_equal(lenient(sas_f_probt(2, 10, 1)), 0.80761156253037503, tolerance = 1e-12)
   # R's pt() returns 2.3e-13 here; the true value is 7.5e-88, so compare the ratio.
-  expect_equal(sas_f_probt(-40, 100, 5) / 7.5280904809890335e-88, 1, tolerance = 1e-11)
-  expect_equal(sas_f_probt(-5, 100, 1) / 7.5915155338165518e-09, 1, tolerance = 1e-12)
-  expect_equal(sas_f_probt(2, 10), 0.96330598261462985, tolerance = 1e-15)
-  expect_true(is.na(sas_f_probt(2, 10, NA_real_))) # missing nc gives missing
-  expect_true(is.na(sas_f_probt(2, 0)))            # df must be positive
+  expect_equal(lenient(sas_f_probt(-40, 100, 5)) / 7.5280904809890335e-88, 1, tolerance = 1e-11)
+  expect_equal(lenient(sas_f_probt(-5, 100, 1)) / 7.5915155338165518e-09, 1, tolerance = 1e-12)
+  expect_equal(lenient(sas_f_probt(2, 10)), 0.96330598261462985, tolerance = 1e-15)
+  expect_true(is.na(lenient(sas_f_probt(2, 10, NA_real_)))) # missing nc gives missing
+  expect_warning(v <- lenient(sas_f_probt(2, 0)), class = "sasonr_data_error") # df must be positive
+  expect_true(is.na(v))
 })
 
 test_that("zero-length results of STRIP and TRIMN have LENGTHC 0", {

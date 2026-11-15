@@ -32,8 +32,8 @@ test_that("a unit that is not a normal double is an invalid argument", {
   withr::local_options(sasonr.sas_version = "SAS 9.4")
   expect_identical(sas_f_round(1, 2.3e-308), 1)
   expect_true(is.na(suppressWarnings(sas_f_round(1, 2.2e-308))))
-  expect_true(is.na(suppressWarnings(sas_f_rounde(1, 1e-308))))
-  expect_true(is.na(suppressWarnings(sas_f_roundz(1, 1e-308))))
+  expect_true(is.na(suppressWarnings(lenient(sas_f_rounde(1, 1e-308)))))
+  expect_true(is.na(suppressWarnings(lenient(sas_f_roundz(1, 1e-308)))))
 })
 
 test_that("a subnormal literal: an ERROR in SAS 9.4, kept as-is in SAS 9.4", {

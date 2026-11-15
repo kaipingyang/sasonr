@@ -14,7 +14,10 @@ test_that("the NAMESPACE exports are exactly the intended API", {
   expect_identical(sort(setdiff(name, exp)), character(), label = "listed but not exported")
   # the binding of the active session is never exported
   expect_false("sas_rt_active" %in% exp)
-  # every SAS function implementation is public
+  # every SAS function implementation is public; the helpers of translated
+  # PROC SQL code (sas_f_cvt_*, sas_f_sql*) are internal
   fns <- grep("^sas_f_", ls(asNamespace("sasonr")), value = TRUE)
-  expect_setequal(intersect(fns, name[kind == "public"]), fns)
+  helpers <- paste0("sas_f_", sasonr:::fn_layer_internal)
+  expect_setequal(intersect(fns, name[kind == "public"]), setdiff(fns, helpers))
+  expect_setequal(intersect(fns, name[kind == "internal"]), helpers)
 })

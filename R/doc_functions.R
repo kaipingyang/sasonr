@@ -764,7 +764,7 @@ NULL
 #'
 #' @param name Name.
 #' @param type Argument `type` of the SAS function.
-#' @param .work Argument `.work` of the SAS function.
+#' @param .work The WORK library to look in: an environment whose objects are the WORK data sets (for example `list2env(res$work)` for a result `res` of [sas_run()]; translated code passes the one of the running program). Without it a WORK member fails loud; SASHELP members are looked up in the SASHELP directory.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Implements the SAS DATA step semantics (log NOTEs, `_ERROR_`), which base R has no counterpart for.

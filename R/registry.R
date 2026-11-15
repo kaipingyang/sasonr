@@ -173,6 +173,15 @@ feature_status_text <- function(status) {
 #' `not_comparable` functions (`TODAY()`, `DATE()`, `TIME()`, `DATETIME()`)
 #' run in the contexts in which they are supported.
 #'
+#' The same rules apply when a function of the function layer (`sas_f_*()`) is
+#' called directly from R code: the function is checked as in a DATA step,
+#' `sas_f_put()` and `sas_f_input()` check their format or informat (given as
+#' text such as `"8.2"`), and arguments outside the supported input domain
+#' fail loud with `sasonr_unsupported`. Where the DATA step writes a data-error
+#' NOTE or set `_ERROR_` (an invalid argument, invalid data), a direct call
+#' returns the SAS result and signals a warning of class `sasonr_data_error`
+#' that carries the NOTE text.
+#'
 #' @name sasonr_strict
 #' @aliases sasonr.strict
 #' @examples
