@@ -2,12 +2,14 @@
 #
 # The emitters build language objects; they are executed as they are and
 # deparsed once, by cg_render(), for display (sas_translate()). Deparsing
-# keeps every value exact (digits17, keepNA, keepInteger), so the displayed
+# keeps every value exact (15 digits where they suffice, else 17; keepNA,
+# keepInteger), so the displayed
 # code parses back to the executed objects. A vectorised pipeline is kept as
 # a cg_pipe (its source and stages) and displayed with `|>`; it runs as the
 # nested call.
 
-cg_deparse_opts <- c("keepNA", "keepInteger", "niceNames", "showAttributes", "digits17")
+cg_deparse_opts15 <- c("keepNA", "keepInteger", "niceNames", "showAttributes")
+cg_deparse_opts <- c(cg_deparse_opts15, "digits17")
 
 #' A pipeline: `target <- src |> stage1 |> stage2 ...`
 #'
@@ -31,8 +33,13 @@ cg_lang <- function(x) {
 #' @noRd
 cg_exec <- function(exprs) as.expression(lapply(exprs, cg_lang))
 
-cg_deparse <- function(x) {
-  paste(deparse(x, width.cutoff = 80L, control = cg_deparse_opts), collapse = "\n")
+# 15 significant digits where they give the same object back (readable
+# literals), else 17
+cg_deparse <- function(x, width = 80L, collapse = "\n") {
+  txt <- paste(deparse(x, width.cutoff = width, control = cg_deparse_opts15), collapse = collapse)
+  back <- tryCatch(parse(text = txt, keep.source = FALSE), error = function(e) NULL)
+  if (length(back) == 1L && identical(back[[1]], x, num.eq = FALSE)) return(txt)
+  paste(deparse(x, width.cutoff = width, control = cg_deparse_opts), collapse = collapse)
 }
 
 #' The display text of the elements, after the header comment lines
@@ -46,3 +53,42 @@ cg_render <- function(exprs, header = character()) {
   }, "")
   paste(c(header, body), collapse = "\n")
 }
+
+# Values as language ------------------------------------------------------
+#
+# A constant embedded in a language object must deparse to text that parses
+# back to the same object: a negative number becomes the call -(x), Inf and
+# NaN the symbols, a vector a c() call, a list a list() call.
+
+cg_num <- function(x) {
+  if (is.na(x) && !is.nan(x)) return(if (is.integer(x)) NA_integer_ else NA_real_)
+  if (is.nan(x)) return(as.name("NaN"))
+  if (x < 0 || (x == 0 && 1 / x < 0)) return(call("-", cg_num(-x)))
+  if (is.infinite(x)) return(as.name("Inf"))
+  x
+}
+
+cg_val <- function(x) {
+  if (is.null(x)) return(NULL)
+  if (is.list(x)) return(as.call(c(list(as.name("list")), lapply(x, function(v) cg_val(v) %||% quote(NULL)))))
+  x <- unname(x)
+  if (length(x) == 1) return(if (is.numeric(x)) cg_num(x) else x)
+  if (length(x) == 0) return(call(switch(typeof(x), character = "character", double = "numeric", integer = "integer", logical = "logical")))
+  as.call(c(list(as.name("c")), lapply(x, cg_val)))
+}
+
+# A call of `fun` ("f" or "pkg::f") with the arguments in `args` (a list,
+# names kept; a NULL element is a NULL argument).
+cg_call <- function(fun, args = list()) {
+  f <- if (grepl("::", fun, fixed = TRUE)) {
+    p <- strsplit(fun, "::", fixed = TRUE)[[1]]
+    call("::", as.name(p[1]), as.name(p[2]))
+  } else as.name(fun)
+  as.call(c(list(f), args))
+}
+
+# `.at = c(line, col)`
+cg_at <- function(line, col) list(.at = call("c", as.integer(line), as.integer(col %||% NA_integer_)))
+
+# The text of an expression on one line (the emitters that still build text).
+cg_text <- function(x) cg_deparse(x, width = 500L, collapse = " ")

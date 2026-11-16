@@ -27,15 +27,17 @@ with_mode <- function(cx, mode) {
   cx2
 }
 
-var_ref <- function(name, cx) {
+var_lang <- function(name, cx) {
   switch(cx$mode,
-    vec = r_name(name),
-    out = paste0(".d$", r_name(name)),
-    row = paste0("pdv$", r_name(name))
+    vec = as.name(name),
+    out = call("$", as.name(".d"), as.name(name)),
+    row = call("$", as.name("pdv"), as.name(name))
   )
 }
 
-negate_if <- function(code, negate) if (isTRUE(negate)) paste0("sas_not(", code, ")") else code
+var_ref <- function(name, cx) cg_text(var_lang(name, cx))
+
+negate_if <- function(x, negate) if (isTRUE(negate)) call("sas_not", x) else x
 
 # The value of a numeric constant operand: a literal, a signed literal or an
 # arithmetic operation on such operands (the operation itself valid); NULL
@@ -73,27 +75,33 @@ gen_missing_node <- function(x, cx) {
   x$node == "binary" && x$op %in% c("+", "-", "*", "/") || x$node == "unary" && identical(x$op, "-")
 }
 
-gen_expr <- function(e, cx) {
-  g <- function(x) gen_expr(x, cx)
+# The text of an expression (the statement emitters still build text).
+gen_expr <- function(e, cx) cg_text(gen_lang(e, cx))
+
+# Missing value literal: `.` or a special missing value.
+missing_lang <- function(code) if (code == ".") NA_real_ else call("sas_missing", code)
+
+gen_lang <- function(e, cx) {
+  g <- function(x) gen_lang(x, cx)
+  inexact <- function() if (isTRUE(cx$inexact)) list(.exact = FALSE)
   switch(e$node,
-    num = r_num(e$value),
-    str = r_str(if (nzchar(e$value)) e$value else " "),
-    missing = if (e$code == ".") "NA_real_" else paste0("sas_missing(", r_str(e$code), ")"),
-    var = var_ref(e$name, cx),
-    array_ref = gen_array_ref(e, cx),
+    num = cg_num(e$value),
+    str = if (nzchar(e$value)) e$value else " ",
+    missing = missing_lang(e$code),
+    var = var_lang(e$name, cx),
+    array_ref = gen_array_lang(e, cx),
     unary = switch(e$op,
       "-" = {
         # SAS records the place of a unary minus at the operand's position; the
         # minus itself is not recorded when the operand is a generated missing
         # value (gen_missing_node(): -(a + b) records the "+" only, -(a ** 2)
         # records the "**" and the minus)
-        at <- if (!is.null(e$arg$col)) at_code(list(line = e$arg$line, col = e$arg$col)) else ""
-        if (gen_missing_node(e$arg, cx)) at <- paste0(at, ", .gen_a = TRUE")
-        if (isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
-        paste0("sas_neg(", g(e$arg), at, ")")
+        at <- if (!is.null(e$arg$col)) cg_at(e$arg$line, e$arg$col)
+        if (gen_missing_node(e$arg, cx)) at <- c(at, list(.gen_a = TRUE))
+        cg_call("sas_neg", c(list(g(e$arg)), at, inexact()))
       },
       "+" = g(e$arg),
-      not = paste0("sas_not(", g(e$arg), ")")
+      not = call("sas_not", g(e$arg))
     ),
     binary = {
       ct <- ct_diag()
@@ -108,7 +116,7 @@ gen_expr <- function(e, cx) {
         log_place_check(c(e$line, e$col %||% NA))
         ct$notes <- c(ct$notes, sprintf("NOTE: Division by zero detected during the compilation phase, detected at line %d column %d.",
                                         as.integer(e$line), as.integer(e$col %||% 0L)))
-        return("NA_real_")
+        return(NA_real_)
       }
       arith <- e$op %in% c("+", "-", "*", "/", "**")
       # ** of two constant operands (literals, signed literals and operations
@@ -122,7 +130,7 @@ gen_expr <- function(e, cx) {
             ((a0 == 0 && b0 <= 0) || (a0 < 0 && b0 != trunc(b0)) || is.infinite(a0^b0))) {
           where_ct()
           ct$notes <- c(ct$notes, "NOTE: Invalid argument(s) to the exponential operator \"**\".")
-          return("NA_real_")
+          return(NA_real_)
         }
       }
       if (arith && e$op != "**" && e$lhs$node == "num" && e$rhs$node == "num") {
@@ -142,7 +150,7 @@ gen_expr <- function(e, cx) {
           (e$lhs$node == "missing" || e$rhs$node == "missing")) {
         where_ct()
         log_place("mv.compile", at = c(e$line, e$col %||% NA_integer_))
-        return("NA_real_")
+        return(NA_real_)
       }
       a <- g(e$lhs)
       b <- g(e$rhs)
@@ -150,32 +158,32 @@ gen_expr <- function(e, cx) {
         "/" = "sas_div", "**" = "sas_pow", "||" = "sas_concat", and = "sas_and",
         or = "sas_or", min = "sas_min_op", max = "sas_max_op", NA_character_
       )
-      at <- if (arith && !is.null(e$col)) at_code(e) else ""
+      at <- if (arith && !is.null(e$col)) cg_at(e$line, e$col)
       # vectorised code evaluates guarded expressions for every row, so the
       # missing-value counts there are not exact (the engine re-runs as L3)
-      if (arith && isTRUE(cx$inexact)) at <- paste0(at, ", .exact = FALSE")
+      if (arith && isTRUE(cx$inexact)) at <- c(at, list(.exact = FALSE))
       # an operand that is a generated missing value (gen_missing_node()): its place
       # was already recorded and +, -, *, / do not record another one (a + b + c with
       # b missing: 1 place; (a + b) / 3: 1 place).  ** always records its place,
       # also for a generated operand ((a + b) ** 2: 2 places).
-      if ((is.na(fun) || fun == "sas_div") && nzchar(at)) {
-        if (gen_missing_node(e$lhs, cx)) at <- paste0(at, ", .gen_a = TRUE")
-        if (gen_missing_node(e$rhs, cx)) at <- paste0(at, ", .gen_b = TRUE")
+      if ((is.na(fun) || fun == "sas_div") && length(at)) {
+        if (gen_missing_node(e$lhs, cx)) at <- c(at, list(.gen_a = TRUE))
+        if (gen_missing_node(e$rhs, cx)) at <- c(at, list(.gen_b = TRUE))
       }
-      if (is.na(fun)) paste0("sas_arith(", a, ", ", b, ", ", r_str(e$op), at, ")") else paste0(fun, "(", a, ", ", b, at, ")")
+      if (is.na(fun)) cg_call("sas_arith", c(list(a, b, e$op), at)) else cg_call(fun, c(list(a, b), at))
     },
     compare = if (isTRUE(e$colon)) {
-      sprintf("sas_cmp_trunc(%s, %s, %s)", r_str(e$op), g(e$lhs), g(e$rhs))
+      call("sas_cmp_trunc", e$op, g(e$lhs), g(e$rhs))
     } else {
-      sprintf("%s(%s, %s)", cmp_helper[[e$op]], g(e$lhs), g(e$rhs))
+      call(cmp_helper[[e$op]], g(e$lhs), g(e$rhs))
     },
-    chain = sprintf("sas_chain(list(%s), %s)", paste(vapply(e$args, g, ""), collapse = ", "), r_chr_vec(e$ops)),
-    "in" = negate_if(sprintf("sas_in(%s, %s)", g(e$lhs), gen_in_values(e)), e$negate),
-    between = negate_if(sprintf("sas_between(%s, %s, %s)", g(e$lhs), g(e$lo), g(e$hi)), e$negate),
-    contains = negate_if(sprintf("as.numeric(sas_f_index(%s, sas_rtrim(%s)) > 0)", g(e$lhs), g(e$rhs)), e$negate),
-    is_missing = negate_if(sprintf("sas_f_missing(%s)", g(e$lhs)), e$negate),
+    chain = call("sas_chain", cg_call("list", lapply(e$args, g)), cg_val(e$ops)),
+    "in" = negate_if(call("sas_in", g(e$lhs), gen_in_values(e)), e$negate),
+    between = negate_if(call("sas_between", g(e$lhs), g(e$lo), g(e$hi)), e$negate),
+    contains = negate_if(call("as.numeric", call(">", call("sas_f_index", g(e$lhs), call("sas_rtrim", g(e$rhs))), 0)), e$negate),
+    is_missing = negate_if(call("sas_f_missing", g(e$lhs)), e$negate),
     call = gen_call(e, cx),
-    omitted = "NULL",
+    omitted = quote(NULL),
     abort_unsupported(paste("expression node", e$node), e$line)
   )
 }
@@ -183,21 +191,22 @@ gen_expr <- function(e, cx) {
 gen_in_values <- function(e) {
   vals <- unlist(lapply(e$items, function(it) {
     switch(it$node,
-      num = r_num(it$value),
-      str = r_str(it$value),
-      missing = if (it$code == ".") "NA_real_" else paste0("sas_missing(", r_str(it$code), ")"),
+      num = list(cg_num(it$value)),
+      str = list(it$value),
+      missing = list(missing_lang(it$code)),
       range = {
         if (it$to - it$from > 10000) abort_unsupported("IN range wider than 10000 values", e$line)
-        vapply(seq(it$from, it$to), r_num, "")
+        lapply(seq(it$from, it$to), function(v) cg_num(as.numeric(v)))
       }
     )
-  }))
-  paste0("c(", paste(vals, collapse = ", "), ")")
+  }), recursive = FALSE)
+  cg_call("c", vals)
 }
 
 at_code <- function(e) sprintf(", .at = c(%dL, %dL)", as.integer(e$line), as.integer(e$col %||% NA_integer_))
 
-fmt_lit <- function(fmt) r_lit(fmt[c("name", "w", "d", "char", "text")])
+fmt_lang <- function(fmt) cg_val(fmt[c("name", "w", "d", "char", "text")])
+fmt_lit <- function(fmt) cg_text(fmt_lang(fmt))
 
 # VNAME(), VLENGTH() ... : compile-time facts about a variable (or an array element).
 gen_var_info <- function(e, cx) {
@@ -210,25 +219,25 @@ gen_var_info <- function(e, cx) {
     len <- if (char) inf$len else 8L
     fmt_text <- if (!is.null(fmt)) toupper(fmt$text) else if (char) paste0("$", len, ".") else "BEST12."
     switch(e$name,
-      vname = r_str(inf$disp %||% v),
-      vlength = r_num(len),
-      vtype = r_str(if (char) "C" else "N"),
-      vlabel = r_str(if (!is.na(an$labels[v] %|NA|% NA)) an$labels[[v]] else (inf$disp %||% v)),
-      vformat = r_str(fmt_text),
-      vformatn = r_str(if (!is.null(fmt)) toupper(paste0(if (fmt$char) "$", fmt$name)) else if (char) "$" else "BEST"),
-      vformatw = r_num(if (!is.null(fmt) && !is.na(fmt$w)) fmt$w else if (char) len else 12),
-      vformatd = r_num(if (!is.null(fmt) && !is.na(fmt$d)) fmt$d else 0),
-      vinformat = r_str(if (char) paste0("$", len, ".") else "BEST32."),
-      vvalue = sprintf("sas_rtrim(sas_put_value(%s%s))", var_ref(v, cx), fmt_code(fmt))
+      vname = inf$disp %||% v,
+      vlength = cg_num(as.numeric(len)),
+      vtype = if (char) "C" else "N",
+      vlabel = if (!is.na(an$labels[v] %|NA|% NA)) an$labels[[v]] else (inf$disp %||% v),
+      vformat = fmt_text,
+      vformatn = if (!is.null(fmt)) toupper(paste0(if (fmt$char) "$", fmt$name)) else if (char) "$" else "BEST",
+      vformatw = cg_num(as.numeric(if (!is.null(fmt) && !is.na(fmt$w)) fmt$w else if (char) len else 12)),
+      vformatd = cg_num(as.numeric(if (!is.null(fmt) && !is.na(fmt$d)) fmt$d else 0)),
+      vinformat = if (char) paste0("$", len, ".") else "BEST32.",
+      vvalue = call("sas_rtrim", cg_call("sas_put_value", c(list(var_lang(v, cx)), if (!is.null(fmt)) list(fmt_lang(fmt)))))
     )
   }
   if (a$node == "var") return(info_of(a$name))
   arr <- an$arrays[[a$name]]
   if (arr$temporary) abort_unsupported(paste0(toupper(e$name), " of a temporary array element"), e$line)
   if (cx$mode != "row") abort_unsupported("array reference in vectorised code", e$line)
-  idx <- sprintf("sas_idx(%s, %dL, %dL)", gen_expr(a$index[[1]], cx), as.integer(arr$lo), as.integer(arr$dim))
-  if (e$name == "vvalue") return(sprintf("sas_rtrim(sas_put_value(%s))", gen_array_ref(a, cx)))
-  sprintf("c(%s)[%s]", paste(vapply(arr$elems, info_of, ""), collapse = ", "), idx)
+  idx <- call("sas_idx", gen_lang(a$index[[1]], cx), as.integer(arr$lo), as.integer(arr$dim))
+  if (e$name == "vvalue") return(call("sas_rtrim", call("sas_put_value", gen_array_lang(a, cx))))
+  call("[", cg_call("c", lapply(arr$elems, info_of)), idx)
 }
 
 gen_call <- function(e, cx) {
@@ -236,67 +245,63 @@ gen_call <- function(e, cx) {
   old_fn_arg <- cx$fn_arg
   cx$fn_arg <- TRUE
   on.exit(cx$fn_arg <- old_fn_arg, add = TRUE)
+  g <- function(x) gen_lang(x, cx)
+  inexact <- if (isTRUE(cx$inexact)) list(.exact = FALSE)
   if (e$name %in% c("dim", "lbound", "hbound")) {
     arr <- cx$an$arrays[[e$args[[1]]$name]]
-    return(switch(e$name, dim = paste0(arr$dim, "L"), lbound = paste0(as.integer(arr$lo), "L"),
-                  hbound = paste0(as.integer(arr$lo + arr$dim - 1L), "L")))
+    return(switch(e$name, dim = as.integer(arr$dim), lbound = as.integer(arr$lo),
+                  hbound = as.integer(arr$lo + arr$dim - 1L)))
   }
   if (e$name %in% var_info_fns) return(gen_var_info(e, cx))
   if (e$name == "put") {
-    return(sprintf("sas_f_put(%s, %s%s)", gen_expr(e$args[[1]], cx), fmt_lit(e$fmt),
-                   if (is.null(e$align)) "" else paste0(", align = ", r_str(e$align))))
+    return(cg_call("sas_f_put", c(list(g(e$args[[1]]), fmt_lang(e$fmt)), if (!is.null(e$align)) list(align = e$align))))
   }
   if (e$name == "input") {
-    return(sprintf("sas_f_input(%s, %s%s%s)", gen_expr(e$args[[1]], cx), fmt_lit(e$fmt),
-                   if (nzchar(e$qq)) paste0(", qq = ", r_str(e$qq)) else "",
-                   if (cx$mode == "row" && !is.null(e$col)) at_code(e) else ""))
+    return(cg_call("sas_f_input", c(list(g(e$args[[1]]), fmt_lang(e$fmt)),
+                                    if (nzchar(e$qq)) list(qq = e$qq),
+                                    if (cx$mode == "row" && !is.null(e$col)) cg_at(e$line, e$col))))
   }
   if (e$name == "exist") {
     # EXIST(member <, type>): the generated DATA step environment carries the
     # WORK library (`work`, see engine_eval()); SASHELP from the store of R/sashelp.R
-    a1 <- gen_expr(e$args[[1]], cx)
-    a2 <- if (length(e$args) > 1) gen_expr(e$args[[2]], cx) else "NULL"
-    return(sprintf("sas_f_exist(%s, %s, work)", a1, a2))
+    a2 <- if (length(e$args) > 1) g(e$args[[2]]) else quote(NULL)
+    return(call("sas_f_exist", g(e$args[[1]]), a2, as.name("work")))
   }
   args <- unlist(lapply(e$args, function(a) {
-    if (a$node == "of") vapply(a$vars, var_ref, "", cx = cx) else gen_expr(a, cx)
-  }))
+    if (a$node == "of") lapply(a$vars, var_lang, cx = cx) else list(g(a))
+  }), recursive = FALSE)
   if (!is.null(e$lag)) {
-    x <- args[1]
-    n <- e$lag$n
+    x <- args[[1]]
+    n <- as.integer(e$lag$n)
     if (cx$mode == "row") {
       fun <- if (e$lag$kind == "lag") "sas_lag" else "sas_dif"
-      return(sprintf("%s(.lags, \"site%d\", %s, %dL)", fun, e$site, x, n))
+      return(call(fun, as.name(".lags"), paste0("site", e$site), x, n))
     }
-    if (e$lag$kind == "lag") return(sprintf("sas_lag_vec(%s, %dL)", x, n))
-    return(sprintf("(%s - sas_lag_vec(%s, %dL))", x, x, n))
+    if (e$lag$kind == "lag") return(call("sas_lag_vec", x, n))
+    return(call("(", call("-", x, call("sas_lag_vec", x, n))))
   }
-  if (e$name == "symget") args <- c(".symtab", args)
+  if (e$name == "symget") args <- c(list(as.name(".symtab")), args)
   in_sql <- identical(cx$an$context, "sql")
   if (e$name %in% names(fn_policy) && (!is.null(e$col) || in_sql)) {
     # missing / invalid arguments: log NOTEs and _ERROR_ (fn_policy.R).
     # In PROC SQL the expressions carry no line/column; the invalid-argument
     # NOTE of PROC SQL does not use them either (diag.R).
-    at_arg <- if (!is.null(e$col)) sprintf(", .at = c(%dL, %dL)", as.integer(e$line), as.integer(e$col)) else ""
-    return(sprintf("sas_fcall(\"%s\", sas_f_%s%s%s%s)", e$name, e$name,
-                   paste0(", ", args, collapse = ""), at_arg,
-                   if (isTRUE(cx$inexact)) ", .exact = FALSE" else ""))
+    return(cg_call("sas_fcall", c(list(e$name, as.name(paste0("sas_f_", e$name))), args,
+                                  if (!is.null(e$col)) cg_at(e$line, e$col), inexact)))
   }
-  at <- if (cx$mode == "row" && e$name %in% err_fns && !is.null(e$col)) at_code(e) else ""
-  if (e$name == "catx") at <- paste0(at, sprintf(", .len = %dL", as.integer(e$buf_len %||% 200L)))
-  if (e$name %in% c("cat", "cats", "catt")) at <- paste0(at, sprintf(", .len = %dL", as.integer(e$buf_len %||% 200L)))
+  at <- if (cx$mode == "row" && e$name %in% err_fns && !is.null(e$col)) cg_at(e$line, e$col)
+  if (e$name %in% c("catx", "cat", "cats", "catt")) at <- c(at, list(.len = as.integer(e$buf_len %||% 200L)))
   if (e$name %in% mv_note_fns && !is.null(e$col) && length(args) > 0) {
     # count missing arguments once, then call with the evaluated arguments
-    extra <- if (nzchar(at)) sprintf(", list(%s)", sub("^, ", "", at)) else ""
-    return(sprintf("do.call(sas_f_%s, c(sas_mv_args(c(%dL, %dL), %s%s)%s))", e$name, as.integer(e$line),
-                   as.integer(e$col), paste(args, collapse = ", "), if (isTRUE(cx$inexact)) ", .exact = FALSE" else "", extra))
+    mv <- cg_call("sas_mv_args", c(list(call("c", as.integer(e$line), as.integer(e$col))), args, inexact))
+    return(call("do.call", as.name(paste0("sas_f_", e$name)),
+                if (length(at)) call("c", mv, cg_call("list", at)) else call("c", mv)))
   }
-  call <- sprintf("sas_f_%s(%s%s)", e$name, paste(args, collapse = ", "), at)
+  out <- cg_call(paste0("sas_f_", e$name), c(args, at))
   if (e$name %in% mv_result_fns && !is.null(e$col)) {
-    call <- sprintf("sas_mv_res(%s, c(%dL, %dL)%s)", call, as.integer(e$line), as.integer(e$col),
-                    if (isTRUE(cx$inexact)) ", .exact = FALSE" else "")
+    out <- cg_call("sas_mv_res", c(list(out, call("c", as.integer(e$line), as.integer(e$col))), inexact))
   }
-  call
+  out
 }
 
 # Can evaluating this expression raise a SAS data error (sets _ERROR_)?
@@ -315,12 +320,15 @@ stmt_may_error <- function(s) {
   any(vapply(Filter(Negate(is.null), stmt_exprs(s)), expr_may_error, logical(1)))
 }
 
-gen_array_ref <- function(e, cx) {
+gen_array_lang <- function(e, cx) {
   if (cx$mode != "row") abort_unsupported("array reference in vectorised code", e$line)
   arr <- cx$an$arrays[[e$name]]
-  idx <- sprintf("sas_idx(%s, %dL, %dL)", gen_expr(e$index[[1]], cx), as.integer(arr$lo), as.integer(arr$dim))
-  if (arr$temporary) sprintf(".ta_%s[%s]", arr$name, idx) else sprintf("pdv[[.arr_%s[%s]]]", arr$name, idx)
+  idx <- call("sas_idx", gen_lang(e$index[[1]], cx), as.integer(arr$lo), as.integer(arr$dim))
+  if (arr$temporary) call("[", as.name(paste0(".ta_", arr$name)), idx)
+  else call("[[", as.name("pdv"), call("[", as.name(paste0(".arr_", arr$name)), idx))
 }
+
+gen_array_ref <- function(e, cx) cg_text(gen_array_lang(e, cx))
 
 coerce_to <- function(code, type, len) {
   if (type == "char") sprintf("sas_char(%s, %dL)", code, as.integer(len)) else code
