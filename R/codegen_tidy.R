@@ -931,7 +931,7 @@ gen_row_step <- function(an) {
 
 # The L3 statement emitters return lists of language objects.
 
-sym <- as.name
+sym <- function(x) as.name(x)
 pdv_ref <- function(v) call("$", sym("pdv"), sym(v))
 assign_lang <- function(target, value) call("<-", target, value)
 brace <- function(body) as.call(c(list(sym("{")), body))
