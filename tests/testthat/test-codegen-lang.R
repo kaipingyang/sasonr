@@ -84,3 +84,11 @@ test_that("a non-syntactic name keeps its backticks in vectorised code (_N_)", {
   expect_equal(r$work$b$n, c(1, 2, 3))
   expect_match(r$translation$steps[[2]]$code, "n = `_n_`", fixed = TRUE)
 })
+
+test_that("cg_trim() matches trimws() and stays linear on long blank runs", {
+  x <- c("  a b  ", "\tx\n", "", "   ", "a", paste0("'", strrep(" ", 3), "'  "))
+  expect_identical(cg_trim(x), trimws(x))
+  long <- paste0("x <- \"", strrep(" ", 32767), "\"")
+  expect_lt(system.time(r <- cg_trim(long))[["elapsed"]], 1)
+  expect_identical(r, long)
+})

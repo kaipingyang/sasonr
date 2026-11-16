@@ -111,7 +111,21 @@ cg_at <- function(line, col) list(.at = call("c", as.integer(line), as.integer(c
 # The text of an expression on one line (the display layouts of the generated code).
 # A call longer than deparse()'s widest line is joined without the line
 # break's indentation.
-cg_text <- function(x) paste(trimws(cg_deparse(x, width = 500L, collapse = NULL)), collapse = " ")
+cg_text <- function(x) paste(cg_trim(cg_deparse(x, width = 500L, collapse = NULL)), collapse = " ")
+
+# trimws() in linear time: its trailing pattern `[ \t\r\n]+$` is tried at every
+# blank, which is quadratic in a line with a long run of blanks (a string
+# literal of thousands of blanks); the leading pattern is anchored, and the
+# trailing blanks are removed by position.
+cg_trim <- function(lines) {
+  lines <- sub("^[ \t\r\n]+", "", lines)
+  for (i in which(grepl("[ \t\r\n]$", lines))) {
+    ch <- strsplit(lines[i], "", fixed = TRUE)[[1]]
+    keep <- which(!ch %in% c(" ", "\t", "\r", "\n"))
+    lines[i] <- if (length(keep)) paste(ch[seq_len(max(keep))], collapse = "") else ""
+  }
+  lines
+}
 
 # A function literal as parse() gives it (the fourth element, the source
 # reference, is NULL).
