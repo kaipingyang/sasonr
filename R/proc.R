@@ -252,7 +252,7 @@ proc_meta <- function(st, vars, out_names = vars) {
 }
 
 proc_source_code <- function(inp, obs_col = FALSE) {
-  ds_code(inp$ds, list(arrays = list()), obs_col = obs_col, where = inp$where)
+  ds_code(inp$ds, list(arrays = list()), obs_col = obs_col, where = inp$where)$text
 }
 
 translate_proc <- function(step, meta, last = NULL) {

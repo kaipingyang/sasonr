@@ -96,3 +96,18 @@ run;
   expect_equal(r$work$a$s, sum(3:6))
   expect_equal(r$work$a$i, 7)
 })
+
+test_that("the fallback to the level of classify_step() fails loud without a valid level", {
+  prog <- "data a; x = 1; run;"
+  orig <- classify_step
+  local_mocked_bindings(dsir_level = function(facts, an) list(level = NA_character_, reasons = NA_character_))
+  expect_equal(sas_translate(prog)$steps[[1]]$level, "L1")
+  for (bad in list(NA_character_, "L4", NULL)) {
+    local_mocked_bindings(classify_step = function(an) {
+      x <- orig(an)
+      x["level"] <- list(bad)
+      x
+    })
+    expect_error(sas_translate(prog), "classify_step\\(\\) gave no valid level")
+  }
+})

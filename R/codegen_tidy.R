@@ -327,15 +327,13 @@ gen_array_lang <- function(e, cx) {
 
 gen_array_ref <- function(e, cx) cg_text(gen_array_lang(e, cx))
 
-proto_code <- function(inf, use_init = TRUE) {
+proto_lang <- function(inf, use_init = TRUE) {
   init <- if (use_init) inf$init else NULL
-  if (inf$type == "char") {
-    return(r_str(sas_char(if (is.null(init)) "" else init, inf$len)))
-  }
-  if (is.null(init)) return("NA_real_")
+  if (inf$type == "char") return(sas_char(if (is.null(init)) "" else init, inf$len))
+  if (is.null(init)) return(NA_real_)
   code <- sas_miss_code(init)
-  if (!is.na(code) && code != 1L) return(sprintf("sas_missing(%s)", r_str(paste0(".", miss_label(code)))))
-  r_num(init)
+  if (!is.na(code) && code != 1L) return(call("sas_missing", paste0(".", miss_label(code))))
+  cg_num(init)
 }
 
 # The value of a PUT item: sas_put_named(), sas_put_fvalue() (an explicit
@@ -387,7 +385,7 @@ input_spec_lang <- function(rd, an) {
   rcx <- new_cx("row", an)
   ptr <- function(v) {
     if (v$node %in% c("num", "str")) return(if (v$node == "num") cg_num(v$value) else v$value)
-    call("function", as.pairlist(alist(pdv = )), gen_lang(v, rcx))
+    cg_fn(alist(pdv = ), gen_lang(v, rcx))
   }
   items <- lapply(rd$items, function(it) {
     if (it$k != "var") return(cg_call("list", c(list(k = it$k), if (!is.null(it$v)) list(v = ptr(it$v)))))
@@ -415,7 +413,7 @@ input_spec_code <- function(rd, an) {
 }
 
 # Code that opens the input stream of a step (INFILE or DATALINES).
-infile_open_code <- function(an) {
+infile_open_lang <- function(an) {
   inf <- an$infile
   opts <- if (is.null(inf)) list() else inf$opts
   n_lines <- max(c(1L, unlist(lapply(an$readers, function(r) {
@@ -426,31 +424,36 @@ infile_open_code <- function(an) {
                 pad = opts$pad, lines = max(n_lines, opts$lines %||% 1L))
   ropts <- Filter(Negate(is.null), ropts)
   if (!is.null(inf) && identical(inf$source$kind, "file")) {
-    return(sprintf("sas_infile_open(sas_read_file(%s), opts = %s, instream = FALSE)", r_str(inf$source$path), r_lit(ropts)))
+    return(call("sas_infile_open", call("sas_read_file", inf$source$path), opts = cg_val(ropts), instream = FALSE))
   }
   dl <- an$dl
   if (is.null(dl)) abort_unsupported("INFILE DATALINES without a DATALINES block", inf$line)
   ropts$end_text <- if (isTRUE(dl$four)) ";;;;" else ";"
-  sprintf("sas_infile_open(%s, %s, opts = %s)", r_chr_vec(dl$lines),
-          if (length(dl$line_no) == 0) "integer()" else paste0("c(", paste0(dl$line_no, "L", collapse = ", "), ")"),
-          r_lit(ropts))
+  line_no <- if (length(dl$line_no) == 0) quote(integer()) else as.call(c(list(as.name("c")), as.list(as.integer(dl$line_no))))
+  call("sas_infile_open", cg_val(dl$lines), line_no,
+       opts = cg_val(ropts))
 }
 
-source_code <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] else NULL) {
-  if (is.null(rd)) return("tibble::tibble(.rows = 1L)")
+# The input source of a step: a [cgi()] item.
+source_item <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] else NULL) {
+  if (is.null(rd)) return(cgi(quote(tibble::tibble(.rows = 1L))))
   if (rd$stmt == "input") {
     end_var <- an$infile$opts$end
-    return(sprintf("sas_read_input(%s, %s%s)", infile_open_code(an), input_spec_code(rd, an),
-                   if (is.null(end_var)) "" else paste0(", end_var = ", r_str(end_var))))
+    inf <- infile_open_lang(an)
+    spec <- input_spec_lang(rd, an)
+    end <- if (!is.null(end_var)) list(end_var = end_var)
+    return(cgi(cg_call("sas_read_input", c(list(inf, spec), end)),
+               sprintf("sas_read_input(%s, %s%s)", cg_text(inf), input_spec_code(rd, an),
+                       if (is.null(end)) "" else paste0(", end_var = ", cg_text(end_var)))))
   }
-  codes <- vapply(rd$datasets, ds_code, "", an = an, where = an$dsir$slots$where$effective)
+  srcs <- lapply(rd$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
   in_vars <- vapply(rd$datasets, function(d) d$options$in_var %||% NA_character_, "")
-  if (length(codes) == 1 && all(is.na(in_vars))) return(codes)
-  by <- ""
-  if (!is.null(an$by) && length(codes) > 1) {
-    by <- sprintf(", by = %s, descending = %s", r_chr_vec(an$by$vars), r_lit(an$by$descending))
-  }
-  sprintf("sas_set_input(list(%s), in_vars = %s%s)", paste(codes, collapse = ", "), r_lit(in_vars), by)
+  if (length(srcs) == 1 && all(is.na(in_vars))) return(srcs[[1]])
+  by <- if (!is.null(an$by) && length(srcs) > 1) list(by = cg_val(an$by$vars), descending = cg_val(an$by$descending))
+  args <- c(list(cg_call("list", lapply(srcs, `[[`, "lang")), in_vars = cg_val(in_vars)), by)
+  cgi(cg_call("sas_set_input", args),
+      sprintf("sas_set_input(list(%s), %s)", paste(vapply(srcs, `[[`, "", "text"), collapse = ", "),
+              paste0(names(args)[-1], " = ", vapply(args[-1], cg_text, ""), collapse = ", ")))
 }
 
 input_columns <- function(an) {
@@ -465,19 +468,18 @@ input_columns <- function(an) {
 add_input_stages <- function(cx, include_n = TRUE) {
   an <- cx$an
   rd <- if (length(an$readers) > 0) an$readers[[1]] else NULL
-  if (include_n && "_n_" %in% an$order) add_stage(cx, "mutate", "`_n_` = as.numeric(dplyr::row_number())")
+  if (include_n && "_n_" %in% an$order) add_stage(cx, "mutate", list(`_n_` = quote(as.numeric(dplyr::row_number()))))
   if (!is.null(rd) && !is.null(rd$end) && rd$stmt == "set") {
-    add_stage(cx, "mutate", sprintf("%s = as.numeric(dplyr::row_number() == dplyr::n())", r_name(rd$end)))
+    add_stage(cx, "mutate", stats::setNames(list(quote(as.numeric(dplyr::row_number() == dplyr::n()))), rd$end))
   }
   if (!is.null(an$by) && !is.null(rd) && rd$stmt == "set") {
-    add_stage(cx, "raw", sprintf("sas_check_sorted(%s, %s)", r_chr_vec(an$by$vars), r_lit(an$by$descending)))
-    flags <- character()
+    add_stage(cx, "raw", call("sas_check_sorted", cg_val(an$by$vars), cg_val(an$by$descending)))
+    flags <- list()
     for (k in seq_along(an$by$vars)) {
-      keys <- paste(r_name(an$by$vars[seq_len(k)]), collapse = ", ")
+      keys <- lapply(an$by$vars[seq_len(k)], sym)
       v <- an$by$vars[k]
-      flags <- c(flags,
-        sprintf("%s = sas_first(%s)", r_name(paste0("first.", v)), keys),
-        sprintf("%s = sas_last(%s)", r_name(paste0("last.", v)), keys))
+      flags[[paste0("first.", v)]] <- cg_call("sas_first", keys)
+      flags[[paste0("last.", v)]] <- cg_call("sas_last", keys)
     }
     add_stage(cx, "mutate", flags)
   }
@@ -485,15 +487,8 @@ add_input_stages <- function(cx, include_n = TRUE) {
 
 # A stage of the vectorised pipeline, as language objects: `mutate` a named
 # list of column values, `filter` a condition, `raw` a call without its first
-# argument. Text (the emitters not yet converted) is parsed here: a mutate item
-# "name = value", a condition or a call.
+# argument.
 add_stage <- function(cx, kind, code) {
-  if (is.character(code)) {
-    code <- switch(kind,
-      mutate = as.list(str2lang(paste0("list(", paste(code, collapse = ", "), ")")))[-1L],
-      str2lang(code)
-    )
-  }
   cx$stages <- c(cx$stages, list(list(kind = kind, code = code)))
 }
 
@@ -510,6 +505,8 @@ mutate_value_text <- function(x) {
   cg_text(x)
 }
 
+# `target <- src |> stages`: a [cgi()] item; `src` is one too. A mutate stage
+# shows one column per line.
 render_pipeline <- function(target, src, stages) {
   merged <- list()
   for (s in stages) {
@@ -520,16 +517,21 @@ render_pipeline <- function(target, src, stages) {
       merged <- c(merged, list(s))
     }
   }
-  # one column per line in a mutate stage
-  texts <- vapply(merged, function(s) {
-    switch(s$kind,
-      mutate = paste0("dplyr::mutate(\n", paste0("    ", r_name(names(s$code)), " = ",
-                                                 vapply(s$code, mutate_value_text, ""), collapse = ",\n"), "\n  )"),
-      filter = paste0("dplyr::filter(", cg_text(s$code), ")"),
-      raw = cg_text(s$code)
+  x <- src
+  for (s in merged) {
+    st <- switch(s$kind,
+      mutate = as.call(c(list(quote(dplyr::mutate)), s$code)),
+      filter = as.call(list(quote(dplyr::filter), s$code)),
+      raw = s$code
     )
-  }, "")
-  paste0(target, " <- ", paste(c(src, texts), collapse = " |>\n  "))
+    y <- cgi_pipe(x, st, sep = " |>\n  ")
+    if (s$kind == "mutate") {
+      y$text <- paste0(x$text, " |>\n  dplyr::mutate(\n",
+                       paste0("    ", r_name(names(s$code)), " = ", vapply(s$code, mutate_value_text, ""), collapse = ",\n"), "\n  )")
+    }
+    x <- y
+  }
+  cgi_assign(target, x)
 }
 
 # L1 / L2: vectorised pipeline -------------------------------------------
@@ -551,13 +553,11 @@ gen_vec_step <- function(an) {
     inf$kind == "data" && !v %in% inputs && !v %in% names(an$sum_plan)
   }, an$order)
   if (length(init_vars) > 0) {
-    add_stage(cx, "mutate", vapply(init_vars, function(v) paste0(r_name(v), " = ", proto_code(an$info[[v]])), ""))
+    add_stage(cx, "mutate", stats::setNames(lapply(init_vars, function(v) proto_lang(an$info[[v]])), init_vars))
   }
   gen_vec_block(an$stmts, NULL, cx, top = TRUE)
 
-  out <- render_pipeline(".d", source_code(an), cx$stages)
-  out <- c(out, vec_put_code(cx), vec_output_code(an))
-  out
+  c(list(render_pipeline(".d", source_item(an), cx$stages)), vec_put_item(cx), vec_output_item(an))
 }
 
 # The PUT statements of a vectorised step: one line per iteration of the step
@@ -572,29 +572,37 @@ vec_put_lang <- function(cx) {
 }
 
 # Its display: one argument of sas_put_rows() per line, one PUT per line.
-vec_put_code <- function(cx) {
+vec_put_item <- function(cx) {
   x <- vec_put_lang(cx)
-  if (is.null(x)) return(character())
+  if (is.null(x)) return(list())
   rows <- x[[3]][[3]]
   args <- function(l, sep) paste(vapply(as.list(l)[-1L], cg_text, ""), collapse = sep)
-  sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s),\n  n = nrow(.d)\n))", cx$sink, cx$sink,
-          args(rows[[2]], ",\n       "), args(rows[[3]], ", "))
+  list(cgi(x, sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s),\n  n = nrow(.d)\n))", cx$sink, cx$sink,
+                      args(rows[[2]], ",\n       "), args(rows[[3]], ", "))))
 }
 
-select_code <- function(o) {
-  cols <- ifelse(o$vars == o$out_names, r_name(o$vars), paste0(r_name(o$out_names), " = ", r_name(o$vars)))
-  paste0("dplyr::select(", paste(cols, collapse = ", "), ")")
+select_lang <- function(o) {
+  cols <- lapply(o$vars, sym)
+  if (any(o$vars != o$out_names)) names(cols) <- ifelse(o$vars == o$out_names, "", o$out_names)
+  cg_call("dplyr::select", cols)
 }
+select_code <- function(o) cg_text(select_lang(o))
 
-vec_output_code <- function(an) {
-  if (length(an$dsir$slots$outputs) == 0) return(character())
+vec_output_item <- function(an) {
+  if (length(an$dsir$slots$outputs) == 0) return(list())
   o <- an$dsir$slots$outputs[[1]]
-  stages <- character()
+  x <- cgi(sym(".d"))
   if (!is.null(an$output_pattern$cond)) {
-    stages <- c(stages, sprintf("dplyr::filter(sas_true(%s))", r_name(an$output_pattern$cond)))
+    x <- cgi_pipe(x, as.call(list(quote(dplyr::filter), call("sas_true", sym(an$output_pattern$cond)))), sep = " |>\n  ")
   }
-  stages <- c(stages, select_code(o))
-  paste0("work$", r_name(o$name), " <- ", paste(c(".d", stages), collapse = " |>\n  "))
+  x <- cgi_pipe(x, select_lang(o), sep = " |>\n  ")
+  list(work_assign(o$name, x))
+}
+
+# `work$name <- x`
+work_assign <- function(name, x) {
+  target <- call("$", sym("work"), sym(name))
+  cgi(call("<-", target, x$lang), paste0(cg_text(target), " <- ", x$text))
 }
 
 gen_vec_block <- function(stmts, guard, cx, top = FALSE) {
@@ -624,9 +632,8 @@ gen_vec_carry <- function(i, cx) {
     cx$inexact <- FALSE
     add_stage(cx, "mutate", stats::setNames(list(val, cond), c(cv[k], cs[k])))
     if (i == plan$last) {
-      # the start value is still text (proto_code())
       carry <- call("sas_carry", cg_call("list", lapply(cv, sym)), cg_call("list", lapply(cs, sym)),
-                    str2lang(proto_code(an$info[[v]])))
+                    proto_lang(an$info[[v]]))
       add_stage(cx, "mutate", stats::setNames(list(carry), v))
     }
   }
@@ -800,52 +807,54 @@ has_stmt <- function(stmts, kind) {
   any(vapply(stmts, function(s) s$stmt %in% kind || has_stmt(stmt_children(s), kind), logical(1)))
 }
 
+# The L3 step: a list of [cgi()] items.
 gen_row_step <- function(an) {
   cx <- new_cx("row", an)
   rd <- if (length(an$readers) > 0) an$readers[[1]] else NULL
-  L <- character()
+  L <- list()
+  add <- function(...) L <<- c(L, lapply(list(...), function(x) if (is.language(x)) cgi(x) else x))
 
   has_input <- any(vapply(an$readers, function(r) r$stmt == "input", logical(1)))
-  if (has_input) L <- c(L, paste0(".inf <- ", infile_open_code(an)))
+  if (has_input) add(cgi_assign(".inf", cgi(infile_open_lang(an))))
   set_rd <- Find(function(r) r$stmt == "set", an$readers)
   if (!is.null(set_rd)) {
     pcx <- new_cx("vec", an)
     if (identical(rd, set_rd)) add_input_stages(pcx, include_n = FALSE)
-    L <- c(L, render_pipeline(".in", source_code(an, set_rd), pcx$stages),
-           ".rows <- sas_rows(.in)", ".n_in <- length(.rows)", ".p <- 0L")
+    add(render_pipeline(".in", source_item(an, set_rd), pcx$stages),
+        quote(.rows <- sas_rows(.in)), quote(.n_in <- length(.rows)), quote(.p <- 0L))
   }
   if (!is.null(rd) && rd$stmt == "merge") {
-    codes <- vapply(rd$datasets, ds_code, "", an = an, where = an$dsir$slots$where$effective)
+    srcs <- lapply(rd$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
     merged_vars <- unique(unlist(lapply(rd$datasets, `[[`, "out_names")))
-    L <- c(L,
-      paste0(".m_in <- list(\n  ", paste(codes, collapse = ",\n  "), "\n)"),
-      ".m <- lapply(.m_in, sas_rows)",
-      sprintf(".plan <- sas_merge_plan(.m_in, %s, %s)", r_chr_vec(an$by$vars), r_lit(an$by$descending)),
-      ".n_in <- nrow(.plan)", ".p <- 0L"
-    )
+    add(cgi(call("<-", sym(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang"))),
+            paste0(".m_in <- list(\n  ", paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n  "), "\n)")),
+        quote(.m <- lapply(.m_in, sas_rows)),
+        call("<-", sym(".plan"), call("sas_merge_plan", sym(".m_in"), cg_val(an$by$vars), cg_val(an$by$descending))),
+        quote(.n_in <- nrow(.plan)), quote(.p <- 0L))
     cx$merge_reset <- merged_vars
   }
   for (arr in an$arrays) {
     if (arr$temporary) {
-      miss <- if (arr$type == "char") r_str(strrep(" ", arr$len)) else "NA_real_"
-      vals <- vapply(seq_len(arr$dim), function(k) {
+      miss <- if (arr$type == "char") strrep(" ", arr$len) else NA_real_
+      vals <- lapply(seq_len(arr$dim), function(k) {
         if (!is.null(arr$init) && k <= length(arr$init)) {
-          if (arr$type == "char") r_str(sas_char(arr$init[[k]], arr$len)) else r_num(arr$init[[k]])
+          if (arr$type == "char") sas_char(arr$init[[k]], arr$len) else cg_num(arr$init[[k]])
         } else miss
-      }, "")
-      L <- c(L, sprintf(".ta_%s <- c(%s)", arr$name, paste(vals, collapse = ", ")))
+      })
+      add(call("<-", sym(paste0(".ta_", arr$name)), as.call(c(list(sym("c")), vals))))
     } else {
-      L <- c(L, sprintf(".arr_%s <- %s", arr$name, r_chr_vec(arr$elems)))
+      add(call("<-", sym(paste0(".arr_", arr$name)), cg_val(arr$elems)))
     }
   }
 
   pdv_order <- union(an$order, c("_error_", "_n_"))
-  pdv_vals <- vapply(pdv_order, function(v) {
+  pdv_vals <- lapply(pdv_order, function(v) {
     inf <- an$info[[v]]
-    if (is.null(inf) || inf$kind == "auto") return(if (v == "_error_") "0" else "NA_real_")
-    proto_code(inf, use_init = isTRUE(inf$retained))
-  }, "")
-  pdv_code <- paste0("pdv <- list(\n", paste0("  ", r_name(pdv_order), " = ", pdv_vals, collapse = ",\n"), "\n)")
+    if (is.null(inf) || inf$kind == "auto") return(if (v == "_error_") 0 else NA_real_)
+    proto_lang(inf, use_init = isTRUE(inf$retained))
+  })
+  add(cgi(call("<-", sym("pdv"), cg_call("list", stats::setNames(pdv_vals, pdv_order))),
+          paste0("pdv <- list(\n", paste0("  ", r_name(pdv_order), " = ", vapply(pdv_vals, cg_text, ""), collapse = ",\n"), "\n)")))
   dump_vars <- setdiff(an$order, c("_error_", "_n_"))
   dump_names <- vapply(dump_vars, function(v) an$info[[v]]$disp %||% v, "", USE.NAMES = FALSE)
   is_flag <- startsWith(dump_vars, "first.") | startsWith(dump_vars, "last.")
@@ -855,58 +864,70 @@ gen_row_step <- function(an) {
                                   vapply(base, function(v) an$info[[v]]$disp %||% v, "", USE.NAMES = FALSE))
   }
   dump_fmts <- Filter(Negate(is.null), lapply(stats::setNames(dump_vars, dump_vars), function(v) an$formats[[v]]))
-  L <- c(L, pdv_code,
-         ".proto <- pdv",
-         sprintf(".dump <- sas_dump_spec(%s, %s, %s)", r_chr_vec(dump_vars), r_chr_vec(dump_names),
-                 if (length(dump_fmts) == 0) "list()" else r_lit(lapply(dump_fmts, function(f) f[c("name", "w", "d", "char", "text")]))))
+  add(quote(.proto <- pdv),
+      call("<-", sym(".dump"), call("sas_dump_spec", cg_val(dump_vars), cg_val(dump_names),
+                                     if (length(dump_fmts) == 0) quote(list())
+                                     else cg_val(lapply(dump_fmts, function(f) f[c("name", "w", "d", "char", "text")])))))
   if (!is.null(rd) && !is.null(rd$nobs)) {
-    nobs <- paste0("nrow(work[[", r_str(vapply(rd$datasets, `[[`, "", "name")), "]])", collapse = " + ")
-    L <- c(L, sprintf("pdv$%s <- %s", r_name(rd$nobs), nobs))
+    nobs <- Reduce(function(a, b) call("+", a, b), lapply(vapply(rd$datasets, `[[`, "", "name"), function(nm) {
+      call("nrow", call("[[", sym("work"), nm))
+    }))
+    add(call("<-", pdv_ref(rd$nobs), nobs))
   }
   reset_vars <- Filter(function(v) an$info[[v]]$kind == "data" && !isTRUE(an$info[[v]]$retained), an$order)
-  if (length(reset_vars) > 0) L <- c(L, sprintf(".reset <- pdv[%s]", r_chr_vec(reset_vars)))
-  if (!is.null(cx$merge_reset)) L <- c(L, sprintf(".m_reset <- pdv[%s]", r_chr_vec(cx$merge_reset)))
-  if (an$lag_sites > 0) L <- c(L, ".lags <- new.env()")
+  if (length(reset_vars) > 0) add(call("<-", sym(".reset"), call("[", sym("pdv"), cg_val(reset_vars))))
+  if (!is.null(cx$merge_reset)) add(call("<-", sym(".m_reset"), call("[", sym("pdv"), cg_val(cx$merge_reset))))
+  if (an$lag_sites > 0) add(quote(.lags <- new.env()))
   for (k in seq_along(an$dsir$slots$outputs)) {
-    L <- c(L, sprintf(".out%d <- list()", k), sprintf(".vars%d <- %s", k, r_chr_vec(an$dsir$slots$outputs[[k]]$vars)))
+    add(call("<-", sym(paste0(".out", k)), quote(list())),
+        call("<-", sym(paste0(".vars", k)), cg_val(an$dsir$slots$outputs[[k]]$vars)))
   }
 
   body <- gen_row_block(an$stmts, cx)
   implicit_output <- length(an$dsir$slots$outputs) > 0 && !has_stmt(an$stmts, "output")
-  loop <- c(
-    ".n_iter <- 0L",
-    "repeat {",
-    "  .n_iter <- .n_iter + 1L",
-    if (length(reset_vars) > 0) "  pdv[names(.reset)] <- .reset",
-    "  pdv$`_n_` <- .n_iter",
-    "  pdv$`_error_` <- 0",
-    if (!is.null(rd)) "  .read <- FALSE",
-    "  .status <- tryCatch({",
-    indent_lines(row_lines(body), 2L),
-    "    \"ok\"",
-    "  }, sasonr_delete = function(e) \"delete\", sasonr_stop = function(e) \"stop\", sasonr_return = function(e) \"ok\")",
-    if (has_input) "  if (.status == \"stop\" && !is.null(.inf$pdv)) pdv[names(.inf$pdv)] <- .inf$pdv",
-    "  pdv <- sas_err_sync(pdv)",
-    sprintf("  .log <- c(.log, sas_iter_dump(pdv, .dump%s))", if (has_input) ", .inf" else ""),
-    if (has_input) "  sas_input_iter_end(.inf)",
-    "  if (.status == \"stop\") break",
-    if (implicit_output) {
-      c("  if (.status == \"ok\") {", indent_lines(output_lines(seq_along(an$dsir$slots$outputs)), 2L), "  }")
-    },
-    if (!is.null(rd)) "  if (!.read) break" else "  break",
-    "}"
+  # the loop body: one-line statements, the tryCatch() of the step's
+  # statements and the implicit OUTPUT block
+  handler <- function(v) cg_fn(alist(e = ), v)
+  status <- call("<-", sym(".status"), as.call(list(sym("tryCatch"), brace(c(body, list("ok"))),
+    sasonr_delete = handler("delete"), sasonr_stop = handler("stop"), sasonr_return = handler("ok"))))
+  status_text <- c("  .status <- tryCatch({", indent_lines(row_lines(body), 2L), "    \"ok\"",
+                   "  }, sasonr_delete = function(e) \"delete\", sasonr_stop = function(e) \"stop\", sasonr_return = function(e) \"ok\")")
+  dump <- as.call(c(list(sym("sas_iter_dump"), sym("pdv"), sym(".dump")), if (has_input) list(sym(".inf"))))
+  outs <- output_langs(seq_along(an$dsir$slots$outputs))
+  out_if <- if (implicit_output) call("if", quote(.status == "ok"), brace(outs))
+  loop <- list(
+    quote(.n_iter <- .n_iter + 1L),
+    if (length(reset_vars) > 0) quote(pdv[names(.reset)] <- .reset),
+    quote(pdv$`_n_` <- .n_iter),
+    quote(pdv$`_error_` <- 0),
+    if (!is.null(rd)) quote(.read <- FALSE),
+    status,
+    if (has_input) quote(if (.status == "stop" && !is.null(.inf$pdv)) pdv[names(.inf$pdv)] <- .inf$pdv),
+    err_sync(),
+    call("<-", sym(".log"), call("c", sym(".log"), dump)),
+    if (has_input) quote(sas_input_iter_end(.inf)),
+    quote(if (.status == "stop") break),
+    out_if,
+    if (!is.null(rd)) quote(if (!.read) break) else quote(break)
   )
-  L <- c(L, loop)
-  if (!is.null(set_rd)) L <- c(L, "sas_reads_consumed(.p)")
+  loop <- Filter(Negate(is.null), loop)
+  loop_text <- unlist(lapply(loop, function(x) {
+    if (identical(x, status)) return(status_text)
+    if (implicit_output && identical(x, out_if)) {
+      return(c("  if (.status == \"ok\") {", indent_lines(vapply(outs, cg_text, ""), 2L), "  }"))
+    }
+    paste0("  ", cg_text(x))
+  }))
+  add(quote(.n_iter <- 0L), cgi(call("repeat", brace(loop)), paste(c("repeat {", loop_text, "}"), collapse = "\n")))
+  if (!is.null(set_rd)) add(quote(sas_reads_consumed(.p)))
   for (k in seq_along(an$dsir$slots$outputs)) {
     o <- an$dsir$slots$outputs[[k]]
-    code <- sprintf("work$%s <- sas_rows_to_tibble(.out%d, .proto[.vars%d])", r_name(o$name), k, k)
-    if (any(o$vars != o$out_names)) code <- paste0(code, " |>\n  ", select_code(o))
-    L <- c(L, code)
+    x <- cgi(call("sas_rows_to_tibble", sym(paste0(".out", k)), call("[", sym(".proto"), sym(paste0(".vars", k)))))
+    if (any(o$vars != o$out_names)) x <- cgi_pipe(x, select_lang(o), sep = " |>\n  ")
+    add(work_assign(o$name, x))
   }
   L
 }
-
 
 # The L3 statement emitters return lists of language objects.
 
@@ -1021,7 +1042,6 @@ output_langs <- function(ks) {
     assign_lang(call("[[", out, call("+", call("length", out), 1L)), call("[", sym("pdv"), sym(paste0(".vars", k))))
   })
 }
-output_lines <- function(ks) vapply(output_langs(ks), cg_text, "")
 
 # CALL MISSING / SORTN / SORTC on variables and array elements.
 gen_row_call_vars <- function(s, cx) {
@@ -1131,17 +1151,17 @@ translate_step <- function(step, meta, level = "auto") {
   )
   body <- if (an$level == "L3") gen_row_step(an) else gen_vec_step(an)
   if (!is.null(an$file)) {
-    body <- c(".fput <- character()", body,
-              sprintf("sas_file_write(%s, .fput, mod = %s)", r_str(an$file$path), if (isTRUE(an$file$mod)) "TRUE" else "FALSE"))
+    body <- c(list(cgi(quote(.fput <- character()))), body,
+              list(cgi(call("sas_file_write", an$file$path, quote(.fput), mod = isTRUE(an$file$mod)))))
   }
   uninit <- uninit_vars(an)
   notes <- c(compile_notes(),
              if (length(uninit) > 0) sprintf("NOTE: Variable %s is uninitialized.",
                                              vapply(uninit, function(v) an$info[[v]]$disp %||% v, "")))
-  code <- paste(c(header, body), collapse = "\n")
   list(
-    # `exprs`: what runs (the emitters still give text; it is parsed once here)
-    code = code, exprs = as.list(parse(text = code, keep.source = FALSE)), level = an$level, reasons = an$reasons,
+    # `exprs`: the language objects that run; `code`: their display
+    code = paste(c(header, vapply(body, `[[`, "", "text")), collapse = "\n"), exprs = lapply(body, `[[`, "lang"),
+    level = an$level, reasons = an$reasons,
     line = step$line, outputs = vapply(an$dsir$slots$outputs, `[[`, "", "name"), meta = out_meta(an),
     compile_notes = notes
   )

@@ -1042,7 +1042,14 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   lv <- dsir_level(dsir_facts(dsir_lower(an), an), an)
   # where both give the same level the reasons of classify_step() stay (the
   # header of the generated code does not change)
-  if (is.na(lv$level) || lv$level == cls$level || (lv$level == "L2" && cls$level != "L2")) lv <- cls
+  if (is.na(lv$level) || identical(lv$level, cls$level) || (lv$level == "L2" && !identical(cls$level, "L2"))) {
+    # the fallback: classify_step() must have decided a level
+    if (!(is.character(cls$level) && length(cls$level) == 1L && cls$level %in% c("L1", "L2", "L3"))) {
+      rlang::abort(paste0("sas_analyze(): classify_step() gave no valid level (", paste(format(cls$level), collapse = ", "),
+                          ")."), .internal = TRUE)
+    }
+    lv <- cls
+  }
   # an undecided level (NA) never reaches the reasons or the generated code
   if (!lv$level %in% c("L1", "L2", "L3") || anyNA(lv$reasons)) {
     rlang::abort("sas_analyze(): no level decided for the step.", .internal = TRUE)

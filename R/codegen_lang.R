@@ -108,7 +108,23 @@ cg_call <- function(fun, args = list()) {
 # `.at = c(line, col)`
 cg_at <- function(line, col) list(.at = call("c", as.integer(line), as.integer(col %||% NA_integer_)))
 
-# The text of an expression on one line (the emitters that still build text).
+# The text of an expression on one line (the display layouts of the generated code).
 # A call longer than deparse()'s widest line is joined without the line
 # break's indentation.
 cg_text <- function(x) paste(trimws(cg_deparse(x, width = 500L, collapse = NULL)), collapse = " ")
+
+# A function literal as parse() gives it (the fourth element, the source
+# reference, is NULL).
+cg_fn <- function(args, body) as.call(list(as.name("function"), as.pairlist(args), body, NULL))
+
+# A piece of generated code: the language object that runs and its display
+# text (built from the deparsed parts in the generated layout).
+cgi <- function(lang, text = cg_text(lang)) list(lang = lang, text = text)
+
+# `x |> stage`: the stage call gets `x` as its first argument.
+cgi_pipe <- function(x, stage, sep = " |> ") {
+  cgi(as.call(c(as.list(stage)[1], list(x$lang), as.list(stage)[-1])), paste0(x$text, sep, cg_text(stage)))
+}
+
+# `name <- x`
+cgi_assign <- function(name, x) cgi(call("<-", as.name(name), x$lang), paste0(name, " <- ", x$text))

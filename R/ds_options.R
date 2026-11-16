@@ -99,32 +99,27 @@ ds_opts_record <- function(d) {
 #' @param obs_col Add the `.obs` column (row number before WHERE).
 #' @param where The analysed condition of the WHERE statement that applies,
 #'   or NULL. WHERE= on the data set takes precedence over it.
-#' @return One R expression as a string.
+#' @return A [cgi()] item: the call (one expression) and its display text.
 #' @noRd
 ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
-  args <- c("work", r_str(rec$name))
-  if (!is.null(rec$keep) || !is.null(rec$drop)) args <- c(args, paste0("keep = ", r_chr_vec(rec$vars)))
-  if (!is.null(rec$rename)) {
-    args <- c(args, paste0("rename = c(", paste0(r_str(names(rec$rename)), " = ", r_str(rec$rename), collapse = ", "), ")"))
-  }
-  code <- sprintf("sas_ds(%s)", paste(args, collapse = ", "))
-  if (obs_col) code <- paste0(code, " |> dplyr::mutate(.obs = dplyr::row_number())")
-  if (!is.null(rec$where)) {
+  args <- list(as.name("work"), rec$name)
+  if (!is.null(rec$keep) || !is.null(rec$drop)) args$keep <- cg_val(rec$vars)
+  if (!is.null(rec$rename)) args$rename <- as.call(c(list(as.name("c")), as.list(rec$rename)))
+  x <- cgi(cg_call("sas_ds", args))
+  if (obs_col) x <- cgi_pipe(x, quote(dplyr::mutate(.obs = dplyr::row_number())))
+  where_stage <- function(e) {
     wcx <- new_cx("vec", an)
     wcx$where <- TRUE
-    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(rec$where, wcx))
+    cg_call("dplyr::filter", list(call("sas_where_cond", call("sas_true", gen_lang(e, wcx)))))
   }
+  if (!is.null(rec$where)) x <- cgi_pipe(x, where_stage(rec$where))
   # the WHERE statement condition applies to every input data set without a
   # WHERE= option (the data set option takes precedence), before FIRSTOBS=/OBS=
-  if (!is.null(where) && is.null(rec$where)) {
-    cx <- new_cx("vec", an)
-    cx$where <- TRUE
-    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(where, cx))
-  }
+  if (!is.null(where) && is.null(rec$where)) x <- cgi_pipe(x, where_stage(where))
   # FIRSTOBS= / OBS= count observations that satisfy WHERE= and WHERE
   if (!is.null(rec$firstobs) || !is.null(rec$obs)) {
-    code <- sprintf("%s |> sas_obs_window(%s, %s)", code,
-                    if (is.null(rec$firstobs)) "NULL" else r_num(rec$firstobs), if (is.null(rec$obs)) "NULL" else r_num(rec$obs))
+    x <- cgi_pipe(x, cg_call("sas_obs_window", list(if (!is.null(rec$firstobs)) cg_num(rec$firstobs),
+                                                    if (!is.null(rec$obs)) cg_num(rec$obs))))
   }
   # values from a data set whose character variable is longer than the PDV
   # variable (defined by an earlier data set) are truncated
@@ -138,11 +133,10 @@ ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
         tr[[rec$out_names[j]]] <- as.integer(inf$len)
       }
     }
-    if (length(tr) > 0) code <- sprintf("%s |> sas_trunc_chars(%s)", code, r_lit(tr))
+    if (length(tr) > 0) x <- cgi_pipe(x, call("sas_trunc_chars", cg_val(tr)))
   }
   wexpr <- rec$where %||% where
-  sprintf("%s |> sas_note_read(%s%s)", code, r_str(rec$name),
-          if (is.null(wexpr)) "" else paste0(", where = ", r_str(where_text(wexpr))))
+  cgi_pipe(x, cg_call("sas_note_read", c(list(rec$name), if (!is.null(wexpr)) list(where = where_text(wexpr)))))
 }
 
 #' KEEP=, DROP= and RENAME= on an output data set
