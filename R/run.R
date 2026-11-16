@@ -636,8 +636,8 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #'   `status = "error"`, the ERROR lines in `$log` and WORK as the failing step
 #'   leaves it.
 #'   `"abort"` stops with the classed R condition instead. Features sasonr does
-#'   not support (`sasonr_unsupported`) always stop the run: they are not SAS
-#'   errors.
+#'   not support (`sasonr_unsupported`) always stop the run: they are not errors of
+#'   the program.
 #' @param session A session from [sas_session()]: the program runs as one more
 #'   submission to it (WORK, macro variables, user formats, options and titles
 #'   of earlier submissions are visible; `work` data sets are added to its

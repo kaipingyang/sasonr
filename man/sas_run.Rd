@@ -28,8 +28,8 @@ the macro language still are), \code{SYSERR}/\code{SYSCC} are set and the result
 \code{status = "error"}, the ERROR lines in \verb{$log} and WORK as the failing step
 leaves it.
 \code{"abort"} stops with the classed R condition instead. Features sasonr does
-not support (\code{sasonr_unsupported}) always stop the run: they are not SAS
-errors.}
+not support (\code{sasonr_unsupported}) always stop the run: they are not errors of
+the program.}
 
 \item{session}{A session from \code{\link[=sas_session]{sas_session()}}: the program runs as one more
 submission to it (WORK, macro variables, user formats, options and titles

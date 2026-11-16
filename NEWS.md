@@ -226,7 +226,7 @@ the development version provides.
   step: approximate and unsupported functions follow `sasonr.strict`
   (`sasonr_strict_error`, or with `sasonr.strict = FALSE` a
   `sasonr_strict_warning` once per function and R session), arguments
-  outside the exact input domain follow the same gate, and a data error (an invalid argument, invalid data) gives the SAS
+  outside the exact input domain follow the same gate, and a data error (an invalid argument, invalid data) gives the documented
   result with a warning of class `sasonr_data_error` that carries the NOTE
   text. `sas_f_put()` and `sas_f_input()` take the format or informat as text
   (`"8.2"`) and check it against the registry.
