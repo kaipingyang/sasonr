@@ -241,11 +241,22 @@ sql_stmt_insert <- function(eng, st) {
     rows <- st$rows
     ctx <- sql_ctx(eng, sql_empty_rel(1L))
     new <- list()
-    for (r in rows) {
+    for (ri in seq_along(rows)) {
+      r <- rows[[ri]]
       cols <- if (st$kind == "insert_set") names(r) else (st$cols %||% vars)
       vals <- if (st$kind == "insert_set") unname(r) else r
       if (length(vals) != length(cols)) abort_syntax("VALUES clause has a different number of values than columns.", st$line)
-      for (k in seq_along(cols)) new[[cols[k]]] <- c(new[[cols[k]]], list(sql_eval(vals[[k]], ctx)))
+      for (k in seq_along(cols)) {
+        v <- sql_eval(vals[[k]], ctx)
+        type <- m$type[[cols[k]]] %||% (if (is.character(tg$data[[cols[k]]])) "char" else "num")
+        # a value whose type is not the column's type is an ERROR when the
+        # statement runs (documented message of PROC SQL)
+        if (st$kind == "insert_values" && cols[k] %in% vars && is.character(v) != identical(type, "char")) {
+          abort_runtime(paste0("Value ", k, " of VALUES clause ", ri, " does not match the data type of the corresponding ",
+                               "column in the object-item list (in the SELECT clause)."), st$line)
+        }
+        new[[cols[k]]] <- c(new[[cols[k]]], list(v))
+      }
     }
     nrows <- length(rows)
     new <- lapply(new, function(x) unlist(x))

@@ -339,6 +339,11 @@ engine_step_error <- function(eng, e, text) {
       log_emit(eng, id = "sql.noexec")
     }
     eng$sql_noexec <- TRUE
+    # how the step ends: an ERROR found while a statement is read leaves
+    # syntax-check mode off; one found while a statement runs starts it at
+    # QUIT; for other ERRORs this is not implemented
+    kind <- if (inherits(e, "sasonr_syntax_error")) "syntax" else if (inherits(e, "sasonr_runtime_error")) "run" else "other"
+    eng$sql_error_kind <- unique(c(eng$sql_error_kind, kind))
     err_set_macro(eng, syscc = 1012)
     return(invisible())
   }

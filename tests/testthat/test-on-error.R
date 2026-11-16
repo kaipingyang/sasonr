@@ -153,3 +153,10 @@ test_that("what a stopped PROC MEANS leaves unknown fails loud", {
   # _NULL_ together with another output name
   expect_error(sas_run("data a _null_; x = ; run;", on_error = "sas"), class = "sasonr_unsupported")
 })
+
+test_that("a PROC SQL ERROR while a statement runs starts syntax-check mode at QUIT", {
+  r <- sas_run("data t; x = 1; output; output; run;\nproc sql;\n  create table r1 as select (select x from t) as y from t;\nquit;\ndata after; z = 1; run;",
+               on_error = "sas")
+  expect_true(any(grepl("enabling syntax check mode", sas_log(r, echo = FALSE))))
+  expect_identical(nrow(r$work$after), 0L)
+})

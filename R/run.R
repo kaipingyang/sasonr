@@ -141,8 +141,16 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "sql_end") {
       if (isTRUE(eng$sql_noexec)) {
+        if ("other" %in% eng$sql_error_kind) {
+          abort_unsupported("whether this PROC SQL ERROR starts syntax-check mode (not supported)", step$line)
+        }
         log_emit(eng, id = "step.stopped")
         eng$sql_noexec <- FALSE
+        if ("run" %in% eng$sql_error_kind && !isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {
+          log_emit(eng, id = "step.syntax_check")
+          eng$syntax_check <- TRUE
+        }
+        eng$sql_error_kind <- NULL
         if (isTRUE(eng$syntax_check)) err_set_macro(eng, syserr = 1012)
       }
       next
