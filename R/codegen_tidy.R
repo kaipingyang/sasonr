@@ -35,8 +35,6 @@ var_lang <- function(name, cx) {
   )
 }
 
-var_ref <- function(name, cx) cg_text(var_lang(name, cx))
-
 negate_if <- function(x, negate) if (isTRUE(negate)) call("sas_not", x) else x
 
 # The value of a numeric constant operand: a literal, a signed literal or an
@@ -206,7 +204,6 @@ gen_in_values <- function(e) {
 at_code <- function(e) sprintf(", .at = c(%dL, %dL)", as.integer(e$line), as.integer(e$col %||% NA_integer_))
 
 fmt_lang <- function(fmt) cg_val(fmt[c("name", "w", "d", "char", "text")])
-fmt_lit <- function(fmt) cg_text(fmt_lang(fmt))
 
 # VNAME(), VLENGTH() ... : compile-time facts about a variable (or an array element).
 gen_var_info <- function(e, cx) {
@@ -330,15 +327,6 @@ gen_array_lang <- function(e, cx) {
 
 gen_array_ref <- function(e, cx) cg_text(gen_array_lang(e, cx))
 
-coerce_to <- function(code, type, len) {
-  if (type == "char") sprintf("sas_char(%s, %dL)", code, as.integer(len)) else code
-}
-
-coerce_var <- function(code, name, an) {
-  inf <- an$info[[name]]
-  coerce_to(code, inf$type, inf$len)
-}
-
 proto_code <- function(inf, use_init = TRUE) {
   init <- if (use_init) inf$init else NULL
   if (inf$type == "char") {
@@ -350,59 +338,41 @@ proto_code <- function(inf, use_init = TRUE) {
   r_num(init)
 }
 
-fmt_code <- function(fmt) {
-  if (is.null(fmt)) return("")
-  paste0(", ", r_lit(fmt[c("name", "w", "d", "char", "text")]))
+# The value of a PUT item: sas_put_named(), sas_put_fvalue() (an explicit
+# format) or sas_put_value().
+put_item_lang <- function(it, cx) {
+  fmt <- it$fmt %||% cx$an$formats[[it$name]]
+  args <- c(list(var_lang(it$name, cx)), if (!is.null(fmt)) list(fmt_lang(fmt)))
+  if (it$kind == "named") return(cg_call("sas_put_named", c(list(cx$an$info[[it$name]]$disp %||% it$name), args)))
+  cg_call(if (!is.null(it$fmt)) "sas_put_fvalue" else "sas_put_value", args)
 }
 
-put_line_code <- function(s, cx, guard = NULL) {
-  if (any(vapply(s$items, function(it) it$kind == "ptr", logical(1)))) return(put_ptr_code(s, cx, guard))
-  items <- vapply(s$items, function(it) {
-    if (it$kind == "lit") return(r_str(it$text))
-    fmt <- it$fmt %||% cx$an$formats[[it$name]]
-    ref <- var_ref(it$name, cx)
-    if (it$kind == "named") {
-      disp <- cx$an$info[[it$name]]$disp %||% it$name
-      sprintf("sas_put_named(%s, %s%s)", r_str(disp), ref, fmt_code(fmt))
-    } else {
-      if (!is.null(it$fmt)) sprintf("sas_put_fvalue(%s%s)", ref, fmt_code(fmt)) else sprintf("sas_put_value(%s%s)", ref, fmt_code(fmt))
-    }
-  }, "")
+put_line_lang <- function(s, cx, guard = NULL) {
+  if (any(vapply(s$items, function(it) it$kind == "ptr", logical(1)))) return(put_ptr_lang(s, cx, guard))
+  items <- lapply(s$items, function(it) if (it$kind == "lit") it$text else put_item_lang(it, cx))
   # literals and formatted (unnamed, explicit format) items add no trailing blank
   lit <- vapply(s$items, function(it) it$kind == "lit" || (it$kind == "value" && !is.null(it$fmt)), logical(1))
-  ls <- put_ls_code(cx)
-  if (!any(lit)) return(paste0("sas_put_line(", paste(items, collapse = ", "), ls, ")"))
-  paste0("sas_put_line(", paste(items, collapse = ", "), ", .lit = ", r_lit(lit), ls, ")")
+  cg_call("sas_put_line", c(items, if (any(lit)) list(.lit = cg_val(lit)), put_ls_arg(cx)))
 }
 
 # PUT with pointer controls: every item becomes a positioned piece of text.
 # `guard`: in a vectorised step, the rows where the PUT executes (only these
 # are laid out, so a pointer of a row that does not execute cannot stop it).
-put_ptr_code <- function(s, cx, guard = NULL) {
-  pieces <- vapply(s$items, function(it) {
-    if (it$kind == "ptr") {
-      if (it$k == "next") return("list(k = \"next\")")
-      return(sprintf("list(k = %s, v = %s)", r_str(it$k), gen_expr(it$v, cx)))
-    }
-    if (it$kind == "lit") return(sprintf("list(k = \"text\", s = %s, blank = FALSE)", r_str(it$text)))
-    fmt <- it$fmt %||% cx$an$formats[[it$name]]
-    ref <- var_ref(it$name, cx)
-    if (it$kind == "named") {
-      disp <- cx$an$info[[it$name]]$disp %||% it$name
-      return(sprintf("list(k = \"text\", s = sas_put_named(%s, %s%s), blank = TRUE)", r_str(disp), ref, fmt_code(fmt)))
-    }
-    if (!is.null(it$fmt)) return(sprintf("list(k = \"text\", s = sas_put_fvalue(%s%s), blank = FALSE)", ref, fmt_code(fmt)))
-    sprintf("list(k = \"text\", s = sas_put_value(%s%s), blank = TRUE)", ref, fmt_code(fmt))
-  }, "")
-  ln <- if (is.numeric(s$line) && length(s$line) == 1L) paste0(s$line, "L") else "NULL"
-  extra <- paste0(put_ls_code(cx), if (!is.null(cx$an$file)) ", .file = TRUE", ", .line = ", ln,
-                  if (!is.null(guard)) paste0(", .guard = ", guard))
-  paste0("sas_put_layout(list(", paste(pieces, collapse = ", "), ")", extra, ")")
+put_ptr_lang <- function(s, cx, guard = NULL) {
+  piece <- function(...) cg_call("list", list(...))
+  pieces <- lapply(s$items, function(it) {
+    if (it$kind == "ptr") return(if (it$k == "next") piece(k = "next") else piece(k = it$k, v = gen_lang(it$v, cx)))
+    if (it$kind == "lit") return(piece(k = "text", s = it$text, blank = FALSE))
+    piece(k = "text", s = put_item_lang(it, cx), blank = it$kind == "named" || is.null(it$fmt))
+  })
+  ln <- if (is.numeric(s$line) && length(s$line) == 1L) as.integer(s$line)
+  cg_call("sas_put_layout", c(list(cg_call("list", pieces)), put_ls_arg(cx), if (!is.null(cx$an$file)) list(.file = TRUE),
+                              list(.line = ln), if (!is.null(guard)) list(.guard = guard)))
 }
 
 # The line size argument of the PUT helpers: a FILE passes its LRECL, the
 # log's LINESIZE is read at run time.
-put_ls_code <- function(cx) if (is.null(cx$an$file)) "" else paste0(", .ls = ", as.integer(cx$an$file$lrecl), "L")
+put_ls_arg <- function(cx) if (!is.null(cx$an$file)) list(.ls = as.integer(cx$an$file$lrecl))
 
 # Input sources (shared by L1/L2 pipelines and the L3 loop) ---------------
 
@@ -413,31 +383,35 @@ ds_code <- function(d, an, obs_col = FALSE, where = NULL) {
 }
 
 # One INPUT statement as a run-time spec for sas_input_stmt().
-input_spec_code <- function(rd, an) {
+input_spec_lang <- function(rd, an) {
   rcx <- new_cx("row", an)
   ptr <- function(v) {
-    if (v$node %in% c("num", "str")) return(if (v$node == "num") r_num(v$value) else r_str(v$value))
-    paste0("function(pdv) ", gen_expr(v, rcx))
+    if (v$node %in% c("num", "str")) return(if (v$node == "num") cg_num(v$value) else v$value)
+    call("function", as.pairlist(alist(pdv = )), gen_lang(v, rcx))
   }
-  items <- vapply(rd$items, function(it) {
-    if (it$k != "var") {
-      return(sprintf("list(k = %s%s)", r_str(it$k), if (is.null(it$v)) "" else paste0(", v = ", ptr(it$v))))
-    }
+  items <- lapply(rd$items, function(it) {
+    if (it$k != "var") return(cg_call("list", c(list(k = it$k), if (!is.null(it$v)) list(v = ptr(it$v)))))
     inf <- an$info[[it$name]]
     char <- identical(inf$type, "char")
-    fields <- c(
-      paste0("name = ", r_str(it$name)), paste0("disp = ", r_str(inf$disp %||% it$name)),
-      paste0("char = ", char), paste0("len = ", if (char) paste0(inf$len, "L") else "NA_integer_"),
-      paste0("mode = ", r_str(it$mode)),
-      if (!is.null(it$fmt)) paste0("fmt = ", fmt_lit(it$fmt)),
-      if (it$mode == "column") sprintf("from = %dL, to = %dL", it$from, it$to),
-      if (!is.null(it$cd)) sprintf("cd = %dL", it$cd),
-      if (isTRUE(it$amp)) "amp = TRUE", if (isTRUE(it$tilde)) "tilde = TRUE",
-      if (nzchar(it$qq %||% "")) paste0("qq = ", r_str(it$qq))
-    )
-    paste0("list(k = \"var\", ", paste(fields, collapse = ", "), ")")
-  }, "")
-  sprintf("list(items = list(\n    %s\n  ), hold = %s)", paste(items, collapse = ",\n    "), r_str(rd$hold %||% ""))
+    cg_call("list", c(
+      list(k = "var", name = it$name, disp = inf$disp %||% it$name, char = char,
+           len = if (char) as.integer(inf$len) else NA_integer_, mode = it$mode),
+      if (!is.null(it$fmt)) list(fmt = fmt_lang(it$fmt)),
+      if (it$mode == "column") list(from = as.integer(it$from), to = as.integer(it$to)),
+      if (!is.null(it$cd)) list(cd = as.integer(it$cd)),
+      if (isTRUE(it$amp)) list(amp = TRUE), if (isTRUE(it$tilde)) list(tilde = TRUE),
+      if (nzchar(it$qq %||% "")) list(qq = it$qq)
+    ))
+  })
+  call("list", items = cg_call("list", items), hold = rd$hold %||% "")
+}
+
+# Its display in a source pipeline: one item per line.
+input_spec_code <- function(rd, an) {
+  x <- input_spec_lang(rd, an)
+  x <- as.list(x)
+  items <- vapply(as.list(x$items)[-1L], cg_text, "")
+  sprintf("list(items = list(\n    %s\n  ), hold = %s)", paste(items, collapse = ",\n    "), cg_text(x$hold))
 }
 
 # Code that opens the input stream of a step (INFILE or DATALINES).
@@ -565,7 +539,7 @@ new_guard <- function(cx) {
   paste0(".g", cx$n_guard)
 }
 
-and_guard <- function(guard, cond) if (is.null(guard)) cond else paste(guard, "&", cond)
+and_guard <- function(guard, cond) if (is.null(guard)) cond else call("&", sym(guard), cond)
 
 gen_vec_step <- function(an) {
   cx <- new_cx("vec", an)
@@ -586,15 +560,25 @@ gen_vec_step <- function(an) {
   out
 }
 
+# The PUT statements of a vectorised step: one line per iteration of the step
+# (a row of `.d`), also for a PUT whose items are literals only (its line is
+# computed once).
+vec_put_lang <- function(cx) {
+  if (length(cx$puts) == 0) return(NULL)
+  sink <- sym(cx$sink)
+  lines <- cg_call("list", lapply(cx$puts, `[[`, "line"))
+  guards <- cg_call("list", lapply(cx$puts, function(p) if (is.null(p$guard)) TRUE else call("$", sym(".d"), sym(p$guard))))
+  assign_lang(sink, call("c", sink, cg_call("sas_put_rows", list(lines, guards, n = quote(nrow(.d))))))
+}
+
+# Its display: one argument of sas_put_rows() per line, one PUT per line.
 vec_put_code <- function(cx) {
-  if (length(cx$puts) == 0) return(character())
-  lines <- vapply(cx$puts, `[[`, "", "line")
-  guards <- vapply(cx$puts, function(p) if (is.null(p$guard)) "TRUE" else paste0(".d$", p$guard), "")
-  sink <- cx$sink
-  # one line per iteration of the step (a row of `.d`), also for a PUT whose
-  # items are literals only (its line is computed once)
-  sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s),\n  n = nrow(.d)\n))", sink, sink,
-          paste(lines, collapse = ",\n       "), paste(guards, collapse = ", "))
+  x <- vec_put_lang(cx)
+  if (is.null(x)) return(character())
+  rows <- x[[3]][[3]]
+  args <- function(l, sep) paste(vapply(as.list(l)[-1L], cg_text, ""), collapse = sep)
+  sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s),\n  n = nrow(.d)\n))", cx$sink, cx$sink,
+          args(rows[[2]], ",\n       "), args(rows[[3]], ", "))
 }
 
 select_code <- function(o) {
@@ -634,30 +618,26 @@ gen_vec_carry <- function(i, cx) {
     set <- plan$sets[[k]]
     cv <- sprintf(".cv_%s_%d", v, seq_along(plan$sets))
     cs <- sprintf(".cs_%s_%d", v, seq_along(plan$sets))
-    cond <- if (is.null(set$cond)) "TRUE" else sprintf("sas_true(%s)", gen_expr(set$cond, cx))
+    cond <- if (is.null(set$cond)) TRUE else call("sas_true", gen_lang(set$cond, cx))
     cx$inexact <- !is.null(set$cond)
-    val <- coerce_var(gen_expr(set$value, cx), v, an)
+    val <- coerce_var_lang(gen_lang(set$value, cx), v, an)
     cx$inexact <- FALSE
-    add_stage(cx, "mutate", c(
-      paste0(r_name(cv[k]), " = ", val),
-      paste0(r_name(cs[k]), " = ", cond)
-    ))
+    add_stage(cx, "mutate", stats::setNames(list(val, cond), c(cv[k], cs[k])))
     if (i == plan$last) {
-      add_stage(cx, "mutate", sprintf("%s = sas_carry(list(%s), list(%s), %s)", r_name(v),
-        paste(r_name(cv), collapse = ", "), paste(r_name(cs), collapse = ", "), proto_code(an$info[[v]])))
+      # the start value is still text (proto_code())
+      carry <- call("sas_carry", cg_call("list", lapply(cv, sym)), cg_call("list", lapply(cs, sym)),
+                    str2lang(proto_code(an$info[[v]])))
+      add_stage(cx, "mutate", stats::setNames(list(carry), v))
     }
   }
   hit
 }
 
 # `v = val` (or `v = if_else(guard, val, v)`) as a one-item mutate list.
+# `guard`: the name of a guard column or a condition.
 assign_item <- function(v, val, guard) {
-  stats::setNames(list(if (is.null(guard)) val else cg_call("dplyr::if_else", list(sym(guard), val, sym(v)))), v)
-}
-
-assign_code <- function(v, val, guard) {
-  if (is.null(guard)) return(paste0(r_name(v), " = ", val))
-  sprintf("%s = dplyr::if_else(%s, %s, %s)", r_name(v), guard, val, r_name(v))
+  if (is.character(guard)) guard <- sym(guard)
+  stats::setNames(list(if (is.null(guard)) val else cg_call("dplyr::if_else", list(guard, val, sym(v)))), v)
 }
 
 gen_vec_stmt <- function(s, guard, cx) {
@@ -686,10 +666,9 @@ gen_vec_stmt <- function(s, guard, cx) {
     },
     substr_assign = {
       v <- s$var
-      at <- sprintf(", .at = c(%dL, %dL)", as.integer(s$line), as.integer(s$col %||% NA_integer_))
-      val <- sprintf("sas_substr_assign(%s, %s, %s, %s%s)", r_name(v), gen_expr(s$pos, cx),
-                     if (is.null(s$len)) "NULL" else gen_expr(s$len, cx), gen_expr(s$value, cx), at)
-      add_stage(cx, "mutate", assign_code(v, val, guard))
+      val <- cg_call("sas_substr_assign", c(list(sym(v), gen_lang(s$pos, cx), if (!is.null(s$len)) gen_lang(s$len, cx),
+                                                 gen_lang(s$value, cx)), cg_at(s$line, s$col)))
+      add_stage(cx, "mutate", assign_item(v, val, guard))
     },
     "if" = gen_vec_if(s, guard, cx),
     subset_if = {
@@ -700,8 +679,8 @@ gen_vec_stmt <- function(s, guard, cx) {
     do = gen_vec_block(s$body, guard, cx),
     select = gen_vec_select(s, guard, cx),
     put = {
-      g <- if (is.null(guard)) "rep(TRUE, nrow(.d))" else paste0(".d$", guard)
-      cx$puts <- c(cx$puts, list(list(guard = guard, line = put_line_code(s, with_mode(cx, "out"), g))))
+      g <- if (is.null(guard)) quote(rep(TRUE, nrow(.d))) else call("$", sym(".d"), sym(guard))
+      cx$puts <- c(cx$puts, list(list(guard = guard, line = put_line_lang(s, with_mode(cx, "out"), g))))
     },
     NULL
   )
@@ -730,18 +709,13 @@ if_chain <- function(s) {
   list(conds = conds, vals = vals, default = NULL)
 }
 
-case_when_code <- function(target, conds, vals, default, guard) {
-  parts <- paste0(vapply(conds, function(c) and_guard(guard, c), ""), " ~ ", vals)
-  if (!is.null(default)) {
-    if (is.null(guard)) {
-      parts <- c(parts, paste0(".default = ", default))
-    } else {
-      parts <- c(parts, paste0(guard, " ~ ", default), paste0(".default = ", r_name(target)))
-    }
-  } else {
-    parts <- c(parts, paste0(".default = ", r_name(target)))
+# `target = dplyr::case_when(...)` as a one-item mutate list.
+case_when_item <- function(target, conds, vals, default, guard) {
+  arms <- unname(Map(function(c, v) call("~", and_guard(guard, c), v), conds, vals))
+  tail <- if (!is.null(default) && is.null(guard)) list(.default = default) else {
+    c(if (!is.null(default)) list(call("~", sym(guard), default)), list(.default = sym(target)))
   }
-  sprintf("%s = dplyr::case_when(\n      %s\n    )", r_name(target), paste(parts, collapse = ",\n      "))
+  stats::setNames(list(cg_call("dplyr::case_when", c(arms, tail))), target)
 }
 
 gen_vec_if <- function(s, guard, cx) {
@@ -752,66 +726,69 @@ gen_vec_if <- function(s, guard, cx) {
     v <- targets
     old <- cx$inexact
     on.exit(cx$inexact <- old)
-    conds <- vapply(seq_along(ch$conds), function(k) {
+    conds <- lapply(seq_along(ch$conds), function(k) {
       if (k > 1) cx$inexact <- TRUE
-      sprintf("sas_true(%s)", gen_expr(ch$conds[[k]], cx))
-    }, "")
+      call("sas_true", gen_lang(ch$conds[[k]], cx))
+    })
     cx$inexact <- TRUE
-    vals <- vapply(ch$vals, function(a) coerce_var(gen_expr(a$value, cx), v, an), "")
-    default <- if (is.null(ch$default)) NULL else coerce_var(gen_expr(ch$default$value, cx), v, an)
+    vals <- lapply(ch$vals, function(a) coerce_var_lang(gen_lang(a$value, cx), v, an))
+    default <- if (is.null(ch$default)) NULL else coerce_var_lang(gen_lang(ch$default$value, cx), v, an)
     if (length(conds) == 1 && is.null(default)) {
-      add_stage(cx, "mutate", assign_code(v, vals, and_guard(guard, conds)))
+      add_stage(cx, "mutate", assign_item(v, vals[[1]], and_guard(guard, conds[[1]])))
     } else {
-      add_stage(cx, "mutate", case_when_code(v, conds, vals, default, guard))
+      add_stage(cx, "mutate", case_when_item(v, conds, vals, default, guard))
     }
     return(invisible())
   }
   g <- new_guard(cx)
-  add_stage(cx, "mutate", paste0(g, " = ", and_guard(guard, sprintf("sas_true(%s)", gen_expr(s$cond, cx)))))
+  add_stage(cx, "mutate", stats::setNames(list(and_guard(guard, call("sas_true", gen_lang(s$cond, cx)))), g))
   gen_vec_stmt(s$then, g, cx)
   if (!is.null(s[["else"]])) {
     g2 <- new_guard(cx)
-    add_stage(cx, "mutate", paste0(g2, " = ", and_guard(guard, paste0("!", g))))
+    add_stage(cx, "mutate", stats::setNames(list(and_guard(guard, call("!", sym(g)))), g2))
     gen_vec_stmt(s[["else"]], g2, cx)
   }
 }
 
-when_cond_code <- function(w, sel_code, cx) {
-  vals <- vapply(w$values, gen_expr, "", cx = cx)
-  if (!is.null(sel_code)) return(sprintf("sas_true(sas_in(%s, list(%s)))", sel_code, paste(vals, collapse = ", ")))
-  if (length(vals) == 1) return(sprintf("sas_true(%s)", vals))
-  paste0("(", paste(sprintf("sas_true(%s)", vals), collapse = " | "), ")")
+# The condition of a WHEN clause; `sel`: the SELECT expression (NULL when
+# there is none).
+when_cond_lang <- function(w, sel, cx) {
+  vals <- lapply(w$values, gen_lang, cx = cx)
+  if (!is.null(sel)) return(call("sas_true", call("sas_in", sel, cg_call("list", vals))))
+  conds <- lapply(vals, function(v) call("sas_true", v))
+  if (length(conds) == 1) return(conds[[1]])
+  call("(", Reduce(function(a, b) call("|", a, b), conds))
 }
 
 gen_vec_select <- function(s, guard, cx) {
   an <- cx$an
   bodies <- c(lapply(s$whens, `[[`, "body"), list(s$otherwise))
   all_assign <- all(vapply(bodies, function(b) b$stmt == "assign" && b$target$node == "var", logical(1)))
-  sel_code <- if (is.null(s$expr)) NULL else gen_expr(s$expr, cx)
+  sel <- if (is.null(s$expr)) NULL else gen_lang(s$expr, cx)
   old <- cx$inexact
   on.exit(cx$inexact <- old)
   cx$inexact <- TRUE
   if (all_assign && length(unique(vapply(bodies, function(b) b$target$name, ""))) == 1) {
     v <- bodies[[1]]$target$name
-    conds <- vapply(s$whens, when_cond_code, "", sel_code = sel_code, cx = cx)
-    vals <- vapply(s$whens, function(w) coerce_var(gen_expr(w$body$value, cx), v, an), "")
-    default <- coerce_var(gen_expr(s$otherwise$value, cx), v, an)
-    add_stage(cx, "mutate", case_when_code(v, conds, vals, default, guard))
+    conds <- lapply(s$whens, when_cond_lang, sel = sel, cx = cx)
+    vals <- lapply(s$whens, function(w) coerce_var_lang(gen_lang(w$body$value, cx), v, an))
+    default <- coerce_var_lang(gen_lang(s$otherwise$value, cx), v, an)
+    add_stage(cx, "mutate", case_when_item(v, conds, vals, default, guard))
     return(invisible())
   }
-  if (!is.null(sel_code)) {
+  if (!is.null(sel)) {
     cx$n_tmp <- cx$n_tmp + 1L
     tmp <- paste0(".s", cx$n_tmp)
-    add_stage(cx, "mutate", paste0(tmp, " = ", sel_code))
-    sel_code <- tmp
+    add_stage(cx, "mutate", stats::setNames(list(sel), tmp))
+    sel <- sym(tmp)
   }
   rem <- guard
   for (w in s$whens) {
     g <- new_guard(cx)
-    add_stage(cx, "mutate", paste0(g, " = ", and_guard(rem, when_cond_code(w, sel_code, cx))))
+    add_stage(cx, "mutate", stats::setNames(list(and_guard(rem, when_cond_lang(w, sel, cx))), g))
     gen_vec_stmt(w$body, g, cx)
     r <- new_guard(cx)
-    add_stage(cx, "mutate", paste0(r, " = ", and_guard(rem, paste0("!", g))))
+    add_stage(cx, "mutate", stats::setNames(list(and_guard(rem, call("!", sym(g)))), r))
     rem <- r
   }
   gen_vec_stmt(s$otherwise, rem, cx)
@@ -1009,7 +986,7 @@ gen_row_stmt <- function(s, cx) {
       quote(.read <- TRUE)
     ),
     input = c(
-      list(str2lang(paste0("pdv <- sas_input_stmt(.inf, pdv, ", input_spec_code(s, an), ")")), quote(.read <- TRUE)),
+      list(assign_lang(sym("pdv"), call("sas_input_stmt", sym(".inf"), sym("pdv"), input_spec_lang(s, an))), quote(.read <- TRUE)),
       if (!is.null(an$infile$opts$end)) list(assign_lang(pdv_ref(an$infile$opts$end), quote(sas_input_at_end(.inf))))
     ),
     merge = c(
@@ -1028,7 +1005,7 @@ gen_row_stmt <- function(s, cx) {
       }
       output_langs(targets)
     },
-    put = list(assign_lang(sym(cx$sink), call("c", sym(cx$sink), str2lang(put_line_code(s, cx))))),
+    put = list(assign_lang(sym(cx$sink), call("c", sym(cx$sink), put_line_lang(s, cx)))),
     call = if (s$routine %in% c("missing", "sortn", "sortc")) gen_row_call_vars(s, cx) else {
       args <- lapply(s$args, g)
       list(cg_call("sas_symput", c(list(sym(".symtab"), args[[1]], args[[2]], trim = s$routine == "symputx"),
@@ -1111,7 +1088,7 @@ gen_row_select <- function(s, cx) {
   }
   other <- if (s$has_otherwise) gen_row_stmt(s$otherwise, cx) else list(call("sas_select_error", as.integer(s$line)))
   # the WHEN chain from the last clause up: `if (c1) {..} else if (c2) {..} else {..}`
-  conds <- lapply(s$whens, function(w) str2lang(when_cond_code(w, sel, cx)))
+  conds <- lapply(s$whens, when_cond_lang, sel = if (!is.null(sel)) sym(sel), cx = cx)
   bodies <- lapply(s$whens, function(w) brace(gen_row_stmt(w$body, cx)))
   chain <- if (length(s$whens) == 0) other else {
     acc <- brace(other)

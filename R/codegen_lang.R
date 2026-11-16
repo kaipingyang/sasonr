@@ -109,4 +109,6 @@ cg_call <- function(fun, args = list()) {
 cg_at <- function(line, col) list(.at = call("c", as.integer(line), as.integer(col %||% NA_integer_)))
 
 # The text of an expression on one line (the emitters that still build text).
-cg_text <- function(x) cg_deparse(x, width = 500L, collapse = " ")
+# A call longer than deparse()'s widest line is joined without the line
+# break's indentation.
+cg_text <- function(x) paste(trimws(cg_deparse(x, width = 500L, collapse = NULL)), collapse = " ")
