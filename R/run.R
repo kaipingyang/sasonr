@@ -202,7 +202,7 @@ engine_exec_steps <- function(eng, text, line) {
     # whatever the values (sasonr_unsupported_construct) fails loud at once.
     sc_empty <- eng$sc_empty %||% character()
     eng$sc_empty <- NULL
-    env <- tryCatch(engine_eval(eng, tr$code, stage = vec, empty = sc_empty),
+    env <- tryCatch(engine_eval(eng, tr$code, stage = vec, empty = sc_empty, exprs = tr$exprs),
                     sasonr_step_exception = function(e) if (vec) e else engine_step_exception(eng, step, tr, e),
                     sasonr_unsupported = function(e) {
                       if (vec && !inherits(e, "sasonr_unsupported_construct")) e else stop(e)
@@ -217,7 +217,7 @@ engine_exec_steps <- function(eng, text, line) {
       tr$reasons <- c(if (branch) "unsupported value or step exception in vectorised code (re-run row by row)" else
         "data error at run time (re-run of the vectorised step)", tr$reasons)
       eng$steps[[length(eng$steps)]] <- tr
-      env <- tryCatch(engine_eval(eng, tr$code, stage = FALSE),
+      env <- tryCatch(engine_eval(eng, tr$code, stage = FALSE, exprs = tr$exprs),
                       sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e))
       if (!is.environment(env)) next
     } else if (vec) {
@@ -433,7 +433,7 @@ sas_num_store <- function(x, len) {
 
 # Evaluate generated code; with `stage = TRUE` output data sets go to a scratch
 # copy of WORK (the caller commits them) and run-time NOTEs are discarded.
-engine_eval <- function(eng, code, stage = FALSE, empty = character()) {
+engine_eval <- function(eng, code, stage = FALSE, empty = character(), exprs = NULL) {
   rt <- eng$session$rt
   rt_reset(rt)
   env <- new.env(parent = asNamespace("sasonr"))
@@ -452,7 +452,9 @@ engine_eval <- function(eng, code, stage = FALSE, empty = character()) {
   env$.meta <- list()
   env$.symtab <- eng$session$macro
   env$.titles <- eng$session$titles
-  tryCatch(eval(parse(text = code, keep.source = FALSE), envir = env), error = function(e) {
+  # the language objects of the translation when it has them, else its text
+  run <- if (is.null(exprs)) parse(text = code, keep.source = FALSE) else cg_exec(exprs)
+  tryCatch(eval(run, envir = env), error = function(e) {
     # surface a sasonr condition wrapped by dplyr (e.g. raised inside mutate())
     p <- e
     while (!is.null(p) && !inherits(p, "sasonr_error")) p <- p$parent

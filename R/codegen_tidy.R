@@ -1104,8 +1104,10 @@ translate_step <- function(step, meta, level = "auto") {
   notes <- c(compile_notes(),
              if (length(uninit) > 0) sprintf("NOTE: Variable %s is uninitialized.",
                                              vapply(uninit, function(v) an$info[[v]]$disp %||% v, "")))
+  code <- paste(c(header, body), collapse = "\n")
   list(
-    code = paste(c(header, body), collapse = "\n"), level = an$level, reasons = an$reasons,
+    # `exprs`: what runs (the emitters still give text; it is parsed once here)
+    code = code, exprs = as.list(parse(text = code, keep.source = FALSE)), level = an$level, reasons = an$reasons,
     line = step$line, outputs = vapply(an$dsir$slots$outputs, `[[`, "", "name"), meta = out_meta(an),
     compile_notes = notes
   )
