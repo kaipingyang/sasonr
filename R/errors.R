@@ -260,6 +260,10 @@ err_recover_step <- function(eng, text) {
       # the output data sets (OUTPUT OUT=, TABLES / OUT=) a stopped PROC MEANS,
       # SUMMARY or FREQ leaves in WORK are not implemented
       if (grepl("\\bout(put)?\\b", text, ignore.case = TRUE, perl = TRUE)) return(NULL)
+      # only an ERROR found while the statements are read (an invalid statement
+      # or option) is known not to start syntax-check mode; others are not
+      # implemented
+      if (!is.null(eng$cur_step)) return(NULL)
     } else if (step$name != "print") {
       return(NULL)
     }
@@ -267,6 +271,8 @@ err_recover_step <- function(eng, text) {
   }
   # an ERROR in a global statement is not a step ERROR (engine_global_error())
   if (step$type != "data") return(NULL)
+  # what a stopped `data a _null_;` leaves in WORK is not implemented
+  if (isTRUE(step$null_mixed)) return(NULL)
   if (isTRUE(step$null) || !length(step$outputs)) {
     return(list(kind = "data", outputs = list(), syntax_check = !isTRUE(step$null)))
   }
@@ -368,7 +374,14 @@ engine_step_error <- function(eng, e, text) {
                                                                          e$sas_line %||% "?", ")"))
     }
   }
-  err_set_macro(eng, syserr = 1012, syscc = if (identical(rec$kind, "proc")) 3000 else 1012)
+  if (identical(rec$kind, "proc") && rec$step$name %in% c("means", "summary", "freq")) {
+    # the SYSERR and SYSCC values after a stopped PROC MEANS, SUMMARY or FREQ
+    # are not implemented: a reference fails loud
+    mac_auto_unknown(eng$session$macro, c("syserr", "syscc"),
+                     paste0("a PROC ", toupper(rec$step$name), " step that stopped with an ERROR (SAS line ", e$sas_line %||% "?", ")"))
+  } else {
+    err_set_macro(eng, syserr = 1012, syscc = if (identical(rec$kind, "proc")) 3000 else 1012)
+  }
   invisible()
 }
 

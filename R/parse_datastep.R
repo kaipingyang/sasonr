@@ -92,6 +92,8 @@ parse_data_step <- function(p) {
   }
   list(
     type = "data", line = line, null = any(is_null),
+    # _NULL_ together with other output names (`data a _null_;`)
+    null_mixed = any(is_null) && !all(is_null),
     outputs = if (any(is_null)) list() else outputs, stmts = stmts
   )
 }
