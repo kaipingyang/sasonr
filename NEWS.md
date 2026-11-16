@@ -128,6 +128,26 @@ the development version provides.
   attribute model (length, format, informat, label, name case).
 * INPUT statement pointers and modifiers, INFILE options, the FILE
   statement and `LINESIZE`.
+* The declarative statements of a DATA step (WHERE, KEEP, DROP, RENAME, BY,
+  the attribute statements and the output list) are collected into slots of
+  an intermediate representation, and the executable statements are lowered
+  to a control-flow graph. Data-flow facts on that graph decide the step
+  level. The generated R code is built as R calls and evaluated directly;
+  `sas_translate()` shows the deparsed text.
+* Data set options (KEEP=, DROP=, RENAME=, WHERE=, IN=, FIRSTOBS=, OBS=)
+  of DATA step input and output data sets, PROC DATA=, PROC OUT= and PROC
+  SQL tables go through one component. An invalid option on an input data
+  set is an ERROR and stops the step; an unknown variable in KEEP=, DROP= or
+  RENAME= of an output data set gives a WARNING and the step completes (an
+  unknown KEEP= variable leaves a data set without variables, an unknown
+  RENAME= pair is ignored). IN= on PROC PRINT DATA= is ERROR 22-7. WHERE= on
+  an output data set is not implemented yet and fails loud.
+* A BY statement inside a DO, IF or SELECT block was ignored; it now fails
+  loud.
+* LEAVE inside a SELECT group leaves the SELECT, not the enclosing DO loop.
+  An iterative DO evaluates its start, TO and BY values before it assigns the
+  start to the index, so `do i = 1 to i;` uses the value of `i` before the
+  loop.
 * An assignment to `SUBSTR()` on the left of `=` is checked as its own
   context of `SUBSTR`; `CONSTANT('EXACTINT', 1E300)` stops the step with the
   step exception in a step that runs once and fails loud elsewhere.
