@@ -38,10 +38,10 @@ cg_exec <- function(exprs) as.expression(lapply(exprs, cg_lang))
 # deparse() indents by 4 spaces; the generated text uses 2 (a string never
 # spans lines: deparse() writes its newlines as \n).
 cg_deparse <- function(x, width = 80L, collapse = "\n") {
-  lines <- deparse(x, width.cutoff = width, control = cg_deparse_opts15)
+  lines <- deparse(x, width.cutoff = width, backtick = TRUE, control = cg_deparse_opts15)
   back <- tryCatch(parse(text = lines, keep.source = FALSE), error = function(e) NULL)
   if (!(length(back) == 1L && identical(back[[1]], x, num.eq = FALSE))) {
-    lines <- deparse(x, width.cutoff = width, control = cg_deparse_opts)
+    lines <- deparse(x, width.cutoff = width, backtick = TRUE, control = cg_deparse_opts)
   }
   # `}` and `else` on one line
   k <- which(grepl("^ *\\}$", lines[-length(lines)]) & grepl("^ *else\\b", lines[-1L]))

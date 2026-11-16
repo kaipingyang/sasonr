@@ -77,3 +77,10 @@ test_that("displayed code of an L1, an L2 and an L3 step", {
     expect_snapshot(cat(tr$steps[[length(tr$steps)]]$code, sep = "\n"))
   }
 })
+
+test_that("a non-syntactic name keeps its backticks in vectorised code (_N_)", {
+  r <- sas_run("data a; do i = 1 to 3; output; end; run; data b; set a; n = _n_; run;")
+  expect_equal(r$translation$steps[[2]]$level, "L1")
+  expect_equal(r$work$b$n, c(1, 2, 3))
+  expect_match(r$translation$steps[[2]]$code, "n = `_n_`", fixed = TRUE)
+})

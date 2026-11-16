@@ -509,8 +509,31 @@ add_input_stages <- function(cx, include_n = TRUE) {
   }
 }
 
+# A stage of the vectorised pipeline, as language objects: `mutate` a named
+# list of column values, `filter` a condition, `raw` a call without its first
+# argument. Text (the emitters not yet converted) is parsed here: a mutate item
+# "name = value", a condition or a call.
 add_stage <- function(cx, kind, code) {
+  if (is.character(code)) {
+    code <- switch(kind,
+      mutate = as.list(str2lang(paste0("list(", paste(code, collapse = ", "), ")")))[-1L],
+      str2lang(code)
+    )
+  }
   cx$stages <- c(cx$stages, list(list(kind = kind, code = code)))
+}
+
+# A mutate value on one line; a multi-line one (case_when) continues at the
+# indentation of its column.
+mutate_value_text <- function(x) {
+  if (is.call(x) && identical(x[[1]], quote(dplyr::case_when))) {
+    parts <- vapply(seq_along(as.list(x))[-1L], function(i) {
+      nm <- names(as.list(x))[i]
+      paste0(if (!is.null(nm) && nzchar(nm)) paste0(nm, " = ") else "", cg_text(x[[i]]))
+    }, "")
+    return(paste0("dplyr::case_when(\n      ", paste(parts, collapse = ",\n      "), "\n    )"))
+  }
+  cg_text(x)
 }
 
 render_pipeline <- function(target, src, stages) {
@@ -523,11 +546,13 @@ render_pipeline <- function(target, src, stages) {
       merged <- c(merged, list(s))
     }
   }
+  # one column per line in a mutate stage
   texts <- vapply(merged, function(s) {
     switch(s$kind,
-      mutate = paste0("dplyr::mutate(\n", paste0("    ", s$code, collapse = ",\n"), "\n  )"),
-      filter = paste0("dplyr::filter(", s$code, ")"),
-      raw = s$code
+      mutate = paste0("dplyr::mutate(\n", paste0("    ", r_name(names(s$code)), " = ",
+                                                 vapply(s$code, mutate_value_text, ""), collapse = ",\n"), "\n  )"),
+      filter = paste0("dplyr::filter(", cg_text(s$code), ")"),
+      raw = cg_text(s$code)
     )
   }, "")
   paste0(target, " <- ", paste(c(src, texts), collapse = " |>\n  "))
@@ -625,6 +650,11 @@ gen_vec_carry <- function(i, cx) {
   hit
 }
 
+# `v = val` (or `v = if_else(guard, val, v)`) as a one-item mutate list.
+assign_item <- function(v, val, guard) {
+  stats::setNames(list(if (is.null(guard)) val else cg_call("dplyr::if_else", list(sym(guard), val, sym(v)))), v)
+}
+
 assign_code <- function(v, val, guard) {
   if (is.null(guard)) return(paste0(r_name(v), " = ", val))
   sprintf("%s = dplyr::if_else(%s, %s, %s)", r_name(v), guard, val, r_name(v))
@@ -638,18 +668,20 @@ gen_vec_stmt <- function(s, guard, cx) {
   switch(s$stmt,
     assign = {
       v <- s$target$name
-      add_stage(cx, "mutate", assign_code(v, coerce_var(gen_expr(s$value, cx), v, an), guard))
+      add_stage(cx, "mutate", assign_item(v, coerce_var_lang(gen_lang(s$value, cx), v, an), guard))
     },
     sum = {
       v <- s$target$name
       plan <- an$sum_plan[[v]]
-      e <- gen_expr(s$value, cx)
+      e <- gen_lang(s$value, cx)
+      cum <- function(init) stats::setNames(list(call("sas_cumsum", e, cg_num(as.numeric(init)), quote(dplyr::n()))), v)
       if (is.null(plan$reset_var)) {
-        add_stage(cx, "mutate", sprintf("%s = sas_cumsum(%s, %s, dplyr::n())", r_name(v), e, r_num(plan$init)))
+        add_stage(cx, "mutate", cum(plan$init))
       } else {
-        add_stage(cx, "raw", sprintf("dplyr::group_by(.grp = cumsum(%s))", r_name(plan$reset_var)))
-        add_stage(cx, "mutate", sprintf("%s = sas_cumsum(%s, %s, dplyr::n())", r_name(v), e, r_num(plan$reset_value)))
-        add_stage(cx, "raw", "dplyr::ungroup()")
+        add_stage(cx, "raw", call("::", sym("dplyr"), sym("group_by")) |> list() |>
+                    c(list(.grp = call("cumsum", sym(plan$reset_var)))) |> as.call())
+        add_stage(cx, "mutate", cum(plan$reset_value))
+        add_stage(cx, "raw", quote(dplyr::ungroup()))
       }
     },
     substr_assign = {
@@ -661,10 +693,10 @@ gen_vec_stmt <- function(s, guard, cx) {
     },
     "if" = gen_vec_if(s, guard, cx),
     subset_if = {
-      cond <- sprintf("sas_true(%s)", gen_expr(s$cond, cx))
-      add_stage(cx, "filter", if (is.null(guard)) cond else sprintf("!(%s & !%s)", guard, cond))
+      cond <- call("sas_true", gen_lang(s$cond, cx))
+      add_stage(cx, "filter", if (is.null(guard)) cond else call("!", call("(", call("&", sym(guard), call("!", cond)))))
     },
-    delete = add_stage(cx, "filter", if (is.null(guard)) "FALSE" else paste0("!", guard)),
+    delete = add_stage(cx, "filter", if (is.null(guard)) FALSE else call("!", sym(guard))),
     do = gen_vec_block(s$body, guard, cx),
     select = gen_vec_select(s, guard, cx),
     put = {
