@@ -55,12 +55,8 @@ new_state <- function(meta) {
   st$arrays <- list()
   st$formats <- list()
   st$labels <- character()
-  st$keep <- list()
-  st$drop <- list()
-  st$rename <- character()
   st$readers <- list()
   st$by <- NULL
-  st$wheres <- list()
   st$meta <- meta
   st$lag_sites <- 0L
   st$loop_depth <- 0L
@@ -602,7 +598,6 @@ an_stmt <- function(s, st) {
     subset_if = s$cond <- if (isTRUE(s$ref_only)) an_expr(s$cond, st) else an_cond(s$cond, st, line),
     where = {
       s$cond <- an_where(s$cond, st)
-      st$wheres <- list(s$cond) # a later WHERE statement replaces an earlier one
     },
     do = {
       if (s$kind == "iter") {
@@ -800,9 +795,8 @@ an_stmt <- function(s, st) {
         }
       }
     },
-    keep = st$keep <- c(st$keep, s$items),
-    drop = st$drop <- c(st$drop, s$items),
-    rename = st$rename[names(s$pairs)] <- s$pairs,
+    # KEEP, DROP and RENAME are collected into the step slots (dsir_slots())
+    keep = , drop = , rename = NULL,
     array = an_array(s, st),
     put = {
       s$items <- lapply(s$items, function(it) {
@@ -1033,6 +1027,8 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   an <- as.list(st)
   an$stmts <- stmts
   an$step <- step
+  # the declarative slots: WHERE, KEEP/DROP/RENAME, the output data sets
+  an$dsir <- dsir_slots(an)
   cls <- classify_step(an)
   an$level <- if (level == "L3") "L3" else cls$level
   an$reasons <- if (level == "L3") "forced L3" else cls$reasons
@@ -1040,7 +1036,6 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   an$skip_top <- cls$skip_top
   an$output_pattern <- cls$output_pattern
   an$carry_plan <- cls$carry_plan
-  an$outputs <- output_specs(an)
   an
 }
 
@@ -1056,7 +1051,9 @@ register_by_flags <- function(st) {
 
 # Output data sets --------------------------------------------------------
 
-output_specs <- function(an) {
+# `sel`: the combined KEEP, DROP and RENAME statements (`keep`, `drop`,
+# `rename`), as dsir_slots() collects them.
+output_specs <- function(an, sel) {
   if (an$step$null) return(list())
   data_vars <- an$order[vapply(an$order, function(v) an$info[[v]]$kind == "data", logical(1))]
   # A variable that appears only in RETAIN, without an initial value, is not
@@ -1072,8 +1069,8 @@ output_specs <- function(an) {
   tmp$order <- data_vars
   tmp$info <- an$info[data_vars]
   base <- data_vars
-  if (length(an$keep) > 0) base <- intersect(base, resolve_items(an$keep, tmp, register = FALSE))
-  if (length(an$drop) > 0) base <- setdiff(base, resolve_items(an$drop, tmp, register = FALSE))
+  if (length(sel$keep) > 0) base <- intersect(base, resolve_items(sel$keep, tmp, register = FALSE))
+  if (length(sel$drop) > 0) base <- setdiff(base, resolve_items(sel$drop, tmp, register = FALSE))
   # Order of application: DROP/KEEP statements (old names), RENAME statement,
   # then the output data set options DROP=/KEEP= (new names) and RENAME=.
   rename_by <- function(names, ren) {
@@ -1081,7 +1078,7 @@ output_specs <- function(an) {
     names[hit[!is.na(hit)]] <- unname(ren[!is.na(hit)])
     names
   }
-  base_names <- rename_by(base, an$rename)
+  base_names <- rename_by(base, sel$rename)
   lapply(an$step$outputs, function(o) {
     keep <- rep(TRUE, length(base))
     if (!is.null(o$options$keep)) keep <- keep & base_names %in% resolve_ds_items(o$options$keep, base_names, o$line)
@@ -1097,7 +1094,7 @@ output_specs <- function(an) {
 
 out_meta <- function(an) {
   res <- list()
-  for (o in an$outputs) {
+  for (o in an$dsir$slots$outputs) {
     type <- lapply(o$vars, function(v) an$info[[v]]$type)
     len <- lapply(o$vars, function(v) an$info[[v]]$len)
     fmts <- lapply(o$vars, function(v) an$formats[[v]])

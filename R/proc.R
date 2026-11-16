@@ -225,14 +225,14 @@ proc_input <- function(step, meta, last) {
   st <- new_state(meta)
   rd <- an_reader(list(stmt = "set", datasets = list(ref), line = step$line), st)
   known <- st$order
-  wheres <- utils::tail(Filter(function(s) s$stmt == "where", step$stmts), 1) # the last WHERE wins
-  conds <- lapply(wheres, function(w) {
-    e <- an_where(w$cond, st)
+  w <- slot_where_effective(Filter(function(s) s$stmt == "where", step$stmts))
+  cond <- NULL
+  if (!is.null(w)) {
+    cond <- an_where(w$cond, st)
     extra <- setdiff(st$order, known)
     if (length(extra) > 0) abort_runtime(paste0("Variable ", extra[1], " is not on file WORK.", toupper(ref$name)), w$line)
-    e
-  })
-  list(ds = rd$datasets[[1]], st = st, wheres = conds)
+  }
+  list(ds = rd$datasets[[1]], st = st, where = cond)
 }
 
 proc_meta <- function(st, vars, out_names = vars) {
@@ -248,7 +248,7 @@ proc_meta <- function(st, vars, out_names = vars) {
 }
 
 proc_source_code <- function(inp, obs_col = FALSE) {
-  ds_code(inp$ds, list(arrays = list()), obs_col = obs_col, wheres = inp$wheres)
+  ds_code(inp$ds, list(arrays = list()), obs_col = obs_col, where = inp$where)
 }
 
 translate_proc <- function(step, meta, last = NULL) {

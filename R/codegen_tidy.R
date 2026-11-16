@@ -398,7 +398,9 @@ put_ls_code <- function(cx) if (is.null(cx$an$file)) "" else paste0(", .ls = ", 
 
 # Input sources (shared by L1/L2 pipelines and the L3 loop) ---------------
 
-ds_code <- function(d, an, obs_col = FALSE, wheres = list()) {
+# `where`: the analysed condition of the WHERE statement that applies (NULL
+# when there is none).
+ds_code <- function(d, an, obs_col = FALSE, where = NULL) {
   o <- d$options
   args <- c("work", r_str(d$name))
   if (!is.null(o$keep) || !is.null(o$drop)) args <- c(args, paste0("keep = ", r_chr_vec(d$vars)))
@@ -412,13 +414,12 @@ ds_code <- function(d, an, obs_col = FALSE, wheres = list()) {
     wcx$where <- TRUE
     code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(o$where, wcx))
   }
-  # WHERE statement conditions apply to every input data set without a WHERE=
-  # option (the data set option takes precedence), before FIRSTOBS=/OBS=
-  if (length(wheres) > 0 && is.null(o$where)) {
+  # the WHERE statement condition applies to every input data set without a
+  # WHERE= option (the data set option takes precedence), before FIRSTOBS=/OBS=
+  if (!is.null(where) && is.null(o$where)) {
     cx <- new_cx("vec", an)
     cx$where <- TRUE
-    conds <- vapply(wheres, function(w) sprintf("sas_where_cond(sas_true(%s))", gen_expr(w, cx)), "")
-    code <- sprintf("%s |> dplyr::filter(%s)", code, paste(conds, collapse = " & "))
+    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(where, cx))
   }
   # FIRSTOBS= / OBS= count observations that satisfy WHERE= and WHERE
   if (!is.null(o$firstobs) || !is.null(o$obs)) {
@@ -439,7 +440,7 @@ ds_code <- function(d, an, obs_col = FALSE, wheres = list()) {
     }
     if (length(tr) > 0) code <- sprintf("%s |> sas_trunc_chars(%s)", code, r_lit(tr))
   }
-  wexpr <- o$where %||% (if (length(wheres) > 0) wheres[[length(wheres)]])
+  wexpr <- o$where %||% where
   sprintf("%s |> sas_note_read(%s%s)", code, r_str(d$name),
           if (is.null(wexpr)) "" else paste0(", where = ", r_str(where_text(wexpr))))
 }
@@ -501,7 +502,7 @@ source_code <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] els
     return(sprintf("sas_read_input(%s, %s%s)", infile_open_code(an), input_spec_code(rd, an),
                    if (is.null(end_var)) "" else paste0(", end_var = ", r_str(end_var))))
   }
-  codes <- vapply(rd$datasets, ds_code, "", an = an, wheres = an$wheres)
+  codes <- vapply(rd$datasets, ds_code, "", an = an, where = an$dsir$slots$where$effective)
   in_vars <- vapply(rd$datasets, function(d) d$options$in_var %||% NA_character_, "")
   if (length(codes) == 1 && all(is.na(in_vars))) return(codes)
   by <- ""
@@ -610,8 +611,8 @@ select_code <- function(o) {
 }
 
 vec_output_code <- function(an) {
-  if (length(an$outputs) == 0) return(character())
-  o <- an$outputs[[1]]
+  if (length(an$dsir$slots$outputs) == 0) return(character())
+  o <- an$dsir$slots$outputs[[1]]
   stages <- character()
   if (!is.null(an$output_pattern$cond)) {
     stages <- c(stages, sprintf("dplyr::filter(sas_true(%s))", r_name(an$output_pattern$cond)))
@@ -838,7 +839,7 @@ gen_row_step <- function(an) {
            ".rows <- sas_rows(.in)", ".n_in <- length(.rows)", ".p <- 0L")
   }
   if (!is.null(rd) && rd$stmt == "merge") {
-    codes <- vapply(rd$datasets, ds_code, "", an = an, wheres = an$wheres)
+    codes <- vapply(rd$datasets, ds_code, "", an = an, where = an$dsir$slots$where$effective)
     merged_vars <- unique(unlist(lapply(rd$datasets, `[[`, "out_names")))
     L <- c(L,
       paste0(".m_in <- list(\n  ", paste(codes, collapse = ",\n  "), "\n)"),
@@ -890,12 +891,12 @@ gen_row_step <- function(an) {
   if (length(reset_vars) > 0) L <- c(L, sprintf(".reset <- pdv[%s]", r_chr_vec(reset_vars)))
   if (!is.null(cx$merge_reset)) L <- c(L, sprintf(".m_reset <- pdv[%s]", r_chr_vec(cx$merge_reset)))
   if (an$lag_sites > 0) L <- c(L, ".lags <- new.env()")
-  for (k in seq_along(an$outputs)) {
-    L <- c(L, sprintf(".out%d <- list()", k), sprintf(".vars%d <- %s", k, r_chr_vec(an$outputs[[k]]$vars)))
+  for (k in seq_along(an$dsir$slots$outputs)) {
+    L <- c(L, sprintf(".out%d <- list()", k), sprintf(".vars%d <- %s", k, r_chr_vec(an$dsir$slots$outputs[[k]]$vars)))
   }
 
   body <- gen_row_block(an$stmts, cx)
-  implicit_output <- length(an$outputs) > 0 && !has_stmt(an$stmts, "output")
+  implicit_output <- length(an$dsir$slots$outputs) > 0 && !has_stmt(an$stmts, "output")
   loop <- c(
     ".n_iter <- 0L",
     "repeat {",
@@ -914,15 +915,15 @@ gen_row_step <- function(an) {
     if (has_input) "  sas_input_iter_end(.inf)",
     "  if (.status == \"stop\") break",
     if (implicit_output) {
-      c("  if (.status == \"ok\") {", indent_lines(output_lines(seq_along(an$outputs)), 2L), "  }")
+      c("  if (.status == \"ok\") {", indent_lines(output_lines(seq_along(an$dsir$slots$outputs)), 2L), "  }")
     },
     if (!is.null(rd)) "  if (!.read) break" else "  break",
     "}"
   )
   L <- c(L, loop)
   if (!is.null(set_rd)) L <- c(L, "sas_reads_consumed(.p)")
-  for (k in seq_along(an$outputs)) {
-    o <- an$outputs[[k]]
+  for (k in seq_along(an$dsir$slots$outputs)) {
+    o <- an$dsir$slots$outputs[[k]]
     code <- sprintf("work$%s <- sas_rows_to_tibble(.out%d, .proto[.vars%d])", r_name(o$name), k, k)
     if (any(o$vars != o$out_names)) code <- paste0(code, " |>\n  ", select_code(o))
     L <- c(L, code)
@@ -1011,8 +1012,8 @@ gen_row_stmt <- function(s, cx) {
       ".read <- TRUE"
     ),
     output = {
-      targets <- if (length(s$targets) == 0) seq_along(an$outputs) else {
-        k <- match(s$targets, vapply(an$outputs, `[[`, "", "name"))
+      targets <- if (length(s$targets) == 0) seq_along(an$dsir$slots$outputs) else {
+        k <- match(s$targets, vapply(an$dsir$slots$outputs, `[[`, "", "name"))
         if (anyNA(k)) abort_syntax(paste0("OUTPUT to ", toupper(s$targets[is.na(k)][1]), " which is not on the DATA statement"), s$line)
         k
       }
@@ -1124,7 +1125,7 @@ translate_step <- function(step, meta, level = "auto") {
                                              vapply(uninit, function(v) an$info[[v]]$disp %||% v, "")))
   list(
     code = paste(c(header, body), collapse = "\n"), level = an$level, reasons = an$reasons,
-    line = step$line, outputs = vapply(an$outputs, `[[`, "", "name"), meta = out_meta(an),
+    line = step$line, outputs = vapply(an$dsir$slots$outputs, `[[`, "", "name"), meta = out_meta(an),
     compile_notes = notes
   )
 }

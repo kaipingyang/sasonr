@@ -3,7 +3,8 @@
 # This file collects the declarative parts of a step into slots. The slots are
 # filled from the analysed statements (`sas_analyze()` output), never from the
 # raw AST, so type and attribute facts stay where the analyser computes them.
-# Nothing in codegen reads the slots yet.
+# sas_analyze() attaches them as `an$dsir`; code generation reads WHERE,
+# KEEP/DROP/RENAME and the output data sets from there.
 
 #' Declarative slots of an analysed DATA step
 #'
@@ -68,6 +69,9 @@ dsir_slots <- function(an) {
         kind = k, line = s$line, in_block = in_block, reader = n_reader, datasets = dss,
         end = s$end, nobs = s$nobs, stmt = s
       )))
+    } else if (k == "by") {
+      # only a BY statement at the top level of the step is hoisted
+      if (in_block) abort_unsupported("a BY statement inside a block", s$line)
     } else if (k == "where") {
       acc$where <- c(acc$where, list(list(expr = s$cond, line = s$line, in_block = in_block)))
     } else if (k %in% c("keep", "drop", "rename")) {
@@ -91,29 +95,49 @@ dsir_slots <- function(an) {
   for (s in an$stmts) visit(s, FALSE)
 
   wheres <- acc$where
+  # the combined statement lists: KEEP/DROP items in order, RENAME pairs (a
+  # later pair for the same old name replaces an earlier one)
+  sel <- list(keep = list(), drop = list(), rename = character())
+  for (x in acc$sel) {
+    if (x$kind == "rename") sel$rename[names(x$items)] <- x$items
+    else sel[[x$kind]] <- c(sel[[x$kind]], x$items)
+  }
+  resolved <- output_specs(an, sel)
   by <- if (is.null(an$by)) NULL else list(
     vars = an$by$vars, descending = an$by$descending,
     # the parser rejects NOTSORTED and GROUPFORMAT
     notsorted = FALSE, groupformat = FALSE, line = an$by$line
   )
-  outs <- lapply(seq_along(an$outputs), function(i) {
+  outs <- lapply(seq_along(resolved), function(i) {
     o <- an$step$outputs[[i]]
-    r <- an$outputs[[i]]
+    r <- resolved[[i]]
     list(name = o$name, options = o$options, line = o$line, vars = r$vars, out_names = r$out_names)
   })
   slots <- list(
     source = acc$source,
     where = list(
       stmts = wheres,
-      effective = if (length(wheres) > 0) wheres[[length(wheres)]]$expr else NULL
+      effective = slot_where_effective(wheres)$expr
     ),
     select_rename = list(
-      stmts = acc$sel, keep = an$keep, drop = an$drop, rename = an$rename,
-      per_output = lapply(an$outputs, function(o) o[c("name", "vars", "out_names")])
+      stmts = acc$sel, keep = sel$keep, drop = sel$drop, rename = sel$rename,
+      per_output = lapply(resolved, function(o) o[c("name", "vars", "out_names")])
     ),
     attrs = acc$attrs,
     by = by,
     outputs = outs
   )
   structure(list(slots = slots), class = "sas_dsir")
+}
+
+#' The WHERE statement that applies
+#'
+#' A later WHERE statement replaces an earlier one (DATA step and PROC alike).
+#'
+#' @param wheres WHERE statements (or slot entries) in statement order.
+#' @return The last element of `wheres`, or NULL when there is none.
+#' @noRd
+slot_where_effective <- function(wheres) {
+  if (length(wheres) == 0) return(NULL)
+  wheres[[length(wheres)]]
 }

@@ -218,7 +218,7 @@ classify_step <- function(an) {
     if (!is.null(rd$nobs)) add3("NOBS= variable")
     if (rd$stmt == "set" && length(rd$datasets) > 1 && !is.null(an$by)) add2("interleaving SET with BY")
   }
-  if (!is.null(an$wheres) && length(an$wheres) > 0 && (length(readers) == 0 || readers[[1]]$stmt == "input")) {
+  if (!is.null(an$dsir$slots$where$effective) && (length(readers) == 0 || readers[[1]]$stmt == "input")) {
     abort_syntax("WHERE statement requires SET or MERGE", step$line)
   }
   if (!is.null(an$by)) add2("BY-group processing (FIRST./LAST.)")

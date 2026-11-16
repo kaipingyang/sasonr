@@ -50,7 +50,9 @@ test_that("where: every WHERE statement in order, the last one is effective", {
   expect_length(w$stmts, 3)
   expect_equal(vapply(w$stmts, `[[`, NA, "in_block"), c(FALSE, TRUE, FALSE))
   expect_equal(w$effective$lhs$name, "g")
-  expect_identical(w$effective, an$wheres[[1]])
+  top <- Filter(function(s) s$stmt == "where", an$stmts)
+  expect_identical(w$effective, top[[length(top)]]$cond)
+  expect_identical(an$dsir$slots$where$effective, w$effective)
   expect_null(slots_of("data c; set a; run;")$where$effective)
 })
 
@@ -107,4 +109,20 @@ test_that("outputs: two output data sets with KEEP= and their resolved columns",
   expect_equal(o[[1]]$vars, "g")
   expect_equal(o[[2]]$vars, c("v", "x"))
   expect_length(slots_of("data _null_; set a; run;")$outputs, 0)
+})
+
+test_that("slot_where_effective: the last WHERE wins", {
+  expect_null(slot_where_effective(list()))
+  expect_equal(slot_where_effective(list("a", "b", "c")), "c")
+})
+
+test_that("a BY statement inside a block fails loud", {
+  for (code in c(
+    "data c; set a; if v > 1 then do; by g; end; run;",
+    "data c; do until (e); set a end = e; by g; end; run;",
+    "data c; set a; select (g); when ('A') by g; otherwise; end; run;"
+  )) {
+    expect_error(sas_analyze(sas_parse(code)$steps[[1]], slot_meta), "a BY statement inside a block",
+                 class = "sasonr_unsupported")
+  }
 })
