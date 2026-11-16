@@ -89,3 +89,56 @@ test_that("missing semicolons: remainders with IF / THEN, two names, parentheses
   expect_error(run_sas_mode("data one;\n  array arr{2} a1 a2;\n  x = 1\n  arr = 2;\nrun;"), class = "sasonr_unsupported")
   expect_error(run_sas_mode("data one;\n  x = 1\n  y = 2 output;\nrun;"), class = "sasonr_unsupported")
 })
+
+# the steps that a stopped step leaves to run: the NOTE that starts
+# syntax-check mode, and the observations of the next DATA step
+sc_note <- "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode."
+sc_pre <- "data a;\n  input x;\n  datalines;\n1\n2\n3\n;\nrun;\n"
+sc_after <- function(code) run_sas_mode(paste0(sc_pre, code, "data check;\n  set a;\nrun;\n"))
+
+test_that("a stopped DATA _NULL_ step does not start syntax-check mode", {
+  r <- sc_after("data _null_;\n  set nosuch;\n  put x;\nrun;\n")
+  expect_identical(r$status, "error")
+  expect_false(sc_note %in% msgs(r))
+  expect_identical(nrow(r$work$check), 3L)
+})
+
+test_that("a stopped PROC MEANS, SUMMARY, FREQ or PRINT does not start syntax-check mode", {
+  for (code in c("proc means data=a;\n  frobnicate;\n  var x;\nrun;\n",
+                 "proc summary data=a;\n  frobnicate;\n  var x;\nrun;\n",
+                 "proc freq data=a;\n  frobnicate;\n  tables x;\nrun;\n",
+                 "proc print data=a;\n  format x $8.;\nrun;\n")) {
+    r <- sc_after(code)
+    expect_identical(r$status, "error", info = code)
+    expect_false(sc_note %in% msgs(r), info = code)
+    expect_identical(nrow(r$work$check), 3L, info = code)
+  }
+  # the numbered ERROR of PROC MEANS: no blank line after it
+  r <- sc_after("proc means data=a;\n  frobnicate;\n  var x;\nrun;\n")
+  i <- match("ERROR 180-322: Statement is not valid or it is used out of proper order.", r$log)
+  expect_identical(r$log[i + 1L], "11           var x;")
+})
+
+test_that("a stopped PROC SORT or DATA step starts syntax-check mode, one NOTE per step", {
+  for (code in c("proc sort data=a out=sorted;\n  by nosuchvar;\nrun;\n",
+                 "proc sort data=a;\n  by nosuchvar;\nrun;\n",
+                 "data b;\n  set a;\n  y = x + ;\n  z = x * ;\nrun;\n")) {
+    r <- sc_after(code)
+    expect_identical(sum(msgs(r) == sc_note), 1L, info = code)
+    expect_identical(nrow(r$work$check), 0L, info = code)
+  }
+})
+
+test_that("an ERROR in OPTIONS: every later step has 0 observations", {
+  r <- run_sas_mode("options ls=abc;\ndata a;\n  x = 1; output; x = 2; output;\nrun;\ndata check;\n  set a;\nrun;\n")
+  expect_identical(sum(msgs(r) == sc_note), 1L)
+  expect_identical(c(nrow(r$work$a), nrow(r$work$check)), c(0L, 0L))
+})
+
+test_that("another stopped PROC, or the OUT= data sets of a stopped PROC MEANS or FREQ, fail loud", {
+  for (code in c("proc transpose data=a out=t;\n  frobnicate;\nrun;\n",
+                 "proc means data=a;\n  frobnicate;\n  output out=m mean=mx;\nrun;\n",
+                 "proc freq data=a;\n  frobnicate;\n  tables x / out=f;\nrun;\n")) {
+    expect_error(sc_after(code), "syntax-check mode.*SAS line", class = "sasonr_unsupported", info = code)
+  }
+})

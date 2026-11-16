@@ -239,26 +239,40 @@ err_data_schema <- function(eng, step) {
 }
 
 # Output data sets of the failing step and their metadata (eng$session$meta form) as
-# compiled when the step stops: list(kind, outputs), or NULL
-# when they cannot be derived from the parsed step.
+# compiled when the step stops: list(kind, outputs, syntax_check), or NULL
+# when they cannot be derived from the parsed step.  `syntax_check`: whether
+# the stopped step starts syntax-check mode (OBS=0): a DATA step with an output
+# data set and PROC SORT (with or without OUT=) do; DATA _NULL_ and PROC
+# PRINT, MEANS, SUMMARY and FREQ do not.  Another PROC that stops with an ERROR
+# is not supported: NULL.
 err_recover_step <- function(eng, text) {
   step <- eng$cur_step %||% err_parse_recover(text)
   if (is.null(step)) return(NULL)
   if (step$type == "proc") {
     outs <- list()
-    if (step$name == "sort" && !is.null(step$options$out)) {
-      outs[[step$options$out$name]] <- list(vars = character(), type = list(), len = list(), formats = list(), disp = list())
+    if (step$name == "sort") {
+      if (!is.null(step$options$out)) {
+        outs[[step$options$out$name]] <- list(vars = character(), type = list(), len = list(), formats = list(), disp = list())
+      }
+      return(list(kind = "proc", outputs = outs, syntax_check = TRUE, step = step))
+    }
+    if (step$name %in% c("means", "summary", "freq")) {
+      # the output data sets (OUTPUT OUT=, TABLES / OUT=) a stopped PROC MEANS,
+      # SUMMARY or FREQ leaves in WORK are not implemented
+      if (grepl("\\bout(put)?\\b", text, ignore.case = TRUE, perl = TRUE)) return(NULL)
     } else if (step$name != "print") {
       return(NULL)
     }
-    return(list(kind = "proc", outputs = outs))
+    return(list(kind = "proc", outputs = outs, syntax_check = FALSE, step = step))
   }
   # an ERROR in a global statement is not a step ERROR (engine_global_error())
   if (step$type != "data") return(NULL)
-  if (isTRUE(step$null) || !length(step$outputs)) return(list(kind = "data", outputs = list()))
+  if (isTRUE(step$null) || !length(step$outputs)) {
+    return(list(kind = "data", outputs = list(), syntax_check = !isTRUE(step$null)))
+  }
   meta <- err_data_schema(eng, step)
   if (is.null(meta) || any(vapply(meta, is.null, logical(1)))) return(NULL)
-  list(kind = "data", outputs = meta)
+  list(kind = "data", outputs = meta, syntax_check = TRUE)
 }
 
 err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
@@ -302,8 +316,13 @@ engine_step_error <- function(eng, e, text) {
   in_sql <- isTRUE(eng$sql_open) || identical(eng$phase, "sql")
   rec <- if (in_sql) NULL else err_recover_step(eng, text)
   if (!in_sql && is.null(rec)) {
-    abort_unsupported(paste0("the data sets that this ERROR leaves in WORK could not be derived from the parsed step (",
-                             conditionMessage(e), ")"), e$sas_line %||% NULL)
+    abort_unsupported(paste0("the data sets that this ERROR leaves in WORK, or whether it starts syntax-check mode, ",
+                             "could not be derived from the parsed step (", conditionMessage(e), ")"), e$sas_line %||% NULL)
+  }
+  # a PROC step whose text does not parse: its lines and ERRORs belong to that
+  # step (the blank line after a numbered ERROR depends on the procedure)
+  if (identical(rec$kind, "proc") && is.null(eng$cur_step)) {
+    log_step_start(eng, log_step_label(rec$step), rec$step$line, rec$step$line)
   }
   eng$status <- "error"
   eng$errors <- c(eng$errors, conditionMessage(e))
@@ -321,7 +340,8 @@ engine_step_error <- function(eng, e, text) {
   log_source_read(eng, eng$chunk_end)
   log_boundary(eng)
   log_emit(eng, id = "step.stopped")
-  if (!isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {
+  # one NOTE per step, also when the step has several ERRORs
+  if (isTRUE(rec$syntax_check) && !isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {
     log_emit(eng, id = "step.syntax_check")
     eng$syntax_check <- TRUE
   }
@@ -338,8 +358,9 @@ engine_step_error <- function(eng, e, text) {
     }
   }
   # _LAST_: the new output of the stopped DATA step; after a data set that was
-  # kept, or the output of a stopped PROC: not supported
-  if (length(rec$outputs)) {
+  # kept, the output of a stopped PROC or a stopped in-place PROC SORT: not
+  # supported
+  if (length(rec$outputs) || (identical(rec$kind, "proc") && identical(rec$step$name, "sort"))) {
     if (identical(rec$kind, "data") && !kept) {
       session_set_last(eng$session, names(rec$outputs)[length(rec$outputs)])
     } else {

@@ -143,8 +143,7 @@ parse_proc_means <- function(p, line, pname) {
       format = parse_format_stmt(p),
       label = parse_label(p),
       attrib = parse_attrib(p),
-      abort_syntax(paste0("Statement ", toupper(kw), " is not valid in PROC ", toupper(pname),
-                          " (ERROR 180-322: Statement is not valid or it is used out of proper order)"), sline)
+      abort_syntax("Statement is not valid or it is used out of proper order. (ERROR 180-322)", sline, tk_col(p), tk_val(p))
     )
   })
   list(type = "proc", name = pname, line = line, options = opts, stmts = body$stmts, titles = body$titles)
