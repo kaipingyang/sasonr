@@ -170,6 +170,10 @@ slot_where_effective <- function(wheres) {
 #'   \item{read}{`reader` (index into `an$readers` and the source slot),
 #'     `kind` (`"set"`, `"merge"`).}
 #'   \item{input}{`reader`, `items`.}
+#'   A read or INPUT instruction ends its block with `branch(eof, stop,
+#'     next)` (`cond` a node `eof` with the reader, `eof = TRUE` on the
+#'     terminator): at the end of the input the step stops there; the stop
+#'     block has `term = "stop"`, `eof = TRUE`.
 #'   \item{output}{`targets` (data set names; empty: every output),
 #'     `index` (positions in the output slot, NA for an unknown name).}
 #'   \item{put}{`items`.}
@@ -186,21 +190,26 @@ slot_where_effective <- function(wheres) {
 #' the iterative DO assigns the start value and evaluates TO and BY once
 #' (`loop_temp` targets), the head tests the bound (`loop_test`) and then the
 #' WHILE condition, the latch tests UNTIL and increments (`loop_next`); a DO
-#' value list keeps a position (`loop_temp` "index"), and the body starts by
-#' assigning the current value (`loop_value`). LEAVE jumps to the loop exit,
+#' value list evaluates every value once before the loop (`loop_temp` "v1",
+#' "v2", ...), keeps a position (`loop_temp` "index"), and the body starts by
+#' assigning the current value (`loop_value`, whose `values` are the
+#' `loop_temp` nodes). LEAVE jumps to the loop exit,
 #' CONTINUE to the latch (DO WHILE / UNTIL: the test block). SELECT lowers
 #' to a chain of `when_test` branches.
 #'
 #' Statements after an unconditional transfer (DELETE, STOP, RETURN, LEAVE,
-#' CONTINUE) are unreachable; their blocks are removed and their lines kept
-#' in `$unreachable`. A LAG/DIF call in such a statement keeps its site with
+#' CONTINUE) are unreachable; their blocks are removed and the lines of the
+#' executable statements that start in them (also those giving only a
+#' terminator, and IF/DO/SELECT heads) are kept in `$unreachable`. A LAG/DIF call in such a statement keeps its site with
 #' `block = NA`.
 #'
 #' @param an The result of [sas_analyze()].
 #' @return The `sas_dsir` object of `an` (its slots) with `blocks` (named by
 #'   id), `entry`, `labels` (statement labels: always empty, the parser
-#'   rejects them), `loops`, `lag_sites` (data frame `id, fn, n, block`) and
-#'   `unreachable`.
+#'   rejects them), `loops`, `lag_sites` (data frame `id, fn, n, block`),
+#'   `unreachable` and `uncertain` (open semantic points of the step:
+#'   `"leave_in_select"` for a LEAVE inside a SELECT inside a DO loop, which the
+#'   engine treats as leaving the loop).
 #' @noRd
 dsir_lower <- function(an) {
   d <- an$dsir %||% dsir_slots(an)
@@ -211,6 +220,8 @@ dsir_lower <- function(an) {
   g$n_select <- 0L
   g$reader <- 0L
   g$cur <- NULL
+  g$starts <- list()
+  g$uncertain <- character()
   out_names <- vapply(d$slots$outputs, `[[`, "", "name")
 
   new_block <- function(loop = NULL) {
@@ -238,7 +249,21 @@ dsir_lower <- function(an) {
   goto <- function(id) g$cur <- id
   loop_temp <- function(k, name) list(node = "loop_temp", loop = k, name = name)
 
+  # a read or INPUT that finds the input exhausted stops the step
+  # (`if (.p > .n_in) sas_stop_step()`): the block ends in a branch on `eof`
+  end_of_input <- function(s, ctx) {
+    loop <- cur_loop(ctx)
+    stop_b <- new_block(loop)
+    next_b <- new_block(loop)
+    term("branch", s, cond = list(node = "eof", reader = g$reader), true = stop_b, false = next_b, eof = TRUE)
+    goto(stop_b)
+    term("stop", s, eof = TRUE)
+    goto(next_b)
+  }
   lower_stmt <- function(s, ctx) {
+    if (!s$stmt %in% c(decl_stmts, "datalines", "file", "infile", "null")) {
+      g$starts[[length(g$starts) + 1L]] <- c(block = g$cur, line = as.character(s$line %||% NA_integer_))
+    }
     switch(s$stmt,
       assign = emit("assign", s, target = s$target, expr = s$value),
       substr_assign = emit("assign", s, target = list(node = "var", name = s$var), expr = s$value,
@@ -248,10 +273,12 @@ dsir_lower <- function(an) {
       merge = {
         g$reader <- g$reader + 1L
         emit("read", s, reader = g$reader, kind = s$stmt)
+        end_of_input(s, ctx)
       },
       input = {
         g$reader <- g$reader + 1L
         emit("input", s, reader = g$reader, items = s$items)
+        end_of_input(s, ctx)
       },
       output = emit("output", s, targets = s$targets,
                     index = if (length(s$targets)) match(s$targets, out_names) else seq_along(out_names)),
@@ -285,7 +312,11 @@ dsir_lower <- function(an) {
       delete = transfer("delete", s, ctx),
       stop = transfer("stop", s, ctx),
       "return" = transfer("return", s, ctx),
-      leave = transfer("jump", s, ctx, to = ctx$loops[[length(ctx$loops)]]$exit),
+      leave = {
+        # the engine leaves the loop, also from inside a SELECT (open point)
+        if (isTRUE(ctx$in_select)) g$uncertain <- union(g$uncertain, "leave_in_select")
+        transfer("jump", s, ctx, to = ctx$loops[[length(ctx$loops)]]$exit)
+      },
       continue = transfer("jump", s, ctx, to = ctx$loops[[length(ctx$loops)]]$latch),
       do = lower_do(s, ctx),
       select = lower_select(s, ctx),
@@ -311,6 +342,8 @@ dsir_lower <- function(an) {
         emit("assign", s, target = loop_temp(k, "to"), expr = s$to)
         emit("assign", s, target = loop_temp(k, "by"), expr = s$by %||% list(node = "num", value = 1, text = "1"))
       } else {
+        # every value is evaluated once, before the first iteration
+        for (j in seq_along(s$values)) emit("assign", s, target = loop_temp(k, paste0("v", j)), expr = s$values[[j]])
         emit("assign", s, target = loop_temp(k, "index"), expr = list(node = "loop_first", loop = k))
       }
       head <- new_block(outer)
@@ -339,7 +372,8 @@ dsir_lower <- function(an) {
       goto(body)
       if (s$kind == "list") {
         emit("assign", s, target = list(node = "var", name = s$var),
-             expr = list(node = "loop_value", loop = k, values = s$values))
+             expr = list(node = "loop_value", loop = k,
+                         values = lapply(seq_along(s$values), function(j) loop_temp(k, paste0("v", j)))))
       }
     } else {
       # DO WHILE: test at the top; DO UNTIL: the body runs once before the test
@@ -361,6 +395,7 @@ dsir_lower <- function(an) {
     g$loops[[k]] <- lp
     inner <- ctx
     inner$loops <- c(ctx$loops, list(lp))
+    inner$in_select <- FALSE
     lower_body(s$body, inner)
     term("jump", s, to = latch)
     goto(exit)
@@ -370,6 +405,7 @@ dsir_lower <- function(an) {
     g$n_select <- g$n_select + 1L
     k <- g$n_select
     loop <- cur_loop(ctx)
+    ctx$in_select <- TRUE
     if (!is.null(s$expr)) emit("assign", s, target = list(node = "select_temp", select = k), expr = s$expr)
     no_match <- function() {
       if (isTRUE(s$has_otherwise)) lower_stmt(s$otherwise, ctx)
@@ -408,9 +444,10 @@ dsir_lower <- function(an) {
     todo <- c(todo, dsir_succ(g$blocks[[id]]$term))
   }
   dead <- setdiff(names(g$blocks), seen)
-  unreachable <- sort(unique(unlist(lapply(g$blocks[dead], function(b) {
-    vapply(b$instrs, function(i) as.integer(i$line), 1L)
-  }))))
+  # every executable statement that starts in a removed block, also those
+  # that give only a terminator (DELETE, STOP, ...) or a head (IF, DO, SELECT)
+  starts <- do.call(rbind, c(list(cbind(block = character(), line = character())), g$starts))
+  unreachable <- sort(unique(as.integer(starts[starts[, "block"] %in% dead, "line"])))
   lags <- dsir_lag_sites(g$blocks)
   lags$block[lags$block %in% dead] <- NA_character_
   d$blocks <- g$blocks[seen[order(as.integer(sub("^B", "", seen)))]]
@@ -419,6 +456,7 @@ dsir_lower <- function(an) {
   d$loops <- g$loops
   d$lag_sites <- lags
   d$unreachable <- unreachable
+  d$uncertain <- g$uncertain
   d
 }
 
@@ -519,6 +557,7 @@ dsir_expr_text <- function(e) {
     loop_next = sprintf("loop_next(%d)", e$loop),
     loop_value = sprintf("loop_value(%d)", e$loop),
     select_temp = sprintf(".sel%d", e$select),
+    eof = sprintf("eof(%d)", e$reader),
     when_test = sprintf("when(%s)", paste(vapply(e$values, dsir_expr_text, ""), collapse = ", ")),
     paste0("<", e$node, ">")
   )

@@ -39,63 +39,67 @@ cfg_check <- function(x) {
   expect_setequal(seen, ids)
 }
 
-test_that("a straight-line step is one block ending the iteration", {
+test_that("a straight-line step: the read, the end-of-input stop, one block ending the iteration", {
   x <- cfg_of("data c; set a; length z $ 3; w = v * 2; total + v; keep g w total; run;")
-  expect_length(x$blocks, 1)
+  expect_length(x$blocks, 3)
   expect_equal(x$entry, "B1")
-  expect_equal(ops_of(x, "B1"), c("read", "assign", "sum"))
+  expect_equal(ops_of(x, "B1"), "read")
   expect_equal(x$blocks$B1$instrs[[1]]$reader, 1L)
-  expect_equal(x$blocks$B1$term$term, "end_iteration")
+  expect_equal(x$blocks$B1$term[c("term", "true", "false", "eof")], list(term = "branch", true = "B2", false = "B3", eof = TRUE))
+  expect_equal(x$blocks$B1$term$cond, list(node = "eof", reader = 1L))
+  expect_equal(x$blocks$B2$term[c("term", "eof")], list(term = "stop", eof = TRUE))
+  expect_equal(ops_of(x, "B3"), c("assign", "sum"))
+  expect_equal(x$blocks$B3$term$term, "end_iteration")
   expect_length(x$labels, 0)
   # declarative statements give no instruction; the line of each instruction is kept
   x <- cfg_of("data c;\nset a;\nw = v;\nformat w 8.2;\nrun;")
-  expect_equal(vapply(x$blocks$B1$instrs, `[[`, 1L, "line"), c(2L, 3L))
+  expect_equal(vapply(c(x$blocks$B1$instrs, x$blocks$B3$instrs), `[[`, 1L, "line"), c(2L, 3L))
 })
 
 test_that("IF-THEN-ELSE is a diamond", {
   x <- cfg_of("data c; set a; if v > 1 then w = 1; else w = 2; u = 3; run;")
-  expect_length(x$blocks, 4)
-  t1 <- x$blocks$B1$term
+  expect_length(x$blocks, 6)
+  t1 <- x$blocks$B3$term
   expect_equal(t1$term, "branch")
   expect_equal(t1$cond$node, "compare")
-  expect_equal(c(t1$true, t1$false), c("B2", "B3"))
-  expect_equal(x$blocks$B2$term, list(term = "jump", line = 1L, to = "B4"))
-  expect_equal(x$blocks$B3$term$to, "B4")
-  expect_equal(block_assigning(x, "u"), "B4")
-  expect_equal(x$blocks$B4$term$term, "end_iteration")
+  expect_equal(c(t1$true, t1$false), c("B4", "B5"))
+  expect_equal(x$blocks$B4$term, list(term = "jump", line = 1L, to = "B6"))
+  expect_equal(x$blocks$B5$term$to, "B6")
+  expect_equal(block_assigning(x, "u"), "B6")
+  expect_equal(x$blocks$B6$term$term, "end_iteration")
   # IF-THEN without ELSE: the false edge goes to the join
   x <- cfg_of("data c; set a; if v > 1 then w = 1; run;")
-  expect_length(x$blocks, 3)
-  expect_equal(c(x$blocks$B1$term$true, x$blocks$B1$term$false), c("B2", "B3"))
+  expect_length(x$blocks, 5)
+  expect_equal(c(x$blocks$B3$term$true, x$blocks$B3$term$false), c("B4", "B5"))
 })
 
 test_that("a subsetting IF branches to a DELETE block", {
   x <- cfg_of("data c; set a; if v > 1; w = v; run;")
-  expect_length(x$blocks, 3)
-  t1 <- x$blocks$B1$term
-  expect_equal(c(t1$term, t1$true, t1$false), c("branch", "B2", "B3"))
-  expect_equal(x$blocks$B3$term$term, "delete")
-  expect_length(x$blocks$B3$instrs, 0)
-  expect_equal(block_assigning(x, "w"), "B2")
+  expect_length(x$blocks, 5)
+  t1 <- x$blocks$B3$term
+  expect_equal(c(t1$term, t1$true, t1$false), c("branch", "B4", "B5"))
+  expect_equal(x$blocks$B5$term$term, "delete")
+  expect_length(x$blocks$B5$instrs, 0)
+  expect_equal(block_assigning(x, "w"), "B4")
 })
 
 test_that("DELETE, STOP and RETURN end the block; what follows is unreachable", {
   for (k in c("delete", "stop", "return")) {
     x <- cfg_of(sprintf("data c;\nset a;\nif v = 1 then do;\n%s;\nw = 1;\nend;\nu = 2;\nrun;", k))
-    expect_equal(x$blocks$B2$term$term, k)
+    expect_equal(x$blocks$B4$term$term, k)
     expect_true(is.na(block_assigning(x, "w")))
     expect_equal(x$unreachable, 5L)
-    expect_equal(block_assigning(x, "u"), "B3")
+    expect_equal(block_assigning(x, "u"), "B5")
     cfg_check(x)
   }
   x <- cfg_of("data c; set a; stop; run;")
-  expect_equal(unname(terms_of(x)), "stop")
+  expect_equal(unname(terms_of(x)), c("branch", "stop", "stop"))
 })
 
 test_that("a DO group adds no block", {
   x <- cfg_of("data c; set a; do; w = 1; u = 2; end; run;")
-  expect_length(x$blocks, 1)
-  expect_equal(ops_of(x, "B1"), c("read", "assign", "assign"))
+  expect_length(x$blocks, 3)
+  expect_equal(ops_of(x, "B3"), c("assign", "assign"))
   expect_length(x$loops, 0)
 })
 
@@ -146,10 +150,11 @@ test_that("DO value list keeps a position and assigns the value in the body", {
   x <- cfg_of("data c; do k = 1, 5, 7; x = k; output; end; stop; run;")
   lp <- x$loops[[1]]
   expect_equal(lp$kind, "list")
-  expect_equal(x$blocks$B1$instrs[[1]]$target, list(node = "loop_temp", loop = 1L, name = "index"))
+  # the values are evaluated once in the pre-header, then the position
+  expect_equal(vapply(x$blocks$B1$instrs, function(i) i$target$name, ""), c("v1", "v2", "v3", "index"))
   b <- x$blocks[[lp$body]]
   expect_equal(b$instrs[[1]]$expr$node, "loop_value")
-  expect_length(b$instrs[[1]]$expr$values, 3)
+  expect_equal(b$instrs[[1]]$expr$values[[3]], list(node = "loop_temp", loop = 1L, name = "v3"))
   expect_equal(ops_of(x, lp$body), c("assign", "assign", "output"))
   expect_equal(x$blocks[[lp$exit]]$term$term, "stop")
   cfg_check(x)
@@ -209,9 +214,9 @@ test_that("nested IF in a DO loop stays inside the loop", {
 
 test_that("SELECT with OTHERWISE is a branch chain", {
   x <- cfg_of("data c; set a; select (g); when ('A') x = 1; when ('B', 'C') x = 2; otherwise x = 3; end; y = 1; run;")
-  expect_equal(ops_of(x, "B1"), c("read", "assign"))
-  expect_equal(x$blocks$B1$instrs[[2]]$target$node, "select_temp")
-  t1 <- x$blocks$B1$term
+  expect_equal(ops_of(x, "B3"), "assign")
+  expect_equal(x$blocks$B3$instrs[[1]]$target$node, "select_temp")
+  t1 <- x$blocks$B3$term
   expect_equal(t1$cond$node, "when_test")
   expect_true(t1$cond$has_expr)
   t2 <- x$blocks[[t1$false]]$term
@@ -228,7 +233,7 @@ test_that("SELECT with OTHERWISE is a branch chain", {
 
 test_that("SELECT without OTHERWISE ends in a runtime-error terminator", {
   x <- cfg_of("data c; set a; select; when (v > 1) x = 1; end; run;")
-  t1 <- x$blocks$B1$term
+  t1 <- x$blocks$B3$term
   expect_false(t1$cond$has_expr)
   ab <- x$blocks[[t1$false]]$term
   expect_equal(ab[c("term", "kind")], list(term = "abort", kind = "select"))
@@ -236,24 +241,25 @@ test_that("SELECT without OTHERWISE ends in a runtime-error terminator", {
   cfg_check(x)
   # no WHEN at all: the OTHERWISE body or the error, without a chain
   x <- cfg_of("data c; set a; select (g); otherwise x = 1; end; run;")
-  expect_length(x$blocks, 1)
+  expect_length(x$blocks, 3)
 })
 
 test_that("OUTPUT records its targets", {
   x <- cfg_of("data c d; set a; output d; if v > 1 then output; run;")
-  o <- x$blocks$B1$instrs[[2]]
+  o <- x$blocks$B3$instrs[[1]]
   expect_equal(o[c("op", "targets", "index")], list(op = "output", targets = "d", index = 2L))
-  o2 <- x$blocks[[x$blocks$B1$term$true]]$instrs[[1]]
+  o2 <- x$blocks[[x$blocks$B3$term$true]]$instrs[[1]]
   expect_equal(o2$index, 1:2)
 })
 
 test_that("PUT, CALL and INPUT are instructions; MERGE is a read", {
   x <- cfg_of("data _null_; set a; put v=; call symputx('m', v); run;")
-  expect_equal(ops_of(x, "B1"), c("read", "put", "call"))
-  expect_equal(x$blocks$B1$instrs[[3]]$routine, "symputx")
+  expect_equal(ops_of(x, "B3"), c("put", "call"))
+  expect_equal(x$blocks$B3$instrs[[2]]$routine, "symputx")
   x <- cfg_of("data c; input x y; datalines;\n1 2\n;\nrun;", list())
   expect_equal(ops_of(x, "B1"), "input")
   expect_equal(x$blocks$B1$instrs[[1]]$reader, 1L)
+  expect_true(isTRUE(x$blocks$B1$term$eof))
   x <- cfg_of("data c; merge a b; by g; run;")
   expect_equal(x$blocks$B1$instrs[[1]][c("op", "kind", "reader")], list(op = "read", kind = "merge", reader = 1L))
 })
@@ -264,11 +270,11 @@ test_that("LAG sites: unconditional, conditional and in a loop test", {
   expect_equal(ls$id, 1:2)
   expect_equal(ls$fn, c("lag", "dif"))
   expect_equal(ls$n, c(1L, 2L))
-  expect_equal(ls$block, c("B1", block_assigning(x, "q")))
-  expect_false(ls$block[2] == "B1")
+  expect_equal(ls$block, c("B3", block_assigning(x, "q")))
+  expect_false(ls$block[2] == "B3")
   x <- cfg_of("data c; set a; if lag(v) > 1 then q = 1; run;")
   # a LAG in the condition runs before the branch
-  expect_equal(x$lag_sites$block, "B1")
+  expect_equal(x$lag_sites$block, "B3")
   x <- cfg_of("data c; set a; if v > 1 then do; delete; q = lag(v); end; run;")
   expect_true(is.na(x$lag_sites$block))
   x <- cfg_of("data c; set a; run;")
@@ -305,7 +311,162 @@ test_that("dsir_dump prints blocks, instructions and edges", {
   x <- cfg_of("data c; set a; if v > 1 then w = lag(v); run;")
   out <- dsir_dump(x)
   expect_equal(out[1], "B1 (entry):")
-  expect_true(any(grepl("-> branch (v > 1) ? B2 : B3", out, fixed = TRUE)))
+  expect_true(any(grepl("-> branch (v > 1) ? B4 : B5", out, fixed = TRUE)))
   expect_true(any(grepl("assign w = lag(v)", out, fixed = TRUE)))
-  expect_true(any(grepl("lag sites: 1 lag1 in B2", out, fixed = TRUE)))
+  expect_true(any(grepl("lag sites: 1 lag1 in B4", out, fixed = TRUE)))
+})
+
+test_that("LAG in a DO value list is evaluated in the pre-header, not in the body", {
+  x <- cfg_of("data c; set a; do i = lag(v), lag2(v); w = i; end; run;")
+  lp <- x$loops[[1]]
+  expect_equal(nrow(x$lag_sites), 2)
+  expect_false(any(x$lag_sites$block == lp$body))
+  pre <- x$blocks[[x$lag_sites$block[1]]]
+  expect_null(pre$loop)
+  expect_equal(pre$term$to, lp$head)
+  cfg_check(x)
+})
+
+test_that("a read and an INPUT end their block with the end-of-input stop", {
+  x <- cfg_of("data c; w = 1; set a; u = v; run;")
+  expect_equal(ops_of(x, "B1"), c("assign", "read"))
+  t <- x$blocks$B1$term
+  expect_equal(x$blocks[[t$true]]$term$term, "stop")
+  expect_equal(block_assigning(x, "u"), t$false)
+  # a read inside a DO loop: the stop block belongs to the loop
+  x <- cfg_of("data c; do until (e); set a end = e; end; run;")
+  rb <- Filter(function(b) any(vapply(b$instrs, `[[`, "", "op") == "read"), x$blocks)[[1]]
+  expect_equal(rb$loop, 1L)
+  expect_equal(x$blocks[[rb$term$true]]$loop, 1L)
+  cfg_check(x)
+})
+
+test_that("unreachable lists statements that give only a terminator or a head", {
+  x <- cfg_of("data c;\nset a;\ndelete;\nstop;\nif v > 1 then w = 1;\ndo i = 1 to 2; end;\nselect (g); otherwise; end;\nreturn;\nrun;")
+  expect_equal(x$unreachable, 4:8)
+  # a DELETE in a THEN branch does not make the IF unreachable
+  x <- cfg_of("data c;\nset a;\nif v > 1 then delete;\nw = 1;\nrun;")
+  expect_length(x$unreachable, 0)
+})
+
+test_that("LEAVE inside a SELECT inside a DO loop is marked uncertain", {
+  x <- cfg_of("data c; do k = 'a', 'b'; select (k); when ('b') leave; otherwise; end; end; run;")
+  expect_equal(x$uncertain, "leave_in_select")
+  expect_equal(dsir_facts(x, sas_analyze(sas_parse("data c; do k = 'a', 'b'; select (k); when ('b') leave; otherwise; end; end; run;")$steps[[1]]))$uncertain,
+               "leave_in_select")
+  x <- cfg_of("data c; do i = 1 to 3; if i = 2 then leave; end; run;")
+  expect_length(x$uncertain, 0)
+})
+
+facts_of <- function(code, meta = cfg_meta) {
+  an <- sas_analyze(sas_parse(code)$steps[[1]], meta)
+  f <- dsir_facts(dsir_lower(an), an)
+  list(f = f, lv = dsir_level(f, an), cls = classify_step(an))
+}
+
+test_that("facts: explicit output, the dominating read, conditional sites", {
+  r <- facts_of("data c; set a; p = lag(v); if v > 1 then q = dif(v); run;")
+  expect_false(r$f$explicit_output)
+  expect_true(r$f$read_dominates)
+  expect_equal(r$f$conditional$lag, 2L)
+  expect_false(r$f$conditional$read)
+  expect_false(r$f$needs_state_machine)
+  r <- facts_of("data c; w = 1; set a; output; run;")
+  expect_true(r$f$explicit_output)
+  expect_false(r$f$read_dominates)
+  r <- facts_of("data c; do until (e); set a end = e; end; stop; run;")
+  expect_false(r$f$read_dominates)
+  r <- facts_of("data c; x = 1; run;")
+  expect_true(is.na(r$f$read_dominates))
+  # rows that a subsetting IF deletes are not paths that complete the iteration
+  r <- facts_of("data c; set a; if v > 1; t + v; run;")
+  expect_length(r$f$conditional$sum, 0)
+  r <- facts_of("data c; set a; if v > 1 then t + v; run;")
+  expect_equal(r$f$conditional$sum, "t")
+})
+
+test_that("facts: cross-row live variables follow the PDV reset rules", {
+  # a sum variable read by its own sum statement
+  r <- facts_of("data c; set a; t + v; run;")
+  expect_equal(r$f$cross_row_live, "t")
+  # a plain assigned variable is reset at the top of each iteration
+  r <- facts_of("data c; set a; if v > 1 then w = v; run;")
+  expect_length(r$f$cross_row_live, 0)
+  # a retained variable assigned on some rows reaches the implicit output
+  r <- facts_of("data c; set a; by g; retain b; if first.g then b = v; run;")
+  expect_equal(r$f$cross_row_live, "b")
+  expect_true(length(r$f$exposed$b) > 0)
+  # assigned on every row: nothing is carried
+  r <- facts_of("data c; set a; retain b; b = v * 2; run;")
+  expect_length(r$f$cross_row_live, 0)
+  # an input variable set by the read before any use
+  r <- facts_of("data c; set a; v + 1; run;")
+  expect_length(r$f$cross_row_live, 0)
+  # an input variable read before the read is carried
+  r <- facts_of("data c; w = v; set a; run;")
+  expect_equal(r$f$cross_row_live, "v")
+  # a retained variable never assigned holds its initial value: no state
+  r <- facts_of("data c; set a; retain k 5; w = k; run;")
+  expect_length(r$f$cross_row_live, 0)
+})
+
+test_that("dsir_level agrees with classify_step on the common shapes", {
+  progs <- c(
+    "data c; set a; w = v * 2; run;",
+    "data c; set a; if v > 1; run;",
+    "data c; set a; t + v; run;",
+    "data c; set a; by g; if first.g then t = 0; t + v; run;",
+    "data c; set a; by g; retain b; if first.g then b = v; run;",
+    "data c; set a; p = lag(v); run;",
+    "data c; set a; if v > 1 then p = lag(v); run;",
+    "data c; set a; by g; if last.g then output; run;",
+    "data c; set a; w = v; output; run;",
+    "data c; set a; if v > 1 then t + v; run;",
+    "data c; do i = 1 to 3; x = i; output; end; run;",
+    "data c d; set a; run;",
+    "data c; set a; call symputx('m', v); run;",
+    "data c; x = 1; run;"
+  )
+  for (p in progs) {
+    r <- facts_of(p)
+    expect_equal(r$lv$level, r$cls$level, info = p)
+  }
+})
+
+test_that("dsir_level is more precise where the data flow shows no carried value", {
+  # the sum variable comes from the input data set: the read sets it on every
+  # row, nothing is carried, but the generator emits a sum statement only as
+  # an accumulator
+  r <- facts_of("data c; set a; v + 1; run;")
+  expect_length(r$f$cross_row_live, 0)
+  expect_equal(r$lv$level, "L3")
+  # a retained variable assigned on every row carries nothing
+  r <- facts_of("data c; set a; retain b; b = v; run;")
+  expect_equal(r$cls$level, "L2")
+  expect_equal(r$lv$level, "L1")
+})
+
+test_that("dsir_level: RETURN forces L3 (the generators do not emit it)", {
+  for (p in c("data c; set a; if v > 1 then return; w = 1; run;",
+              "data _null_; x = 1; put 'x=' x; return; put 'never'; run;")) {
+    r <- facts_of(p)
+    expect_equal(r$lv$level, "L3", info = p)
+    expect_true("RETURN statement" %in% r$lv$reasons, info = p)
+  }
+})
+
+test_that("dsir_level: a carried value may be read after its last assignment", {
+  r <- facts_of("data c; set a; by g; retain b; if first.g then b = v; w = v - b; run;")
+  expect_equal(r$cls$level, "L2")
+  expect_equal(r$lv$level, "L2")
+  # read before the assignment: the previous row's value is used
+  r <- facts_of("data c; set a; by g; retain b; w = b; if first.g then b = v; run;")
+  expect_equal(r$cls$level, "L3")
+  expect_equal(r$lv$level, "L3")
+})
+
+test_that("dsir_level: a carried assignment inside a DO group with other statements is not the pattern", {
+  r <- facts_of("data c; set a; by g; retain b; if first.g then b = .; if v = 1 then do; f = 'Y'; b = v; end; else w = v - b; run;")
+  expect_equal(r$cls$level, "L3")
+  expect_equal(r$lv$level, "L3")
 })

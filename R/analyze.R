@@ -1029,13 +1029,28 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   an$step <- step
   # the declarative slots: WHERE, KEEP/DROP/RENAME, the output data sets
   an$dsir <- dsir_slots(an)
+  # classify_step() still checks the step (errors) and builds the L2 plans;
+  # the level comes from the facts of the control-flow graph. classify_step()
+  # decides where they do not (dsir_level() NA) and where the facts allow L2
+  # but classify_step() has no plan for the L2 generator
   cls <- classify_step(an)
-  an$level <- if (level == "L3") "L3" else cls$level
-  an$reasons <- if (level == "L3") "forced L3" else cls$reasons
   an$sum_plan <- cls$sum_plan
   an$skip_top <- cls$skip_top
   an$output_pattern <- cls$output_pattern
   an$carry_plan <- cls$carry_plan
+  if (level == "L3") {
+    an$level <- "L3"
+    an$reasons <- "forced L3"
+    return(an)
+  }
+  lv <- dsir_level(dsir_facts(dsir_lower(an), an), an)
+  # where both give the same level the reasons of classify_step() stay (the
+  # header of the generated code does not change)
+  if (is.na(lv$level) || lv$level == cls$level || (lv$level == "L2" && cls$level != "L2")) lv <- cls
+  # L1: no value is carried across rows, every assignment is a plain one
+  if (lv$level == "L1") an$carry_plan <- list()
+  an$level <- lv$level
+  an$reasons <- lv$reasons
   an
 }
 

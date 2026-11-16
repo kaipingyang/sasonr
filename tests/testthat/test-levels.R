@@ -32,3 +32,24 @@ run;
   expect_equal(auto$work$s$cnt, c(13, 15))
   expect_equal(auto$work$t$note, c("sma", "big", "big"))
 })
+
+test_that("a retained variable assigned on every row before use is L1 and equals L3", {
+  code <- "
+data a; input g $ v; datalines;
+A 1
+A .
+B 3
+B 4
+;
+data r1; retain b a; set a; a = v + 1; b = a * 2; run;
+data r2; set a; retain k 5 c ''; if v > 3 then delete; k = v; c = g; w = k + 1; run;
+data r3; set a; retain d; if v > 1; d = v; run;
+"
+  auto <- sas_run(code)
+  rows <- sas_run(code, level = "L3")
+  expect_equal(vapply(auto$translation$steps, `[[`, "", "level"), c("L1", "L1", "L1", "L1"))
+  expect_false(any(grepl("sas_carry", vapply(auto$translation$steps, `[[`, "", "code"))))
+  expect_equal(auto$work, rows$work)
+  expect_equal(names(auto$work$r1), c("b", "a", "g", "v"))
+  expect_equal(auto$work$r2$k, c(1, NA, 3))
+})
