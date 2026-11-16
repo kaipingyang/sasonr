@@ -47,6 +47,7 @@ reference:
   - sas_translate
   - sas_session
   - sas_session_accessors
+  - sas_log
   - sas_export_work
   - sasonr_strict
 - title: Front end (lexer, parser, analysis)
