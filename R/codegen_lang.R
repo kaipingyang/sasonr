@@ -35,11 +35,29 @@ cg_exec <- function(exprs) as.expression(lapply(exprs, cg_lang))
 
 # 15 significant digits where they give the same object back (readable
 # literals), else 17
+# deparse() indents by 4 spaces; the generated text uses 2 (a string never
+# spans lines: deparse() writes its newlines as \n).
 cg_deparse <- function(x, width = 80L, collapse = "\n") {
-  txt <- paste(deparse(x, width.cutoff = width, control = cg_deparse_opts15), collapse = collapse)
-  back <- tryCatch(parse(text = txt, keep.source = FALSE), error = function(e) NULL)
-  if (length(back) == 1L && identical(back[[1]], x, num.eq = FALSE)) return(txt)
-  paste(deparse(x, width.cutoff = width, control = cg_deparse_opts), collapse = collapse)
+  lines <- deparse(x, width.cutoff = width, control = cg_deparse_opts15)
+  back <- tryCatch(parse(text = lines, keep.source = FALSE), error = function(e) NULL)
+  if (!(length(back) == 1L && identical(back[[1]], x, num.eq = FALSE))) {
+    lines <- deparse(x, width.cutoff = width, control = cg_deparse_opts)
+  }
+  # `}` and `else` on one line
+  k <- which(grepl("^ *\\}$", lines[-length(lines)]) & grepl("^ *else\\b", lines[-1L]))
+  for (i in rev(k)) {
+    lines[i] <- paste0(lines[i], " ", sub("^ +", "", lines[i + 1L]))
+    lines <- lines[-(i + 1L)]
+  }
+  # `if (c) stmt` without braces: deparse() puts stmt on the next line
+  k <- which(grepl("^ *(\\} )?(if \\(.*\\)|else) $", lines))
+  for (i in rev(k)) if (i < length(lines)) {
+    lines[i] <- paste0(lines[i], sub("^ +", "", lines[i + 1L]))
+    lines <- lines[-(i + 1L)]
+  }
+  lead <- nchar(lines) - nchar(sub("^ +", "", lines))
+  lines <- paste0(strrep(" ", lead %/% 2L), substring(lines, lead + 1L))
+  paste(lines, collapse = collapse)
 }
 
 #' The display text of the elements, after the header comment lines

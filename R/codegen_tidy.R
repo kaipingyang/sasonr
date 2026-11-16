@@ -873,7 +873,7 @@ gen_row_step <- function(an) {
     "  pdv$`_error_` <- 0",
     if (!is.null(rd)) "  .read <- FALSE",
     "  .status <- tryCatch({",
-    indent_lines(body, 2L),
+    indent_lines(row_lines(body), 2L),
     "    \"ok\"",
     "  }, sasonr_delete = function(e) \"delete\", sasonr_stop = function(e) \"stop\", sasonr_return = function(e) \"ok\")",
     if (has_input) "  if (.status == \"stop\" && !is.null(.inf$pdv)) pdv[names(.inf$pdv)] <- .inf$pdv",
@@ -898,85 +898,95 @@ gen_row_step <- function(an) {
   L
 }
 
-output_lines <- function(ks) sprintf(".out%d[[length(.out%d) + 1L]] <- pdv[.vars%d]", ks, ks, ks)
+
+# The L3 statement emitters return lists of language objects.
+
+sym <- as.name
+pdv_ref <- function(v) call("$", sym("pdv"), sym(v))
+assign_lang <- function(target, value) call("<-", target, value)
+brace <- function(body) as.call(c(list(sym("{")), body))
+err_sync <- function() quote(pdv <- sas_err_sync(pdv))
+
+coerce_lang <- function(x, type, len) if (type == "char") call("sas_char", x, as.integer(len)) else x
+coerce_var_lang <- function(x, name, an) {
+  inf <- an$info[[name]]
+  coerce_lang(x, inf$type, inf$len)
+}
 
 gen_row_block <- function(stmts, cx) {
   unlist(lapply(stmts, function(s) {
     code <- gen_row_stmt(s, cx)
-    if (length(code) > 0 && !s$stmt %in% c("if", "do", "select") && stmt_may_error(s)) code <- c(code, "pdv <- sas_err_sync(pdv)")
+    if (length(code) > 0 && !s$stmt %in% c("if", "do", "select") && stmt_may_error(s)) code <- c(code, list(err_sync()))
     code
-  }))
+  }), recursive = FALSE) %||% list()
 }
+
+# The display lines of L3 statements (2-space indentation, as the rest of the
+# generated text).
+row_lines <- function(objs) unlist(lapply(objs, function(x) strsplit(cg_deparse(x), "\n", fixed = TRUE)[[1]]))
 
 # A condition whose evaluation may raise a data error: evaluate it first so
 # _ERROR_ is set before the branch runs.
 row_cond <- function(e, cx, out_name) {
-  if (!expr_may_error(e)) return(list(pre = character(), cond = sprintf("sas_true(%s)", gen_expr(e, cx))))
+  if (!expr_may_error(e)) return(list(pre = list(), cond = call("sas_true", gen_lang(e, cx))))
   cx$n_tmp <- cx$n_tmp + 1L
-  v <- paste0(".c", cx$n_tmp)
-  list(pre = c(sprintf("%s <- sas_true(%s)", v, gen_expr(e, cx)), "pdv <- sas_err_sync(pdv)"), cond = v)
+  v <- sym(paste0(".c", cx$n_tmp))
+  list(pre = list(assign_lang(v, call("sas_true", gen_lang(e, cx))), err_sync()), cond = v)
 }
-
-block <- function(head, body, tail = "}") c(head, indent_lines(body, 1L), tail)
 
 gen_row_stmt <- function(s, cx) {
   an <- cx$an
-  g <- function(e) gen_expr(e, cx)
+  g <- function(e) gen_lang(e, cx)
   switch(s$stmt,
     assign = {
       if (s$target$node == "var") {
         v <- s$target$name
-        sprintf("%s <- %s", var_ref(v, cx), coerce_var(g(s$value), v, an))
+        list(assign_lang(var_lang(v, cx), coerce_var_lang(g(s$value), v, an)))
       } else {
         arr <- an$arrays[[s$target$name]]
-        sprintf("%s <- %s", gen_array_ref(s$target, cx), coerce_to(g(s$value), arr$type, arr$len))
+        list(assign_lang(gen_array_lang(s$target, cx), coerce_lang(g(s$value), arr$type, arr$len)))
       }
     },
     sum = {
-      ref <- var_ref(s$target$name, cx)
-      sprintf("%s <- sas_f_sum(%s, %s)", ref, ref, g(s$value))
+      ref <- var_lang(s$target$name, cx)
+      list(assign_lang(ref, call("sas_f_sum", ref, g(s$value))))
     },
     substr_assign = {
-      at <- sprintf(".at = c(%dL, %dL)", as.integer(s$line), as.integer(s$col %||% NA_integer_))
-      sprintf("%s <- sas_substr_assign(%s, %s, %s, %s, %s)", var_ref(s$var, cx), var_ref(s$var, cx),
-              g(s$pos), if (is.null(s$len)) "NULL" else g(s$len), g(s$value), at)
+      ref <- var_lang(s$var, cx)
+      list(assign_lang(ref, cg_call("sas_substr_assign", c(list(ref, g(s$pos), if (is.null(s$len)) NULL else g(s$len), g(s$value)),
+                                                           cg_at(s$line, s$col)))))
     },
     "if" = {
       rc <- row_cond(s$cond, cx)
-      out <- block(sprintf("if (%s) {", rc$cond), gen_row_block(list(s$then), cx))
-      if (!is.null(s[["else"]])) {
-        out[length(out)] <- "} else {"
-        out <- c(out, indent_lines(gen_row_block(list(s[["else"]]), cx), 1L), "}")
-      }
-      c(rc$pre, out)
+      then <- brace(gen_row_block(list(s$then), cx))
+      out <- if (is.null(s[["else"]])) call("if", rc$cond, then) else call("if", rc$cond, then, brace(gen_row_block(list(s[["else"]]), cx)))
+      c(rc$pre, list(out))
     },
-    subset_if = sprintf("if (!sas_true(%s)) sas_delete()", g(s$cond)),
-    stop = "sas_stop_step()",
-    "return" = "sas_return()",
-    delete = "sas_delete()",
-    leave = "break",
-    continue = "next",
+    subset_if = list(call("if", call("!", call("sas_true", g(s$cond))), quote(sas_delete()))),
+    stop = list(quote(sas_stop_step())),
+    "return" = list(quote(sas_return())),
+    delete = list(quote(sas_delete())),
+    leave = list(quote(break)),
+    continue = list(quote(next)),
     do = gen_row_do(s, cx),
     select = gen_row_select(s, cx),
-    set = c(
-      ".p <- .p + 1L",
-      "if (.p > .n_in) sas_stop_step()",
-      "pdv <- sas_read_row(pdv, .rows, .p)",
-      ".read <- TRUE"
+    set = list(
+      quote(.p <- .p + 1L),
+      quote(if (.p > .n_in) sas_stop_step()),
+      quote(pdv <- sas_read_row(pdv, .rows, .p)),
+      quote(.read <- TRUE)
     ),
     input = c(
-      paste0("pdv <- sas_input_stmt(.inf, pdv, ", input_spec_code(s, an), ")"),
-      ".read <- TRUE",
-      if (!is.null(an$infile$opts$end)) sprintf("pdv$%s <- sas_input_at_end(.inf)", r_name(an$infile$opts$end))
+      list(str2lang(paste0("pdv <- sas_input_stmt(.inf, pdv, ", input_spec_code(s, an), ")")), quote(.read <- TRUE)),
+      if (!is.null(an$infile$opts$end)) list(assign_lang(pdv_ref(an$infile$opts$end), quote(sas_input_at_end(.inf))))
     ),
     merge = c(
-      ".p <- .p + 1L",
-      "if (.p > .n_in) sas_stop_step()",
-      sprintf("pdv <- sas_merge_read(pdv, .m, .plan, .p, .m_reset, %s, %s)",
-              r_lit(vapply(s$datasets, function(d) d$options$in_var %||% NA_character_, "")),
-              r_chr_vec(an$by$vars)),
-      if (!is.null(s$end)) sprintf("pdv$%s <- as.numeric(.p == .n_in)", r_name(s$end)),
-      ".read <- TRUE"
+      list(quote(.p <- .p + 1L), quote(if (.p > .n_in) sas_stop_step()),
+           assign_lang(sym("pdv"), call("sas_merge_read", sym("pdv"), sym(".m"), sym(".plan"), sym(".p"), sym(".m_reset"),
+                                         cg_val(vapply(s$datasets, function(d) d$options$in_var %||% NA_character_, "")),
+                                         cg_val(an$by$vars)))),
+      if (!is.null(s$end)) list(assign_lang(pdv_ref(s$end), quote(as.numeric(.p == .n_in)))),
+      list(quote(.read <- TRUE))
     ),
     output = {
       targets <- if (length(s$targets) == 0) seq_along(an$dsir$slots$outputs) else {
@@ -984,99 +994,106 @@ gen_row_stmt <- function(s, cx) {
         if (anyNA(k)) abort_syntax(paste0("OUTPUT to ", toupper(s$targets[is.na(k)][1]), " which is not on the DATA statement"), s$line)
         k
       }
-      output_lines(targets)
+      output_langs(targets)
     },
-    put = sprintf("%s <- c(%s, %s)", cx$sink, cx$sink, put_line_code(s, cx)),
+    put = list(assign_lang(sym(cx$sink), call("c", sym(cx$sink), str2lang(put_line_code(s, cx))))),
     call = if (s$routine %in% c("missing", "sortn", "sortc")) gen_row_call_vars(s, cx) else {
-      args <- vapply(s$args, g, "")
-      scope <- if (length(args) >= 3) paste0(", scope = ", args[3]) else ""
-      sprintf("sas_symput(.symtab, %s, %s, trim = %s%s)", args[1], args[2], s$routine == "symputx", scope)
+      args <- lapply(s$args, g)
+      list(cg_call("sas_symput", c(list(sym(".symtab"), args[[1]], args[[2]], trim = s$routine == "symputx"),
+                                   if (length(args) >= 3) list(scope = args[[3]]))))
     },
-    character()
+    list()
   )
 }
+
+output_langs <- function(ks) {
+  lapply(ks, function(k) {
+    out <- sym(paste0(".out", k))
+    assign_lang(call("[[", out, call("+", call("length", out), 1L)), call("[", sym("pdv"), sym(paste0(".vars", k))))
+  })
+}
+output_lines <- function(ks) vapply(output_langs(ks), cg_text, "")
 
 # CALL MISSING / SORTN / SORTC on variables and array elements.
 gen_row_call_vars <- function(s, cx) {
   an <- cx$an
-  refs <- vapply(s$targets, function(t) if (t$node == "var") var_ref(t$name, cx) else gen_array_ref(t, cx), "")
+  refs <- lapply(s$targets, function(t) if (t$node == "var") var_lang(t$name, cx) else gen_array_lang(t, cx))
   if (s$routine == "missing") {
-    vals <- vapply(s$targets, function(t) {
+    return(Map(function(ref, t) {
       ty <- expr_type(t, an)
-      if (ty$type == "char") r_str(strrep(" ", ty$len)) else "NA_real_"
-    }, "")
-    return(paste(refs, "<-", vals))
+      assign_lang(ref, if (ty$type == "char") strrep(" ", ty$len) else NA_real_)
+    }, refs, s$targets))
   }
   cx$n_tmp <- cx$n_tmp + 1L
-  tmp <- paste0(".srt", cx$n_tmp)
-  c(sprintf("%s <- sas_sort_values(list(%s))", tmp, paste(refs, collapse = ", ")),
-    sprintf("%s <- %s[[%dL]]", refs, tmp, seq_along(refs)))
+  tmp <- sym(paste0(".srt", cx$n_tmp))
+  c(list(assign_lang(tmp, call("sas_sort_values", cg_call("list", refs)))),
+    Map(function(ref, k) assign_lang(ref, call("[[", tmp, k)), refs, seq_along(refs)))
 }
 
 gen_row_do <- function(s, cx) {
-  g <- function(e) gen_expr(e, cx)
+  g <- function(e) gen_lang(e, cx)
   body <- gen_row_block(s$body, cx)
   if (s$kind == "block") return(body)
   cx$n_tmp <- cx$n_tmp + 1L
   k <- cx$n_tmp
-  if (s$kind == "while") return(block("repeat {", c(sprintf("if (!sas_true(%s)) break", g(s$cond)), body)))
+  tmp <- function(stem) sym(paste0(".", stem, k))
+  brk_unless <- function(cond) call("if", call("!", cond), quote(break))
+  if (s$kind == "while") return(list(call("repeat", brace(c(list(brk_unless(call("sas_true", g(s$cond)))), body)))))
   if (s$kind == "until") {
-    return(c(sprintf(".first%d <- TRUE", k), block("repeat {", c(
-      sprintf("if (!.first%d && sas_true(%s)) break", k, g(s$cond)),
-      sprintf(".first%d <- FALSE", k), body
-    ))))
+    return(list(assign_lang(tmp("first"), TRUE), call("repeat", brace(c(list(
+      call("if", call("&&", call("!", tmp("first")), call("sas_true", g(s$cond))), quote(break)),
+      assign_lang(tmp("first"), FALSE)), body)))))
   }
-  ref <- var_ref(s$var, cx)
+  ref <- var_lang(s$var, cx)
   if (s$kind == "list") {
-    vals <- vapply(s$values, g, "")
-    head <- sprintf("for (.v%d in list(%s)) {", k, paste(vals, collapse = ", "))
-    return(block(head, c(sprintf("%s <- %s", ref, coerce_var(paste0(".v", k), s$var, cx$an)), body)))
+    return(list(call("for", tmp("v"), cg_call("list", lapply(s$values, g)),
+                     brace(c(list(assign_lang(ref, coerce_var_lang(tmp("v"), s$var, cx$an))), body)))))
   }
   wu <- s$while_until
   # the start, TO and BY are evaluated before the index is assigned
-  c(
-    sprintf(".from%d <- %s", k, g(s$from)),
-    sprintf(".to%d <- %s", k, g(s$to)),
-    sprintf(".by%d <- %s", k, if (is.null(s$by)) "1" else g(s$by)),
-    sprintf("%s <- .from%d", ref, k),
-    sprintf(".first%d <- TRUE", k),
-    block("repeat {", c(
-      block(sprintf("if (!.first%d) {", k), c(
-        if (identical(wu$kind, "until")) sprintf("if (sas_true(%s)) break", g(wu$cond)),
-        sprintf("%s <- %s + .by%d", ref, ref, k)
-      )),
-      sprintf(".first%d <- FALSE", k),
-      sprintf("if (!sas_do_test(%s, .to%d, .by%d)) break", ref, k, k),
-      if (identical(wu$kind, "while")) sprintf("if (!sas_true(%s)) break", g(wu$cond)),
+  list(
+    assign_lang(tmp("from"), g(s$from)),
+    assign_lang(tmp("to"), g(s$to)),
+    assign_lang(tmp("by"), if (is.null(s$by)) 1 else g(s$by)),
+    assign_lang(ref, tmp("from")),
+    assign_lang(tmp("first"), TRUE),
+    call("repeat", brace(c(
+      list(call("if", call("!", tmp("first")), brace(c(
+        if (identical(wu$kind, "until")) list(call("if", call("sas_true", g(wu$cond)), quote(break))),
+        list(assign_lang(ref, call("+", ref, tmp("by"))))
+      )))),
+      list(assign_lang(tmp("first"), FALSE), brk_unless(call("sas_do_test", ref, tmp("to"), tmp("by")))),
+      if (identical(wu$kind, "while")) list(brk_unless(call("sas_true", g(wu$cond)))),
       body
-    ))
+    )))
   )
 }
 
 gen_row_select <- function(s, cx) {
-  out <- character()
+  pre <- list()
   sel <- NULL
   if (!is.null(s$expr)) {
     cx$n_tmp <- cx$n_tmp + 1L
     sel <- paste0(".s", cx$n_tmp)
-    out <- sprintf("%s <- %s", sel, gen_expr(s$expr, cx))
+    pre <- list(assign_lang(sym(sel), gen_lang(s$expr, cx)))
   }
-  first <- TRUE
-  for (w in s$whens) {
-    cond <- when_cond_code(w, sel, cx)
-    head <- if (first) sprintf("if (%s) {", cond) else sprintf("} else if (%s) {", cond)
-    out <- c(out, head, indent_lines(gen_row_stmt(w$body, cx), 1L))
-    first <- FALSE
+  other <- if (s$has_otherwise) gen_row_stmt(s$otherwise, cx) else list(call("sas_select_error", as.integer(s$line)))
+  # the WHEN chain from the last clause up: `if (c1) {..} else if (c2) {..} else {..}`
+  conds <- lapply(s$whens, function(w) str2lang(when_cond_code(w, sel, cx)))
+  bodies <- lapply(s$whens, function(w) brace(gen_row_stmt(w$body, cx)))
+  chain <- if (length(s$whens) == 0) other else {
+    acc <- brace(other)
+    for (k in rev(seq_along(s$whens))) acc <- call("if", conds[[k]], bodies[[k]], acc)
+    list(acc)
   }
-  other <- if (s$has_otherwise) gen_row_stmt(s$otherwise, cx) else sprintf("sas_select_error(%dL)", as.integer(s$line))
-  out <- if (first) c(out, other) else c(out, "} else {", indent_lines(other, 1L), "}")
+  out <- c(pre, chain)
   # LEAVE leaves the SELECT group: the SELECT runs inside a one-pass loop
   # whose `break` is the LEAVE
   if (!select_ctl(s, "leave")) return(out)
   if (select_ctl(s, "continue", nested = TRUE)) {
     abort_unsupported("CONTINUE inside a SELECT group that holds a LEAVE", s$line)
   }
-  c("repeat {", indent_lines(c(out, "break"), 1L), "}")
+  list(call("repeat", brace(c(out, list(quote(break))))))
 }
 
 # Does a WHEN or OTHERWISE body of SELECT `s` hold statement `what` that acts

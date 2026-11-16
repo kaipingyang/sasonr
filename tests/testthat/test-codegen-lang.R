@@ -30,7 +30,17 @@ test_that("a pipeline is displayed with |> and runs as the nested call", {
 cgl_progs <- c(
   l1 = "data a; input g $ v; datalines;\nA 1\nA .\nB 3\n;\ndata b; set a; w = v * 2 + 0.1; if v > 1 then c = 'big'; run;",
   l2 = "data a; input g $ v; datalines;\nA 1\nA .\nB 3\n;\ndata b; set a; by g; if first.g then t = 0; t + v; p = lag(v); run;",
-  l3 = "data b; do i = 1 to 3; select (i); when (2) leave; otherwise; end; x = i / 3; output; end; run;"
+  l3 = "data b; do i = 1 to 3; select (i); when (2) leave; otherwise; end; x = i / 3; output; end; run;",
+  # the L3 statement forms: arrays, DO WHILE/UNTIL/list, CONTINUE, SELECT,
+  # IF/ELSE IF/ELSE, CALL MISSING/SORTN, SUBSTR=, PUT, subsetting IF
+  l3_forms = paste(
+    "data a; input g $ v s $; datalines;\nA 1 xy\nA . zz\nB 3 qq\n;",
+    "data b; set a; by g; array x{2} v w; array t{3} _temporary_ (1 2 3); retain k;",
+    "if first.g then k = 0; do i = 1 to 2; x{i} = i * t{i}; end; call missing(w);",
+    "substr(s, 1, 1) = 'Q'; select (g); when ('A') m = 1; when ('B', 'C') m = 2; otherwise m = 3; end;",
+    "if v > 1 then put 'big ' v= s=; else if v > 0 then w = 1; else do; w = 2; z = 3; end;",
+    "j = 0; do while (j < 2); j + 1; end; do until (j > 4); j + 1; if j = 3 then continue; end;",
+    "do q = 'a', 'b'; end; call sortn(v, w); if m < 3; run;")
 )
 
 test_that("the displayed code of a DATA step parses to the objects that run", {
@@ -62,7 +72,7 @@ test_that("running the displayed code gives the same WORK as sas_run()", {
 })
 
 test_that("displayed code of an L1, an L2 and an L3 step", {
-  for (nm in names(cgl_progs)) {
+  for (nm in c("l1", "l2", "l3")) {
     tr <- sas_translate(cgl_progs[[nm]])
     expect_snapshot(cat(tr$steps[[length(tr$steps)]]$code, sep = "\n"))
   }
