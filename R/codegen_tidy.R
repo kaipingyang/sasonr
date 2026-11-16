@@ -19,7 +19,6 @@ new_cx <- function(mode, an) {
   cx$stages <- list()
   cx$puts <- list()
   cx$sink <- if (is.null(an$file)) ".log" else ".fput"
-  cx$ls <- if (is.null(an$file)) 132L else an$file$lrecl
   cx
 }
 
@@ -106,6 +105,7 @@ gen_expr <- function(e, cx) {
       # constant division by zero is folded at compile time (no _ERROR_ at run time)
       if (e$op == "/" && e$lhs$node == "num" && e$rhs$node == "num" && e$rhs$value == 0) {
         where_ct()
+        log_place_check(c(e$line, e$col %||% NA))
         ct$notes <- c(ct$notes, sprintf("NOTE: Division by zero detected during the compilation phase, detected at line %d column %d.",
                                         as.integer(e$line), as.integer(e$col %||% 0L)))
         return("NA_real_")
@@ -132,6 +132,7 @@ gen_expr <- function(e, cx) {
         v0 <- switch(e$op, "+" = a0 + b0, "-" = a0 - b0, "*" = a0 * b0, "/" = a0 / b0)
         if (is.infinite(v0)) {
           where_ct()
+          log_place_check(c(e$line, e$col %||% NA))
           ct$notes <- c(ct$notes, sprintf("NOTE: A number has become too large during the compilation phase, detected at line %d column %d. ",
                                           as.integer(e$line), as.integer(e$col %||% 0L)))
         }
@@ -140,7 +141,7 @@ gen_expr <- function(e, cx) {
       if (arith && e$lhs$node %in% c("num", "missing") && e$rhs$node %in% c("num", "missing") &&
           (e$lhs$node == "missing" || e$rhs$node == "missing")) {
         where_ct()
-        ct$mv <- c(ct$mv, at_key(c(e$line, e$col %||% NA_integer_)))
+        log_place("mv.compile", at = c(e$line, e$col %||% NA_integer_))
         return("NA_real_")
       }
       a <- g(e$lhs)
@@ -346,8 +347,8 @@ fmt_code <- function(fmt) {
   paste0(", ", r_lit(fmt[c("name", "w", "d", "char", "text")]))
 }
 
-put_line_code <- function(s, cx) {
-  if (any(vapply(s$items, function(it) it$kind == "ptr", logical(1)))) return(put_ptr_code(s, cx))
+put_line_code <- function(s, cx, guard = NULL) {
+  if (any(vapply(s$items, function(it) it$kind == "ptr", logical(1)))) return(put_ptr_code(s, cx, guard))
   items <- vapply(s$items, function(it) {
     if (it$kind == "lit") return(r_str(it$text))
     fmt <- it$fmt %||% cx$an$formats[[it$name]]
@@ -361,13 +362,15 @@ put_line_code <- function(s, cx) {
   }, "")
   # literals and formatted (unnamed, explicit format) items add no trailing blank
   lit <- vapply(s$items, function(it) it$kind == "lit" || (it$kind == "value" && !is.null(it$fmt)), logical(1))
-  ls <- if (identical(cx$ls, 132L) || is.null(cx$ls)) "" else paste0(", .ls = ", cx$ls, "L")
+  ls <- put_ls_code(cx)
   if (!any(lit)) return(paste0("sas_put_line(", paste(items, collapse = ", "), ls, ")"))
   paste0("sas_put_line(", paste(items, collapse = ", "), ", .lit = ", r_lit(lit), ls, ")")
 }
 
 # PUT with pointer controls: every item becomes a positioned piece of text.
-put_ptr_code <- function(s, cx) {
+# `guard`: in a vectorised step, the rows where the PUT executes (only these
+# are laid out, so a pointer of a row that does not execute cannot stop it).
+put_ptr_code <- function(s, cx, guard = NULL) {
   pieces <- vapply(s$items, function(it) {
     if (it$kind == "ptr") {
       if (it$k == "next") return("list(k = \"next\")")
@@ -383,8 +386,15 @@ put_ptr_code <- function(s, cx) {
     if (!is.null(it$fmt)) return(sprintf("list(k = \"text\", s = sas_put_fvalue(%s%s), blank = FALSE)", ref, fmt_code(fmt)))
     sprintf("list(k = \"text\", s = sas_put_value(%s%s), blank = TRUE)", ref, fmt_code(fmt))
   }, "")
-  paste0("sas_put_layout(list(", paste(pieces, collapse = ", "), "))")
+  ln <- if (is.numeric(s$line) && length(s$line) == 1L) paste0(s$line, "L") else "NULL"
+  extra <- paste0(put_ls_code(cx), if (!is.null(cx$an$file)) ", .file = TRUE", ", .line = ", ln,
+                  if (!is.null(guard)) paste0(", .guard = ", guard))
+  paste0("sas_put_layout(list(", paste(pieces, collapse = ", "), ")", extra, ")")
 }
+
+# The line size argument of the PUT helpers: a FILE passes its LRECL, the
+# log's LINESIZE is read at run time.
+put_ls_code <- function(cx) if (is.null(cx$an$file)) "" else paste0(", .ls = ", as.integer(cx$an$file$lrecl), "L")
 
 # Input sources (shared by L1/L2 pipelines and the L3 loop) ---------------
 
@@ -588,8 +598,9 @@ vec_put_code <- function(cx) {
   lines <- vapply(cx$puts, `[[`, "", "line")
   guards <- vapply(cx$puts, function(p) if (is.null(p$guard)) "TRUE" else paste0(".d$", p$guard), "")
   sink <- cx$sink
-  if (length(lines) == 1 && guards == "TRUE") return(sprintf("%s <- c(%s, %s)", sink, sink, lines))
-  sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s)\n))", sink, sink,
+  # one line per iteration of the step (a row of `.d`), also for a PUT whose
+  # items are literals only (its line is computed once)
+  sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s),\n  n = nrow(.d)\n))", sink, sink,
           paste(lines, collapse = ",\n       "), paste(guards, collapse = ", "))
 }
 
@@ -688,7 +699,10 @@ gen_vec_stmt <- function(s, guard, cx) {
     delete = add_stage(cx, "filter", if (is.null(guard)) "FALSE" else paste0("!", guard)),
     do = gen_vec_block(s$body, guard, cx),
     select = gen_vec_select(s, guard, cx),
-    put = cx$puts <- c(cx$puts, list(list(guard = guard, line = put_line_code(s, with_mode(cx, "out"))))),
+    put = {
+      g <- if (is.null(guard)) "rep(TRUE, nrow(.d))" else paste0(".d$", guard)
+      cx$puts <- c(cx$puts, list(list(guard = guard, line = put_line_code(s, with_mode(cx, "out"), g))))
+    },
     NULL
   )
   invisible()

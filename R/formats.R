@@ -692,7 +692,7 @@ fmt_width <- function(fmt, x_char = fmt$char) {
 sas_define_format <- function(def) {
   key <- paste0(def$kind, ":", if (def$char) "$", def$name)
   s <- sas_rt_active()
-  if (is.null(s)) rlang::abort("sas_define_format() registers a format in a SAS session: call it inside sas_run().", class = "sasonr_error")
+  if (is.null(s)) rlang::abort("sas_define_format() registers a format in a session: call it inside sas_run().", class = "sasonr_error")
   s$formats[[key]] <- def
   invisible(NULL)
 }
@@ -1204,7 +1204,7 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
     rt_error(if (qq == "?") NULL else paste0("NOTE: Invalid argument to function INPUT", at_text(.at), "."))
     # the call is also listed in the "Mathematical operations could not be performed" NOTE
     # (not for a character informat such as $HEX)
-    if (qq == "" && !is.null(.at) && !is_char) rt_count("math", .at)
+    if (qq == "" && !is.null(.at) && !is_char) log_place("math.failed", at = .at)
   }
   if (is_char && !is.na(w)) vals <- sas_char(vals, w)
   vals

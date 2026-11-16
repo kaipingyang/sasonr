@@ -1,4 +1,4 @@
-# SAS log NOTEs about steps and data: data set sizes, observations read,
+# Log NOTEs about steps and data: data set sizes, observations read,
 # missing values generated, mathematical errors, uninitialized variables.
 #
 # Run-time counters live in the run-time state of the active session
@@ -6,50 +6,24 @@
 # notes (constant folding, type conversions) are collected in its compile-time
 # state (`ct_diag()`) while a step is translated.
 
+# `places`: the places of the merged compile-time messages (log_place()).
 ct_reset <- function(ct = ct_diag()) {
   ct$notes <- character()
-  ct$mv <- character()
-  ct$conv <- list()
+  log_places_reset(ct)
   invisible()
 }
 
-# Record an implicit type conversion found at compile time ("n2c" or "c2n").
-ct_conversion <- function(kind, line, col) {
-  ct <- ct_diag()
-  ct$conv[[kind]] <- c(ct$conv[[kind]], sprintf("%d:%d", as.integer(line), as.integer(col %||% 0L)))
-  invisible()
-}
-
-# The places are listed by line, and within a line by the column as text
-# ("95:143 95:195 95:25"), each in a 9-column field.
+# The type conversion NOTEs (conv.n2c, conv.c2n), in the order the first
+# place of each was found; the place order is a catalogue field (log_catalog.R).
 conversion_notes <- function() {
   ct <- ct_diag()
-  conv <- ct$conv %||% list()
-  if (length(conv) == 0) return(character())
-  head <- c(n2c = "NOTE: Numeric values have been converted to character values at the places given by: (Line):(Column).",
-            c2n = "NOTE: Character values have been converted to numeric values at the places given by: (Line):(Column).")
-  out <- character()
-  for (k in names(conv)) {
-    places <- unique(conv[[k]])
-    ln <- as.integer(sub(":.*$", "", places))
-    places <- places[order(ln, sub("^.*:", "", places), method = "radix")]
-    out <- c(out, head[[k]], place_lines(sprintf("%-6s", places)))
-  }
-  out
+  ids <- intersect(names(ct$places), c("conv.n2c", "conv.c2n"))
+  unlist(lapply(ids, function(id) log_place_lines(id, ct$places[[id]]))) %||% character()
 }
 
 at_key <- function(.at) {
   if (is.null(.at) || length(.at) < 2 || anyNA(.at)) return("0:0")
   sprintf("%d:%d", as.integer(.at[1]), as.integer(.at[2]))
-}
-
-rt_count <- function(slot, .at, n = 1L) {
-  rt <- rt_diag()
-  v <- rt[[slot]]
-  key <- at_key(.at)
-  v[key] <- (if (key %in% names(v)) v[[key]] else 0L) + as.integer(n)
-  rt[[slot]] <- v
-  invisible()
 }
 
 # Functions whose missing numeric arguments are reported in the
@@ -100,7 +74,7 @@ sas_mv_count <- function(.at, ..., .exact = TRUE) {
   k <- sum(miss)
   if (k > 0) {
     if (!.exact) rt$mv_rerun <- TRUE
-    rt_count("mv", .at, k)
+    log_place("mv.generated", at = .at, n = k)
   }
   invisible()
 }
@@ -144,41 +118,11 @@ place_lines <- function(entries) {
   c(out, cur)
 }
 
-count_entries <- function(counts) {
-  keys <- sorted_places(names(counts))
-  sprintf("%d at %s", as.integer(counts[keys]), keys)
-}
-
-note_mv_lines <- function(entries) {
-  c("NOTE: Missing values were generated as a result of performing an operation on missing values.",
-    "      Each place is given by: (Number of times) at (Line):(Column).",
-    place_lines(entries))
-}
-
-# NOTEs written at the end of a step from the run-time counters.
-step_end_notes <- function() {
-  rt <- rt_diag()
-  out <- character()
-  if (isTRUE(rt$flow_note)) out <- "NOTE: sasonr went to a new line when INPUT statement reached past the end of a line."
-  if (length(rt$mv) > 0) out <- c(out, note_mv_lines(count_entries(rt$mv)))
-  if (length(rt$math) > 0) {
-    head <- "NOTE: Mathematical operations could not be performed at the following places. The results of the operations have been set to missing values."
-    out <- c(out,
-      if (nchar(head) <= (rt_linesize())) head else
-        c("NOTE: Mathematical operations could not be performed at the following places. The results of the operations have been set to ",
-          "      missing values."),
-      "      Each place is given by: (Number of times) at (Line):(Column).",
-      place_lines(count_entries(rt$math)))
-  }
-  out
-}
-
-# Compile-time NOTEs of a step (constant folding).
+# Compile-time NOTEs of a step (type conversions, constant folding).
 compile_notes <- function() {
   ct <- ct_diag()
-  out <- c(conversion_notes(), ct$notes)
-  if (length(ct$mv) > 0) out <- c(out, note_mv_lines(sorted_places(unique(ct$mv))))
-  out
+  mv <- ct$places[["mv.compile"]]
+  c(conversion_notes(), ct$notes, if (length(mv)) log_place_lines("mv.compile", mv))
 }
 
 #' Record the observations read from an input data set (for the log NOTE)
@@ -206,26 +150,8 @@ sas_reads_consumed <- function(p) {
   invisible()
 }
 
-read_notes <- function() {
-  rt <- rt_diag()
-  unlist(lapply(rt$reads, function(r) {
-    c(sprintf("NOTE: There were %d observations read from the data set WORK.%s.", as.integer(r$n), toupper(r$name)),
-      if (!is.null(r$where)) paste0("      WHERE ", r$where, ";"))
-  }))
-}
-
-# PROC PRINT reports an empty input differently.
-print_read_notes <- function() {
-  rt <- rt_diag()
-  unlist(lapply(rt$reads, function(r) {
-    if (r$n == 0) return(sprintf("NOTE: No observations in data set WORK.%s.", toupper(r$name)))
-    c(sprintf("NOTE: There were %d observations read from the data set WORK.%s.", as.integer(r$n), toupper(r$name)),
-      if (!is.null(r$where)) paste0("      WHERE ", r$where, ";"))
-  }))
-}
-
 dataset_note <- function(name, d) {
-  sprintf("NOTE: The data set WORK.%s has %d observations and %d variables.", toupper(name), nrow(d), ncol(d))
+  log_render("ds.created", list(name = toupper(name), nobs = nrow(d), nvar = ncol(d)))
 }
 
 # Variables that are referenced but never given a value (compile-time NOTE).

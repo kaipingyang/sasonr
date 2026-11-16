@@ -1,0 +1,18 @@
+/* Style sheet of the HTML views of sasonr (sas_log(format = "html")). */
+.sas-log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; }
+.sas-log-summary { font-weight: bold; margin: 0 0 0.5em 0; }
+.sas-log details.sas-step { margin: 0 0 0.25em 0; }
+.sas-log details.sas-step > summary { cursor: pointer; color: #555555; }
+.sas-log pre.sas-log-text { margin: 0.25em 0 0.5em 0; white-space: pre; overflow-x: auto; }
+.sas-note { color: #0000ff; }
+.sas-warning { color: #008000; }
+.sas-error { color: #ff0000; }
+.sas-marker { font-weight: normal; }
+.sas-put { color: inherit; }
+.sas-src { color: inherit; }
+@media (prefers-color-scheme: dark) {
+  .sas-log details.sas-step > summary { color: #aaaaaa; }
+  .sas-note { color: #6ea8fe; }
+  .sas-warning { color: #75d17b; }
+  .sas-error { color: #ff6b6b; }
+}

@@ -14,7 +14,7 @@ sas_infile_open(
 \arguments{
 \item{lines}{Records.}
 
-\item{line_no}{SAS log line numbers of the records (in-stream data) or
+\item{line_no}{Log line numbers of the records (in-stream data) or
 record numbers (external files).}
 
 \item{opts}{list(dlm, dsd, mode ("flowover", "missover", "truncover",

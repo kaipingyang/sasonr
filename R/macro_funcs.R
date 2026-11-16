@@ -261,13 +261,12 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
     putc = sas_format(vals[[1]], vals[[2]]),
     if (fname %in% names(fn_policy)) {
       # invalid arguments: one NOTE for the %SYSFUNC call, not the DATA step NOTEs
-      old <- list(err = rt$err, notes = rt$notes, math = rt$math, mv = rt$mv)
+      old <- list(err = rt$err, notes = rt$notes, places = log_places_save(rt))
       r <- do.call(sas_fcall, c(list(fname, f), vals))
       bad <- isTRUE(rt$err) && !isTRUE(old$err)
       rt$err <- old$err
       rt$notes <- old$notes
-      rt$math <- old$math
-      rt$mv <- old$mv
+      log_places_restore(rt, old$places)
       if (bad && is.function(rt$on_note)) {
         # sasonr writes this NOTE; the WARNING that goes with it is not
         # written.
@@ -282,9 +281,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
                                    "is not supported (supported: LINESIZE=MAX, NONOTES)"), line)
         }
         if (if (is.null(so)) rt_notes_on() else isTRUE(so$notes)) {
-          rt$on_note(log_wrap(paste("NOTE: Mathematical operations could not be performed during %SYSFUNC function execution.",
-                                    "The result of the operations have been set to a missing value."),
-                              ls = so$linesize %||% rt_linesize()))
+          rt$on_note(log_render("sysfunc.math", ls = so$linesize %||% rt_linesize()))
         }
       }
       r

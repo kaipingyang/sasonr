@@ -621,7 +621,7 @@ prx_state <- function(session) {
 }
 
 prx_no_session <- function(fname) {
-  rlang::abort(paste0(fname, "() with a pattern id needs the SAS session that holds the PRXPARSE ids: ",
+  rlang::abort(paste0(fname, "() with a pattern id needs the session that holds the PRXPARSE ids: ",
                       "pass `session = ` (a sas_session()) outside sas_run()."), class = "sasonr_error")
 }
 
@@ -1338,21 +1338,26 @@ pnf_series <- function(x, n, d, nc) {
   if (x <= 0) return(0)
   y <- n * x / (n * x + d)
   lam <- nc / 2
+  # the series walks outwards from the Poisson mode one term at a time: for a
+  # mode beyond 1e6 (or j + 1 == j) it cannot be summed term by term
+  if (lam > 1e6) abort_unsupported("noncentral F distribution with a noncentrality above 2e6")
   term <- function(j) exp(stats::dpois(j, lam, log = TRUE) + stats::pbeta(y, n / 2 + j, d / 2, log.p = TRUE))
   j0 <- floor(lam)
   tot <- term(j0)
+  # `<=`: when every term underflows to 0 the sum stays 0 and `<` never holds
   j <- j0 + 1
   repeat {
     t <- term(j)
     tot <- tot + t
-    if (t < 1e-20 * tot && stats::dpois(j, lam) < 1e-20) break
+    if (t <= 1e-20 * tot && stats::dpois(j, lam) < 1e-20) break
     j <- j + 1
+    if (j - j0 > 1e7) abort_unsupported("noncentral F distribution: the series does not converge for these arguments")
   }
   j <- j0 - 1
   while (j >= 0) {
     t <- term(j)
     tot <- tot + t
-    if (t < 1e-20 * tot) break
+    if (t <= 1e-20 * tot) break
     j <- j - 1
   }
   min(tot, 1)
@@ -1365,8 +1370,18 @@ qnf_series <- function(p, n, d, nc) {
   x0 <- suppressWarnings(stats::qf(p, n, d, nc))
   lo <- x0 * (1 - 1e-6)
   hi <- x0 * (1 + 1e-6)
-  while (pnf_series(lo, n, d, nc) > p) lo <- lo / 2
-  while (pnf_series(hi, n, d, nc) < p) hi <- hi * 2
+  # bracket the quantile; each side gets at most 2100 halvings / doublings
+  # (the double range), after that the arguments are outside what is implemented
+  for (k in 0:2100) {
+    if (k == 2100) abort_unsupported("noncentral F quantile: no bracket found for these arguments")
+    if (!(pnf_series(lo, n, d, nc) > p)) break
+    lo <- lo / 2
+  }
+  for (k in 0:2100) {
+    if (k == 2100 || !is.finite(hi)) abort_unsupported("noncentral F quantile: no bracket found for these arguments")
+    if (!(pnf_series(hi, n, d, nc) < p)) break
+    hi <- hi * 2
+  }
   for (k in 1:200) {
     mid <- (lo + hi) / 2
     if (mid <= lo || mid >= hi) break
@@ -1968,6 +1983,7 @@ sas_f_cvt_c2n <- function(x, .at = NULL) {
   out[ok] <- as.numeric(s[ok])
   bad <- !ok & nzchar(s) & s != "."
   if (any(bad)) {
+    log_place_check(.at)
     rt_error(sprintf("NOTE: Invalid numeric data, '%s' , at line %d column %d.", s[which(bad)[1]],
                      as.integer(.at[1] %||% NA), as.integer(.at[2] %||% NA)))
   }

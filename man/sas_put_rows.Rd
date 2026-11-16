@@ -4,7 +4,7 @@
 \alias{sas_put_rows}
 \title{Interleave several guarded PUT statements row by row (L1/L2)}
 \usage{
-sas_put_rows(lines, guards)
+sas_put_rows(lines, guards, n = NULL)
 }
 \description{
 Interleave several guarded PUT statements row by row (L1/L2)

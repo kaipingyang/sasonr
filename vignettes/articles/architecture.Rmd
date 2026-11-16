@@ -52,7 +52,7 @@ The level is decided by analysing the AST. If a vectorised step meets a
 condition that needs row-by-row diagnostics (for example invalid data that
 sets `_ERROR_`), it is re-run as L3.
 
-## The SAS session
+## The session
 
 Everything a SAS program can change lives in one session object
 (`SasSession`, an R6 class), never in package-level variables:

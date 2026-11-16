@@ -19,16 +19,16 @@ data c; set a; z = x * 10; run;
   expect_identical(nrow(r$work$b), 0L)
   expect_identical(names(r$work$c), c("i", "x", "z"))
   expect_identical(nrow(r$work$c), 0L)
-  expect_true("NOTE: sasonr stopped processing this step because of errors." %in% r$log)
-  expect_true("NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode." %in% r$log)
-  expect_true("NOTE: The data set WORK.C has 0 observations and 3 variables." %in% r$log)
-  expect_true("syserr=3 syscc=1012" %in% r$log)
+  expect_true("NOTE: sasonr stopped processing this step because of errors." %in% msgs(r))
+  expect_true("NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode." %in% msgs(r))
+  expect_true("NOTE: The data set WORK.C has 0 observations and 3 variables." %in% msgs(r))
+  expect_true("syserr=3 syscc=1012" %in% msgs(r))
 })
 
 test_that("a failing step does not replace an existing data set", {
   r <- run_sas_mode("data a; do i = 1 to 4; output; end; run; data a; set a; j = i * ; run;")
   expect_identical(nrow(r$work$a), 4L)
-  expect_true("WARNING: Data set WORK.A was not replaced because this step was stopped." %in% r$log)
+  expect_true("WARNING: Data set WORK.A was not replaced because this step was stopped." %in% msgs(r))
 })
 
 test_that("an ERROR in PROC SQL sets NOEXEC for that PROC SQL only", {
@@ -42,15 +42,15 @@ data c; set a; run;
   expect_false("q1" %in% names(r$work))
   expect_false("q2" %in% names(r$work))
   expect_identical(nrow(r$work$c), 2L)
-  expect_true("NOTE: Statement not executed due to NOEXEC option." %in% r$log)
-  expect_true("syserr=0 syscc=1012" %in% r$log)
+  expect_true("NOTE: Statement not executed due to NOEXEC option." %in% msgs(r))
+  expect_true("syserr=0 syscc=1012" %in% msgs(r))
 })
 
 test_that("global statements and macro code still run after an ERROR", {
   r <- run_sas_mode("data b; x = nosuchfn(2); run; %let after = yes; %put after=&after; data _null_; put 'not written'; run;")
-  expect_true("after=yes" %in% r$log)
-  expect_false("not written" %in% r$log)
-  expect_true(any(startsWith(r$log, "ERROR 68-185: The function NOSUCHFN is unknown")))
+  expect_true("after=yes" %in% msgs(r))
+  expect_false("not written" %in% msgs(r))
+  expect_true(any(startsWith(msgs(r), "ERROR 68-185: The function NOSUCHFN is unknown")))
 })
 
 test_that("on_error = 'abort' keeps the classed condition; fail loud always aborts", {
@@ -68,7 +68,7 @@ test_that("an assignment without its semicolon: the rest of the statement adds i
   expect_identical(names(r$work$one), c("x", "y", "z"))
   expect_identical(nrow(r$work$one), 0L)
   expect_true(paste("WARNING: The data set WORK.ONE may be incomplete.  When this step was stopped there were",
-                    "0 observations and 3 variables.") %in% r$log)
+                    "0 observations and 3 variables.") %in% msgs(r))
   expect_identical(names(run_sas_mode("data one;\n  x = 1\n  y = 2;\nrun;")$work$one), c("x", "y"))
   expect_identical(names(run_sas_mode("data one;\n  x = 1\n  y;\nrun;")$work$one), c("x", "y"))
   expect_identical(names(run_sas_mode("data one;\n  x = 1\n  2 w;\nrun;")$work$one), c("x", "w"))

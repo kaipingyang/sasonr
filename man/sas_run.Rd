@@ -19,7 +19,7 @@ sas_run(
 
 \item{level}{\code{"auto"} (choose L1/L2/L3 per step) or \code{"L3"} (force row loops).}
 
-\item{on_error}{What a SAS ERROR does (a syntax error, an unknown function,
+\item{on_error}{What an ERROR of the program does (a syntax error, an unknown function,
 a missing input data set, an ERROR in PROC SQL ...). \code{"sas"} (the
 default; option \code{sasonr.on_error}) uses the batch-mode error handling: the
 failing step is not run, syntax-check mode (OBS=0) applies to the rest of
@@ -38,11 +38,12 @@ WORK). \code{NULL} (the default) runs in a fresh session that is discarded
 afterwards.}
 }
 \value{
-A \code{sasonr_result}: \verb{$log} (PUT and \%PUT lines), \verb{$listing} (procedure
-output), \verb{$work} (output data sets with trailing blanks removed),
+A \code{sasonr_result}: \verb{$log} (the log: the program lines with the
+NOTEs, WARNINGs, ERRORs and PUT output; see \code{\link[=sas_log]{sas_log()}}), \verb{$log_events}
+(a tibble of the log events), \verb{$listing} (procedure output), \verb{$work} (output data sets with trailing blanks removed),
 \verb{$translation}, \verb{$macro_vars} (global macro variables), \verb{$status}
-(\code{"ok"} or \code{"error"}), \verb{$errors} (SAS ERROR messages) and \verb{$error_line}
-(SAS line of the first ERROR). With a \code{session}, \verb{$log}, \verb{$listing},
+(\code{"ok"} or \code{"error"}), \verb{$errors} (the ERROR messages) and \verb{$error_line}
+(SAS line of the first ERROR). With a \code{session}, \verb{$log}, \verb{$log_events}, \verb{$listing},
 \verb{$translation}, \verb{$status} and \verb{$errors} describe this submission, \verb{$work}
 and \verb{$macro_vars} the whole session.
 }

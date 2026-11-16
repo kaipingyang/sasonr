@@ -9,7 +9,7 @@ the development version provides.
   listing and the WORK data sets; `sas_translate()` shows the R code that is
   generated for each step. `sas_lex()`, `sas_parse()`, `sas_parse_expr()` and
   `sas_analyze()` expose the lexer, the parser and the static analysis.
-* `sas_session()` creates a persistent SAS session. Successive
+* `sas_session()` creates a persistent session. Successive
   `sas_run(code, session = s)` calls are submissions to that session: WORK
   data sets, macro variables and macro definitions, user formats, `OPTIONS`,
   titles and filerefs carry over. `sas_work()`, `sas_meta()`,
@@ -40,12 +40,34 @@ the development version provides.
   `<member>_meta.csv`, or a built `.rds`). sasonr ships no SASHELP members;
   without a directory every SASHELP member is missing and fails loud.
 
+## The log
+
+* `$log` of a result shows the program lines with their
+  numbers (long lines continued on `!` lines at `LINESIZE`), each step's
+  messages after its lines, compile-time ERRORs after their line with an
+  underscore marker and the error number. `OPTIONS SOURCE` and `NOSOURCE`
+  turn the echo on and off.
+* `$log` of a result and `sas_log()` now carry the source echo (before:
+  the messages and PUT output only, which `sas_log(x, echo = FALSE)` gives).
+  The first argument of `sas_log()` is now `x` (a result or a session);
+  `sas_log(session = s)` still works.
+* `sas_log(x, format = c("plain", "ansi", "html"), echo = TRUE)` gives the
+  log of a result or a session as plain text, as text coloured for the
+  terminal (ERROR red, WARNING green, NOTE blue, with a summary line), or as
+  HTML with CSS classes (`sas-note`, `sas-warning`, `sas-error`, `sas-put`,
+  `sas-src`; style sheet in `system.file("css", "sasonr.css", package =
+  "sasonr")`). `echo = FALSE` gives the messages and PUT output only.
+* `print()` of a result shows the coloured view in a terminal with colours;
+  `options(sasonr.log_style = "plain")` turns it off.
+* `$log_events` of a result is a tibble of the log events (kind, message id,
+  step, place, text, program line) behind every view.
+
 ## Errors and fail-loud behaviour
 
 * Features that sasonr does not support raise a condition of class
   `sasonr_unsupported` with the SAS line instead of being approximated.
-* SAS error model: `sas_run(on_error = c("sas", "abort"))`, default `"sas"`
-  (option `sasonr.on_error`). After a SAS ERROR the step is not run and
+* Error model: `sas_run(on_error = c("sas", "abort"))`, default `"sas"`
+  (option `sasonr.on_error`). After an ERROR in the program the step is not run and
   syntax-check mode (OBS=0), the documented behaviour of batch jobs, applies
   to the rest of the program: DATA steps create empty data sets, global
   statements and macro code still run, PROC SQL errors set NOEXEC for that
@@ -77,13 +99,16 @@ the development version provides.
   `unsupported`, or a function in a context in which it is not supported
   (DATA step, WHERE, PROC SQL, `%SYSFUNC`), stops with a condition of class
   `sasonr_strict_error` (a subclass of `sasonr_unsupported`). With
-  `options(sasonr.strict = FALSE)` such features run with a warning of class
-  `sasonr_strict_warning`. `PUTN`, `PUTC`, `INPUTN` and `INPUTC` check the
-  format they name at run time. See `?sasonr_strict`.
+  `options(sasonr.strict = FALSE)` such features run: the log of the
+  submission ends with one NOTE that lists the approximate features used,
+  and each feature signals one warning of class `sasonr_strict_warning` per
+  submission. Arguments
+  outside the domain in which a function's results are exact go through the
+  same gate. `PUTN`, `PUTC`, `INPUTN` and `INPUTC` check the format they name
+  at run time. See `?sasonr_strict`.
 * Feature statuses (`supported`, `partial`, `approximate`, `unsupported`,
   `not_comparable`) are available through `sas_feature_registry()` and
-  `sas_proc_stat_registry()`. A `partial` feature runs only inside its
-  supported input domain; other inputs fail loud.
+  `sas_proc_stat_registry()`.
 * sasonr targets SAS 9.4 and has one behaviour.
 
 ## DATA step
@@ -105,7 +130,7 @@ the development version provides.
   statement and `LINESIZE`.
 * An assignment to `SUBSTR()` on the left of `=` is checked as its own
   context of `SUBSTR`; `CONSTANT('EXACTINT', 1E300)` stops the step with the
-  SAS exception in a step that runs once and fails loud elsewhere.
+  step exception in a step that runs once and fails loud elsewhere.
 * Dates have no 29 February in years divisible by 4000.
 * Log messages that describe sasonr's own handling name sasonr as the
   subject: "NOTE: sasonr stopped processing this step because of errors.",
@@ -159,7 +184,7 @@ the development version provides.
 
 * Own recursive-descent SQL parser; DuckDB runs joins and grouping, and SAS
   semantics are applied in R: missing values, remerging of summary
-  statistics with the SAS NOTE, `CALCULATED`, `INTO :macro-variable` and
+  statistics with the remerge NOTE, `CALCULATED`, `INTO :macro-variable` and
   `SQLOBS`.
 * Computed character columns get fixed lengths (CAT functions
   of column arguments 200, of constant arguments the length of the value).
@@ -199,9 +224,9 @@ the development version provides.
   number of arguments is checked.
 * A direct call of a `sas_f_*` function from R code is checked as in a DATA
   step: approximate and unsupported functions follow `sasonr.strict`
-  (`sasonr_strict_error`, or a `sasonr_strict_warning` with
-  `sasonr.strict = FALSE`), arguments outside the supported input domain fail
-  loud, and a data error (an invalid argument, invalid data) gives the SAS
+  (`sasonr_strict_error`, or with `sasonr.strict = FALSE` a
+  `sasonr_strict_warning` once per function and R session), arguments
+  outside the exact input domain follow the same gate, and a data error (an invalid argument, invalid data) gives the SAS
   result with a warning of class `sasonr_data_error` that carries the NOTE
   text. `sas_f_put()` and `sas_f_input()` take the format or informat as text
   (`"8.2"`) and check it against the registry.

@@ -1,5 +1,5 @@
 # Display engine limits (PERCENT, exact integer digits, BEST narrow E form,
-# HOURw.d), SAS exceptions in SELECT, PROC SQL math-error NOTEs, FIRSTOBS= and
+# HOURw.d), step exceptions in SELECT, PROC SQL math-error NOTEs, FIRSTOBS= and
 # OBS= MIN, the WHERE note and the WHERE length limit.
 hexd <- function(h) readBin(as.raw(strtoi(substring(h, seq(1, 15, 2), seq(2, 16, 2)), 16L)), "double", size = 8L, endian = "big")
 
@@ -36,7 +36,7 @@ test_that("BESTw. narrow E form and HOURw.d go through the display engine", {
   expect_identical(trimws(sas_f_putn(900, "HOUR4.1")), trimws(sas_f_putn(0.25, "4.1")))
 })
 
-test_that("SAS exception: SELECT whens and otherwise are traversed", {
+test_that("step exception: SELECT whens and otherwise are traversed", {
   expect_error(sas_run("data a; select; when (1) output; otherwise; end; x = constant('EXACTINT', 1e300); run;"),
                class = "sasonr_unsupported")
   expect_error(sas_run("data a; if 0 then y = 1; else output; x = constant('EXACTINT', 1e300); run;"),
@@ -56,9 +56,9 @@ test_that("PROC SQL: math-error NOTEs fail loud instead of being dropped, the ru
   on.exit(sas_session_close(s))
   expect_error(sas_run("data one; x = 0; run; proc sql; create table t as select 1 / x as y from one; quit;",
                        session = s, on_error = "abort"), class = "sasonr_unsupported")
-  expect_identical(s$rt$mv, integer())
+  expect_null(s$rt$places[["mv.generated"]])
   r <- sas_run("data two; set one; run;", session = s)
-  expect_false(any(grepl("Division by zero|Missing values|Mathematical", r$log)))
+  expect_false(any(grepl("Division by zero|Missing values|Mathematical", msgs(r))))
 })
 
 test_that("FIRSTOBS=MIN is 1, OBS=MIN is 0", {

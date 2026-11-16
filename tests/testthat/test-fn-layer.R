@@ -39,7 +39,7 @@ test_that("supported functions run without a condition", {
   expect_identical(sas_f_sqrt(c(4, 9)), c(2, 3))
 })
 
-test_that("arguments outside the supported domain fail loud in direct calls", {
+test_that("arguments outside the exact domain go through the strict gate in direct calls", {
   dom_points <- list(
     anyalnum = list("a", 1e+15),
     anyalpha = list("a", 1e+15),
@@ -115,12 +115,19 @@ test_that("arguments outside the supported domain fail loud in direct calls", {
                "sin", "tan", "timepart", "week", "year")) {
     expect_true(nm %in% names(dom_points), info = nm)
   }
-  withr::local_options(sasonr.strict = FALSE)
+  # strict mode fails loud; with sasonr.strict = FALSE the call runs and warns
   for (nm in names(dom_points)) {
     f <- getExportedValue("sasonr", paste0("sas_f_", nm))
-    expect_error(withCallingHandlers(do.call(f, dom_points[[nm]]),
-                                     sasonr_strict_warning = function(w) invokeRestart("muffleWarning")),
-                 class = "sasonr_unsupported", info = nm)
+    expect_error(withr::with_options(list(sasonr.strict = TRUE), do.call(f, dom_points[[nm]])),
+                 class = "sasonr_strict_error", info = nm)
+    w <- NULL
+    withr::with_options(list(sasonr.strict = FALSE, rlib_warning_verbosity = "verbose"), withCallingHandlers(
+      try(do.call(f, dom_points[[nm]]), silent = TRUE),
+      warning = function(x) {
+        if (inherits(x, "sasonr_strict_warning")) w <<- c(w, x$kind)
+        invokeRestart("muffleWarning")
+      }))
+    expect_true("domain" %in% w, info = nm)
   }
 })
 
@@ -145,7 +152,7 @@ test_that("calls inside a submission are not checked twice", {
   res <- sas_run("data a; y = sqrt(-1); z = put(3.14159, 8.2); w = round(2.5); run;")
   expect_true(is.na(res$work$a$y))
   expect_identical(res$work$a$z, "    3.14")
-  expect_true(any(grepl("Invalid argument to function SQRT", res$log)))
+  expect_true(any(grepl("Invalid argument to function SQRT", msgs(res))))
 })
 
 test_that("a direct call passes the arguments as written to the implementation", {

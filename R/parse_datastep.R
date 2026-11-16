@@ -903,7 +903,20 @@ parse_put <- function(p) {
     abort_unsupported(paste("PUT item", tok_desc(p)), line)
   }
   advance(p)
+  put_check_empty_lines(items, line)
   list(stmt = "put", items = items, line = line)
+}
+
+# The empty lines a PUT statement writes by its form (no items; a `/` at the
+# start, at the end or after another `/`, or between pointers only) are not
+# implemented yet: they fail loud.
+put_check_empty_lines <- function(items, line) {
+  if (!length(items)) abort_unsupported("PUT with no items", line)
+  seg <- cumsum(vapply(items, function(it) it$kind == "ptr" && it$k == "next", logical(1)))
+  text <- vapply(items, function(it) it$kind != "ptr", logical(1))
+  # segment k holds the items after the k-th `/`; segments 0..max(seg) are the lines
+  filled <- vapply(0:max(seg), function(k) any(text[seg == k]), logical(1))
+  if (!all(filled)) abort_unsupported("PUT line pointer / that writes an empty line", line)
 }
 
 parse_call_stmt <- function(p) {

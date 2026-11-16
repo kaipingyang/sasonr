@@ -2,7 +2,7 @@
 % Please edit documentation in R/session_api.R
 \name{sas_session}
 \alias{sas_session}
-\title{Create a persistent SAS session}
+\title{Create a persistent session}
 \usage{
 sas_session(work = list())
 }

@@ -50,14 +50,6 @@ proc_stat_check <- function(proc, stat, line = NULL, condition = "default") {
   if (!feature_gated(st)) return(invisible())
   cond_txt <- if (identical(condition, "default")) "" else paste0(" (", condition, ")")
   what <- sprintf("PROC %s statistic %s%s %s", toupper(proc), toupper(stat), cond_txt, feature_status_text(st))
-  if (!isFALSE(getOption("sasonr.strict", TRUE))) {
-    msg <- paste0(what, "; set options(sasonr.strict = FALSE) to use it")
-    if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
-    rlang::abort(msg, class = c("sasonr_strict_error", "sasonr_unsupported", "sasonr_error"), sas_line = line,
-                 kind = "proc_statistic", proc = toupper(proc), name = toupper(stat), status = st)
-  }
-  warning(structure(class = c("sasonr_strict_warning", "warning", "condition"),
-                    list(message = paste0("sasonr: ", what, if (!is.null(line)) sprintf(" at line %s", line) else ""),
-                         call = NULL, kind = "proc_statistic", proc = toupper(proc), name = toupper(stat), status = st)))
-  invisible()
+  strict_gate(what, line, feature = sprintf("PROC %s statistic %s%s", toupper(proc), toupper(stat), cond_txt),
+              fields = list(kind = "proc_statistic", proc = toupper(proc), name = toupper(stat), status = st))
 }

@@ -19,29 +19,37 @@ features (the last bits of numeric results may not be exact), \code{unsupported}
 ones, features missing from the registry, and functions called in a
 context (DATA step, WHERE, PROC SQL, \verb{\%SYSFUNC}) in which they are not
 supported.
-\item \code{FALSE}: the program runs; each such feature gives a warning of class
-\code{sasonr_strict_warning}.
+\item \code{FALSE}: the program runs with the R implementation's values. In
+\code{\link[=sas_run]{sas_run()}} the log gets one NOTE at the end of the submission that lists
+the approximate features used (event id \code{sasonr.approximate} in
+\verb{$log_events}, also when the submission stops with an error), and each
+feature signals one warning of class \code{sasonr_strict_warning} per
+submission. A direct call of a function-layer function (\verb{sas_f_*()}) warns
+with class \code{sasonr_strict_warning} once per function and R session.
 }
 
-\code{supported} features, \code{partial} ones (they run only inside their supported
-input domain; other inputs fail loud in both modes) and clock-dependent
-\code{not_comparable} functions (\code{TODAY()}, \code{DATE()}, \code{TIME()}, \code{DATETIME()})
-run in the contexts in which they are supported.
+\code{supported} features, \code{partial} ones and clock-dependent \code{not_comparable}
+functions (\code{TODAY()}, \code{DATE()}, \code{TIME()}, \code{DATETIME()}) run in the contexts
+in which they are supported. Arguments outside the domain in which a
+function's results are exact (for example very large arguments of some
+date functions) are gated in the same way. Features that are not
+implemented at all fail loud with \code{sasonr_unsupported} in both modes.
 
 The same rules apply when a function of the function layer (\verb{sas_f_*()}) is
 called directly from R code: the function is checked as in a DATA step,
 \code{sas_f_put()} and \code{sas_f_input()} check their format or informat (given as
-text such as \code{"8.2"}), and arguments outside the supported input domain
-fail loud with \code{sasonr_unsupported}. Where the DATA step writes a data-error
+text such as \code{"8.2"}), and arguments outside the exact input domain go
+through the strict gate. Where the DATA step writes a data-error
 NOTE or set \verb{_ERROR_} (an invalid argument, invalid data), a direct call
-returns the SAS result and signals a warning of class \code{sasonr_data_error}
+returns the result a DATA step gives and signals a warning of class \code{sasonr_data_error}
 that carries the NOTE text.
 }
 \examples{
 # PROBT() is approximate: the last bits of some results may not be exact
 try(sas_run("data a; y = probt(1.5, 10); run;"))
-old <- options(sasonr.strict = FALSE)
-res <- suppressWarnings(sas_run("data a; y = probt(1.5, 10); run;"))
+res <- rlang::with_options(sasonr.strict = FALSE,
+  suppressWarnings(sas_run("data a; y = probt(1.5, 10); run;")))
 res$work$a$y
-options(old)
+# the NOTE at the end of the log lists the approximate features
+tail(res$log, 1)
 }

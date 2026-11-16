@@ -13,7 +13,7 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 Absolute value. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm}{SAS documentation} (Functions and CALL Routines).
 }
 \section{Differences from R}{
- Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+ Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 }
 
 \examples{

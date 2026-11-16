@@ -2,7 +2,7 @@
 # _ERROR_ and the PDV dump.
 
 run_log <- function(code, ...) {
-  log <- sas_run(code, ...)$log
+  log <- msgs(sas_run(code, ...))
   grep("^NOTE", log, value = TRUE, invert = TRUE)
 }
 fmt <- function(x, text) sas_format(x, sas_fmt_text(text))
@@ -82,7 +82,7 @@ test_that("INPUT() with invalid data sets _ERROR_ and dumps the PDV", {
   expect_equal(log, "x=. y=1 _ERROR_=1 _N_=1")
   # `?` suppresses the NOTE only, `??` also _ERROR_
   expect_equal(run_log("data _null_; x = input('abc', ?? 8.); run;"), character())
-  full <- sas_run("data _null_; x = input('abc', ? 8.); run;")$log
+  full <- msgs(sas_run("data _null_; x = input('abc', ? 8.); run;"))
   expect_false(any(grepl("^NOTE", full)))
   expect_equal(full, "x=. _ERROR_=1 _N_=1")
 })
@@ -96,7 +96,7 @@ test_that("_ERROR_ is live inside the step and the step falls back to row-wise c
   r <- sas_run("data a; input x; datalines;\n1\n0\n2\n;\nrun; data b; set a; y = 1 / x; run;")
   expect_equal(r$work$b$y, c(1, NA, 0.5))
   expect_equal(r$translation$steps[[2]]$level, "L3")
-  expect_equal(grep("^NOTE", r$log, invert = TRUE, value = TRUE), "x=0 y=. _ERROR_=1 _N_=2")
+  expect_equal(grep("^NOTE", msgs(r), invert = TRUE, value = TRUE), "x=0 y=. _ERROR_=1 _N_=2")
   # constant division by zero is folded at compile time: no _ERROR_
   expect_equal(run_log("data _null_; z = 5 / 0; if _error_ then put 'err'; run;"), character())
 })
@@ -182,8 +182,8 @@ test_that("INFILE reads an external file; LOST CARD is a data error", {
   log <- run_log(sprintf("data _null_; infile '%s' truncover; input s $ 1-2 n 4-5; put s= n=; run;", f))
   expect_equal(log, c("s=a n=1", "s=bb n=."))
   r <- sas_run("data _null_; input a b; put a= b=; datalines;\n1 2\n3\n;\nrun;")
-  expect_true("NOTE: LOST CARD." %in% r$log)
-  expect_true("a=3 b=. _ERROR_=1 _N_=2" %in% r$log)
+  expect_true("NOTE: LOST CARD." %in% msgs(r))
+  expect_true("a=3 b=. _ERROR_=1 _N_=2" %in% msgs(r))
 })
 
 test_that("new character functions", {
@@ -219,7 +219,7 @@ test_that("new numeric and date functions", {
 
 test_that("PUT wraps at the 132-column log line size", {
   vars <- paste0("v", 1:30, " = 12345;", collapse = " ")
-  log <- sas_run(paste("data _null_;", vars, "put", paste0("v", 1:30, "=", collapse = " "), "; run;"))$log
+  log <- msgs(sas_run(paste("data _null_;", vars, "put", paste0("v", 1:30, "=", collapse = " "), "; run;")))
   expect_equal(length(log), 3L)
   expect_true(all(nchar(log) <= 132))
 })
@@ -259,6 +259,6 @@ test_that("$HEX informat turns hex digit pairs into bytes", {
   res <- sas_run("data a; r = input('ZZ', $hex2.); e = _error_; run;")
   expect_identical(sub(" +$", "", res$work$a$r), "")
   expect_identical(res$work$a$e, 1)
-  expect_true(any(startsWith(res$log, "NOTE: Invalid argument to function INPUT at line 1 column")))
-  expect_false(any(grepl("Mathematical operations", res$log)))
+  expect_true(any(startsWith(msgs(res), "NOTE: Invalid argument to function INPUT at line 1 column")))
+  expect_false(any(grepl("Mathematical operations", msgs(res))))
 })

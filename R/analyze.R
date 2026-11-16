@@ -310,7 +310,7 @@ construct_fns <- c("sqllike", "sqlinlist", "sqlcase", "sqlmonotonic", "sqlquant"
 
 an_call <- function(e, st) {
   if (!isTRUE(e$construct) && e$name %in% construct_fns) {
-    abort_syntax(paste0("The function ", toupper(e$name), " is unknown, or cannot be accessed. (ERROR 68-185)"), e$line)
+    abort_syntax(paste0("The function ", toupper(e$name), " is unknown, or cannot be accessed. (ERROR 68-185)"), e$line, e$col, e$name)
   }
   lk <- lag_kind(e$name)
   if (e$name %in% c("dim", "lbound", "hbound")) {
@@ -347,7 +347,7 @@ an_call <- function(e, st) {
     }
     e$args <- lapply(e$args, an_expr, st = st)
     a <- expr_type(e$args[[1]], st)
-    if (e$name == "input" && a$type == "num") ct_conversion("n2c", e$args[[1]]$line %||% e$line, e$args[[1]]$col %||% e$col)
+    if (e$name == "input" && a$type == "num") log_place("conv.n2c", e$args[[1]]$line %||% e$line, e$args[[1]]$col %||% e$col)
     # PUT(123, $5.) writes the number with 5.; PUT('abc', 8.) writes the text with $8.
     if (e$name == "put" && f$name == "" && !is.na(f$w) && is.na(f$d) && f$char != (a$type == "char") &&
         is.null(user_fmt("", TRUE))) {
@@ -375,7 +375,7 @@ an_call <- function(e, st) {
     spec <- fn_table[[e$name]]
     if (is.null(spec)) {
       if (!sas_known_function(e$name)) {
-        abort_syntax(paste0("The function ", toupper(e$name), " is unknown, or cannot be accessed. (ERROR 68-185)"), e$line)
+        abort_syntax(paste0("The function ", toupper(e$name), " is unknown, or cannot be accessed. (ERROR 68-185)"), e$line, e$col, e$name)
       }
       abort_unsupported(paste0("function ", toupper(e$name), "()"), e$line)
     }
@@ -386,14 +386,14 @@ an_call <- function(e, st) {
     sas_n <- registry_arg_counts(e$name)
     if (!is.null(sas_n)) {
       if (!is.na(sas_n[2]) && length(e$args) > sas_n[2]) {
-        abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line)
+        abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line, e$col, e$name)
       }
       if (length(e$args) < sas_n[1] && nargs < sas_n[1]) {
-        abort_syntax(paste0("The ", toupper(e$name), " function call does not have enough arguments (ERROR 71-185)"), e$line)
+        abort_syntax(paste0("The ", toupper(e$name), " function call does not have enough arguments (ERROR 71-185)"), e$line, e$col, e$name)
       }
     }
     if (length(e$args) > spec$max && e$name %in% fn_max_exact) {
-      abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line)
+      abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line, e$col, e$name)
     }
     if (length(e$args) > spec$max) {
       # optional arguments beyond those implemented here are not supported
@@ -419,7 +419,7 @@ an_call <- function(e, st) {
     n_res <- sum(vapply(e$args, function(a) if (identical(a$node, "of")) length(a$vars) else 1L, integer(1)))
     n_min <- max(registry_arg_counts(e$name)[1] %|NA|% 0L, fn_table[[e$name]]$min %||% 0L)
     if (n_res < n_min) {
-      abort_syntax(paste0("The ", toupper(e$name), " function call does not have enough arguments (ERROR 71-185)"), e$line)
+      abort_syntax(paste0("The ", toupper(e$name), " function call does not have enough arguments (ERROR 71-185)"), e$line, e$col, e$name)
     }
   }
   if (is.null(lk)) e$args <- convert_fn_args(e, st)
@@ -428,7 +428,7 @@ an_call <- function(e, st) {
   if (!is.null(lk) && lk$kind == "dif" && length(e$args) && e$args[[1]]$node != "of" &&
       expr_type(e$args[[1]], st)$type == "char") {
     a <- e$args[[1]]
-    ct_conversion("c2n", a$line %||% e$line, a$col %||% e$col)
+    log_place("conv.c2n", a$line %||% e$line, a$col %||% e$col)
     e$args[[1]] <- list(node = "call", name = "cvt_c2n", args = list(a),
                         line = a$line %||% e$line, col = a$col %||% e$col, construct = TRUE)
   }
@@ -449,7 +449,7 @@ convert_fn_args <- function(e, st) {
     if (is.na(want) || a$node %in% c("of", "omitted")) return(a)
     have <- expr_type(a, st)$type
     if (have == want) return(a)
-    ct_conversion(if (want == "char") "n2c" else "c2n", a$line %||% e$line, a$col %||% e$col)
+    log_place(if (want == "char") "conv.n2c" else "conv.c2n", a$line %||% e$line, a$col %||% e$col)
     list(node = "call", name = if (want == "char") "cvt_n2c" else "cvt_c2n", args = list(a),
          line = a$line %||% e$line, col = a$col %||% e$col, construct = TRUE)
   })

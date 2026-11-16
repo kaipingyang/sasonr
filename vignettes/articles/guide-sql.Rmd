@@ -13,7 +13,7 @@ library(sasonr)
 PROC SQL is parsed by sasonr's own SQL parser. Joins and grouping run on
 DuckDB; SAS semantics are applied in R: missing values sort and compare as
 the smallest value, character comparisons ignore trailing blanks, summary
-statistics are merged back to detail rows ("remerging") with the SAS NOTE,
+statistics are merged back to detail rows ("remerging") with the remerge NOTE,
 `CALCULATED` columns and `INTO :macro-variable` are supported.
 
 ## Summaries, CALCULATED and CASE

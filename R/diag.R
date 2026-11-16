@@ -10,17 +10,16 @@
 #
 # Fields of the run-time state (`SasSession$rt`): per submission prx,
 # prx_cache (PRXPARSE ids) and on_warn, on_error, on_note (log callbacks of
-# the engine); per step evaluation (rt_reset()): err, stop_step, notes, mv,
-# math, mv_rerun, reads, proc_notes, flow_note.  The format catalog, filerefs
+# the engine); per step evaluation (rt_reset()): err, stop_step, notes,
+# places (mv.generated, math.failed: log_place()), mv_rerun, reads, proc_notes, flow_note.  The format catalog, filerefs
 # and the LINESIZE/NOTES options are separate session components.
 
 rt_reset <- function(rt = rt_diag()) {
   rt$err <- FALSE
   rt$stop_step <- FALSE
   rt$notes <- character()
-  rt$mv <- integer()
+  log_places_reset(rt)
   rt$mv_rerun <- FALSE
-  rt$math <- integer()
   rt$reads <- list()
   rt$proc_notes <- character()
   rt$flow_note <- FALSE
@@ -37,6 +36,7 @@ rt_error <- function(note = NULL) {
 
 at_text <- function(.at) {
   if (is.null(.at) || length(.at) < 2 || anyNA(.at)) return("")
+  log_place_check(.at)
   sprintf(" at line %d column %d", as.integer(.at[1]), as.integer(.at[2]))
 }
 
@@ -61,7 +61,7 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
       v <- a[min(i, length(a))]
       if (is.character(v)) note_chr(v) else trimws(sas_fmt_best(v, 12L))
     }, "")
-    if (math) rt_count("math", .at, sum(bad %||% TRUE))
+    if (math) log_place("math.failed", at = .at, n = sum(bad %||% TRUE))
     return(rt_error(sprintf("NOTE: Argument %d to function %s(%s)%s is invalid.", argn, toupper(fname),
                             paste(vals, collapse = ","), at_text(.at))))
   }
@@ -76,7 +76,7 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
     call <- paste0(call, "(", paste(vals, collapse = ","), ")")
     # the failed call also counts as a place where a mathematical operation
     # could not be performed (summary NOTE at the end of the step)
-    if (math) rt_count("math", .at, sum(bad %||% TRUE))
+    if (math) log_place("math.failed", at = .at, n = sum(bad %||% TRUE))
   }
   rt_error(sprintf("NOTE: Invalid %s to function %s%s.", what, call, at_text(.at)))
 }
@@ -93,7 +93,7 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
 #' @keywords internal
 sas_where_cond <- function(x) {
   rt <- rt_diag()
-  saved <- list(err = rt$err, notes = rt$notes, mv = rt$mv, math = rt$math, mv_rerun = rt$mv_rerun)
+  saved <- list(err = rt$err, notes = rt$notes, places = log_places_save(rt), mv_rerun = rt$mv_rerun)
   force(x)
   n0 <- length(saved$notes)
   added <- if (length(rt$notes) > n0) rt$notes[(n0 + 1L):length(rt$notes)] else character()
@@ -104,8 +104,7 @@ sas_where_cond <- function(x) {
     abort_unsupported("a division by zero in a WHERE condition")
   }
   rt$notes <- saved$notes
-  rt$math <- saved$math
-  rt$mv <- saved$mv
+  log_places_restore(rt, saved$places)
   rt$mv_rerun <- saved$mv_rerun
   rt$err <- saved$err
   x
@@ -115,7 +114,7 @@ sas_where_cond <- function(x) {
 note_math <- function(.at = NULL, n = 1L) {
   rt <- rt_diag()
   rt$err <- TRUE
-  rt_count("math", .at, n)
+  log_place("math.failed", at = .at, n = n)
 }
 
 #' Copy a pending data error into `_ERROR_` (and its NOTEs into the log)
@@ -128,7 +127,7 @@ sas_err_sync <- function(pdv) {
   if (!rt$err && length(rt$notes) == 0) return(pdv)
   env <- parent.frame()
   if (length(rt$notes) > 0) {
-    if (rt_notes_on()) env$.log <- c(env$.log, rt$notes)
+    if (rt_notes_on()) log_buffer_add(env, rt$notes)
     rt$notes <- character()
   }
   if (rt$err) pdv[["_error_"]] <- 1

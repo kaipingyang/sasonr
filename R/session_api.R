@@ -1,6 +1,6 @@
-# Public API of the SAS session (session.R): sas_session() and its accessors.
+# Public API of the session (session.R): sas_session() and its accessors.
 
-#' Create a persistent SAS session
+#' Create a persistent session
 #'
 #' A session holds the state kept between submissions: the WORK
 #' library and its metadata, macro variables and macro definitions, user
@@ -36,24 +36,25 @@ sas_session <- function(work = list()) {
 
 check_session <- function(session) {
   if (!R6::is.R6(session) || !inherits(session, "SasSession")) {
-    rlang::abort("`session` must be a SAS session created by `sas_session()`.", class = "sasonr_error")
+    rlang::abort("`session` must be a session created by `sas_session()`.", class = "sasonr_error")
   }
   session
 }
 
-#' Inspect a SAS session
+#' Inspect a session
 #'
 #' Functional accessors of a [sas_session()]: the WORK data sets (trailing
 #' blanks of character values removed, as in [sas_run()] results), their
-#' metadata, the macro variables, the cumulative log and listing of all
-#' submissions. `sas_session_close()` closes the PROC SQL connection.
+#' metadata, the macro variables and the cumulative listing of all
+#' submissions ([sas_log()] gives the cumulative log). `sas_session_close()`
+#' closes the PROC SQL connection.
 #'
 #' @param session A session from [sas_session()].
 #' @param scope `"global"` (user-defined global macro variables) or
 #'   `"automatic"` (automatic macro variables such as `SYSCC`).
 #' @return `sas_work()`: named list of tibbles. `sas_meta()`: named list of
 #'   variable metadata. `sas_macro_vars()`: named list of character values.
-#'   `sas_log()`, `sas_listing()`: character vectors. `sas_session_close()`:
+#'   `sas_listing()`: character vector. `sas_session_close()`:
 #'   the session, invisibly.
 #' @examples
 #' s <- sas_session()
@@ -91,13 +92,6 @@ sas_macro_vars <- function(session, scope = c("global", "automatic")) {
   mv <- as.list(session$macro$globals)
   auto <- names(mv) %in% macro_auto_vars
   mv[sort(names(mv)[if (scope == "global") !auto else auto])]
-}
-
-#' @rdname sas_session_accessors
-#' @export
-sas_log <- function(session) {
-  check_session(session)
-  session$log
 }
 
 #' @rdname sas_session_accessors

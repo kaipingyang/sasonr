@@ -7,7 +7,7 @@ run_notes <- function(code, level = "auto") {
 test_that("DATA step NOTEs: data set size, observations read with WHERE", {
   r <- run_notes(c("data a; do i = 1 to 5; output; end; run;",
                    "data b; set a; where i > 2; run;"))
-  expect_equal(r$log, c(
+  expect_equal(msgs(r), c(
     "NOTE: The data set WORK.A has 5 observations and 1 variables.",
     "NOTE: There were 3 observations read from the data set WORK.A.",
     "      WHERE i>2;",
@@ -19,16 +19,16 @@ test_that("observations read stop at STOP; PROC SORT NODUPKEY NOTE", {
   r <- run_notes(c("data a; input k; datalines;", "1", "1", "2", ";", "run;",
                    "data b; set a; if _n_ = 2 then stop; run;",
                    "proc sort data=a out=c nodupkey; by k; run;"))
-  expect_true("NOTE: There were 2 observations read from the data set WORK.A." %in% r$log)
-  expect_true("NOTE: 1 observations with duplicate key values were deleted." %in% r$log)
-  expect_true("NOTE: The data set WORK.C has 2 observations and 1 variables." %in% r$log)
+  expect_true("NOTE: There were 2 observations read from the data set WORK.A." %in% msgs(r))
+  expect_true("NOTE: 1 observations with duplicate key values were deleted." %in% msgs(r))
+  expect_true("NOTE: The data set WORK.C has 2 observations and 1 variables." %in% msgs(r))
 })
 
 test_that("missing values generated: counts per place, compile-time folding", {
   code <- c("data _null_;", "  y = . + 3;", "  x = 2 * y;", "run;")
   for (lv in c("auto", "L3")) {
     r <- run_notes(code, lv)
-    expect_equal(r$log, c(
+    expect_equal(msgs(r), c(
       "NOTE: Missing values were generated as a result of performing an operation on missing values.",
       "      Each place is given by: (Number of times) at (Line):(Column).",
       "      2:9  ",
@@ -44,8 +44,8 @@ test_that("guarded missing-value counts are exact (vectorised steps re-run row b
             "data b; set a; if x = . then y = x + 1; z = x * 2; run;")
   r1 <- run_notes(code)
   r3 <- run_notes(code, "L3")
-  expect_equal(r1$log, r3$log)
-  expect_true("      2 at 7:36   2 at 7:47  " %in% r1$log)
+  expect_equal(msgs(r1), msgs(r3))
+  expect_true("      2 at 7:36   2 at 7:47  " %in% msgs(r1))
 })
 
 test_that("missing values generated: only the operation that produced the missing value is a place", {
@@ -67,7 +67,7 @@ test_that("missing values generated: only the operation that produced the missin
             "run;")
   for (lv in c("auto", "L3")) {
     r <- run_notes(code, lv)
-    expect_equal(r$log, c(
+    expect_equal(msgs(r), c(
       "NOTE: Missing values were generated as a result of performing an operation on missing values.",
       "      Each place is given by: (Number of times) at (Line):(Column).",
       "      1 at 3:10   1 at 4:10   1 at 5:11   1 at 6:10   1 at 7:10   1 at 8:10   1 at 9:9   1 at 10:10  ",
@@ -91,7 +91,7 @@ test_that("missing-value places: ** and function results are not generated missi
             "run;")
   for (lv in c("auto", "L3")) {
     r <- run_notes(code, lv)
-    expect_equal(r$log[3], "      1 at 3:11   1 at 3:16   1 at 4:11   1 at 4:17   2 at 5:12   2 at 6:9   1 at 7:12   1 at 8:9  ",
+    expect_equal(msgs(r)[3], "      1 at 3:11   1 at 3:16   1 at 4:11   1 at 4:17   2 at 5:12   2 at 6:9   1 at 7:12   1 at 8:9  ",
                  label = lv)
   }
 })
@@ -105,19 +105,19 @@ test_that("missing-value places: inside function arguments every operation recor
             "run;")
   for (lv in c("auto", "L3")) {
     r <- run_notes(code, lv)
-    expect_equal(r$log[3], "      1 at 3:11   1 at 4:8   1 at 4:15   1 at 4:20   1 at 5:8   2 at 5:16  ", label = lv)
+    expect_equal(msgs(r)[3], "      1 at 3:11   1 at 4:8   1 at 4:15   1 at 4:20   1 at 5:8   2 at 5:16  ", label = lv)
   }
 })
 
 test_that("uninitialized variables and macro WARNINGs are logged", {
   r <- run_notes(c("data a; x = y + 1; run;", "%put &nope;"))
-  expect_equal(r$log[1], "NOTE: Variable y is uninitialized.")
-  expect_true("WARNING: Apparent symbolic reference NOPE not resolved." %in% r$log)
+  expect_equal(msgs(r)[1], "NOTE: Variable y is uninitialized.")
+  expect_true("WARNING: Apparent symbolic reference NOPE not resolved." %in% msgs(r))
 })
 
 test_that("OPTIONS NONOTES suppresses NOTEs", {
   r <- run_notes(c("options nonotes;", "data a; x = 1; run;"))
-  expect_length(r$log, 0)
+  expect_length(msgs(r), 0)
 })
 
 test_that("variable attributes are kept for export", {
@@ -137,7 +137,7 @@ test_that("variable attributes are kept for export", {
 test_that("WHERE NOTEs: MIN / MAX, one-value IN lists, chains, prefix signs", {
   where_line <- function(w) {
     r <- run_notes(c("data a; a = 1; b = 2; c = 3; run;", paste0("data b; set a; where ", w, "; run;")))
-    sub("^ +", "", r$log[startsWith(r$log, "      WHERE ")])
+    sub("^ +", "", msgs(r)[startsWith(msgs(r), "      WHERE ")])
   }
   expect_identical(where_line("a min b < c"), "WHERE c>a><b;")
   expect_identical(where_line("a max b = c"), "WHERE c=a<>b;")
@@ -151,20 +151,20 @@ test_that("WHERE NOTEs: MIN / MAX, one-value IN lists, chains, prefix signs", {
 test_that("WHERE conditions write no missing-value NOTE and no NOTE for invalid ** arguments", {
   r <- run_notes(c("data a; a = 0; b = .; c = 0; v = 1; run;",
                    "data w; set a; where (a * b is missing) = v and (a ** c in (.)) = v; e = _error_; run;"))
-  expect_false(any(grepl("Missing values were generated", r$log, fixed = TRUE)))
-  expect_false(any(grepl("exponential operator", r$log, fixed = TRUE)))
+  expect_false(any(grepl("Missing values were generated", msgs(r), fixed = TRUE)))
+  expect_false(any(grepl("exponential operator", msgs(r), fixed = TRUE)))
   expect_identical(nrow(r$work$w), 1L)
   expect_identical(r$work$w$e, 0)
   # in an assignment the same operations are reported
   r <- run_notes("data a; a = 0; b = .; c = 0; x = a * b; y = a ** c; run;")
-  expect_true(any(startsWith(r$log, "NOTE: Missing values were generated")))
-  expect_true(any(startsWith(r$log, "NOTE: Invalid argument(s) to the exponential operator")))
+  expect_true(any(startsWith(msgs(r), "NOTE: Missing values were generated")))
+  expect_true(any(startsWith(msgs(r), "NOTE: Invalid argument(s) to the exponential operator")))
 })
 
 test_that("WHERE conditions drop function data-error NOTEs; a division by zero fails loud", {
   withr::local_options(sasonr.strict = FALSE)
   r <- run_notes(c("data a; x = -1; v = .; run;", "data w; set a; where sqrt(x) = v; e = _error_; run;"))
-  expect_false(any(grepl("Invalid argument to function SQRT", r$log, fixed = TRUE)))
+  expect_false(any(grepl("Invalid argument to function SQRT", msgs(r), fixed = TRUE)))
   expect_identical(nrow(r$work$w), 1L)
   expect_identical(r$work$w$e, 0)
   expect_error(run_notes(c("data a; x = 0; v = .; run;", "data w; set a; where 1 / x = v; run;")),
@@ -174,7 +174,7 @@ test_that("WHERE conditions drop function data-error NOTEs; a division by zero f
 test_that("WHERE= options and PROC WHERE drop data-error NOTEs; compile-time NOTEs in WHERE fail loud", {
   r <- run_notes(c("data a; a = 0; b = .; v = 1; run;", "data w; set a(where = ((a * b is missing) = v)); run;",
                    "proc print data=a; where (a * b is missing) = v; run;"))
-  expect_false(any(grepl("Missing values were generated", r$log, fixed = TRUE)))
+  expect_false(any(grepl("Missing values were generated", msgs(r), fixed = TRUE)))
   expect_identical(nrow(r$work$w), 1L)
   for (w in c("x = 1/0", "x = 0 ** 0", "x = . + 1")) {
     expect_error(run_notes(c("data a; x = 1; run;", paste0("data w; set a; where ", w, "; run;"))), class = "sasonr_unsupported")
@@ -190,7 +190,7 @@ test_that("an ERROR of a function in a WHERE condition fails loud", {
 test_that("WHERE NOTEs: constant BETWEEN bounds in ascending order, colon comparisons in chains", {
   where_line <- function(w) {
     r <- run_notes(c("data a; a = 2; s = 'ab'; t = 'a'; u = 'b'; v = 1; run;", paste0("data b; set a; where ", w, "; run;")))
-    sub("^ +", "", r$log[startsWith(r$log, "      WHERE ")])
+    sub("^ +", "", msgs(r)[startsWith(msgs(r), "      WHERE ")])
   }
   expect_identical(where_line("a between 3 and 1"), "WHERE (a>=1 and a<=3);")
   expect_identical(where_line("a not between 3 and 1"), "WHERE not (a>=1 and a<=3);")

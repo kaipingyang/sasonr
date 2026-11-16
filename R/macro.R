@@ -36,7 +36,6 @@ new_macro_session <- function(exec = NULL) {
   ses$globals <- new.env(parent = emptyenv())
   ses$frames <- list()
   ses$macros <- new.env(parent = emptyenv())
-  ses$log <- character()
   ses$exec <- exec
   ses$line <- 1L
   now <- Sys.time()
@@ -198,11 +197,7 @@ mv_symput <- function(ses, name, value, scope = NULL) {
   invisible()
 }
 
-mac_put <- function(ses, line) {
-  ses$log <- c(ses$log, line)
-  if (is.function(ses$on_put)) ses$on_put(line)
-  invisible()
-}
+mac_put <- function(ses, line) log_macro_put(ses, line)
 
 # A macro-time ERROR that does not stop processing (written to the log).
 mac_error_note <- function(msg) {
@@ -270,7 +265,7 @@ str_sink <- function() {
   s <- new.env(parent = emptyenv())
   s$parts <- character()
   s$compiler <- FALSE
-  s$add <- function(x) s$parts[length(s$parts) + 1L] <- x
+  s$add <- function(x, mapped = FALSE) s$parts[length(s$parts) + 1L] <- x
   s$comment <- s$add
   s
 }
@@ -305,7 +300,9 @@ code_sink <- function(ses) {
   s$stmt <- integer()
   s$stmt_begin <- NA_integer_
   s$stmt_line <- 1L
-  s$chunk_line <- NA_integer_
+  # the program line on which the text in `acc` starts (NA: `acc` is empty);
+  # every line break in `acc` is a line break of the program
+  s$acc_line <- NA_integer_
   s$dl <- FALSE
   s$dl4 <- FALSE
   s$sql <- FALSE
@@ -317,8 +314,8 @@ code_sink <- function(ses) {
   flush_upto <- function(p) {
     text <- substr(s$acc, 1L, p)
     s$acc <- substr(s$acc, p + 1L, nchar(s$acc))
-    line <- s$chunk_line
-    s$chunk_line <- if (nzchar(trimws(s$acc))) s$stmt_line else NA_integer_
+    line <- s$acc_line
+    s$acc_line <- if (nzchar(s$acc)) line + mp_count_nl(text) else NA_integer_
     if (nzchar(trimws(text))) ses$exec(text, if (is.na(line)) 1L else line)
   }
   step_done <- function() {
@@ -387,19 +384,28 @@ code_sink <- function(ses) {
     0L
   }
 
-  s$add <- function(text) {
+  # `mapped`: program text whose lines are those of the submission; other
+  # text (a macro body, a macro variable's value) is generated at the line of
+  # the invocation, so its line breaks are blanks there and do not count as
+  # program lines (statement lines, OPTIONS SOURCE / LINESIZE in the echo)
+  s$add <- function(text, mapped = FALSE) {
     text <- mq_unmask(text)
     if (!nzchar(text)) return(invisible())
-    if (is.na(s$chunk_line) && nzchar(trimws(text))) s$chunk_line <- ses$line
+    if (!nzchar(s$acc)) s$acc_line <- ses$line
     base <- nchar(s$acc)
-    s$acc <- paste0(s$acc, text)
+    nl <- !mapped && !s$dl && grepl("\n", text, fixed = TRUE)
+    s$acc <- paste0(s$acc, if (nl) gsub("\n", " ", text, fixed = TRUE) else text)
     if (s$dl) return(invisible())
     cps <- utf8ToInt(text)
     cur_line <- ses$line
     for (k in seq_along(cps)) {
       c <- cps[k]
       st <- s$state
-      if (k > 1L && cps[k - 1L] == 10L) cur_line <- cur_line + 1L
+      if (nl && c == 10L) {
+        if (st == "q") abort_unsupported_construct("a line break inside a quoted string in macro-generated text", ses$line)
+        c <- 32L
+      }
+      if (mapped && k > 1L && cps[k - 1L] == 10L) cur_line <- cur_line + 1L
       if (st == "code") {
         if (is_ws_cp(c)) {
           if (length(s$stmt) > 0) s$stmt[length(s$stmt) + 1L] <- 32L
@@ -428,9 +434,24 @@ code_sink <- function(ses) {
     }
     invisible()
   }
+  # After program text that the macro processor consumed: the text that
+  # follows starts on program line `line`.  The line breaks that did not
+  # reach `acc` are added; inside a quoted string they would change its
+  # value, and `acc` ahead of the program means its lines are not known:
+  # both fail loud.
+  s$resync <- function(line, in_quote = FALSE) {
+    if (is.na(line) || !nzchar(s$acc)) return(invisible())
+    end <- s$acc_line + mp_count_nl(s$acc)
+    if (end > line) abort_unsupported_construct("program text whose line numbers are not known after macro processing", line)
+    if (end < line) {
+      if (in_quote) abort_unsupported_construct("a macro reference spanning lines inside a quoted string", line)
+      s$add(strrep("\n", line - end), mapped = TRUE)
+    }
+    invisible()
+  }
   s$at_stmt_start <- function() s$state == "code" && length(s$stmt) == 0 && !s$dl
   s$comment <- function(text) {
-    if (is.na(s$chunk_line)) s$chunk_line <- ses$line
+    if (!nzchar(s$acc)) s$acc_line <- ses$line
     s$acc <- paste0(s$acc, text)
   }
   s$end_datalines <- function() {
@@ -476,7 +497,7 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
       txt <- intToUtf8(cp[lit:to])
       if (mask_lit) txt <- mq_mask(txt, triggers = !triggers)
       if (!is.null(src$line_of)) ses$line <- src$line_of[lit]
-      sink$add(txt)
+      sink$add(txt, mapped = !is.null(src$line_of))
     }
   }
   stop_chars <- stop$chars
@@ -509,6 +530,7 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
         emit_lit(i - 1L)
         src$i <- i
         mp_trigger(src, ses, sink, mode, in_dq = quote == 34L, put_eq = put_eq)
+        mp_consumed(src, ses, sink, i, src$i, in_quote = TRUE)
         i <- src$i
         lit <- i
         next
@@ -536,13 +558,19 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
       k <- i + 2L
       while (k < n && !(cp[k] == 42L && cp[k + 1L] == 47L)) k <- k + 1L
       if (k >= n) abort_syntax("unterminated /* comment", src_line(src, i))
-      if (mode == "code") sink$comment(intToUtf8(cp[i:(k + 1L)]))
+      if (mode == "code") {
+        # the comment starts on its own program line (it does not pass through emit_lit())
+        if (!is.null(src$line_of)) ses$line <- src$line_of[i]
+        sink$comment(intToUtf8(cp[i:(k + 1L)]))
+      }
       i <- k + 2L
       lit <- i
       next
     } else if (c == 37L && at(i + 1L) == 42L) {
       emit_lit(i - 1L)
+      i0 <- i
       i <- mp_skip_macro_comment(src, i + 2L)
+      mp_consumed(src, ses, sink, i0, i)
       lit <- i
       next
     } else if (c == 59L && isTRUE(sink$compiler)) {
@@ -567,6 +595,7 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
       emit_lit(i - 1L)
       src$i <- i
       mp_trigger(src, ses, sink, mode, in_dq = FALSE, put_eq = put_eq)
+      mp_consumed(src, ses, sink, i, src$i)
       i <- src$i
       lit <- i
       next
@@ -580,6 +609,22 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
 
 # `%* ... ;` comment starting after `%*`; quotes inside are honoured, and an
 # unmatched one swallows the rest of the text.
+# Program text from position `i0` up to `i1` (excluded) that the macro
+# processor consumed (a trigger, a macro comment): its lines are
+# macro-affected (ses$macro_lines; the echo and the NOTE places of those
+# lines are not implemented, log_macro_line()), and the sink is brought to the
+# program line of the text that follows (`in_quote`: inside a quoted
+# string), so the program lines after it keep their numbers.
+mp_consumed <- function(src, ses, sink, i0, i1, in_quote = FALSE) {
+  if (is.null(src$line_of) || i1 <= i0) return(invisible())
+  last <- min(i1 - 1L, src$n)
+  ses$macro_lines <- union(ses$macro_lines, src$line_of[i0]:src$line_of[last])
+  if (is.function(sink$resync) && i1 <= src$n) sink$resync(src$line_of[i1], in_quote)
+  invisible()
+}
+
+mp_count_nl <- function(x) sum(utf8ToInt(x) == 10L)
+
 mp_skip_macro_comment <- function(src, k) {
   while (k <= src$n) {
     c <- src$cp[k]
@@ -608,7 +653,7 @@ mp_copy_datalines <- function(src, i, ses, sink) {
   four <- sink$dl4
   e <- i
   while (e <= n && src$cp[e] != 10L) e <- e + 1L
-  sink$add(src_text(src, i, e))
+  sink$add(src_text(src, i, e), mapped = !is.null(src$line_of))
   i <- e + 1L
   while (i <= n) {
     e <- i
@@ -616,20 +661,20 @@ mp_copy_datalines <- function(src, i, ses, sink) {
     line_cp <- if (e > i) src$cp[i:(e - 1L)] else integer()
     if (four) {
       if (length(line_cp) >= 4L && all(line_cp[1:4] == 59L)) {
-        sink$add(src_text(src, i, i + 3L))
+        sink$add(src_text(src, i, i + 3L), mapped = !is.null(src$line_of))
         sink$end_datalines()
         return(i + 4L)
       }
     } else {
       nb <- which(!is_ws_cp(line_cp))
       if (length(nb) > 0 && line_cp[nb[1]] == 59L) {
-        sink$add(src_text(src, i, i + nb[1] - 1L))
+        sink$add(src_text(src, i, i + nb[1] - 1L), mapped = !is.null(src$line_of))
         sink$end_datalines()
         return(i + nb[1])
       }
     }
     if (!is.null(src$line_of)) ses$line <- src$line_of[i]
-    sink$add(src_text(src, i, e))
+    sink$add(src_text(src, i, e), mapped = !is.null(src$line_of))
     i <- e + 1L
   }
   sink$end_datalines()
@@ -650,6 +695,13 @@ mp_resolve <- function(text, ses, mode = "macro") {
 # Triggers ----------------------------------------------------------------------
 
 mp_trigger <- function(src, ses, sink, mode, in_dq, put_eq) {
+  # the text a trigger in the program generates is at the trigger's line,
+  # which is macro-affected from now on (the rest of the lines it spans:
+  # mp_consumed())
+  if (!is.null(src$line_of)) {
+    ses$line <- src$line_of[src$i]
+    ses$macro_lines <- union(ses$macro_lines, ses$line)
+  }
   if (src$cp[src$i] == 38L) return(mp_amp(src, ses, sink, mode, put_eq))
   k <- src$i + 1L
   name <- src_word(src, k)

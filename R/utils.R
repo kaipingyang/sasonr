@@ -1,10 +1,12 @@
 # Internal utilities: classed conditions and small code-generation helpers.
 
-sasonr_abort <- function(msg, class, line = NULL) {
+# `col`, `token`: the column and text of the token the condition is about
+# (fields `sas_col`, `sas_token`; the ERROR marker of the source echo).
+sasonr_abort <- function(msg, class, line = NULL, col = NULL, token = NULL) {
   if (!is.null(line) && length(line) == 1 && !is.na(line)) {
     msg <- paste0(msg, " (SAS line ", line, ")")
   }
-  rlang::abort(msg, class = c(class, "sasonr_error"), sas_line = line)
+  rlang::abort(msg, class = c(class, "sasonr_error"), sas_line = line, sas_col = col, sas_token = token)
 }
 
 abort_unsupported <- function(msg, line = NULL) {
@@ -17,15 +19,15 @@ abort_unsupported_construct <- function(msg, line = NULL) {
   sasonr_abort(paste("Unsupported:", msg), c("sasonr_unsupported_construct", "sasonr_unsupported"), line)
 }
 
-abort_syntax <- function(msg, line = NULL) {
-  sasonr_abort(paste("Syntax error:", msg), "sasonr_syntax_error", line)
+abort_syntax <- function(msg, line = NULL, col = NULL, token = NULL) {
+  sasonr_abort(paste("Syntax error:", msg), "sasonr_syntax_error", line, col, token)
 }
 
 abort_runtime <- function(msg, line = NULL) {
   sasonr_abort(paste("Runtime error:", msg), "sasonr_runtime_error", line)
 }
 
-# A SAS ERROR in a global statement (OPTIONS, FILENAME ...).  `what` names the
+# An ERROR in a global statement (OPTIONS, FILENAME ...).  `what` names the
 # error and `open_code` says whether the statement stands outside a step: the
 # error model (engine_global_error(), errors.R) handles only the cases it
 # supports, everything else fails loud.

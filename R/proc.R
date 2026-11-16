@@ -10,11 +10,11 @@
 # or longer than one page of a finite PAGESIZE= fails loud
 # (engine_add_listing(), run.R).
 # PAGENO= only changes the page numbers, which are written only under NUMBER.
-# The others do not change what sasonr writes (log source echo, timing,
-# MPRINT ...).
+# SOURCE / NOSOURCE turn the source echo of the rich log views on and off
+# (sas_log()); the others do not change what sasonr writes (timing, MPRINT ...).
 options_ignorable <- c(
   "center", "nocenter", "date", "nodate", "number", "nonumber", "ls", "linesize",
-  "ps", "pagesize", "notes", "nonotes", "nosource", "nosource2",
+  "ps", "pagesize", "notes", "nonotes", "source", "nosource", "nosource2",
   "nomprint", "nomlogic", "nosymbolgen", "nomprintnest", "nomlogicnest",
   "formdlim", "pageno", "stimer", "nostimer",
   "fullstimer", "nofullstimer", "msglevel", "errors",
@@ -113,8 +113,11 @@ parse_global_stmt <- function(p, open_code = FALSE) {
         if (tk_type(p) %in% c("name", "num", "str", "str_macro")) advance(p) else g_err("invalid OPTIONS value")
       }
     }
+    # the options take effect after the statement (its last line: the source echo)
+    end_line <- tk_line(p)
     advance(p)
-    return(list(type = "global", kind = "options", opts = opts, ls = ls, ps = ps, formdlim = formdlim, line = line))
+    return(list(type = "global", kind = "options", opts = opts, ls = ls, ps = ps, formdlim = formdlim, line = line,
+                end_line = end_line))
   }
   abort_unsupported(paste0("global statement ", toupper(tk_val(p))), line)
 }

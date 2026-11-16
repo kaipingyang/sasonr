@@ -14,7 +14,7 @@ test_that("PROC SQL function NOTEs go through sql_function_notes()", {
   # the supported form (one MDY NOTE) still runs
   withr::local_options(sasonr.step_notes = TRUE)
   r <- sas_run(paste(one, "proc sql; create table t as select mdy(2, 30, 2024) as d from one; quit;"))
-  expect_true("NOTE: Invalid argument to function MDY. Missing values may be generated." %in% r$log)
+  expect_true("NOTE: Invalid argument to function MDY. Missing values may be generated." %in% msgs(r))
 })
 
 test_that("EXPECTED / DEVIATION / CELLCHI2 go through the statistics registry", {

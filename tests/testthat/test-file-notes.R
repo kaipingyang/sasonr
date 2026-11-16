@@ -15,9 +15,17 @@ test_that("FILE writes PUT output to an external file; MOD appends", {
   r <- sas_run("data _null_; x = 1; file 'out.txt'; put 'a' x; run;
 data _null_; file 'out.txt' mod lrecl=1000; put 'b'; run;")
   expect_equal(readLines(file.path(d, "out.txt")), c("a1", "b"))
-  expect_false(any(c("a1", "b") %in% r$log))
+  expect_false(any(c("a1", "b") %in% msgs(r)))
   # FILE LOG keeps the log as destination
-  expect_true("c" %in% sas_run("data _null_; file log; put 'c'; run;")$log)
+  expect_true("c" %in% msgs(sas_run("data _null_; file log; put 'c'; run;")))
+})
+
+test_that("FILE writes the empty lines of PUT output", {
+  d <- withr_local_dir()
+  sas_run("data _null_; file 'out.txt'; put 'a' / ' ' / 'b'; put ' '; put 'c'; run;")
+  expect_identical(readLines(file.path(d, "out.txt")), c("a", "", "b", "", "c"))
+  # the empty lines a PUT writes by its form fail loud (also with a FILE LRECL)
+  expect_error(sas_run("data _null_; file 'out.txt' lrecl=80; put; run;"), "PUT with no items")
 })
 
 test_that("FILE inside a condition, FILE PRINT and unknown options fail loud", {
@@ -32,27 +40,27 @@ test_that("OPTIONS LINESIZE= sets the log line size (PUT wrapping, NOTE layout)"
   notes_on()
   long <- strrep("x", 100)
   code <- sprintf("data _null_; a = '%s'; b = '%s'; put a b; run;", long, long)
-  expect_length(sas_run(code)$log, 2)
-  expect_length(sas_run(paste("options linesize=max;", code))$log, 1)
-  log <- sas_run("options linesize=max; data _null_; x = input('abc', 8.); run;")$log
+  expect_length(msgs(sas_run(code)), 2)
+  expect_length(msgs(sas_run(paste("options linesize=max;", code))), 1)
+  log <- msgs(sas_run("options linesize=max; data _null_; x = input('abc', 8.); run;"))
   expect_true(any(startsWith(log, "NOTE: Mathematical operations could not be performed at the following places. The results of the operations have been set to missing values.")))
 })
 
-test_that("implicit conversions of function arguments write the SAS NOTEs", {
+test_that("implicit conversions of function arguments write the NOTEs", {
   notes_on()
-  log <- sas_run("data _null_;\n  r = catx(1,'a','b');\n  s = round('3.5');\nrun;")$log
+  log <- msgs(sas_run("data _null_;\n  r = catx(1,'a','b');\n  s = round('3.5');\nrun;"))
   k <- which(startsWith(log, "NOTE: Numeric values have been converted to character values"))
   expect_length(k, 1)
   expect_equal(trimws(log[k + 1]), "2:12")
   k <- which(startsWith(log, "NOTE: Character values have been converted to numeric values"))
   expect_equal(trimws(log[k + 1]), "3:13")
-  log <- sas_run("data _null_;\n  r = input(123, 8.);\nrun;")$log
+  log <- msgs(sas_run("data _null_;\n  r = input(123, 8.);\nrun;"))
   expect_true(any(startsWith(log, "NOTE: Numeric values have been converted to character values")))
 })
 
 test_that("missing arguments of ROUND/INT/INTCK/INTNX are counted in the missing-value NOTE", {
   notes_on()
-  log <- sas_run("data _null_;\n  r = round(5.5, .);\n  s = intck('month', ., 1);\nrun;")$log
+  log <- msgs(sas_run("data _null_;\n  r = round(5.5, .);\n  s = intck('month', ., 1);\nrun;"))
   k <- which(startsWith(log, "NOTE: Missing values were generated"))
   expect_length(k, 1)
   expect_match(log[k + 2], "1 at 2:7")
@@ -61,7 +69,7 @@ test_that("missing arguments of ROUND/INT/INTCK/INTNX are counted in the missing
 
 test_that("INPUT() with invalid data is listed in the mathematical-operations NOTE", {
   notes_on()
-  log <- sas_run("data _null_;\n  x = input('abc', 8.);\nrun;")$log
+  log <- msgs(sas_run("data _null_;\n  x = input('abc', 8.);\nrun;"))
   expect_true(any(log == "NOTE: Invalid argument to function INPUT at line 2 column 7."))
   k <- which(startsWith(log, "NOTE: Mathematical operations could not be performed"))
   expect_match(paste(log[k:(k + 3)], collapse = " "), "1 at 2:7")
@@ -75,12 +83,12 @@ test_that("an invalid PRX pattern fails loud (no Perl diagnostic in the log)", {
 test_that("%SYSFUNC(CATX) with an empty argument reports the %SYSEVALF ERROR and continues", {
   notes_on()
   r <- sas_run("%let r = %sysfunc(catx(%str( ),a,,c)); %put [&r];")
-  expect_equal(r$log, c("ERROR: %SYSEVALF function has no expression to evaluate.", "[a c]"))
+  expect_equal(msgs(r), c("ERROR: %SYSEVALF function has no expression to evaluate.", "[a c]"))
 })
 
 test_that("the PDV dump writes a blank character value as one blank and wraps at the line size", {
   notes_on()
-  log <- sas_run("data _null_; a = ' '; b = substr('abc', 9); run;")$log
+  log <- msgs(sas_run("data _null_; a = ' '; b = substr('abc', 9); run;"))
   expect_true("a=  b=  _ERROR_=1 _N_=1" %in% log)
   items <- c(paste0("s=", strrep("ab", 100)), "r= ", "_ERROR_=1", "_N_=1")
   # a value wider than the line continues on the next lines (cut every LINESIZE columns)
@@ -105,7 +113,7 @@ test_that("HEX16. informat reads IEEE 754 bit patterns; invalid digits are inval
   expect_identical(1 / r$work$a$y, -Inf)
   expect_equal(r$work$a$z, pi)
   expect_equal(r$work$a$i, 255)
-  log <- sas_run("data _null_;\n  x = input('3FF800000000000G', hex16.);\nrun;")$log
+  log <- msgs(sas_run("data _null_;\n  x = input('3FF800000000000G', hex16.);\nrun;"))
   expect_true(any(startsWith(log, "NOTE: Invalid argument to function INPUT")))
   expect_error(sas_run("data _null_; x = input('3FF8', hex16.); run;"), class = "sasonr_unsupported")
 })
@@ -114,14 +122,14 @@ test_that("ABS/SIGN return an ordinary missing for special missing; all-missing 
   notes_on()
   r <- sas_run("data a;\n  x = .A;\n  y = abs(x);\n  s = sum(., .);\n  t = sum(0, .);\nrun;")
   expect_equal(sas_miss_code(r$work$a$y), 1L)
-  k <- which(startsWith(r$log, "NOTE: Missing values were generated"))
-  expect_match(r$log[k + 2], "1 at 3:7")
-  expect_match(r$log[k + 2], "1 at 4:7")
-  expect_false(grepl("5:7", r$log[k + 2]))
+  k <- which(startsWith(msgs(r), "NOTE: Missing values were generated"))
+  expect_match(msgs(r)[k + 2], "1 at 3:7")
+  expect_match(msgs(r)[k + 2], "1 at 4:7")
+  expect_false(grepl("5:7", msgs(r)[k + 2]))
 })
 
 test_that("PROC SQL writes no missing-value NOTE", {
   notes_on()
   r <- sas_run("data t; x = .; run; proc sql; create table u as select x + 1 as y from t; quit;")
-  expect_false(any(startsWith(r$log, "NOTE: Missing values were generated")))
+  expect_false(any(startsWith(msgs(r), "NOTE: Missing values were generated")))
 })

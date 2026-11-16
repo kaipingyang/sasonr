@@ -10,7 +10,7 @@
 
 #' Open an input stream
 #' @param lines Records.
-#' @param line_no SAS log line numbers of the records (in-stream data) or
+#' @param line_no Log line numbers of the records (in-stream data) or
 #'   record numbers (external files).
 #' @param opts list(dlm, dsd, mode ("flowover", "missover", "truncover",
 #'   "stopover"), firstobs, obs, pad, lines (N), end_text).
@@ -283,7 +283,10 @@ input_items <- function(inf, pdv, spec) {
       line = {
         target <- inf$base + ptr_value(it$v, pdv) - 1L
         if (target < inf$r - inf$N + 1L) {
-          abort_runtime(sprintf("Old line %d wanted but SAS is at line %d", as.integer(inf$line_no[target]), as.integer(inf$line_no[inf$r])))
+          # a neutral wording (sasonr names itself, as the catalogue's
+          # `neutral` entries do, log_catalog.R); it moves to the catalogue
+          # with the other message literals
+          abort_runtime(sprintf("Old line %d wanted but sasonr is at line %d", as.integer(inf$line_no[target]), as.integer(inf$line_no[inf$r])))
         }
         if (target > inf$nrec) lost_card(inf)
         load_record(inf, target)

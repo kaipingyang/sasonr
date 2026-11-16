@@ -58,7 +58,7 @@ data b; label Zed = 'z' Alpha = 'a'; input Alpha Zed; datalines;
 test_that("%ELSE %IF ... %THEN %DO chains inside a macro", {
   res <- sas_run("%macro a(v); %if &v = 1 %then %do; %put one; %end;
     %else %if &v = 2 %then %do; %put two; %end; %else %do; %put other; %end; %mend a; %a(2) %a(3) %a(1)")
-  expect_equal(res$log, c("two", "other", "one"))
+  expect_equal(msgs(res), c("two", "other", "one"))
 })
 
 test_that("quoted physical data set names fail loud; ANYDTDTE reads Julian dates", {

@@ -23,7 +23,7 @@ Compiles a Perl regular expression. See the \href{https://documentation.sas.com/
 \examples{
 # PRXPARSE: each call is explained above it and followed by its result
 
-# Outside sas_run() the PRXPARSE ids are kept in an explicit SAS session.
+# Outside sas_run() the PRXPARSE ids are kept in an explicit session.
 s <- sas_session()
 
 # PRXPARSE compiles a Perl regular expression and returns a numeric pattern

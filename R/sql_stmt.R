@@ -1,10 +1,14 @@
 # PROC SQL statements and their integration with the engine (WORK, metadata,
 # log, listing, macro variables).
 
-sql_note <- function(eng, lines) {
-  if (rt_notes_on() && isTRUE(eng$step_notes)) eng$log <- c(eng$log, lines)
+# A catalogued message of PROC SQL (log_catalog.R), written under NOTES.
+sql_msg <- function(eng, id, ...) {
+  if (rt_notes_on() && isTRUE(eng$step_notes)) log_emit(eng, id = id, ...)
   invisible()
 }
+
+# "1 row was" / "2 rows were": the id of the singular or plural message.
+sql_rows_id <- function(id, n) paste0("sql.", if (n == 1) "row" else "rows", "_", id)
 
 sql_set_mvar <- function(eng, name, value) mv_let(eng$session$macro, name, value, how = "INTO")
 
@@ -19,9 +23,8 @@ engine_sql <- function(eng, st) {
   rt <- rt_diag()
   rt_reset()
   on.exit({
-    # PROC SQL writes no "Missing values were generated" NOTE
-    rt$mv <- integer()
-    if (isTRUE(eng$step_notes)) sql_note(eng, step_end_notes())
+    # PROC SQL writes no "Missing values were generated" NOTE (log_close_order)
+    log_step_close(eng, "sql", notes = rt_notes_on() && isTRUE(eng$step_notes))
   })
   switch(st$kind,
     select = sql_stmt_select(eng, st),
@@ -29,13 +32,13 @@ engine_sql <- function(eng, st) {
     create_view = {
       eng$session$views[[st$table]] <- st$query
       session_set_last(eng$session, st$table, view = TRUE)
-      sql_note(eng, sprintf("NOTE: SQL view WORK.%s has been defined.", toupper(st$table)))
+      sql_msg(eng, "sql.view_defined", name = toupper(st$table))
     },
     create_like = {
       src <- get0(st$source, envir = eng$session$work, inherits = FALSE)
       if (is.null(src)) abort_runtime(paste0("File WORK.", toupper(st$source), ".DATA does not exist."), st$line)
       sql_store(eng, st$table, src[0, , drop = FALSE], eng$session$meta[[st$source]] %||% meta_from_df(src))
-      sql_note(eng, sprintf("NOTE: Table WORK.%s created, with 0 rows and %d columns.", toupper(st$table), ncol(src)))
+      sql_msg(eng, "sql.table_created", name = toupper(st$table), nrow = 0L, ncol = ncol(src))
     },
     create_cols = sql_stmt_create_cols(eng, st),
     insert_values = ,
@@ -47,16 +50,16 @@ engine_sql <- function(eng, st) {
       for (t in st$tables) {
         if (st$what == "view") {
           eng$session$views[[t]] <- NULL
-          sql_note(eng, sprintf("NOTE: View WORK.%s has been dropped.", toupper(t)))
+          sql_msg(eng, "sql.view_dropped", name = toupper(t))
           next
         }
         if (!exists(t, envir = eng$session$work, inherits = FALSE)) {
-          sql_note(eng, sprintf("WARNING: File WORK.%s.DATA does not exist.", toupper(t)))
+          sql_msg(eng, "sql.no_file", name = toupper(t))
           next
         }
         rm(list = t, envir = eng$session$work)
         eng$session$meta[[t]] <- NULL
-        sql_note(eng, sprintf("NOTE: Table WORK.%s has been dropped.", toupper(t)))
+        sql_msg(eng, "sql.table_dropped", name = toupper(t))
       }
     },
     alter = sql_stmt_alter(eng, st),
@@ -78,7 +81,7 @@ sql_outobs <- function(eng, res) {
   n <- eng$sql_opts$outobs
   if (!is.null(n) && nrow(res$data) > n) {
     res <- sql_rel_rows(res, seq_len(n))
-    sql_note(eng, sprintf("WARNING: Statement terminated early due to OUTOBS=%d option.", as.integer(n)))
+    sql_msg(eng, "sql.outobs", n = as.integer(n))
   }
   res
 }
@@ -88,7 +91,7 @@ sql_stmt_select <- function(eng, st) {
   res <- sql_outobs(eng, sql_query(q, eng))
   n <- nrow(res$data)
   into <- if (q$node == "select") q$into else NULL
-  if (n == 0) sql_note(eng, "NOTE: No rows were selected.")
+  if (n == 0) sql_msg(eng, "sql.no_rows")
   if (!is.null(into)) sql_into(eng, res, into, st$line)
   if (!isTRUE(eng$sql_opts$noprint) && n > 0) {
     engine_add_listing(eng, sas_sql_listing(res, eng$session$titles, number = isTRUE(eng$sql_opts$number)), st$line)
@@ -151,7 +154,7 @@ sql_rel_to_table <- function(eng, res, line, warn_dups = TRUE) {
   }
   keep <- !duplicated(names)
   for (k in which(!keep)) {
-    if (warn_dups) sql_note(eng, sprintf("WARNING: Variable %s already exists on file WORK.", cols[[k]]$disp))
+    if (warn_dups) sql_msg(eng, "sql.var_exists", name = cols[[k]]$disp)
   }
   cols <- cols[keep]
   names <- names[keep]
@@ -184,7 +187,7 @@ sql_stmt_create <- function(eng, st) {
   res <- sql_outobs(eng, sql_query(st$query, eng))
   tb <- sql_rel_to_table(eng, res, st$line)
   sql_store(eng, st$table, tb$data, tb$meta, ordered = isTRUE(res$ordered))
-  sql_note(eng, sprintf("NOTE: Table WORK.%s created, with %d rows and %d columns.", toupper(st$table), nrow(tb$data), ncol(tb$data)))
+  sql_msg(eng, "sql.table_created", name = toupper(st$table), nrow = nrow(tb$data), ncol = ncol(tb$data))
   sql_set_status(eng, nrow(tb$data))
 }
 
@@ -203,7 +206,7 @@ sql_stmt_create_cols <- function(eng, st) {
     if (!is.null(c$label)) meta$labels[[nm]] <- c$label
   }
   sql_store(eng, st$table, tibble::as_tibble(d), meta)
-  sql_note(eng, sprintf("NOTE: Table WORK.%s created, with 0 rows and %d columns.", toupper(st$table), length(st$cols)))
+  sql_msg(eng, "sql.table_created", name = toupper(st$table), nrow = 0L, ncol = length(st$cols))
   sql_set_status(eng, 0)
 }
 
@@ -261,7 +264,7 @@ sql_stmt_insert <- function(eng, st) {
   }
   d <- dplyr::bind_rows(tg$data, tibble::as_tibble(add, .rows = nrows))
   sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$session$unordered, last = FALSE)
-  sql_note(eng, sprintf("NOTE: %d %s inserted into WORK.%s.", nrows, if (nrows == 1) "row was" else "rows were", toupper(st$table)))
+  sql_msg(eng, sql_rows_id("inserted", nrows), n = nrows, name = toupper(st$table))
   sql_set_status(eng, nrows)
 }
 
@@ -289,7 +292,7 @@ sql_stmt_update <- function(eng, st) {
     }
   }
   sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered, last = FALSE)
-  sql_note(eng, sprintf("NOTE: %d %s updated in WORK.%s.", length(idx), if (length(idx) == 1) "row was" else "rows were", toupper(st$table)))
+  sql_msg(eng, sql_rows_id("updated", length(idx)), n = length(idx), name = toupper(st$table))
   sql_set_status(eng, length(idx))
 }
 
@@ -300,7 +303,7 @@ sql_stmt_delete <- function(eng, st) {
   d <- tg$data[!hit, , drop = FALSE]
   k <- sum(hit)
   sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered, last = FALSE)
-  sql_note(eng, sprintf("NOTE: %d %s deleted from WORK.%s.", k, if (k == 1) "row was" else "rows were", toupper(st$table)))
+  sql_msg(eng, sql_rows_id("deleted", k), n = k, name = toupper(st$table))
   sql_set_status(eng, k)
 }
 
@@ -340,5 +343,5 @@ sql_stmt_alter <- function(eng, st) {
     }
   }
   sql_store(eng, st$table, d, m, ordered = !st$table %in% eng$session$unordered)
-  sql_note(eng, sprintf("NOTE: Table WORK.%s has been modified, with %d columns.", toupper(st$table), ncol(d)))
+  sql_msg(eng, "sql.table_modified", name = toupper(st$table), ncol = ncol(d))
 }

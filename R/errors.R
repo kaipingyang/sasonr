@@ -1,4 +1,4 @@
-# SAS error model of sas_run(on_error = "sas").
+# Error model of sas_run(on_error = "sas").
 #
 # The batch-mode model: a step that raises an ERROR is not executed (or
 # stops); the log gets "NOTE: sasonr stopped processing this step
@@ -11,7 +11,7 @@
 # with 0 observations and the variables compiled so far; an existing one is
 # not replaced.  SYSERR and SYSCC are set.
 #
-# Only SAS ERRORs (`sasonr_syntax_error`, `sasonr_runtime_error`) are handled
+# Only ERRORs of the program (`sasonr_syntax_error`, `sasonr_runtime_error`) are handled
 # this way.  `sasonr_unsupported` (fail loud) and R errors always abort.  An
 # execution-time ERROR in a DATA step (data sets partly written) still aborts
 # with `sasonr_unsupported`: the partial data sets are not supported yet.
@@ -280,19 +280,19 @@ err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
 engine_global_error <- function(eng, e) {
   if (!identical(e$what, "linesize") || !isTRUE(e$open_code) || isTRUE(eng$sql_open) ||
       isTRUE(eng$syntax_check) || isTRUE(eng$sc_pending) || isTRUE(eng$session$options$nosyntaxcheck)) {
-    abort_unsupported(paste0("the SAS error handling of this ERROR in a global statement (", err_message_lines(e), ")"),
+    abort_unsupported(paste0("the error handling of this ERROR in a global statement (", err_message_lines(e), ")"),
                       e$sas_line %||% NULL)
   }
   eng$status <- "error"
   eng$errors <- c(eng$errors, conditionMessage(e))
   if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
-  eng$log <- c(eng$log, err_message_lines(e))
+  err_emit_error(eng, e)
   err_set_macro(eng, syscc = 1012)
   eng$sc_pending <- TRUE
   invisible()
 }
 
-# Handle a SAS ERROR raised while compiling or running the step in `text`.
+# Handle an ERROR of the program raised while compiling or running the step in `text`.
 engine_step_error <- function(eng, e, text) {
   if (inherits(e, "sasonr_global_error")) return(engine_global_error(eng, e))
   if (identical(eng$phase, "execute_data")) {
@@ -308,31 +308,31 @@ engine_step_error <- function(eng, e, text) {
   eng$status <- "error"
   eng$errors <- c(eng$errors, conditionMessage(e))
   if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
-  eng$log <- c(eng$log, err_message_lines(e))
+  err_emit_error(eng, e)
   if (in_sql) {
     if (!isTRUE(eng$sql_noexec)) {
-      eng$log <- c(eng$log, "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.")
+      log_emit(eng, id = "sql.noexec")
     }
     eng$sql_noexec <- TRUE
     err_set_macro(eng, syscc = 1012)
     return(invisible())
   }
-  eng$log <- c(eng$log, "NOTE: sasonr stopped processing this step because of errors.")
+  # the rest of the step's lines, then what the stopped step writes
+  log_source_read(eng, eng$chunk_end)
+  log_boundary(eng)
+  log_emit(eng, id = "step.stopped")
   if (!isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {
-    eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
-                 "      This prevents execution of subsequent data modification statements.")
+    log_emit(eng, id = "step.syntax_check")
     eng$syntax_check <- TRUE
   }
   kept <- FALSE
   for (nm in names(rec$outputs)) {
     old <- get0(nm, envir = eng$session$work, inherits = FALSE)
     m <- rec$outputs[[nm]]
-    eng$log <- c(eng$log, sprintf(
-      "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and %d variables.",
-      toupper(nm), length(m$vars)))
+        log_emit(eng, id = "ds.incomplete", name = toupper(nm), nobs = 0L, nvar = length(m$vars))
     if (!is.null(old)) {
       kept <- TRUE
-      eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because this step was stopped.", toupper(nm)))
+      log_emit(eng, id = "ds.not_replaced_stopped", name = toupper(nm))
     } else {
       engine_empty_dataset(eng, nm, m)
     }
@@ -360,4 +360,27 @@ engine_empty_dataset <- function(eng, nm, m) {
   assign(nm, d, envir = eng$session$work)
   eng$session$meta[[nm]] <- utils::modifyList(meta_from_df(d), m)
   invisible()
+}
+
+# The ERROR message of condition `e`: a compile-time ERROR follows the program
+# line it was found in (the source echo, log_items()), with its column and
+# token when the condition knows them (`sas_col`, `sas_token`: the underscore
+# marker).
+err_emit_error <- function(eng, e) {
+  line <- e$sas_line
+  exact <- identical(eng$phase, "compile") && length(line) == 1L && !is.na(line)
+  at <- if (exact && length(e$sas_col) == 1L && !is.na(e$sas_col)) c(line, e$sas_col)
+  text <- err_message_lines(e)
+  # the source echo around a numbered ERROR on a macro-affected line (SAS
+  # shows the generated line; the column of the marker is not known) and
+  # around an ERROR on a line that NOSOURCE hides is not implemented: the echo
+  # of the submission is left out
+  if (log_error_numbered(text) && length(line) == 1L && log_macro_line(line, eng$session$rt)) {
+    log_echo_omit(eng, "a numbered ERROR on a line with macro references")
+  }
+  if (!is.null(at) && !log_source_on_all(eng$program$source, line)) {
+    log_echo_omit(eng, "an ERROR on a line that OPTIONS NOSOURCE hides")
+  }
+  log_emit(eng, "error", text = text, at = at, token = e$sas_token,
+           src = if (exact) line, phase = if (exact) "compile")
 }

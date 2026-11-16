@@ -6,7 +6,7 @@
 #'
 #' @param x Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_abs.R
 #' @family numeric functions
 #' @name sas_f_abs
@@ -110,7 +110,7 @@ NULL
 #' @param x Numeric value in from -1 to 1. Values outside the domain give a missing result with a note in the log; missing gives missing.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_arcos.R
 #' @family numeric functions
 #' @name sas_f_arcos
@@ -123,7 +123,7 @@ NULL
 #' @param x Numeric value in from -1 to 1. Values outside the domain give a missing result with a note in the log; missing gives missing.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_arsin.R
 #' @family numeric functions
 #' @name sas_f_arsin
@@ -136,7 +136,7 @@ NULL
 #' @param x Numeric value (any real number). A missing value gives a missing result.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_atan.R
 #' @family numeric functions
 #' @name sas_f_atan
@@ -149,7 +149,7 @@ NULL
 #' @param y Numeric y coordinate (SAS argument-1). A missing value gives a missing result.
 #' @param x Numeric x coordinate (SAS argument-2); the signs of `y` and `x` select the quadrant of the angle in (-pi, pi]. A missing value gives a missing result.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_atan2.R
 #' @family numeric functions
 #' @name sas_f_atan2
@@ -176,7 +176,7 @@ NULL
 #' @param a First shape parameter, a positive number. Missing gives missing.
 #' @param b Second shape parameter, a positive number. Missing gives missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_beta.R
 #' @family numeric functions
 #' @name sas_f_beta
@@ -352,7 +352,7 @@ NULL
 #'
 #' @param x Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. No fuzzing is applied.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_ceilz.R
 #' @family numeric functions
 #' @name sas_f_ceilz
@@ -391,7 +391,7 @@ NULL
 #' @param k Numeric index of the value to return. A negative index counts from the end of the list (-1 is the last); 0, missing, or an index beyond the list gives a missing result with a note in the log.
 #' @param ... Numeric values to choose from.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_choosen.R
 #' @family numeric functions
 #' @name sas_f_choosen
@@ -429,7 +429,7 @@ NULL
 #'
 #' @param ... Numeric values; the first one that is not `.` or a special missing value is returned. If all are missing the result is missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_coalesce.R
 #' @family numeric functions
 #' @name sas_f_coalesce
@@ -468,7 +468,7 @@ NULL
 #' @param n Total number of elements, a nonnegative integer. Missing gives missing.
 #' @param r Number of chosen elements, an integer from 0 to `n`. Missing gives missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_comb.R
 #' @family numeric functions
 #' @name sas_f_comb
@@ -521,7 +521,7 @@ NULL
 #' @param name Character name of the constant, not case sensitive: 'PI', 'E', 'EULER', 'BIG', 'LOGBIG', 'SQRTBIG', 'SMALL', 'LOGSMALL', 'SQRTSMALL', 'MACEPS', 'LOGMACEPS', 'SQRTMACEPS' or 'EXACTINT'.
 #' @param p Optional numeric parameter, used only by 'EXACTINT': the number of bytes (integer from 3 to 8); without it 'EXACTINT' refers to 8 bytes.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_constant.R
 #' @family numeric functions
 #' @name sas_f_constant
@@ -534,7 +534,7 @@ NULL
 #' @param x Numeric value in radians. A missing value gives a missing result.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_cos.R
 #' @family numeric functions
 #' @name sas_f_cos
@@ -547,7 +547,7 @@ NULL
 #' @param x Numeric value (any real number). A missing value gives a missing result.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_cosh.R
 #' @family numeric functions
 #' @name sas_f_cosh
@@ -752,7 +752,7 @@ NULL
 #' @param a Numeric dividend (SAS x). Missing gives missing.
 #' @param b Numeric divisor (SAS y). Division by 0 gives the special missing value .I for a positive dividend, .M for a negative one, and . for 0/0, without a log note.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_divide.R
 #' @family numeric functions
 #' @name sas_f_divide
@@ -779,7 +779,7 @@ NULL
 #' @param x Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. Results that overflow give missing with a note in the log.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_exp.R
 #' @family numeric functions
 #' @name sas_f_exp
@@ -792,7 +792,7 @@ NULL
 #' @param n Nonnegative integer. Missing gives missing; a result too large to represent gives missing with a note in the log.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_fact.R
 #' @family numeric functions
 #' @name sas_f_fact
@@ -889,7 +889,7 @@ NULL
 #'
 #' @param x Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. No fuzzing is applied.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_floorz.R
 #' @family numeric functions
 #' @name sas_f_floorz
@@ -902,7 +902,7 @@ NULL
 #' @param x Numeric value; must not be 0 or a negative integer (poles), which give missing with a note in the log. Missing gives missing.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_gamma.R
 #' @family numeric functions
 #' @name sas_f_gamma
@@ -914,7 +914,7 @@ NULL
 #'
 #' @param ... Integer values. Any missing argument gives a missing result.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_gcd.R
 #' @family numeric functions
 #' @name sas_f_gcd
@@ -994,7 +994,7 @@ NULL
 #' @param b Numeric value returned when the condition is false.
 #' @param m Optional numeric value returned when the condition is missing; when omitted, `b` is returned.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_ifn.R
 #' @family numeric functions
 #' @name sas_f_ifn
@@ -1135,7 +1135,7 @@ NULL
 #'
 #' @param x Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result. No fuzzing is applied.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_intz.R
 #' @family numeric functions
 #' @name sas_f_intz
@@ -1196,7 +1196,7 @@ NULL
 #'
 #' @param ... Integer values. Any missing argument gives a missing result.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_lcm.R
 #' @family numeric functions
 #' @name sas_f_lcm
@@ -1268,7 +1268,7 @@ NULL
 #'
 #' @param x Positive numeric value. Missing gives missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_lgamma.R
 #' @family numeric functions
 #' @name sas_f_lgamma
@@ -1281,7 +1281,7 @@ NULL
 #' @param x Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_log.R
 #' @family numeric functions
 #' @name sas_f_log
@@ -1294,7 +1294,7 @@ NULL
 #' @param x Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_log10.R
 #' @family numeric functions
 #' @name sas_f_log10
@@ -1307,7 +1307,7 @@ NULL
 #' @param x Positive numeric value. 0 or a negative value gives missing with a note in the log; missing gives missing.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_log2.R
 #' @family numeric functions
 #' @name sas_f_log2
@@ -1320,7 +1320,7 @@ NULL
 #' @param a First shape parameter, a positive number. Missing gives missing.
 #' @param b Second shape parameter, a positive number. Missing gives missing.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_logbeta.R
 #' @family numeric functions
 #' @name sas_f_logbeta
@@ -1475,7 +1475,7 @@ NULL
 #' @param b Numeric divisor. 0 gives missing with a note in the log. The computation is fuzzed to correct for binary rounding.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_mod.R
 #' @family numeric functions
 #' @name sas_f_mod
@@ -1489,7 +1489,7 @@ NULL
 #' @param b Numeric divisor. 0 gives missing with a note in the log. No fuzzing is applied.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_modz.R
 #' @family numeric functions
 #' @name sas_f_modz
@@ -1682,7 +1682,7 @@ NULL
 #' @param n Total number of elements, a nonnegative integer. Missing gives missing.
 #' @param r Optional number of elements arranged, an integer from 0 to `n`; when omitted the result is n!.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_perm.R
 #' @family numeric functions
 #' @name sas_f_perm
@@ -2074,7 +2074,7 @@ NULL
 #'
 #' @param x Numeric value. A missing value (`.` or a special missing value such as `.A`) gives a missing result.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_sign.R
 #' @family numeric functions
 #' @name sas_f_sign
@@ -2087,7 +2087,7 @@ NULL
 #' @param x Numeric value in radians. A missing value gives a missing result.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_sin.R
 #' @family numeric functions
 #' @name sas_f_sin
@@ -2100,7 +2100,7 @@ NULL
 #' @param x Numeric value (any real number). A missing value gives a missing result.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_sinh.R
 #' @family numeric functions
 #' @name sas_f_sinh
@@ -2207,7 +2207,7 @@ NULL
 #' @param x Nonnegative numeric value. A negative value gives missing with a note in the log; missing gives missing.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_sqrt.R
 #' @family numeric functions
 #' @name sas_f_sqrt
@@ -2311,7 +2311,7 @@ NULL
 #' @param x Numeric value in radians. A missing value gives a missing result.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_tan.R
 #' @family numeric functions
 #' @name sas_f_tan
@@ -2324,7 +2324,7 @@ NULL
 #' @param x Numeric value (any real number). A missing value gives a missing result.
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_tanh.R
 #' @family numeric functions
 #' @name sas_f_tanh
@@ -2537,7 +2537,7 @@ NULL
 #' @param x Numeric value to look up. A missing value gives a missing result.
 #' @param ... Numeric values; the result is the index of the first one equal to `x`, or 0.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the SAS log; R propagates NA/NaN silently and has no special missing values.
+#' @section Differences from R: Missing arguments (including special missing values) give an ordinary missing value and are reported in the log; R propagates NA/NaN silently and has no special missing values.
 #' @example inst/examples/sas_f_whichn.R
 #' @family numeric functions
 #' @name sas_f_whichn

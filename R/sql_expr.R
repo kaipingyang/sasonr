@@ -360,20 +360,18 @@ sql_eval_lowered <- function(low, ctx, rows = NULL) {
   n <- nrow(d)
   for (id in names(d)) assign(id, d[[id]], envir = env)
   assign(".sql_n", n, envir = env)
-  saved <- list(err = rt$err, notes = rt$notes, math = rt$math, mv = rt$mv)
+  saved <- list(err = rt$err, notes = rt$notes, places = log_places_save(rt))
   on.exit({
     rt$err <- saved$err
     rt$notes <- saved$notes
-    rt$math <- saved$math
-    rt$mv <- saved$mv
+    log_places_restore(rt, saved$places)
   }, add = TRUE)
   rt$err <- FALSE
   rt$notes <- character()
-  rt$math <- character()
-  rt$mv <- character()
+  log_places_reset(rt)
   v <- eval(parse(text = code, keep.source = FALSE), env)
   sql_function_notes(rt$notes, ctx)
-  sql_count_notes(rt$mv, rt$math, function_note = length(rt$notes) > 0L)
+  sql_count_notes(log_places_get(rt, "mv.generated"), log_places_get(rt, "math.failed"), function_note = length(rt$notes) > 0L)
   if (length(v) == 1 && n != 1) v <- rep(v, n)
   if (length(v) != n) v <- rep_len(v, n)
   v
@@ -404,7 +402,7 @@ sql_function_notes <- function(notes, ctx) {
     abort_unsupported(paste0("a function data-error NOTE in PROC SQL (", sub("^NOTE: ", "", notes[1]),
                              if (length(notes) > 1L) paste0(" and ", length(notes) - 1L, " more"), ")"))
   }
-  sql_note(ctx$eng, sprintf("NOTE: Invalid argument to function %s. Missing values may be generated.", fn))
+  sql_msg(ctx$eng, "sql.invalid_arg", fn = fn)
   invisible()
 }
 

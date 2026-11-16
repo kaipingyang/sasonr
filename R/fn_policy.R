@@ -1,4 +1,4 @@
-# SAS run-time behaviour of function calls with missing or invalid arguments.
+# Run-time behaviour (as SAS documents it) of function calls with missing or invalid arguments.
 #
 # For a function listed in `fn_policy`, translated code calls
 # sas_fcall(name, f, args, .at): the implementation computes the values; the
@@ -476,20 +476,37 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   if (p$miss != "none") dom[miss] <- "ok"
   if (any(dom == "exc")) sas_step_exception(.at)
   if (any(dom == "?")) {
-    abort_unsupported(sprintf("%s with these arguments (not supported)", toupper(.name)),
-                      .at[1] %||% NULL)
+    # arguments outside the exact domain: the strict gate (?sasonr_strict).
+    # Guarded vectorised code fails loud as unsupported so that the step is
+    # re-run row by row, where only the rows that reach the call count.
+    if (!.exact) abort_unsupported(sprintf("%s with these arguments (not supported)", toupper(.name)), .at[1] %||% NULL)
+    feature_check("domain", .name, .at[1] %||% NULL)
   }
+  approx <- dom == "?"
+  dom[approx] <- "ok"
   num <- !identical(fn_table[[.name]]$type, "char")
   blank <- if (num) NA_real_ else ""
   # no valid row: the implementation is not called (arguments may be of the wrong type)
   fargs <- if (".at" %in% names(formals(.f))) c(args, list(.at = .at)) else args
-  # R warnings of the implementation (NaNs produced ...) are not SAS messages:
-  # the SAS NOTEs come from the policy above.  Only that warning class is
+  # R warnings of the implementation (NaNs produced ...) are not log messages:
+  # the NOTEs come from the policy above.  Only that warning class is
   # muffled; any other warning reaches the caller.
   res <- if (all(miss & p$miss != "none" | dom != "ok")) rep(blank, n) else withCallingHandlers(
     do.call(.f, fargs),
-    warning = function(w) if (grepl("NaNs produced|value out of range", conditionMessage(w))) invokeRestart("muffleWarning")
+    warning = function(w) if (grepl("NaNs produced|value out of range", conditionMessage(w))) invokeRestart("muffleWarning"),
+    # outside the exact domain (sasonr.strict = FALSE) the implementation
+    # may not handle the arguments at all: that is not implemented
+    error = function(e) if (any(approx) && !inherits(e, "sasonr_error")) unsupported_domain(.name, .at)
   )
+  # an implementation that returns no value for these arguments (an omitted
+  # argument it does not handle) is not implemented for them either
+  if (!length(res) && n > 0L) unsupported_domain(.name, .at)
+  # a missing or infinite result outside the exact domain would become a
+  # data error (NOTE, _ERROR_) that the implementation made up
+  if (any(approx)) {
+    ra <- rep_len(res, n)[approx]
+    if (anyNA(ra) || (num && any(is.infinite(ra)))) unsupported_domain(.name, .at)
+  }
   if (num && p$nan != "none") {
     bad_res <- !miss & dom == "ok" & (is.infinite(res) | is.na(res))
     dom[bad_res] <- p$nan
@@ -500,7 +517,7 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
     switch(kind,
       mv = {
         if (!.exact) rt$mv_rerun <- TRUE
-        rt_count("mv", .at, k)
+        log_place("mv.generated", at = .at, n = k)
       },
       math = note_math(.at, k),
       inv = note_invalid_arg(.name, NULL, .at, args, rows, math = p$math),
@@ -515,6 +532,11 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   if (num && .name %in% plain_missing_fns) res[is.na(res)] <- NA_real_
   if (!num) res[is.na(res)] <- ""
   res
+}
+
+# Arguments outside the exact domain that the implementation cannot handle.
+unsupported_domain <- function(name, .at) {
+  abort_unsupported(sprintf("%s with these arguments (not implemented)", toupper(name)), .at[1] %||% NULL)
 }
 
 # functions whose missing results are always the ordinary missing value

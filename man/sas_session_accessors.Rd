@@ -5,18 +5,15 @@
 \alias{sas_work}
 \alias{sas_meta}
 \alias{sas_macro_vars}
-\alias{sas_log}
 \alias{sas_listing}
 \alias{sas_session_close}
-\title{Inspect a SAS session}
+\title{Inspect a session}
 \usage{
 sas_work(session)
 
 sas_meta(session)
 
 sas_macro_vars(session, scope = c("global", "automatic"))
-
-sas_log(session)
 
 sas_listing(session)
 
@@ -31,14 +28,15 @@ sas_session_close(session)
 \value{
 \code{sas_work()}: named list of tibbles. \code{sas_meta()}: named list of
 variable metadata. \code{sas_macro_vars()}: named list of character values.
-\code{sas_log()}, \code{sas_listing()}: character vectors. \code{sas_session_close()}:
+\code{sas_listing()}: character vector. \code{sas_session_close()}:
 the session, invisibly.
 }
 \description{
 Functional accessors of a \code{\link[=sas_session]{sas_session()}}: the WORK data sets (trailing
 blanks of character values removed, as in \code{\link[=sas_run]{sas_run()}} results), their
-metadata, the macro variables, the cumulative log and listing of all
-submissions. \code{sas_session_close()} closes the PROC SQL connection.
+metadata, the macro variables and the cumulative listing of all
+submissions (\code{\link[=sas_log]{sas_log()}} gives the cumulative log). \code{sas_session_close()}
+closes the PROC SQL connection.
 }
 \examples{
 s <- sas_session()

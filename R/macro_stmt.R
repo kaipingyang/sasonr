@@ -79,7 +79,10 @@ mp_put_stmt <- function(src, ses) {
   txt <- mq_unmask(r$text)
   txt <- chartr("\n\t", "  ", txt)
   txt <- sub("^ +", "", txt)
-  mac_put(ses, sas_rtrim(txt))
+  txt <- sas_rtrim(txt)
+  # what a %PUT with empty text writes is not implemented yet
+  if (!nzchar(txt)) abort_unsupported("%PUT with no text", line)
+  mac_put(ses, txt)
 }
 
 mp_scope_stmt <- function(nm, src, ses) {

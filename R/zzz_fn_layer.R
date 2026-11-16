@@ -5,16 +5,16 @@
 # SAS program:
 #   - the feature registry (strict mode, registry.R): an approximate,
 #     unsupported or unregistered function fails loud with
-#     `sasonr_strict_error` (a warning of class `sasonr_strict_warning` with
-#     options(sasonr.strict = FALSE));
+#     `sasonr_strict_error` (with options(sasonr.strict = FALSE) a warning of
+#     class `sasonr_strict_warning`, once per function and R session);
 #   - the format registry for PUT() and INPUT() (a format given as text such as
 #     "8.2" is parsed first) and, as before, for PUTN/PUTC/INPUTN/INPUTC;
 #   - the argument domain of the policy table (fn_policy.R) through
-#     sas_fcall(): arguments outside the supported domain fail loud, invalid
-#     arguments give SAS's missing result;
+#     sas_fcall(): arguments outside the exact domain go through the same
+#     strict gate, invalid arguments give SAS's missing result;
 #   - a data error (the invalid-argument NOTE, invalid data, a mathematical
 #     operation that could not be performed, `_ERROR_` set) is signalled as a
-#     warning of class `sasonr_data_error` that carries the SAS NOTE text.
+#     warning of class `sasonr_data_error` that carries the NOTE text.
 # Inside a submission (translated code, %SYSFUNC, PROC code) and in calls that
 # one function makes to another, the functions run unwrapped: the analyzer,
 # sas_fcall() and the %SYSFUNC gate check them there.
@@ -118,7 +118,7 @@ fn_layer_fmt <- function(fmt, kind) {
 # The data errors a direct call recorded, as warnings of class sasonr_data_error.
 fn_layer_data_errors <- function(rt, name) {
   msgs <- rt$notes
-  if (!length(msgs) && length(rt$math)) {
+  if (!length(msgs) && length(log_places_get(rt, "math.failed"))) {
     msgs <- c(msgs, "NOTE: Mathematical operations could not be performed. The result of the operation has been set to a missing value.")
   }
   if (!length(msgs) && isTRUE(rt$err)) {

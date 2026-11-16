@@ -35,27 +35,35 @@ new_engine <- function(session, level, execute) {
   eng$level <- level
   eng$execute <- execute
   eng$steps <- list()
-  eng$log <- character()
+  log_engine_init(eng)
   eng$listing <- character()
   eng$sql_open <- FALSE
   eng$sql_opts <- list()
   ses <- session$macro
-  ses$exec <- function(text, line) engine_exec(eng, text, line)
+  ses$exec <- function(text, line) {
+    # the macro-affected lines so far: a trigger later on the line of the
+    # step's last statement (after `run;`) is marked only after the step
+    # ran; the step's own text on that line is not changed by it
+    eng$session$rt$macro_lines <- ses$macro_lines
+    eng$chunk_no <- (eng$chunk_no %||% 0L) + 1L
+    engine_exec(eng, text, line)
+  }
   ses$on_step_options <- function(text, line) engine_step_options(eng, text, line)
   ses$line <- 1L
   ses$frames <- list()
+  # the program lines the macro processor changed (mp_consumed())
+  ses$macro_lines <- integer()
   rt <- session$rt
-  # PRXPARSE ids do not outlive a submission
+  # PRXPARSE ids do not outlive a submission, nor the approximate features used
+  # with sasonr.strict = FALSE (strict_gate())
   rt$prx <- list()
   rt$prx_cache <- list()
+  log_approx_reset(rt)
   rt_reset(rt)
   # step-level NOTEs (data set sizes, observations read, missing values...)
   # and macro WARNINGs in the log; options(sasonr.step_notes = FALSE) turns them off
   eng$step_notes <- isTRUE(getOption("sasonr.step_notes", TRUE))
-  rt$on_warn <- if (eng$step_notes) function(msg) eng$log <- c(eng$log, paste("WARNING:", msg))
-  rt$on_error <- function(msg) eng$log <- c(eng$log, paste("ERROR:", msg))
-  rt$on_note <- function(msg) eng$log <- c(eng$log, msg)
-  ses$on_put <- function(line) eng$log <- c(eng$log, line)
+  log_bind_callbacks(eng, rt, ses)
   eng
 }
 
@@ -63,9 +71,12 @@ engine_exec <- function(eng, text, line) {
   if (!identical(eng$on_error, "sas")) return(engine_exec_steps(eng, text, line))
   eng$phase <- "compile"
   eng$cur_step <- NULL
+  # the last program line of the chunk (the source echo after an ERROR)
+  eng$chunk_end <- log_chunk_last(text, line)
   tryCatch(engine_exec_steps(eng, text, line),
            sasonr_syntax_error = function(e) engine_step_error(eng, e, text),
            sasonr_runtime_error = function(e) engine_step_error(eng, e, text))
+  if (!isTRUE(eng$in_sql_step)) log_open_code(eng)
   invisible()
 }
 
@@ -73,10 +84,26 @@ engine_exec_steps <- function(eng, text, line) {
   rt <- eng$session$rt
   prog <- sas_parse(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE, sql_open = eng$sql_open)
   eng$sql_open <- isTRUE(attr(prog, "sql_open"))
-  for (step in prog$steps) {
+  # the last program line of each step (the source echo of the rich log views)
+  ends <- log_step_ends(prog$steps, text, line)
+  # the RUN; after the data lines of a DATALINES step belongs to that step
+  if (!length(prog$steps) && log_step_tail_extend(eng, log_chunk_last(text, line), text)) return(invisible())
+  for (k in seq_along(prog$steps)) {
+    step <- prog$steps[[k]]
     eng$phase <- "compile"
     # the AST of the step being compiled / run (errors.R derives from it what an ERROR leaves in WORK)
     eng$cur_step <- step
+    # the step index of the log events (a PROC SQL step counts from PROC SQL)
+    if (step$type %in% c("data", "proc", "sql_begin")) {
+      log_step_start(eng, log_step_label(step), step$line, ends[k], tail = attr(ends, "tail")[[k]])
+      if (!is.null(dl <- log_step_datalines(step))) log_source_skip(eng, dl$line_no)
+      eng$in_sql_step <- step$type == "sql_begin"
+    } else {
+      # global statements between steps are open code; a PROC SQL step lasts until QUIT
+      if (step$type == "global" && !isTRUE(eng$in_sql_step)) log_open_code(eng)
+      if (step$type == "sql_end") eng$in_sql_step <- FALSE
+      log_source_read(eng, ends[k])
+    }
     if (isTRUE(eng$sc_pending) && step$type != "global") {
       # after an ERROR in a global statement syntax-check mode starts at the
       # next step, here a DATA step (also DATA _NULL_, also with a TITLE
@@ -87,8 +114,9 @@ engine_exec_steps <- function(eng, text, line) {
       }
       eng$sc_pending <- FALSE
       if (!isTRUE(eng$session$options$nosyntaxcheck)) {
-        eng$log <- c(eng$log, "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
-                     "      This prevents execution of subsequent data modification statements.")
+        # the NOTE is the first thing the step writes: after its lines
+        log_boundary(eng)
+        log_emit(eng, id = "step.syntax_check")
         eng$syntax_check <- TRUE
       }
     }
@@ -106,14 +134,14 @@ engine_exec_steps <- function(eng, text, line) {
         # sasonr models PROC SQL in syntax-check mode as follows: as with
         # NOEXEC no statement runs, SQLOBS and SQLRC are 0, the step ends
         # "stopped" with SYSERR 1012
-        eng$log <- c(eng$log, "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.")
+        log_emit(eng, id = "sql.noexec")
         eng$sql_noexec <- TRUE
       }
       next
     }
     if (step$type == "sql_end") {
       if (isTRUE(eng$sql_noexec)) {
-        eng$log <- c(eng$log, "NOTE: sasonr stopped processing this step because of errors.")
+        log_emit(eng, id = "step.stopped")
         eng$sql_noexec <- FALSE
         if (isTRUE(eng$syntax_check)) err_set_macro(eng, syserr = 1012)
       }
@@ -121,7 +149,7 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "sql") {
       if (isTRUE(eng$sql_noexec) || isTRUE(eng$syntax_check)) {
-        if (isTRUE(eng$sql_noexec)) eng$log <- c(eng$log, "NOTE: Statement not executed due to NOEXEC option.")
+        if (isTRUE(eng$sql_noexec)) log_emit(eng, id = "sql.not_executed")
         if (isTRUE(eng$syntax_check)) sql_set_status(eng, 0, 0)
         next
       }
@@ -160,7 +188,7 @@ engine_exec_steps <- function(eng, text, line) {
     # run-wide state the vectorised attempt may change before a re-run (PRXPARSE ids)
     prx0 <- rt$prx
     # Vectorised code evaluates every IF/SELECT branch on every row, so a branch
-    # that never runs can fail loud or raise a SAS exception: the step is re-run
+    # that never runs can fail loud or raise a step exception: the step is re-run
     # row by row (L3), where only the taken branches run; a genuine unsupported
     # value or exception is raised there again.  A construct that is unsupported
     # whatever the values (sasonr_unsupported_construct) fails loud at once.
@@ -178,7 +206,7 @@ engine_exec_steps <- function(eng, text, line) {
       # that _ERROR_, the NOTEs and the PDV dump follow the row-by-row execution.
       rt$prx <- prx0
       tr <- translate_step(step, eng$session$meta, "L3")
-      tr$reasons <- c(if (branch) "unsupported value or SAS exception in vectorised code (re-run row by row)" else
+      tr$reasons <- c(if (branch) "unsupported value or step exception in vectorised code (re-run row by row)" else
         "data error at run time (re-run of the vectorised step)", tr$reasons)
       eng$steps[[length(eng$steps)]] <- tr
       env <- tryCatch(engine_eval(eng, tr$code, stage = FALSE),
@@ -187,7 +215,7 @@ engine_exec_steps <- function(eng, text, line) {
     } else if (vec) {
       for (nm in tr$outputs) assign(nm, env$work[[nm]], envir = eng$session$work)
       # NOTEs that are not data errors (e.g. INPUT going to a new line)
-      if (length(rt$notes) > 0 && isTRUE(eng$session$options$notes)) env$.log <- c(env$.log, rt$notes)
+      if (length(rt$notes) > 0 && isTRUE(eng$session$options$notes)) log_buffer_add(env, rt$notes)
     }
     if (length(sc_empty)) {
       # PROC TRANSPOSE in syntax-check mode (engine_check_step()): run on its
@@ -206,30 +234,19 @@ engine_exec_steps <- function(eng, text, line) {
       # supported; a longer step would have to stop part-way through.
       big <- vapply(tr$outputs, function(nm) NROW(get0(nm, envir = eng$session$work, inherits = FALSE)) > 1L, logical(1))
       if (any(big)) abort_unsupported("an execution-time ERROR that stops a DATA step with more than one observation", step$line)
-      env$.log <- c(env$.log, "NOTE: sasonr stopped processing this step because of errors.")
+      log_buffer_add(env, log_render("step.stopped"))
     }
     if (step$type == "data") engine_store_numlen(eng, tr$outputs)
-    notes_on <- isTRUE(eng$session$options$notes) && eng$step_notes
-    eng$log <- c(eng$log, if (notes_on) tr$compile_notes, env$.log)
-    if (notes_on) {
-      ds_notes <- unlist(lapply(tr$outputs, function(nm) {
-        d <- get0(nm, envir = eng$session$work, inherits = FALSE)
-        if (is.null(d)) NULL else if (stopped) {
-          sprintf("WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were %d observations and %d variables.",
-                  toupper(nm), nrow(d), ncol(d))
-        } else dataset_note(nm, d)
-      }))
-      # PROC SORT of an empty data set reports no observations read
-      if (identical(tr$reasons, "PROC SORT")) rt$reads <- Filter(function(r) r$n > 0, rt$reads)
-      reads <- if (identical(tr$reasons, "PROC PRINT")) print_read_notes() else read_notes()
-      eng$log <- c(eng$log, step_end_notes(), reads, rt$proc_notes, ds_notes)
-    }
+    log_step_close(eng, if (step$type == "data") "data" else "proc", tr = tr, env = env, stopped = stopped,
+                   notes = isTRUE(eng$session$options$notes) && eng$step_notes)
     engine_add_listing(eng, env$.lst, step$line)
     if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = if (isTRUE(eng$syntax_check)) 3 else 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
     if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
     if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
   }
+  # what follows the chunk (%PUT, global statements) is open code
+  if (!isTRUE(eng$in_sql_step)) log_open_code(eng)
   invisible()
 }
 
@@ -290,21 +307,19 @@ engine_check_step <- function(eng, step) {
       return(TRUE)
     }
     for (t in step$titles) engine_global(eng, t)
+    log_boundary(eng)
     exists_ds <- function(nm) exists(nm, envir = eng$session$work, inherits = FALSE)
     notes_on <- isTRUE(eng$session$options$notes) && eng$step_notes
     # an output data set: a new one gets 0 observations and 0 variables and
     # becomes _LAST_, an existing one is kept; `stopped`: as in a stopped step
     out_ds <- function(nm, stopped = FALSE) {
       if (stopped) {
-        eng$log <- c(eng$log, sprintf(
-          "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and 0 variables.",
-          toupper(nm)))
+        log_emit(eng, id = "ds.incomplete", name = toupper(nm), nobs = 0L, nvar = 0L)
       } else if (notes_on) {
-        eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and 0 variables.", toupper(nm)))
+        log_emit(eng, id = "ds.created", name = toupper(nm), nobs = 0L, nvar = 0L)
       }
       if (exists_ds(nm)) {
-        eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because %s.", toupper(nm),
-                                      if (stopped) "this step was stopped" else "new file is incomplete"))
+        log_emit(eng, id = if (stopped) "ds.not_replaced_stopped" else "ds.not_replaced_incomplete", name = toupper(nm))
         return(invisible())
       }
       engine_empty_dataset(eng, nm, list(vars = character(), type = list(), len = list(), formats = list(), disp = list()))
@@ -347,7 +362,7 @@ engine_check_step <- function(eng, step) {
         if (any(vapply(step$stmts, function(x) identical(x$stmt, "output") && length(x$out$options) > 0, logical(1)))) {
           unsupported("PROC MEANS with data set options on OUT=")
         }
-        eng$log <- c(eng$log, "NOTE: sasonr stopped processing this step because of errors.")
+        log_emit(eng, id = "step.stopped")
         if (length(outs)) out_ds(outs, stopped = TRUE)
         syserr <- 1012
       } else if (step$name != "print") {
@@ -358,6 +373,7 @@ engine_check_step <- function(eng, step) {
     return(FALSE)
   }
   tr <- translate_step(step, eng$session$meta, eng$level)
+  log_boundary(eng)
   old <- vapply(tr$outputs, function(nm) exists(nm, envir = eng$session$work, inherits = FALSE), logical(1))
   if (any(old)) {
     if (length(tr$outputs) > 1L) unsupported("a DATA step with several output data sets, one of them existing,")
@@ -366,10 +382,10 @@ engine_check_step <- function(eng, step) {
     m <- tr$meta[[nm]]
     vars <- m$vars %||% character()
     if (isTRUE(eng$session$options$notes) && eng$step_notes) {
-      eng$log <- c(eng$log, sprintf("NOTE: The data set WORK.%s has 0 observations and %d variables.", toupper(nm), length(vars)))
+      log_emit(eng, id = "ds.created", name = toupper(nm), nobs = 0L, nvar = length(vars))
     }
     if (old[[nm]]) {
-      eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because this step was stopped.", toupper(nm)))
+      log_emit(eng, id = "ds.not_replaced_stopped", name = toupper(nm))
     } else {
       engine_empty_dataset(eng, nm, m)
     }
@@ -423,7 +439,7 @@ engine_eval <- function(eng, code, stage = FALSE, empty = character()) {
   } else {
     env$work <- eng$session$work
   }
-  env$.log <- character()
+  log_buffer_init(env)
   env$.lst <- character()
   env$.meta <- list()
   env$.symtab <- eng$session$macro
@@ -436,7 +452,7 @@ engine_eval <- function(eng, code, stage = FALSE, empty = character()) {
     stop(e)
   })
   if (!stage && length(rt$notes) > 0) {
-    env$.log <- c(env$.log, rt$notes)
+    log_buffer_add(env, rt$notes)
     rt$notes <- character()
   }
   env
@@ -451,12 +467,15 @@ engine_global <- function(eng, g) {
   }
   if (g$kind == "filename_noref") {
     q <- g$quote %||% abort_unsupported("FILENAME with a quoted name and no physical path", g$line)
-    if (eng$step_notes) eng$log <- c(eng$log, paste0("WARNING: No logical assign for filename ", q, g$text, q, "."))
+    if (eng$step_notes) log_emit(eng, id = "filename.no_assign", quote = q, name = g$text)
     assign("sysfilrc", "-20004", envir = eng$session$macro$globals)
   }
   if (g$kind == "options") {
     o <- eng$session$options
-    if (!is.null(g$ls)) o$linesize <- g$ls
+    if (!is.null(g$ls)) {
+      o$linesize <- g$ls
+      log_source_ls(eng, g$end_line %||% g$line, g$ls)
+    }
     # the positive and negative forms apply in the order written: the last one
     # wins
     for (opt in g$opts) {
@@ -465,7 +484,9 @@ engine_global <- function(eng, g) {
         syntaxcheck = o$nosyntaxcheck <- FALSE, nosyntaxcheck = o$nosyntaxcheck <- TRUE,
         center = o$center <- TRUE, nocenter = o$center <- FALSE,
         date = o$date <- TRUE, nodate = o$date <- FALSE,
-        number = o$number <- TRUE, nonumber = o$number <- FALSE
+        number = o$number <- TRUE, nonumber = o$number <- FALSE,
+        source = log_source_option(eng, g$end_line %||% g$line, TRUE),
+        nosource = log_source_option(eng, g$end_line %||% g$line, FALSE)
       )
     }
     if (!is.null(g$ps)) o$pagesize <- g$ps
@@ -548,6 +569,7 @@ sas_untranslated <- function(what, line) {
 
 engine_program <- function(eng, code) {
   text <- paste(code, collapse = "\n")
+  log_program(eng, text)
   sink <- code_sink(eng$session$macro)
   mp_scan(mp_src(text, line_of = TRUE), eng$session$macro, sink, mode = "code")
   sink$finish()
@@ -605,7 +627,7 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #' the macro code that follows the step, including inside macro bodies.
 #'
 #' @inheritParams sas_translate
-#' @param on_error What a SAS ERROR does (a syntax error, an unknown function,
+#' @param on_error What an ERROR of the program does (a syntax error, an unknown function,
 #'   a missing input data set, an ERROR in PROC SQL ...). `"sas"` (the
 #'   default; option `sasonr.on_error`) uses the batch-mode error handling: the
 #'   failing step is not run, syntax-check mode (OBS=0) applies to the rest of
@@ -621,11 +643,12 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #'   of earlier submissions are visible; `work` data sets are added to its
 #'   WORK). `NULL` (the default) runs in a fresh session that is discarded
 #'   afterwards.
-#' @return A `sasonr_result`: `$log` (PUT and %PUT lines), `$listing` (procedure
-#'   output), `$work` (output data sets with trailing blanks removed),
+#' @return A `sasonr_result`: `$log` (the log: the program lines with the
+#'   NOTEs, WARNINGs, ERRORs and PUT output; see [sas_log()]), `$log_events`
+#'   (a tibble of the log events), `$listing` (procedure output), `$work` (output data sets with trailing blanks removed),
 #'   `$translation`, `$macro_vars` (global macro variables), `$status`
-#'   (`"ok"` or `"error"`), `$errors` (SAS ERROR messages) and `$error_line`
-#'   (SAS line of the first ERROR). With a `session`, `$log`, `$listing`,
+#'   (`"ok"` or `"error"`), `$errors` (the ERROR messages) and `$error_line`
+#'   (SAS line of the first ERROR). With a `session`, `$log`, `$log_events`, `$listing`,
 #'   `$translation`, `$status` and `$errors` describe this submission, `$work`
 #'   and `$macro_vars` the whole session.
 #' @examples
@@ -667,10 +690,13 @@ sas_run <- function(code, work = list(), level = c("auto", "L3"),
   old <- .active$session
   on.exit(sas_rt_active(old), add = TRUE)
   sas_rt_active(session)
+  # the approximate-features NOTE also ends a submission that an R error
+  # stops (before its events go to the session)
+  on.exit(log_approx_close(eng), add = TRUE)
   on.exit(engine_flush(eng), add = TRUE)
   if (on_error == "sas") {
     # step ERRORs are handled by engine_exec(); a condition that reaches this
-    # level was raised by the macro processor, whose SAS error handling
+    # level was raised by the macro processor, whose error handling
     # (ERROR text, stopping the macro, what %LET receives) is not implemented
     tryCatch(engine_program(eng, code),
              sasonr_syntax_error = function(e) macro_error_unsupported(e),
@@ -678,6 +704,7 @@ sas_run <- function(code, work = list(), level = c("auto", "L3"),
   } else {
     engine_program(eng, code)
   }
+  log_approx_close(eng)
   engine_result(eng)
 }
 
@@ -738,7 +765,7 @@ engine_flush <- function(eng) {
   if (isTRUE(eng$flushed)) return(invisible())
   eng$flushed <- TRUE
   s <- eng$session
-  s$log <- c(s$log, unlist(strsplit(eng$log, "\n", fixed = TRUE)))
+  log_flush(eng)
   s$listing <- c(s$listing, eng$listing)
   invisible()
 }
@@ -751,13 +778,13 @@ engine_result <- function(eng) {
   out <- lapply(as.list(eng$session$work), function(d) {
     dplyr::mutate(d, dplyr::across(dplyr::where(is.character), sas_rtrim))
   })
-  eng$log <- unlist(strsplit(eng$log, "\n", fixed = TRUE)) %||% character()
   mv <- as.list(eng$session$macro$globals)
   autos <- macro_auto_vars
   mv <- mv[setdiff(sort(names(mv)), autos)]
   dsn <- sort(names(out) %||% character())
   structure(
-    list(log = eng$log, listing = eng$listing, work = out[dsn], meta = eng$session$meta[intersect(dsn, names(eng$session$meta))],
+    list(log = log_view_plain(ev <- log_result_events(eng), log_echo_default), log_events = ev,
+         listing = eng$listing, work = out[dsn], meta = eng$session$meta[intersect(dsn, names(eng$session$meta))],
          unordered = intersect(eng$session$unordered, dsn),
          translation = structure(list(steps = eng$steps), class = "sasonr_translation"),
          macro_vars = mv, status = eng$status, errors = eng$errors %||% character(),
@@ -774,8 +801,15 @@ print.sasonr_translation <- function(x, ...) {
 
 #' @export
 print.sasonr_result <- function(x, ...) {
-  cli::cli_h2("SAS log (PUT / %PUT output)")
-  if (length(x$log) > 0) cat(x$log, sep = "\n") else cli::cli_text("{.emph (empty)}")
+  # the coloured log with the source echo in a terminal with colours
+  # (sas_log(format = "ansi")); options(sasonr.log_style = "plain") turns it off
+  if (!identical(getOption("sasonr.log_style"), "plain") && cli::num_ansi_colors() > 1 && !is.null(x$log_events)) {
+    cli::cli_h2("Log")
+    cat(sas_log(x, "ansi"), sep = "\n")
+  } else {
+    cli::cli_h2("Log")
+    if (length(x$log) > 0) cat(x$log, sep = "\n") else cli::cli_text("{.emph (empty)}")
+  }
   if (length(x$listing) > 0) {
     cli::cli_h2("Listing")
     cat(x$listing, sep = "\n")

@@ -1,6 +1,6 @@
 # Most tests compare PUT output only; step-level NOTEs are tested in test-notes.R.
 options(sasonr.step_notes = FALSE)
-# Unit tests that expect a SAS ERROR check the classed condition
+# Unit tests that expect an ERROR of the program check the classed condition
 # (sas_run(on_error = "abort")); the batch-mode error handling (on_error =
 # "sas", the default) is tested in test-on-error.R.
 options(sasonr.on_error = "abort")
@@ -12,3 +12,6 @@ lenient <- function(expr) {
   withr::with_options(list(sasonr.strict = FALSE), withCallingHandlers(
     expr, sasonr_strict_warning = function(w) invokeRestart("muffleWarning")))
 }
+
+# The messages and PUT output of a result (its log without the source echo).
+msgs <- function(r) sas_log(r, echo = FALSE)

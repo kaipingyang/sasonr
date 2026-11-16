@@ -1,4 +1,4 @@
-# The SAS session: every piece of mutable state a SAS program can change.
+# The session: every piece of mutable state a SAS program can change.
 #
 # A `SasSession` (R6) owns the state kept between steps and between
 # submissions: the WORK library and its metadata, the user format catalog,
@@ -29,7 +29,7 @@
 # sashelp.R), function/format tables (`fn_table`, `fn_policy`,
 # `sysfunc_table`, `.pnt_gl` ...).  R options read per submission
 # (`sasonr.step_notes`) or at use (`sasonr.strict`, `sasonr.on_error`,
-# `sasonr.sashelp_dir`) are user policy, not SAS session state.
+# `sasonr.sashelp_dir`) are user policy, not session state.
 
 SasSession <- R6::R6Class("SasSession",
   cloneable = FALSE,
@@ -61,8 +61,10 @@ SasSession <- R6::R6Class("SasSession",
     options = NULL,
     # sql: SQL back end: environment with the lazily opened DuckDB connection.
     sql = NULL,
-    # log: Cumulative SAS log of all submissions.
-    log = NULL,
+    # events: The events of that log (log.R).
+    events = NULL,
+    # log_programs: The program of each submission (the source echo, log.R).
+    log_programs = NULL,
     # listing: Cumulative procedure output of all submissions.
     listing = NULL,
     # rt: Run-time diagnostics of the step being executed (data errors, NOTE counters,
@@ -86,7 +88,7 @@ SasSession <- R6::R6Class("SasSession",
       self$macro <- new_macro_session()
       self$options <- new_session_options()
       self$sql <- new.env(parent = emptyenv())
-      self$log <- character()
+      log_session_init(self)
       self$listing <- character()
       self$rt <- new_rt_state()
       self$ct <- new_ct_state()
@@ -194,7 +196,7 @@ rt_notes_on <- function() {
 # the outer one corrupted: it is refused before anything is changed.
 session_enter <- function(session) {
   if (isTRUE(session$busy)) {
-    rlang::abort("A SAS session cannot run a submission while another submission to it is running.",
+    rlang::abort("A session cannot run a submission while another submission to it is running.",
                  class = "sasonr_error")
   }
   session$busy <- TRUE

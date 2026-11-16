@@ -61,21 +61,21 @@ data c; set a(firstobs=2 where=(x ne 2)); run;"
 })
 
 test_that("PUT: no blank after literals; formatted items keep their field", {
-  log <- sas_run("data _null_; x = 14; y = 3.14159; put 'x=' x ' y=' y; put 'b=[' y best8. ']'; put x= y= 5.2; run;")$log
+  log <- msgs(sas_run("data _null_; x = 14; y = 3.14159; put 'x=' x ' y=' y; put 'b=[' y best8. ']'; put x= y= 5.2; run;"))
   expect_equal(log, c("x=14  y=3.14159", "b=[ 3.14159]", "x=14 y=3.14"))
 })
 
 test_that("arithmetic on special missing values and overflow yields ordinary missing", {
   # EXP is approximate (last bits): strict mode off for the overflow case
-  log <- withr::with_options(list(sasonr.strict = FALSE), suppressWarnings(
-    sas_run("data _null_; a = .A + 1; b = -.B; c = exp(1000); d = . ** 0; put a= b= c= d=; run;")))$log
+  log <- msgs(withr::with_options(list(sasonr.strict = FALSE), suppressWarnings(
+    sas_run("data _null_; a = .A + 1; b = -.B; c = exp(1000); d = . ** 0; put a= b= c= d=; run;"))))
   # EXP overflow is a data error: _ERROR_ is set and the PDV is dumped
   expect_equal(grep("^NOTE", log, value = TRUE, invert = TRUE), c("a=. b=. c=. d=.", "a=. b=. c=. d=. _ERROR_=1 _N_=1"))
 })
 
 test_that("SUBSTR: nonpositive length returns the remainder, invalid position a blank", {
-  log <- sas_run("data _null_; a = substr('hello', 2, -1); b = substr('hello', 0, 2); c = substr('hello', 9); d = substr('hello', 2, 9);
-    put '[' a '][' b '][' c '][' d ']'; run;")$log
+  log <- msgs(sas_run("data _null_; a = substr('hello', 2, -1); b = substr('hello', 0, 2); c = substr('hello', 9); d = substr('hello', 2, 9);
+    put '[' a '][' b '][' c '][' d ']'; run;"))
   # a blank character value is dumped as one blank ("b=  c=")
   expect_equal(grep("^NOTE", log, value = TRUE, invert = TRUE), c("[ello ][ ][ ][ello ]", "a=ello b=  c=  d=ello _ERROR_=1 _N_=1"))
 })
@@ -86,7 +86,7 @@ test_that("BESTw. chooses E notation", {
 })
 
 test_that("short date format widths and invalid widths", {
-  log <- sas_run("data _null_; d = '17mar2013'd; put d mmddyy6. ' ' d yymmdd5. ' ' d mmddyy4. ' ' d ddmmyy8.; run;")$log
+  log <- msgs(sas_run("data _null_; d = '17mar2013'd; put d mmddyy6. ' ' d yymmdd5. ' ' d mmddyy4. ' ' d ddmmyy8.; run;"))
   expect_equal(log, "031713 13-03 0317 17/03/13")
   expect_error(sas_run("data _null_; d = 1; put d date4.; run;"), class = "sasonr_syntax_error")
 })
@@ -155,7 +155,7 @@ test_that("invalid programs fail loud", {
 })
 
 test_that("TIMEw.d writes fractional seconds", {
-  expect_equal(sas_run("data _null_; t = 37845.9; put t time12.3; run;")$log, "10:30:45.900")
+  expect_equal(msgs(sas_run("data _null_; t = 37845.9; put t time12.3; run;")), "10:30:45.900")
 })
 
 test_that("left-hand SUBSTR replaces part of a variable (SAS semantics)", {
@@ -168,7 +168,7 @@ test_that("left-hand SUBSTR replaces part of a variable (SAS semantics)", {
   res3 <- sas_run("data d; length t $6; t='abcdef'; substr(t,8)='Z'; e=_error_; r=t; run;")
   expect_equal(res3$work$d$t, "abcdef")
   expect_equal(res3$work$d$e, 1)
-  expect_true(any(grepl("Invalid second argument to function SUBSTR", res3$log)))
+  expect_true(any(grepl("Invalid second argument to function SUBSTR", msgs(res3))))
 })
 test_that("SUBSTR assignment to an undeclared variable fails loud", {
   expect_error(sas_run("data d; substr(t,2,2)='XY'; run;", on_error = "abort"), class = "sasonr_unsupported")
@@ -227,9 +227,9 @@ test_that("0 ** 0 and 0 ** -1 are invalid arguments of **: NOTE, _ERROR_, missin
   r <- sas_run("data t; a = 0; b = 0; c = -1; x = a ** b; y = a ** c; z = 2 ** c; run;")
   expect_true(is.na(r$work$t$x) && is.na(r$work$t$y))
   expect_identical(r$work$t$z, 0.5)
-  expect_true(any(startsWith(r$log, "NOTE: Invalid argument(s) to the exponential operator \"**\" at line 1 column")))
-  expect_true(any(startsWith(r$log, "NOTE: Mathematical operations could not be performed")))
-  expect_true(any(grepl("_ERROR_=1", r$log, fixed = TRUE)))
+  expect_true(any(startsWith(msgs(r), "NOTE: Invalid argument(s) to the exponential operator \"**\" at line 1 column")))
+  expect_true(any(startsWith(msgs(r), "NOTE: Mathematical operations could not be performed")))
+  expect_true(any(grepl("_ERROR_=1", msgs(r), fixed = TRUE)))
 })
 
 test_that("0 ** 0 of two constants is folded at compile time", {
@@ -238,8 +238,8 @@ test_that("0 ** 0 of two constants is folded at compile time", {
   r <- sas_run("data t; x = 0 ** 0; e = _error_; run;")
   expect_true(is.na(r$work$t$x))
   expect_identical(r$work$t$e, 0)
-  expect_true("NOTE: Invalid argument(s) to the exponential operator \"**\"." %in% r$log)
-  expect_false(any(grepl("Mathematical operations could not be performed", r$log, fixed = TRUE)))
+  expect_true("NOTE: Invalid argument(s) to the exponential operator \"**\"." %in% msgs(r))
+  expect_false(any(grepl("Mathematical operations could not be performed", msgs(r), fixed = TRUE)))
 })
 
 test_that("** of a negative base and a non-integer exponent is an invalid argument", {
@@ -249,7 +249,7 @@ test_that("** of a negative base and a non-integer exponent is an invalid argume
   expect_true(is.na(r$work$t$x))
   expect_identical(r$work$t$e, 1)
   expect_identical(r$work$t$c, -8)
-  expect_true(any(startsWith(r$log, "NOTE: Invalid argument(s) to the exponential operator \"**\" at line 1 column")))
+  expect_true(any(startsWith(msgs(r), "NOTE: Invalid argument(s) to the exponential operator \"**\" at line 1 column")))
 })
 
 test_that("invalid ** of constant operands is folded at compile time", {
@@ -260,6 +260,6 @@ test_that("invalid ** of constant operands is folded at compile time", {
   expect_true(all(is.na(c(w$x1, w$x2, w$x3, w$x4))))
   expect_equal(w$x5, sqrt(2))
   expect_identical(w$e, 0)
-  expect_identical(sum(r$log == "NOTE: Invalid argument(s) to the exponential operator \"**\"."), 4L)
-  expect_false(any(grepl("Mathematical operations|too large", r$log)))
+  expect_identical(sum(msgs(r) == "NOTE: Invalid argument(s) to the exponential operator \"**\"."), 4L)
+  expect_false(any(grepl("Mathematical operations|too large", msgs(r))))
 })

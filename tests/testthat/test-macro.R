@@ -1,4 +1,4 @@
-mlog <- function(code, ...) suppressWarnings(sas_run(code, ...))$log
+mlog <- function(code, ...) msgs(suppressWarnings(sas_run(code, ...)))
 
 test_that("macro variables resolve with &, &var. and multi-pass &&", {
   expect_equal(mlog("%let a=1; %let b=a; %put R=&&&b;"), "R=1")
@@ -92,7 +92,8 @@ test_that("%SYSFUNC supports a small function set and formats", {
   expect_error(mlog("%put %sysfunc(today(), date9.);"), class = "sasonr_strict_error")
   withr::with_options(list(sasonr.strict = FALSE), {
     expect_identical(withCallingHandlers(mlog("%put %sysfunc(today(), date9.);"),
-                                         sasonr_strict_warning = function(w) invokeRestart("muffleWarning")), today)
+                                         sasonr_strict_warning = function(w) invokeRestart("muffleWarning")),
+                     c(today, "NOTE: sasonr used approximate implementations: function TODAY in %SYSFUNC."))
   })
   expect_equal(mlog("%put %sysfunc(putn(5, z3.)) %sysfunc(compress(a b c)) %sysfunc(sum(1, 2.5));"), "005 abc 3.5")
   expect_equal(mlog("%put %sysfunc(cats(a, b, c))|%sysfunc(upcase(x))|%sysfunc(strip(  y  ));"), "abc|X|y")
@@ -137,7 +138,7 @@ data all; set d1-d3; run;
 %mend chk;
 %chk"
   res <- sas_run(code)
-  expect_equal(res$log, "R=BIG")
+  expect_equal(msgs(res), "R=BIG")
   expect_equal(res$work$all$x, c(1, 2, 3))
 })
 
@@ -149,7 +150,7 @@ test_that("DATALINES are not macro-resolved; comments", {
 
 test_that("unresolved references warn and stay as text; unsupported features fail loud", {
   expect_warning(r <- sas_run("%put A=&nope;"), class = "sasonr_macro_warning")
-  expect_equal(r$log, "A=&nope")
+  expect_equal(msgs(r), "A=&nope")
   expect_error(sas_run("%include 'x.sas';"), class = "sasonr_unsupported")
   expect_error(sas_run("%put _user_;"), class = "sasonr_unsupported")
   expect_error(sas_run("%undefined_macro"), class = "sasonr_unsupported")
@@ -199,14 +200,14 @@ test_that("global statements take effect before the macro code that follows them
   # a global statement applies to the macro code after it with
   # no step boundary in between, and the %SYSFUNC NOTE written at
   # LINESIZE=MAX is one line
-  expect_identical(sas_run("options linesize=max;\n%let d = %sysfunc(mdy(2, 30, 2024));")$log, note)
-  expect_identical(sas_run("%macro m; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); %mend; %m")$log, note)
+  expect_identical(msgs(sas_run("options linesize=max;\n%let d = %sysfunc(mdy(2, 30, 2024));")), note)
+  expect_identical(msgs(sas_run("%macro m; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); %mend; %m")), note)
   # PROC SQL runs its statements one by one
-  expect_true(note %in% sas_run("proc sql; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); quit;")$log)
+  expect_true(note %in% msgs(sas_run("proc sql; options linesize=max; %let d = %sysfunc(mdy(2, 30, 2024)); quit;")))
   # the session keeps the option for the next submission
   s <- sas_session()
   sas_run("options linesize=max;", session = s)
-  expect_identical(sas_run("%let d = %sysfunc(mdy(2, 30, 2024));", session = s)$log, note)
+  expect_identical(msgs(sas_run("%let d = %sysfunc(mdy(2, 30, 2024));", session = s)), note)
   # an unsupported option fails loud at its own statement, before the macro call after it runs
   expect_error(sas_run("options minoperator; %macro m; %if a in a b %then %put yes; %mend; %m"),
                class = "sasonr_unsupported", regexp = "system option MINOPERATOR")
@@ -229,26 +230,26 @@ test_that("an OPTIONS statement inside a step applies to the macro code after it
   let <- "%let d = %sysfunc(mdy(2, 30, 2024));"
   # the OPTIONS statement applies when it is compiled,
   # before the macro code after it in the step; the session keeps it
-  expect_identical(sas_run(step(paste("options linesize=max;", let)))$log, c(note, note))
+  expect_identical(msgs(sas_run(step(paste("options linesize=max;", let)))), c(note, note))
   # macro code before the OPTIONS statement runs under the LINESIZE before it
-  expect_identical(sas_run(step(paste(let, "options linesize=max;")))$log, c(note132, note))
+  expect_identical(msgs(sas_run(step(paste(let, "options linesize=max;")))), c(note132, note))
   # NONOTES suppresses the NOTE, in the step after the statement and after the step
   withr::local_options(sasonr.step_notes = TRUE)
   a_note <- "NOTE: The data set WORK.A has 1 observations and 1 variables."
-  expect_identical(sas_run(step(paste("options nonotes;", let)))$log, a_note)
-  expect_identical(sas_run(step(paste(let, "options nonotes;")))$log, c(a_note, note132))
+  expect_identical(msgs(sas_run(step(paste("options nonotes;", let)))), a_note)
+  expect_identical(msgs(sas_run(step(paste(let, "options nonotes;")))), c(a_note, note132))
   # ... and in open code (the %SYSFUNC call after the step)
-  expect_identical(sas_run("options nonotes; %let d = %sysfunc(mdy(2, 30, 2024));")$log, character())
+  expect_identical(msgs(sas_run("options nonotes; %let d = %sysfunc(mdy(2, 30, 2024));")), character())
   withr::local_options(sasonr.step_notes = FALSE)
   # a variable, an array element or a sum statement named OPTIONS is not an OPTIONS statement
   r <- sas_run("data a; options = 1; %let d = %sysfunc(mdy(2, 30, 2024)); run;")
-  expect_identical(r$log, note132)
+  expect_identical(msgs(r), note132)
   expect_equal(r$work$a$options, 1)
   r <- sas_run("data a; array options{2} o1 o2; options{1} = 5; %let d = %sysfunc(mdy(2, 30, 2024)); run;")
-  expect_identical(r$log, note132)
+  expect_identical(msgs(r), note132)
   expect_equal(r$work$a$o1, 5)
   r <- sas_run("data a; option + 1; %let d = %sysfunc(mdy(2, 30, 2024)); run;")
-  expect_identical(r$log, note132)
+  expect_identical(msgs(r), note132)
   expect_equal(r$work$a$option, 1)
 })
 
@@ -267,7 +268,7 @@ test_that("positive and negative system options apply in the order written", {
   withr::local_options(sasonr.step_notes = TRUE)
   # the last of NOTES / NONOTES wins
   r <- sas_run("options notes nonotes; data a; x = 1; run; options nonotes notes; data b; x = 1; run;")
-  expect_identical(r$log, "NOTE: The data set WORK.B has 1 observations and 1 variables.")
+  expect_identical(msgs(r), "NOTE: The data set WORK.B has 1 observations and 1 variables.")
   # NOSYNTAXCHECK wins, the step after the ERROR runs
   r <- sas_run("options syntaxcheck nosyntaxcheck; data a; x = 1; run; data b; set a y = 2; run;
     data c; x = 1; run;", on_error = "sas")
@@ -290,12 +291,12 @@ test_that("%STR(%') in %IF and %DO actions and in macro bodies", {
 %m(1)
 "
   r <- sas_run(code)
-  expect_true(all(c("q=none", "q='") %in% r$log))
+  expect_true(all(c("q=none", "q='") %in% msgs(r)))
   expect_identical(nrow(r$work$a), 1L)
   r <- sas_run("%macro m;\n  %do;\n    %let q = %str(%');\n  %end;\n  %put q=&q;\n%mend;\n%m\n")
-  expect_true("q='" %in% r$log)
+  expect_true("q='" %in% msgs(r))
   r <- sas_run("%macro m;\n  %let q = %str(%');\n  %put q=&q;\n%mend;\n%m\n")
-  expect_true("q='" %in% r$log)
+  expect_true("q='" %in% msgs(r))
 })
 
 test_that("data lines generated by a macro fail loud", {

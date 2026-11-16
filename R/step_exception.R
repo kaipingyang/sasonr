@@ -6,16 +6,9 @@
 # DO loop): the outputs are left with 0 observations.  Anything else fails
 # loud.
 
-sas_exception_lines <- function(task = "DATASTEP") {
-  block <- c("ERROR:  An exception has been encountered.",
-             "Please contact technical support and provide them with the following traceback information:",
-             " ", sprintf("The SAS task name is [%s]", task), "Segmentation Violation", " ")
-  c(block, "Traceback of the Exception:", " ", " ", block)
-}
-
 # Raised from generated code (sas_fcall) at the failing call.
 sas_step_exception <- function(.at = NULL) {
-  rlang::abort("SAS exception", class = c("sasonr_step_exception", "sasonr_error"), sas_line = .at[1] %||% NULL)
+  rlang::abort("step exception", class = c("sasonr_step_exception", "sasonr_error"), sas_line = .at[1] %||% NULL)
 }
 
 # One pass, no observation written before the failing statement.
@@ -35,20 +28,20 @@ step_runs_once <- function(step) {
 
 engine_step_exception <- function(eng, step, tr, e) {
   if (!identical(step$type, "data") || !step_runs_once(step)) {
-    abort_unsupported("a SAS exception (crash) in a DATA step that may have written observations before it", e$sas_line %||% NULL)
+    abort_unsupported("a step exception (crash) in a DATA step that may have written observations before it", e$sas_line %||% NULL)
   }
   eng$status <- "error"
   eng$errors <- c(eng$errors, "An exception has been encountered.")
   if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
-  eng$log <- c(eng$log, sas_exception_lines(), "NOTE: sasonr stopped processing this step because of errors.")
+  log_boundary(eng)
+  log_emit(eng, id = "step.exception", task = "DATASTEP")
+  log_emit(eng, id = "step.stopped")
   for (nm in tr$outputs) {
     m <- tr$meta[[nm]]
     old <- get0(nm, envir = eng$session$work, inherits = FALSE)
-    eng$log <- c(eng$log, sprintf(
-      "WARNING: The data set WORK.%s may be incomplete.  When this step was stopped there were 0 observations and %d variables.",
-      toupper(nm), length(m$vars %||% character())))
+        log_emit(eng, id = "ds.incomplete", name = toupper(nm), nobs = 0L, nvar = length(m$vars %||% character()))
     if (!is.null(old)) {
-      eng$log <- c(eng$log, sprintf("WARNING: Data set WORK.%s was not replaced because this step was stopped.", toupper(nm)))
+      log_emit(eng, id = "ds.not_replaced_stopped", name = toupper(nm))
     } else {
       engine_empty_dataset(eng, nm, m)
     }

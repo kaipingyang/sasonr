@@ -73,7 +73,7 @@ test_that("sasonr.strict applies to the DATA step, PROC SQL and %SYSFUNC", {
 test_that("an execution-time ERROR that stops a one-observation step keeps the data set", {
   res <- withr::with_options(list(sasonr.step_notes = TRUE), sas_run("data a; r = symget(''); run;"))
   expect_equal(nrow(res$work$a), 1L)
-  expect_true(any(startsWith(res$log, "WARNING: The data set WORK.A may be incomplete.")))
-  expect_false(any(startsWith(res$log, "NOTE: The data set WORK.A has")))
+  expect_true(any(startsWith(msgs(res), "WARNING: The data set WORK.A may be incomplete.")))
+  expect_false(any(startsWith(msgs(res), "NOTE: The data set WORK.A has")))
   expect_error(sas_run("data a; do i = 1 to 2; r = symget(''); output; end; run;"), class = "sasonr_unsupported")
 })

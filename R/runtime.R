@@ -536,14 +536,14 @@ sas_f_substr <- function(x, pos, len = NULL, .at = NULL) {
     end <- n
   } else {
     len <- rep_len(trunc(len), m)
-    # a nonpositive or missing length returns the remainder (SAS NOTE: invalid argument)
+    # a nonpositive or missing length returns the remainder (a NOTE: invalid argument)
     bad_len <- !bad_pos & (is.na(len) | len <= 0 | pos + len - 1 > n)
     if (any(bad_len)) note_invalid_arg("substr", 3L, .at)
     end <- ifelse(is.na(len) | len <= 0, n, pmin(pos + len - 1, n))
   }
   if (any(bad_pos)) note_invalid_arg("substr", 2L, .at)
   out <- substr(x, pos, end)
-  # an invalid position returns blank (SAS NOTE: invalid argument)
+  # an invalid position returns blank (a NOTE: invalid argument)
   out[bad_pos] <- ""
   out
 }
@@ -1048,8 +1048,9 @@ sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize()) {
 #' @export
 #' @keywords internal
 sas_file_write <- function(path, lines, mod = FALSE) {
-  lines <- unlist(strsplit(lines %||% character(), "\n", fixed = TRUE)) %||% character()
-  # a file in a directory that does not exist cannot be opened (SAS ERROR)
+  # every PUT line is a record, an empty one too (log_split_lines())
+  lines <- log_split_lines(lines %||% character(), put = rep(TRUE, length(lines)))$lines
+  # a file in a directory that does not exist cannot be opened (an ERROR)
   if (!dir.exists(dirname(path))) abort_runtime(paste0("Physical file does not exist, ", path))
   con <- file(path, open = if (mod) "ab" else "wb")
   on.exit(close(con))
@@ -1060,14 +1061,20 @@ sas_file_write <- function(path, lines, mod = FALSE) {
 #' Interleave several guarded PUT statements row by row (L1/L2)
 #' @export
 #' @keywords internal
-sas_put_rows <- function(lines, guards) {
-  n <- max(lengths(lines), lengths(guards), 0L)
+sas_put_rows <- function(lines, guards, n = NULL) {
+  n <- n %||% max(lengths(lines), lengths(guards), 0L)
   if (n == 0) return(character())
+  # a line is computed once (literals only) or per row
+  if (!all(lengths(lines) %in% c(1L, n)) || !all(lengths(guards) %in% c(1L, n))) {
+    rlang::abort("sas_put_rows(): a PUT line or guard does not have one value per row.", .internal = TRUE)
+  }
   lines <- lapply(lines, rep_len, n)
   guards <- lapply(guards, function(g) rep_len(sas_true(g), n))
   txt <- do.call(rbind, lines)
   keep <- do.call(rbind, guards)
-  as.vector(txt)[as.vector(keep)]
+  out <- as.vector(txt)[as.vector(keep)]
+  # NA: a PUT with pointer controls that writes no line (sas_put_layout())
+  out[!is.na(out)]
 }
 
 # Data sets ---------------------------------------------------------------
@@ -1457,16 +1464,22 @@ sas_put_fvalue <- function(value, fmt) sas_format(value, fmt)
 #'
 #' Pieces are written into a line buffer at the current column (overwriting);
 #' list and named output leave one blank after the value. `/` starts a new line.
+#' `.ls`: the line size (the log's LINESIZE, a FILE's LRECL; `.file`); `.guard`:
+#' the rows where the PUT executes (vectorised steps): the result then has one
+#' element per row, NA where no line is written.
 #' @export
 #' @keywords internal
-sas_put_layout <- function(pieces) {
-  n <- max(1L, unlist(lapply(pieces, function(p) if (p$k == "text") length(p$s) else if (!is.null(p$v)) length(p$v) else 1L)))
+sas_put_layout <- function(pieces, .ls = rt_linesize(), .line = NULL, .file = FALSE, .guard = NULL) {
+  n <- max(1L, unlist(lapply(pieces, function(p) if (p$k == "text") length(p$s) else if (!is.null(p$v)) length(p$v) else 1L)), length(.guard))
   if (any(vapply(pieces, function(p) p$k == "text" && length(p$s) == 0, logical(1)))) return(character())
-  vapply(seq_len(n), function(i) {
+  run <- if (is.null(.guard)) rep(TRUE, n) else rep_len(sas_true(.guard), n)
+  has_next <- any(vapply(pieces, function(p) p$k == "next", logical(1)))
+  row <- function(i) {
     lines <- character()
     buf <- character()
     col <- 1L
-    for (p in pieces) {
+    for (j in seq_along(pieces)) {
+      p <- pieces[[j]]
       if (p$k == "next") {
         lines <- c(lines, sas_rtrim(paste(buf, collapse = "")))
         buf <- character()
@@ -1477,7 +1490,14 @@ sas_put_layout <- function(pieces) {
         v <- rep_len(p$v, n)[i]
         if (is.na(v)) abort_runtime("invalid PUT pointer value")
         nc <- if (p$k == "col") trunc(v) else col + trunc(v)
-        if (nc > 32767) return("") # beyond the maximum line size: nothing is written
+        if (nc > 32767) {
+          # a PUT to the log that starts with a pointer beyond 32767 writes no
+          # line; other forms (a FILE, text before it, a `/`) are not implemented yet
+          if (!.file && j == 1L && p$k == "col" && !has_next) return(NA_character_)
+          abort_unsupported_construct("PUT pointer beyond the line size", .line)
+        }
+        # what a pointer beyond the line size writes is not implemented yet
+        if (nc > .ls) abort_unsupported_construct("PUT pointer beyond the line size", .line)
         col <- max(1L, as.integer(nc))
         next
       }
@@ -1492,6 +1512,12 @@ sas_put_layout <- function(pieces) {
       }
     }
     buf[is.na(buf)] <- " "
-    paste(c(lines, sas_rtrim(paste(buf, collapse = ""))), collapse = "\n")
-  }, "")
+    out <- c(lines, sas_rtrim(paste(buf, collapse = "")))
+    # a pointer line longer than the line size is not implemented yet (sas_put_line() wraps list output)
+    if (any(nchar(out) > .ls)) abort_unsupported_construct("PUT with pointer controls writing past the line size", .line)
+    paste(out, collapse = "\n")
+  }
+  out <- rep(NA_character_, n)
+  for (i in which(run)) out[i] <- row(i)
+  if (is.null(.guard)) out[!is.na(out)] else out
 }

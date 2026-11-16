@@ -92,7 +92,7 @@ test_that("remerge merges summary values back and writes the NOTE", {
   expect_equal(r$work$r$mx, rep(30, 4))
   expect_equal(r$work$rg$g, c("A", "A", "B", "C"))
   expect_equal(r$work$rg$s, c(40, 40, NA, 5))
-  expect_equal(sum(grepl("requires remerging", r$log)), 2)
+  expect_equal(sum(grepl("requires remerging", msgs(r))), 2)
 })
 
 test_that("joins: inner, left, full; missing keys match missing keys", {
@@ -165,14 +165,14 @@ test_that("INTO: single value, TRIMMED, SEPARATED BY, ranges, SQLOBS", {
     "select id into :none from a where id > 99;",
     "quit;",
     "%put [&mx] [&mxt] [&gl] [&i1 &i2 &i3] [&j3] [&sqlobs];"))
-  expect_equal(r$log, "[      30] [30] [A,B,A,C] [1 2 3] [5] [0]")
+  expect_equal(msgs(r), "[      30] [30] [A,B,A,C] [1 2 3] [5] [0]")
 })
 
 test_that("a SELECT runs before the macro code that follows it inside PROC SQL", {
   r <- run_sql(c(base_data, "proc sql noprint;", "select count(*) into :n from a;", "%put n=&n;",
                  "select count(*) into :n from b;", "%put n=&n;", "quit;"))
   # INTO without TRIMMED keeps the leading blanks of BEST8.
-  expect_equal(r$log, c("n=       4", "n=       3"))
+  expect_equal(msgs(r), c("n=       4", "n=       3"))
 })
 
 test_that("SELECT writes a SAS-style report to the listing", {
@@ -209,7 +209,7 @@ test_that("INSERT, UPDATE, DELETE, ALTER, DROP and their NOTEs", {
   expect_equal(names(r$work$t), c("k", "z"))
   expect_true(all(c("NOTE: 3 rows were inserted into WORK.T.", "NOTE: 1 row was inserted into WORK.T.",
                     "NOTE: 3 rows were updated in WORK.T.", "NOTE: 1 row was deleted from WORK.T.",
-                    "NOTE: Table WORK.T has been modified, with 2 columns.", "NOTE: Table WORK.U has been dropped.") %in% r$log))
+                    "NOTE: Table WORK.T has been modified, with 2 columns.", "NOTE: Table WORK.U has been dropped.") %in% msgs(r)))
 })
 
 test_that("OUTOBS= limits the result; GROUP BY without summary functions orders", {

@@ -2415,7 +2415,7 @@ freq_relrisk_listing <- function(st, info) {
 }
 
 # "Sample Size = n" after the statistics of a table, with the missing count
-# and the SAS warning when at least 20% of the data are missing.
+# and the WARNING when at least 20% of the data are missing.
 freq_sample_size <- function(st) {
   out <- paste0("Sample Size = ", freq_num(st$n))
   if (isTRUE(st$nmiss > 0)) {

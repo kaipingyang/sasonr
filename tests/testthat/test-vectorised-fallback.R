@@ -1,5 +1,5 @@
 # Vectorised DATA steps (L1/L2) that stop on an unsupported value, a data
-# error or a SAS exception re-run row by row (L3): only the branches that run
+# error or a step exception re-run row by row (L3): only the branches that run
 # count, and the failed vectorised attempt leaves nothing behind.
 
 test_that("a SELECT branch that does not run cannot fail loud (vectorised code re-runs row by row)", {
@@ -12,7 +12,7 @@ ROUNDE 1 1
 ;
 "
   res <- sas_run(code)
-  expect_identical(res$log[res$log %in% c("99999.5", "1")], c("99999.5", "1"))
+  expect_identical(msgs(res)[msgs(res) %in% c("99999.5", "1")], c("99999.5", "1"))
   expect_error(sas_run(sub("ROUND 99999", "ROUNDE 99999", code)), class = "sasonr_unsupported")
 })
 
@@ -40,10 +40,10 @@ ROUND 0 1
   res <- sas_run(code)
   expect_identical(res$work$a$r, c(99999.5, 0))
   # one PUT line per row, one division-by-zero NOTE and PDV dump (row 2 only)
-  expect_identical(sum(grepl("^f=ROUND r=", res$log)), 2L)
-  expect_identical(sum(grepl("^NOTE: Division by zero detected", res$log)), 1L)
-  expect_identical(sum(grepl("_ERROR_=1", res$log)), 1L)
-  expect_false(any(grepl("_ERROR_=1", res$log[seq_len(match("f=ROUND r=99999.5", res$log))])))
+  expect_identical(sum(grepl("^f=ROUND r=", msgs(res))), 2L)
+  expect_identical(sum(grepl("^NOTE: Division by zero detected", msgs(res))), 1L)
+  expect_identical(sum(grepl("_ERROR_=1", msgs(res))), 1L)
+  expect_false(any(grepl("_ERROR_=1", msgs(res)[seq_len(match("f=ROUND r=99999.5", msgs(res)))])))
 })
 
 test_that("an unsupported value in a branch that runs still fails loud at L3", {
@@ -76,15 +76,15 @@ test_that("a type-level unsupported construct fails loud and is not re-run", {
   expect_error(sas_run("data a; x = 1; if x = 2 then y = _infile_; run;"), class = "sasonr_unsupported")
 })
 
-test_that("a SAS exception in a branch that does not run is not reported", {
+test_that("a step exception in a branch that does not run is not reported", {
   # vectorised code evaluated CONSTANT('EXACTINT', 1E300) for x = 1 and stopped
-  # the step with the SAS exception block; only the ELSE branch runs
+  # the step with the exception block; only the ELSE branch runs
   res <- sas_run("data a; x = 1; if x = 2 then y = constant('EXACTINT', 1E300); else y = 3; run;")
   expect_identical(res$work$a$y, 3)
-  expect_false(any(grepl("exception", res$log)))
+  expect_false(any(grepl("exception", msgs(res))))
   # taken: the exception (row-by-row run) as before
   res <- sas_run("data a; x = 2; if x = 2 then y = constant('EXACTINT', 1E300); else y = 3; run;")
-  expect_true(any(grepl("An exception has been encountered", res$log)))
+  expect_true(any(grepl("An exception has been encountered", msgs(res))))
   expect_identical(nrow(res$work$a), 0L)
 })
 

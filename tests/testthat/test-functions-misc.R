@@ -61,7 +61,7 @@ test_that("SYMGET: a name with a leading blank is invalid", {
   expect_equal(res$work$d$r1, "hello")
   expect_equal(res$work$d$r2, "")
   expect_equal(res$work$d$e, 1)
-  expect_true(any(grepl("Invalid argument to function SYMGET(' mv ')", res$log, fixed = TRUE)))
+  expect_true(any(grepl("Invalid argument to function SYMGET(' mv ')", msgs(res), fixed = TRUE)))
 })
 
 test_that("blank literals: QUOTE and TRANWRD", {

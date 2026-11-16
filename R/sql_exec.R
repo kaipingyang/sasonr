@@ -406,7 +406,7 @@ sql_select <- function(q, eng, outer) {
       rel <- sql_rel_rows(rel, ord)
       gid <- gid[ord]
       rows_gid <- gid
-      sql_note(eng, "NOTE: The query requires remerging summary statistics back with the original data.")
+      sql_msg(eng, "sql.remerge")
       # remerging does not keep the input order within a group
       if (length(group) > 0) rel$ordered <- FALSE
     } else {
@@ -598,7 +598,7 @@ sql_setop <- function(q, eng, outer) {
       r
     }
     if (length(a$cols) < length(b$cols)) a <- widen(a, b) else b <- widen(b, a)
-    sql_note(eng, sprintf("WARNING: A table has been extended with null columns to perform the %s set operation.", toupper(q$op)))
+    sql_msg(eng, "sql.null_columns", op = toupper(q$op))
   }
   cols <- a$cols
   for (k in seq_along(cols)) {
