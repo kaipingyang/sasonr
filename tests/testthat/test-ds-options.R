@@ -209,3 +209,29 @@ test_that("IN= on PROC PRINT DATA= is ERROR 22-7; on other PROCs it fails loud",
   expect_equal(nrow(r$work$check), 1L)
   expect_error(sas_run(paste0(dso_have, "proc sort data=have(in=f) out=s; by x; run;")), class = "sasonr_unsupported")
 })
+
+test_that("PROC SQL FROM KEEP= naming an unknown variable: two ERRORs, NOEXEC, the next step runs", {
+  r <- dso_sas("proc sql;\n  select * from have(keep=nosuchvar);\nquit;\ndata check;\n  x = 1;\n  output;\nrun;")
+  expect_equal(msgs(r)[-1][c(1:3, 5)], c(
+    "ERROR: The variable nosuchvar in the DROP, KEEP, or RENAME list has never been referenced.",
+    invalid_have,
+    "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.",
+    "NOTE: The data set WORK.CHECK has 1 observations and 1 variables."))
+  expect_false(any(grepl("syntax check mode", msgs(r))))
+  expect_equal(sort(names(r$work)), c("check", "have"))
+})
+
+test_that("PROC SQL FROM RENAME= of an unknown old name: two ERRORs, NOEXEC, the next step runs", {
+  r <- dso_sas("proc sql;\n  select * from have(rename=(nosuchvar=newname));\nquit;\ndata check;\n  x = 1;\n  output;\nrun;")
+  expect_equal(msgs(r)[-1][c(1:3, 5)], c(
+    "ERROR: Variable nosuchvar is not on file WORK.HAVE.", invalid_have,
+    "NOTE: PROC SQL set option NOEXEC and will continue to check the syntax of statements.",
+    "NOTE: The data set WORK.CHECK has 1 observations and 1 variables."))
+  expect_equal(nrow(r$work$check), 1L)
+})
+
+test_that("PROC SQL FROM: valid options, FIRSTOBS=/OBS= after WHERE=, a RENAME= clash fails loud", {
+  r <- sas_run(paste0(dso_have, "proc sql; create table t as select * from have(keep=x grp rename=(grp=g) where=(x > 1) firstobs=2); quit;"))
+  expect_equal(as.data.frame(r$work$t), data.frame(x = 3, g = "a"))
+  expect_error(sas_run(paste0(dso_have, "proc sql; select * from have(rename=(x=y)); quit;")), class = "sasonr_unsupported")
+})

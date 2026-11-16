@@ -33,16 +33,18 @@
 #   unknown variable is aligned with the target (SORT and MEANS write the
 #   WARNING with the compile notes, FREQ, TRANSPOSE and CONTENTS fail loud on
 #   it); every other wrong name, and WHERE=, fails loud.
-# - PROC SQL table (sql_table_rel() in sql_exec.R): KEEP=/DROP= naming an
-#   unknown variable is ignored; RENAME= is not checked (as DATA step input,
-#   including the R error) and has no clash check; WHERE= is evaluated as an
-#   SQL expression on the names after RENAME=; IN= fails loud; FIRSTOBS=/OBS=
-#   window the rows after WHERE= with their own inline code, then INOBS=.
+# - PROC SQL table (sql_table_rel() in sql_exec.R): KEEP=/DROP=/RENAME= by
+#   ds_in_plan() (the ERRORs as for DATA step input, read as statement ERRORs:
+#   NOEXEC, no syntax-check mode at QUIT; a RENAME= clash fails loud); WHERE=
+#   is evaluated as an SQL expression on the names after RENAME=; IN= fails
+#   loud; FIRSTOBS=/OBS= (ds_obs_rows()) window the rows after WHERE=, then
+#   INOBS=.
 #
 # TARGET BEHAVIOUR (as documented) -- one wrong name in an option; the level depends on
 # the role of the data set. "output" rows hold for the DATA step output data
 # set; the KEEP= row also for PROC SORT OUT= and PROC MEANS OUTPUT OUT=; the
-# "input" rows for the DATA step SET and PROC PRINT DATA= (KEEP=). Any
+# "input" rows for the DATA step SET, PROC PRINT DATA= (KEEP=) and PROC SQL
+# FROM (KEEP=, RENAME= of an unknown old name). Any
 # form not in this table fails loud until its behaviour is established:
 #
 #   role / option                        message                                      result
@@ -242,4 +244,62 @@ proc_out_options <- function(d, m, opts, line = NULL, file = "", warned = FALSE)
   names(d) <- new
   list(data = d, meta = list(vars = new, type = ren(m$type), len = ren(m$len), formats = ren(m$formats),
                              informats = ren(m$informats), labels = ren(m$labels), disp = stats::setNames(disp, new)))
+}
+
+#' KEEP=, DROP= and RENAME= on an input data set
+#'
+#' The input role of the data set option component (DATA step SET/MERGE,
+#' PROC DATA=, PROC SQL FROM). A wrong name is an ERROR followed by
+#' "ERROR: Invalid DROP, KEEP, or RENAME option on file WORK.X." and the step
+#' (the PROC SQL statement) stops: KEEP=/DROP= naming a variable that is not
+#' on the data set ("The variable x in the DROP, KEEP, or RENAME list has
+#' never been referenced."), RENAME= of an old name that is not on it
+#' ("Variable x is not on file WORK.X."), RENAME= giving two variables one
+#' name ("Variable y already exists on file WORK.X."). RENAME= of a variable
+#' that KEEP=/DROP= removes fails loud.
+#'
+#' @param vars The variables of the data set.
+#' @param opts The options from `parse_ds_options()`.
+#' @param file The data set name.
+#' @param line SAS line for the conditions.
+#' @param sql In PROC SQL: every ERROR is raised as found while the statement
+#'   is read (no syntax-check mode at QUIT); a RENAME= clash fails loud.
+#' @return `list(vars, names)`: the variables read (old names) and their names
+#'   after RENAME=.
+#' @noRd
+ds_in_plan <- function(vars, opts, file, line = NULL, sql = FALSE) {
+  invalid <- paste0("\nERROR: Invalid DROP, KEEP, or RENAME option on file WORK.", toupper(file), ".")
+  err <- function(msg, syntax = FALSE) {
+    if (sql || syntax) abort_syntax(paste0(msg, invalid), line) else abort_runtime(paste0(msg, invalid), line)
+  }
+  for (opt in c("keep", "drop")) {
+    if (is.null(opts[[opt]])) next
+    miss <- setdiff(resolve_ds_items(opts[[opt]], vars, line), vars)
+    if (length(miss) > 0) {
+      err(paste0("The variable ", ds_item_text(opts[[opt]], miss[1]), " in the DROP, KEEP, or RENAME list has never been referenced."))
+    }
+  }
+  keep <- vars
+  if (!is.null(opts$keep)) keep <- intersect(keep, resolve_ds_items(opts$keep, vars, line))
+  if (!is.null(opts$drop)) keep <- setdiff(keep, resolve_ds_items(opts$drop, vars, line))
+  out <- keep
+  if (!is.null(opts$rename)) {
+    old <- names(opts$rename)
+    if (any(!old %in% keep & old %in% vars)) abort_unsupported("RENAME= of a variable that KEEP=/DROP= removes", line)
+    if (any(!old %in% vars)) err(paste0("Variable ", old[!old %in% vars][1], " is not on file WORK.", toupper(file), "."))
+    out[match(old, keep)] <- unname(opts$rename)
+  }
+  if (anyDuplicated(out)) {
+    if (sql) abort_unsupported("RENAME= in PROC SQL giving two columns one name", line)
+    err(sprintf("Variable %s already exists on file WORK.%s.", out[anyDuplicated(out)], toupper(file)), syntax = TRUE)
+  }
+  list(vars = keep, names = out)
+}
+
+#' The rows FIRSTOBS= and OBS= keep of `n` rows (those after WHERE=)
+#' @noRd
+ds_obs_rows <- function(n, firstobs = NULL, obs = NULL) {
+  from <- firstobs %||% 1
+  to <- min(obs %||% n, n)
+  seq_len(max(0, to - from + 1)) + from - 1
 }

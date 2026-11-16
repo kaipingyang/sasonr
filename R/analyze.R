@@ -910,34 +910,11 @@ an_reader <- function(s, st) {
     if (is.null(m)) {
       sasonr_abort(paste0("data set WORK.", toupper(ds$name), " does not exist"), "sasonr_runtime_error", line)
     }
-    vars <- m$vars
     o <- ds$options
-    # a wrong name in an option of an input data set: the ERROR, then the
-    # "Invalid ... option" ERROR; the step stops
-    invalid <- paste0("\nERROR: Invalid DROP, KEEP, or RENAME option on file WORK.", toupper(ds$name), ".")
-    for (opt in c("keep", "drop")) {
-      if (is.null(o[[opt]])) next
-      miss <- setdiff(resolve_ds_items(o[[opt]], m$vars, line), m$vars)
-      if (length(miss) > 0) {
-        abort_runtime(paste0("The variable ", ds_item_text(o[[opt]], miss[1]),
-                             " in the DROP, KEEP, or RENAME list has never been referenced.", invalid), line)
-      }
-    }
-    if (!is.null(o$keep)) vars <- intersect(vars, resolve_ds_items(o$keep, m$vars, line))
-    if (!is.null(o$drop)) vars <- setdiff(vars, resolve_ds_items(o$drop, m$vars, line))
-    out_names <- vars
-    if (!is.null(o$rename)) {
-      old <- names(o$rename)
-      if (any(!old %in% vars & old %in% m$vars)) abort_unsupported("RENAME= of a variable that KEEP=/DROP= removes", line)
-      if (any(!old %in% m$vars)) {
-        abort_runtime(paste0("Variable ", old[!old %in% m$vars][1], " is not on file WORK.", toupper(ds$name), ".", invalid), line)
-      }
-      out_names[match(old, vars)] <- unname(o$rename)
-    }
-    if (anyDuplicated(out_names)) {
-      abort_syntax(sprintf("Variable %s already exists on file WORK.%s.%s", out_names[anyDuplicated(out_names)],
-                           toupper(ds$name), invalid), line)
-    }
+    # KEEP=/DROP=/RENAME=: the input role of the data set option component
+    plan <- ds_in_plan(m$vars, o, ds$name, line)
+    vars <- plan$vars
+    out_names <- plan$names
     for (j in seq_along(vars)) {
       v <- vars[j]
       is_char <- identical(m$type[[v]], "char")
@@ -1066,6 +1043,10 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   # where both give the same level the reasons of classify_step() stay (the
   # header of the generated code does not change)
   if (is.na(lv$level) || lv$level == cls$level || (lv$level == "L2" && cls$level != "L2")) lv <- cls
+  # an undecided level (NA) never reaches the reasons or the generated code
+  if (!lv$level %in% c("L1", "L2", "L3") || anyNA(lv$reasons)) {
+    rlang::abort("sas_analyze(): no level decided for the step.", .internal = TRUE)
+  }
   # L1: no value is carried across rows, every assignment is a plain one
   if (lv$level == "L1") an$carry_plan <- list()
   an$level <- lv$level

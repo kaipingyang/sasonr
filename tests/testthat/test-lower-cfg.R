@@ -487,3 +487,14 @@ test_that("dsir_level: a carried assignment inside a DO group with other stateme
   expect_equal(r$cls$level, "L3")
   expect_equal(r$lv$level, "L3")
 })
+
+test_that("an undecided dsir_level() (NA) falls back to classify_step(); NA never reaches the code", {
+  p <- "data c; set a; by g; retain b; if first.g then do; if v > 1 then b = v; end; run;"
+  r <- facts_of(p)
+  expect_true(is.na(r$lv$level))
+  an <- sas_analyze(sas_parse(p)$steps[[1]], cfg_meta)
+  expect_equal(an$level, r$cls$level)
+  expect_equal(an$reasons, r$cls$reasons)
+  tr <- translate_step(sas_parse(p)$steps[[1]], cfg_meta)
+  expect_false(grepl("\\bNA\\b", strsplit(tr$code, "\n")[[1]][2]))
+})

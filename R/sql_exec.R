@@ -54,11 +54,10 @@ sql_table_rel <- function(src, eng, outer) {
     o <- src$options
   }
   if (!is.null(o$in_var)) abort_unsupported("IN= in PROC SQL", src$line)
-  vars <- names(d)
-  if (!is.null(o$keep)) vars <- intersect(vars, resolve_ds_items(o$keep, vars, src$line))
-  if (!is.null(o$drop)) vars <- setdiff(vars, resolve_ds_items(o$drop, vars, src$line))
-  out_names <- vars
-  if (!is.null(o$rename)) out_names[match(names(o$rename), vars)] <- unname(o$rename)
+  # KEEP=/DROP=/RENAME=: the input role of the data set option component
+  plan <- ds_in_plan(names(d), o, name, src$line, sql = TRUE)
+  vars <- plan$vars
+  out_names <- plan$names
   inobs <- eng$sql_opts$inobs
   cols <- list()
   data <- list()
@@ -83,12 +82,8 @@ sql_table_rel <- function(src, eng, outer) {
     keep <- sas_true(sql_eval(sql_from_ds_expr(o$where, rel), ctx))
     rel <- sql_rel_rows(rel, which(keep))
   }
-  if (!is.null(o$firstobs) || !is.null(o$obs)) {
-    n <- nrow(rel$data)
-    from <- o$firstobs %||% 1
-    to <- min(o$obs %||% n, n)
-    rel <- sql_rel_rows(rel, seq_len(max(0, to - from + 1)) + from - 1)
-  }
+  # FIRSTOBS=/OBS= on the rows after WHERE=, then INOBS=
+  if (!is.null(o$firstobs) || !is.null(o$obs)) rel <- sql_rel_rows(rel, ds_obs_rows(nrow(rel$data), o$firstobs, o$obs))
   if (!is.null(inobs) && nrow(rel$data) > inobs) rel <- sql_rel_rows(rel, seq_len(inobs))
   rel
 }
