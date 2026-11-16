@@ -20,8 +20,9 @@
 #'     `an$readers`), `datasets` (SET/MERGE: one entry per data set with
 #'     `name`, `options` as parsed and analysed (KEEP=/DROP= items, RENAME=
 #'     pairs, WHERE= analysed expression, IN=, FIRSTOBS=/OBS=), `vars` (input
-#'     variables after KEEP=/DROP=) and `out_names` (after RENAME=); empty for
-#'     INPUT), `end`, `nobs` (SET/MERGE END=/NOBS= variables or NULL) and
+#'     variables after KEEP=/DROP=), `out_names` (after RENAME=) and `opts`
+#'     (the normalised option record, `ds_opts_record()`); empty for INPUT),
+#'     `end`, `nobs` (SET/MERGE END=/NOBS= variables or NULL) and
 #'     `stmt` (the analysed statement itself).}
 #'   \item{where}{`stmts`: every WHERE statement in order, each `list(expr,
 #'     line, in_block)` with the analysed condition; `effective`: the
@@ -63,7 +64,8 @@ dsir_slots <- function(an) {
     if (k %in% c("set", "merge", "input")) {
       n_reader <<- n_reader + 1L
       dss <- if (k == "input") list() else lapply(s$datasets, function(d) {
-        list(name = d$name, options = d$options, vars = d$vars, out_names = d$out_names)
+        list(name = d$name, options = d$options, vars = d$vars, out_names = d$out_names,
+             opts = ds_opts_record(d))
       })
       acc$source <- c(acc$source, list(list(
         kind = k, line = s$line, in_block = in_block, reader = n_reader, datasets = dss,

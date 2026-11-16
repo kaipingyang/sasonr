@@ -401,48 +401,7 @@ put_ls_code <- function(cx) if (is.null(cx$an$file)) "" else paste0(", .ls = ", 
 # `where`: the analysed condition of the WHERE statement that applies (NULL
 # when there is none).
 ds_code <- function(d, an, obs_col = FALSE, where = NULL) {
-  o <- d$options
-  args <- c("work", r_str(d$name))
-  if (!is.null(o$keep) || !is.null(o$drop)) args <- c(args, paste0("keep = ", r_chr_vec(d$vars)))
-  if (!is.null(o$rename)) {
-    args <- c(args, paste0("rename = c(", paste0(r_str(names(o$rename)), " = ", r_str(o$rename), collapse = ", "), ")"))
-  }
-  code <- sprintf("sas_ds(%s)", paste(args, collapse = ", "))
-  if (obs_col) code <- paste0(code, " |> dplyr::mutate(.obs = dplyr::row_number())")
-  if (!is.null(o$where)) {
-    wcx <- new_cx("vec", an)
-    wcx$where <- TRUE
-    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(o$where, wcx))
-  }
-  # the WHERE statement condition applies to every input data set without a
-  # WHERE= option (the data set option takes precedence), before FIRSTOBS=/OBS=
-  if (!is.null(where) && is.null(o$where)) {
-    cx <- new_cx("vec", an)
-    cx$where <- TRUE
-    code <- sprintf("%s |> dplyr::filter(sas_where_cond(sas_true(%s)))", code, gen_expr(where, cx))
-  }
-  # FIRSTOBS= / OBS= count observations that satisfy WHERE= and WHERE
-  if (!is.null(o$firstobs) || !is.null(o$obs)) {
-    code <- sprintf("%s |> sas_obs_window(%s, %s)", code,
-                    if (is.null(o$firstobs)) "NULL" else r_num(o$firstobs), if (is.null(o$obs)) "NULL" else r_num(o$obs))
-  }
-  # values from a data set whose character variable is longer than the PDV
-  # variable (defined by an earlier data set) are truncated
-  m <- an$meta[[d$name]]
-  if (!is.null(an$info) && !is.null(m)) {
-    tr <- list()
-    for (j in seq_along(d$vars)) {
-      inf <- an$info[[d$out_names[j]]]
-      ml <- m$len[[d$vars[j]]]
-      if (identical(m$type[[d$vars[j]]], "char") && identical(inf$type, "char") && !is.null(ml) && ml > inf$len) {
-        tr[[d$out_names[j]]] <- as.integer(inf$len)
-      }
-    }
-    if (length(tr) > 0) code <- sprintf("%s |> sas_trunc_chars(%s)", code, r_lit(tr))
-  }
-  wexpr <- o$where %||% where
-  sprintf("%s |> sas_note_read(%s%s)", code, r_str(d$name),
-          if (is.null(wexpr)) "" else paste0(", where = ", r_str(where_text(wexpr))))
+  ds_opts_apply(ds_opts_record(d), an, obs_col = obs_col, where = where)
 }
 
 # One INPUT statement as a run-time spec for sas_input_stmt().
