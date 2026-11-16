@@ -395,8 +395,13 @@ translate_proc_means <- function(step, meta, last) {
   outs <- vapply(outputs, `[[`, "", "name")
   static_meta <- lapply(outputs, function(x) means_out_layout(spec, x)$meta)
   names(static_meta) <- outs
+  # the WARNINGs of KEEP=/DROP=/RENAME= on the OUTPUT data sets
+  warns <- unlist(lapply(outputs, function(x) {
+    if (length(x$ds_opts) == 0) return(character())
+    ds_out_plan(means_out_layout(spec, x)$meta$vars, x$ds_opts, x$name, x$line)$warnings
+  }))
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = paste("PROC", toupper(pname)),
-       line = step$line, outputs = outs, meta = static_meta)
+       line = step$line, outputs = outs, meta = static_meta, compile_notes = warns)
 }
 
 # Every statistic the step computes (printed table and OUTPUT data sets) is
@@ -702,7 +707,7 @@ sas_proc_means <- function(d, sp) {
     out_types <- means_types_wanted(sp, k, FALSE)
     o_two <- o$two_sided
     data <- means_out_data(d, sp, o, lay, cells_by, out_types, all_stats, o_two)
-    res <- proc_out_options(data, lay$meta, o$ds_opts, o$line)
+    res <- proc_out_options(data, lay$meta, o$ds_opts, o$line, file = o$name, warned = TRUE)
     out[[o$name]] <- res
   }
   listing <- if (sp$print) means_listing(d, sp, cells_by, means_types_wanted(sp, k, TRUE)) else character()

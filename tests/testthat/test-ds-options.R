@@ -89,3 +89,123 @@ test_that("PROC DATA= reads through the same component", {
                    ds_opts_apply(ds_opts_record(inp$ds), list(arrays = list()), obs_col = TRUE, where = inp$where))
   expect_match(proc_source_code(inp), "sas_obs_window(2, NULL)", fixed = TRUE)
 })
+
+# Output data sets of PROC SORT OUT= and PROC MEANS OUTPUT OUT=: a wrong name
+# in KEEP=/RENAME= is a WARNING and the step completes.
+dso_have <- "data have; input x y grp $; datalines;\n1 10 a\n2 20 b\n3 30 a\n;\nrun;\n"
+dso_notes <- function(code) {
+  old <- options(sasonr.step_notes = TRUE)
+  on.exit(options(old))
+  sas_run(paste0(dso_have, code))
+}
+never_ref <- "WARNING: The variable nosuchvar in the DROP, KEEP, or RENAME list has never been referenced."
+
+test_that("PROC SORT OUT= KEEP= naming an unknown variable: WARNING, no variable kept", {
+  r <- dso_notes("proc sort data=have out=sorted(keep=nosuchvar); by x; run;")
+  expect_equal(msgs(r)[-1], c(
+    never_ref,
+    "NOTE: There were 3 observations read from the data set WORK.HAVE.",
+    "NOTE: The data set WORK.SORTED has 3 observations and 0 variables."
+  ))
+  expect_equal(dim(r$work$sorted), c(3L, 0L))
+})
+
+test_that("PROC MEANS OUTPUT OUT= KEEP= naming an unknown variable: WARNING, no variable kept", {
+  r <- dso_notes("proc means data=have noprint; var y; output out=agg(keep=nosuchvar) mean=m; run;")
+  expect_equal(msgs(r)[-1], c(
+    never_ref,
+    "NOTE: There were 3 observations read from the data set WORK.HAVE.",
+    "NOTE: The data set WORK.AGG has 1 observations and 0 variables."
+  ))
+  expect_equal(dim(r$work$agg), c(1L, 0L))
+})
+
+test_that("output data set option forms the measured rules do not cover fail loud", {
+  for (p in c("proc sort data=have out=s(keep=x nosuchvar); by x; run;",
+              "proc sort data=have out=s(drop=nosuchvar); by x; run;",
+              "proc sort data=have out=s(rename=(x=xa nosuchvar=n)); by x; run;",
+              "proc sort data=have out=s(rename=(nosuchvar=newname)); by x; run;",
+              "proc sort data=have out=s(rename=(x=y)); by x; run;",
+              "proc means data=have noprint; var y; output out=a(rename=(m=_freq_)) mean=m; run;",
+              "proc sort data=have out=s(where=(x > 1)); by x; run;",
+              "proc freq data=have noprint; tables grp / out=f(keep=nosuchvar); run;")) {
+    expect_error(sas_run(paste0(dso_have, p)), class = "sasonr_unsupported", info = p)
+  }
+  # valid options are applied as before
+  r <- sas_run(paste0(dso_have, "proc sort data=have out=s(keep=x grp rename=(grp=g)); by descending x; run;"))
+  expect_equal(as.data.frame(r$work$s), data.frame(x = c(3, 2, 1), g = c("a", "b", "a")))
+})
+
+# DATA step output and input data sets; PROC PRINT DATA=.
+dso_sas <- function(code) {
+  old <- options(sasonr.step_notes = TRUE, sasonr.on_error = "sas")
+  on.exit(options(old))
+  sas_run(paste0(dso_have, code))
+}
+err_warn <- function(r) grep("^(ERROR|WARNING)", msgs(r), value = TRUE)
+invalid_have <- "ERROR: Invalid DROP, KEEP, or RENAME option on file WORK.HAVE."
+incomplete_out <- "WARNING: The data set WORK.OUT may be incomplete.  When this step was stopped there were 0 observations and 1 variables."
+
+test_that("DATA step output KEEP= naming an unknown variable: WARNING, 0 variables; PROC PRINT has none", {
+  r <- dso_sas("data out(keep=nosuchvar); set have; put 'anchor x=' x=; run; proc print data=out; run;")
+  expect_equal(msgs(r)[-1], c(
+    never_ref, "anchor x=x=1", "anchor x=x=2", "anchor x=x=3",
+    "NOTE: There were 3 observations read from the data set WORK.HAVE.",
+    "NOTE: The data set WORK.OUT has 3 observations and 0 variables.",
+    "NOTE: No variables in data set WORK.OUT."
+  ))
+  expect_equal(dim(r$work$out), c(3L, 0L))
+})
+
+test_that("DATA step output RENAME= of an unknown old name: WARNING, the pair is ignored", {
+  r <- dso_sas("data out(rename=(nosuchvar=newname)); set have; run;")
+  expect_equal(err_warn(r), never_ref)
+  expect_equal(names(r$work$out), c("x", "y", "grp"))
+})
+
+test_that("DATA step output RENAME= onto an existing name: WARNING, the renamed variable stays", {
+  r <- dso_sas("data out(rename=(x=y)); set have; put 'anchor x=' x=; run;")
+  expect_equal(err_warn(r), "WARNING: Variable y already exists on file WORK.OUT.")
+  expect_equal(as.data.frame(r$work$out), data.frame(y = c(1, 2, 3), grp = c("a", "b", "a")))
+  # the other order is not established: fails loud
+  expect_error(sas_run(paste0(dso_have, "data out(rename=(grp=x)); set have; run;")), class = "sasonr_unsupported")
+})
+
+test_that("DATA step input KEEP= naming an unknown variable: two ERRORs, the step stops", {
+  r <- dso_sas("data out;\n  set have(keep=nosuchvar);\n  put 'anchor x=' x=;\nrun;")
+  expect_equal(err_warn(r), c(
+    "ERROR: The variable nosuchvar in the DROP, KEEP, or RENAME list has never been referenced.",
+    invalid_have, incomplete_out))
+  expect_equal(dim(r$work$out), c(0L, 1L))
+  expect_equal(names(r$work$out), "x")
+})
+
+test_that("PROC PRINT DATA= KEEP= naming an unknown variable: two ERRORs, the next step runs", {
+  r <- dso_sas("proc print data=have(keep=nosuchvar); run; data check; x = 1; output; run;")
+  expect_equal(err_warn(r), c(
+    "ERROR: The variable nosuchvar in the DROP, KEEP, or RENAME list has never been referenced.", invalid_have))
+  expect_equal(nrow(r$work$check), 1L)
+})
+
+test_that("DATA step input RENAME= of an unknown old name: ERRORs, one pair or two", {
+  r <- dso_sas("data out;\n  set have(rename=(nosuchvar=newname));\n  put 'anchor x=' x=;\nrun;")
+  expect_equal(err_warn(r), c("ERROR: Variable nosuchvar is not on file WORK.HAVE.", invalid_have, incomplete_out))
+  expect_equal(names(r$work$out), "x")
+  r <- dso_sas("data out;\n  set have(rename=(x=xa nosuchvar=yb));\n  put 'anchor xa=' xa=;\nrun;")
+  expect_equal(err_warn(r), c("ERROR: Variable nosuchvar is not on file WORK.HAVE.", invalid_have, incomplete_out))
+  expect_equal(names(r$work$out), "xa")
+  expect_equal(nrow(r$work$out), 0L)
+})
+
+test_that("DATA step input RENAME= onto an existing name: ERRORs, the step stops", {
+  r <- dso_sas("data out;\n  set have(rename=(x=y));\n  put 'anchor y=' y=;\nrun;")
+  expect_equal(err_warn(r), c("ERROR: Variable y already exists on file WORK.HAVE.", invalid_have, incomplete_out))
+  expect_equal(names(r$work$out), "y")
+})
+
+test_that("IN= on PROC PRINT DATA= is ERROR 22-7; on other PROCs it fails loud", {
+  r <- dso_sas("proc print data=have(in=flag); run; data check; x = 1; output; run;")
+  expect_equal(err_warn(r), "ERROR 22-7: Invalid option name IN.")
+  expect_equal(nrow(r$work$check), 1L)
+  expect_error(sas_run(paste0(dso_have, "proc sort data=have(in=f) out=s; by x; run;")), class = "sasonr_unsupported")
+})

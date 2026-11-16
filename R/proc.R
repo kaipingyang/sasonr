@@ -222,6 +222,10 @@ proc_input <- function(step, meta, last) {
     if (is.null(last)) abort_runtime("There is no default input data set (_LAST_ is _NULL_)", step$line)
     ref <- list(name = last, options = list(), line = step$line)
   }
+  if (!is.null(ref$options$in_var)) {
+    if (step$name == "print") abort_syntax("Invalid option name IN. (ERROR 22-7)", step$line)
+    abort_unsupported(paste0("IN= on PROC ", toupper(step$name), " DATA="), step$line)
+  }
   st <- new_state(meta)
   rd <- an_reader(list(stmt = "set", datasets = list(ref), line = step$line), st)
   known <- st$order
@@ -271,17 +275,9 @@ translate_proc <- function(step, meta, last = NULL) {
     miss <- setdiff(by$vars, vars)
     if (length(miss) > 0) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found"), by$line)
     out <- step$options$out %||% list(name = inp$ds$name, options = list())
-    out_vars <- vars
-    out_names <- vars
-    o <- out$options
-    if (!is.null(o$keep)) out_vars <- intersect(out_vars, resolve_ds_items(o$keep, out_vars, step$line))
-    if (!is.null(o$drop)) out_vars <- setdiff(out_vars, resolve_ds_items(o$drop, out_vars, step$line))
-    if (!is.null(o$where)) abort_unsupported("WHERE= on an output data set", step$line)
-    out_names <- out_vars
-    if (!is.null(o$rename)) {
-      hit <- match(names(o$rename), out_vars)
-      out_names[hit[!is.na(hit)]] <- unname(o$rename[!is.na(hit)])
-    }
+    plan <- ds_out_plan(vars, out$options, out$name, step$line)
+    out_vars <- plan$vars
+    out_names <- plan$names
     sel <- select_code(list(vars = out_vars, out_names = out_names))
     code <- c(
       header,
@@ -298,7 +294,7 @@ translate_proc <- function(step, meta, last = NULL) {
     }
     res_meta <- stats::setNames(list(m), out$name)
     return(list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC SORT",
-                line = step$line, outputs = out$name, meta = res_meta))
+                line = step$line, outputs = out$name, meta = res_meta, compile_notes = plan$warnings))
   }
   # PROC PRINT
   # FORMAT statements attach formats for this step only
@@ -332,11 +328,14 @@ translate_proc <- function(step, meta, last = NULL) {
     list(name = v, disp = inf$disp %||% v, char = identical(inf$type, "char"),
          fmt = if (is.null(inp$st$formats[[v]])) NULL else inp$st$formats[[v]][c("name", "w", "d", "char", "text")])
   })
+  # a data set without variables: "No variables in data set" (log_emit_reads()), no listing
   code <- c(
     header,
     paste0(".d <- ", proc_source_code(inp, obs_col = TRUE)),
-    sprintf(".lst <- c(.lst, sas_print_listing(.d, %s, noobs = %s, titles = .titles))",
-            r_lit(spec), isTRUE(step$options[["noobs"]]))
+    if (length(vars) > 0) {
+      sprintf(".lst <- c(.lst, sas_print_listing(.d, %s, noobs = %s, titles = .titles))",
+              r_lit(spec), isTRUE(step$options[["noobs"]]))
+    }
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC PRINT",
        line = step$line, outputs = character(), meta = list())

@@ -912,18 +912,31 @@ an_reader <- function(s, st) {
     }
     vars <- m$vars
     o <- ds$options
+    # a wrong name in an option of an input data set: the ERROR, then the
+    # "Invalid ... option" ERROR; the step stops
+    invalid <- paste0("\nERROR: Invalid DROP, KEEP, or RENAME option on file WORK.", toupper(ds$name), ".")
     for (opt in c("keep", "drop")) {
       if (is.null(o[[opt]])) next
       miss <- setdiff(resolve_ds_items(o[[opt]], m$vars, line), m$vars)
-      if (length(miss) > 0) abort_runtime(paste0("The variable ", toupper(miss[1]), " in the DROP, KEEP, or RENAME list has never been referenced"), line)
+      if (length(miss) > 0) {
+        abort_runtime(paste0("The variable ", ds_item_text(o[[opt]], miss[1]),
+                             " in the DROP, KEEP, or RENAME list has never been referenced.", invalid), line)
+      }
     }
     if (!is.null(o$keep)) vars <- intersect(vars, resolve_ds_items(o$keep, m$vars, line))
     if (!is.null(o$drop)) vars <- setdiff(vars, resolve_ds_items(o$drop, m$vars, line))
     out_names <- vars
-    if (!is.null(o$rename)) out_names[match(names(o$rename), vars)] <- unname(o$rename)
+    if (!is.null(o$rename)) {
+      old <- names(o$rename)
+      if (any(!old %in% vars & old %in% m$vars)) abort_unsupported("RENAME= of a variable that KEEP=/DROP= removes", line)
+      if (any(!old %in% m$vars)) {
+        abort_runtime(paste0("Variable ", old[!old %in% m$vars][1], " is not on file WORK.", toupper(ds$name), ".", invalid), line)
+      }
+      out_names[match(old, vars)] <- unname(o$rename)
+    }
     if (anyDuplicated(out_names)) {
-      abort_syntax(sprintf("Variable %s already exists on file WORK.%s.", out_names[anyDuplicated(out_names)],
-                           toupper(ds$name)), line)
+      abort_syntax(sprintf("Variable %s already exists on file WORK.%s.%s", out_names[anyDuplicated(out_names)],
+                           toupper(ds$name), invalid), line)
     }
     for (j in seq_along(vars)) {
       v <- vars[j]
@@ -964,6 +977,12 @@ an_reader <- function(s, st) {
   register_by_flags(st)
   st$readers <- c(st$readers, list(s))
   s
+}
+
+# The name of `name` as written in the variable-list items (else `name`).
+ds_item_text <- function(items, name) {
+  for (it in items) if (identical(it$kind, "name") && identical(it$name, name)) return(it$text %||% name)
+  name
 }
 
 resolve_ds_items <- function(items, vars, line) {
@@ -1094,16 +1113,13 @@ output_specs <- function(an, sel) {
     names
   }
   base_names <- rename_by(base, sel$rename)
+  # KEEP=/DROP=/RENAME= of each output data set: the output role of the data
+  # set option component (a wrong name is a WARNING, a compile note)
+  ct <- ct_diag()
   lapply(an$step$outputs, function(o) {
-    keep <- rep(TRUE, length(base))
-    if (!is.null(o$options$keep)) keep <- keep & base_names %in% resolve_ds_items(o$options$keep, base_names, o$line)
-    if (!is.null(o$options$drop)) keep <- keep & !base_names %in% resolve_ds_items(o$options$drop, base_names, o$line)
-    if (!is.null(o$options$where)) abort_unsupported("WHERE= on an output data set", o$line)
-    vars <- base[keep]
-    out_names <- rename_by(base_names[keep], o$options$rename)
-    # RENAME= onto an existing name: the first variable of that name is kept
-    dup <- duplicated(out_names)
-    list(name = o$name, vars = vars[!dup], out_names = out_names[!dup])
+    plan <- ds_out_plan(base_names, o$options, o$name, o$line, rename_rules = TRUE)
+    ct$notes <- c(ct$notes, setdiff(plan$warnings, ct$notes))
+    list(name = o$name, vars = base[match(plan$vars, base_names)], out_names = plan$names)
   })
 }
 

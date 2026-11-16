@@ -57,6 +57,7 @@ log_catalog <- list(
   ds.read_where = log_msg("note", c("NOTE: There were <nobs> observations read from the data set WORK.<name>.",
                                     "      WHERE <where>;")),
   ds.no_obs = log_msg("note", "NOTE: No observations in data set WORK.<name>."),
+  ds.no_vars = log_msg("note", "NOTE: No variables in data set WORK.<name>."),
   # global statements
   filename.no_assign = log_msg("warning", "WARNING: No logical assign for filename <quote><name><quote>."),
   # DATA step run time and compile time

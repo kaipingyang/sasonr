@@ -6,39 +6,62 @@
 # The DATA step reader (ds_code() in codegen_tidy.R) and PROC DATA=
 # (proc_source_code() in proc.R, through ds_code()) use it today. The other
 # places that apply data set options still have their own code; they move onto
-# this record in later steps. What each of them does today:
+# this record in later steps.
 #
-# - DATA step input (an_reader() in analyze.R, read by ds_code()): KEEP=/DROP=
-#   naming a variable not on the data set is an ERROR ("... has never been
-#   referenced", no final period). RENAME= is not checked against the data
-#   set: a single unknown old name is ignored, an unknown old name among
-#   several pairs stops with an R error. Two variables renamed to one name is
-#   an ERROR ("Variable x already exists on file"). WHERE= uses the names
+# CURRENT BEHAVIOUR (before alignment) -- what each place does today; this is
+# not the target, see "Target behaviour" below:
+#
+# - DATA step input (an_reader() in analyze.R, read by ds_code()): aligned
+#   with the target for KEEP=/DROP= naming an unknown variable, RENAME= of an
+#   unknown old name and RENAME= onto an existing name (the two ERRORs; the
+#   error model keeps the variables the rest of the step references); RENAME=
+#   of a variable that KEEP=/DROP= removes fails loud. WHERE= uses the names
 #   after KEEP=/DROP= and RENAME= (an unknown or dropped variable is an
 #   ERROR, "is not on file"); WHERE= replaces the WHERE statement for its data
 #   set. IN= is a 0/1 variable set by sas_set_input() / the merge plan.
 #   FIRSTOBS=/OBS= window the rows that satisfy WHERE= / WHERE.
 # - PROC DATA= (proc_input() in proc.R, then ds_code()): as DATA step input;
 #   in addition a WHERE statement variable not on the data set is an ERROR
-#   ("Variable x is not on file WORK.A"). IN= is accepted by the parser and
-#   has no effect.
-# - DATA step output (output_specs() in analyze.R): KEEP=/DROP= naming an
-#   unknown variable is ignored; RENAME= of an unknown old name is ignored;
-#   a RENAME= clash keeps the first variable of that name; WHERE= fails loud
-#   (unsupported). IN=, FIRSTOBS=, OBS= are rejected by the parser (output
-#   context), as on every output data set.
-# - PROC OUT= (proc_out_options() in proc_util.R; MEANS, FREQ, TRANSPOSE,
-#   CONTENTS): KEEP=/DROP= naming an unknown variable and RENAME= of an
-#   unknown old name are ERRORs ("... has never been referenced.", with a
-#   final period); no RENAME= clash check; WHERE= fails loud.
-# - PROC SORT OUT= (inline in translate_proc()): KEEP=/DROP= naming an unknown
-#   variable is ignored; RENAME= of an unknown old name is ignored; no clash
-#   check; WHERE= fails loud.
+#   ("Variable x is not on file WORK.A"). IN= on PROC PRINT is ERROR 22-7,
+#   on the other PROCs it fails loud.
+# - DATA step output (output_specs() in analyze.R): the output role,
+#   ds_out_plan() with the RENAME= rules; WHERE= fails loud (unsupported).
+#   IN=, FIRSTOBS=, OBS= are rejected by the parser (output context), as on
+#   every output data set.
+# - PROC SORT OUT= and PROC OUT= (MEANS, FREQ, TRANSPOSE, CONTENTS): the
+#   output role, ds_out_plan() and proc_out_options() below. KEEP= naming one
+#   unknown variable is aligned with the target (SORT and MEANS write the
+#   WARNING with the compile notes, FREQ, TRANSPOSE and CONTENTS fail loud on
+#   it); every other wrong name, and WHERE=, fails loud.
 # - PROC SQL table (sql_table_rel() in sql_exec.R): KEEP=/DROP= naming an
 #   unknown variable is ignored; RENAME= is not checked (as DATA step input,
 #   including the R error) and has no clash check; WHERE= is evaluated as an
 #   SQL expression on the names after RENAME=; IN= fails loud; FIRSTOBS=/OBS=
 #   window the rows after WHERE= with their own inline code, then INOBS=.
+#
+# TARGET BEHAVIOUR (as documented) -- one wrong name in an option; the level depends on
+# the role of the data set. "output" rows hold for the DATA step output data
+# set; the KEEP= row also for PROC SORT OUT= and PROC MEANS OUTPUT OUT=; the
+# "input" rows for the DATA step SET and PROC PRINT DATA= (KEEP=). Any
+# form not in this table fails loud until its behaviour is established:
+#
+#   role / option                        message                                      result
+#   input  KEEP=/DROP= unknown variable  ERROR: The variable x in the DROP, KEEP, or   the step stops; an output
+#                                        RENAME list has never been referenced.       data set of the DATA step
+#                                        ERROR: Invalid DROP, KEEP, or RENAME option   keeps the variables the
+#                                        on file WORK.A.                              step references (0 obs.)
+#   input  RENAME= unknown old name      ERROR: Variable x is not on file WORK.A.     as above; the valid pairs
+#                                        ERROR: Invalid DROP, KEEP, ... (as above)    of the option are applied
+#   input  RENAME= onto an existing name ERROR: Variable y already exists on file     as above; the rename is
+#                                        WORK.A. + the "Invalid" ERROR                applied
+#   output KEEP= unknown variable        WARNING: The variable x in the DROP, KEEP,   the step completes; the
+#                                        or RENAME list has never been referenced.    variable is not kept
+#                                                                                     (KEEP=x alone: 0 variables)
+#   output RENAME= unknown old name      the same WARNING                             the pair is ignored
+#   output RENAME= onto an existing name WARNING: Variable y already exists on file   the renamed variable stays,
+#                                        WORK.OUT.                                    the other one is dropped
+#   output WHERE=                        none                                         the rows are filtered
+#   PROC PRINT DATA= with IN=            ERROR 22-7: Invalid option name IN.
 #
 # Order inside the DATA step reader: KEEP=/DROP= and RENAME= (sas_ds), WHERE=
 # (or else the WHERE statement), FIRSTOBS=/OBS= on the rows that satisfy it,
@@ -118,4 +141,105 @@ ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
   wexpr <- rec$where %||% where
   sprintf("%s |> sas_note_read(%s%s)", code, r_str(rec$name),
           if (is.null(wexpr)) "" else paste0(", where = ", r_str(where_text(wexpr))))
+}
+
+#' KEEP=, DROP= and RENAME= on an output data set
+#'
+#' The output role of the data set option component, used by PROC SORT OUT=
+#' and the PROC OUT= data sets (MEANS, FREQ, TRANSPOSE, CONTENTS). On an
+#' output data set a wrong name is a WARNING and the step completes:
+#' - KEEP= naming one variable that is not on the data set: "The variable x
+#'   in the DROP, KEEP, or RENAME list has never been referenced." and no
+#'   variable is kept;
+#' - with `rename_rules` (the DATA step output data set): RENAME= with one
+#'   pair whose old name is not on the data set: the same WARNING, the pair
+#'   is ignored; RENAME= with one pair whose new name is another variable of
+#'   the data set: "Variable y already exists on file WORK.OUT."; the renamed
+#'   variable stays at its place and the other one is dropped.
+#' The forms these rules do not cover fail loud: KEEP= naming an unknown
+#' variable among others, DROP= naming an unknown variable, an unknown or
+#' clashing RENAME= pair without `rename_rules` or among several pairs,
+#' WHERE=.
+#'
+#' @param vars The variables of the data set before the options.
+#' @param opts The options from `parse_ds_options()` (`keep`, `drop`,
+#'   `rename`, `where`).
+#' @param file The data set name (for the WARNING text).
+#' @param line SAS line for the conditions.
+#' @param rename_rules Apply the two RENAME= rules above (else they fail loud).
+#' @return `list(vars, names, warnings)`: the variables kept (old names), their
+#'   names after RENAME=, and the WARNING lines.
+#' @noRd
+ds_out_plan <- function(vars, opts, file, line = NULL, rename_rules = FALSE) {
+  warn <- character()
+  never <- function(v) paste0("WARNING: The variable ", v, " in the DROP, KEEP, or RENAME list has never been referenced.")
+  if (!is.null(opts$where)) abort_unsupported("WHERE= on an output data set", line)
+  keep <- vars
+  if (!is.null(opts$keep)) {
+    items <- resolve_ds_items(opts$keep, vars, line)
+    miss <- setdiff(items, vars)
+    if (length(miss) > 0) {
+      if (length(items) > 1) abort_unsupported("KEEP= on an output data set naming a variable that is not on it, among other variables", line)
+      warn <- c(warn, never(ds_item_text(opts$keep, miss)))
+    }
+    keep <- intersect(vars, items)
+  }
+  if (!is.null(opts$drop)) {
+    items <- resolve_ds_items(opts$drop, vars, line)
+    if (length(setdiff(items, vars)) > 0) abort_unsupported("DROP= on an output data set naming a variable that is not on it", line)
+    keep <- setdiff(keep, items)
+  }
+  out <- keep
+  rn <- opts$rename
+  if (length(rn) > 0) {
+    hit <- match(names(rn), keep)
+    if (anyNA(hit)) {
+      if (length(rn) > 1 || !rename_rules) abort_unsupported("RENAME= on an output data set naming a variable that is not on it", line)
+      warn <- c(warn, never(names(rn)))
+    } else {
+      out[hit] <- unname(rn)
+      clash <- intersect(unname(rn), keep[-hit])
+      if (length(clash) > 0) {
+        if (length(rn) > 1 || !rename_rules || match(clash, keep) < hit) {
+          abort_unsupported("RENAME= on an output data set to the name of another variable", line)
+        }
+        warn <- c(warn, paste0("WARNING: Variable ", clash, " already exists on file WORK.", toupper(file), "."))
+        k <- match(clash, keep)
+        keep <- keep[-k]
+        out <- out[-k]
+      }
+      if (anyDuplicated(out)) abort_unsupported("RENAME= on an output data set giving two variables one name", line)
+    }
+  }
+  list(vars = keep, names = out, warnings = warn)
+}
+
+#' Apply KEEP=, DROP= and RENAME= to a PROC output data set (data + metadata)
+#'
+#' @param d The data frame; `m` its metadata (`vars`, `type`, `len`,
+#'   `formats`, `informats`, `labels`, `disp`).
+#' @param opts,line As for [ds_out_plan()]; `file` the data set name.
+#' @param warned TRUE when the translation already wrote the WARNINGs of
+#'   [ds_out_plan()] (compile notes); otherwise a WARNING fails loud.
+#' @return `list(data, meta)`.
+#' @noRd
+proc_out_options <- function(d, m, opts, line = NULL, file = "", warned = FALSE) {
+  if (length(opts) == 0) return(list(data = d, meta = m))
+  plan <- ds_out_plan(m$vars, opts, file, line)
+  if (length(plan$warnings) > 0 && !warned) abort_unsupported(sub("^WARNING: ", "", plan$warnings[1]), line)
+  keep <- plan$vars
+  new <- plan$names
+  d <- d[keep]
+  ren <- function(l) {
+    l <- l[intersect(keep, names(l))]
+    if (length(l) == 0) return(l)
+    names(l) <- new[match(names(l), keep)]
+    l
+  }
+  disp <- m$disp[keep]
+  ch <- new != keep
+  disp[ch] <- as.list(new[ch])
+  names(d) <- new
+  list(data = d, meta = list(vars = new, type = ren(m$type), len = ren(m$len), formats = ren(m$formats),
+                             informats = ren(m$informats), labels = ren(m$labels), disp = stats::setNames(disp, new)))
 }

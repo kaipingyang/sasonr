@@ -209,48 +209,6 @@ proc_out_meta <- function(cols) {
   m
 }
 
-# KEEP= / DROP= / RENAME= on an output data set (data + metadata).
-proc_out_options <- function(d, m, opts, line = NULL) {
-  if (length(opts) == 0) return(list(data = d, meta = m))
-  vars <- m$vars
-  if (!is.null(opts$where)) abort_unsupported("WHERE= on an output data set", line)
-  keep <- vars
-  if (!is.null(opts$keep)) keep <- intersect(vars, resolve_ds_items(opts$keep, vars, line))
-  if (!is.null(opts$drop)) keep <- setdiff(keep, resolve_ds_items(opts$drop, vars, line))
-  for (o in c("keep", "drop")) {
-    if (is.null(opts[[o]])) next
-    miss <- setdiff(resolve_ds_items(opts[[o]], vars, line), vars)
-    if (length(miss) > 0) {
-      abort_runtime(paste0("The variable ", toupper(miss[1]), " in the DROP, KEEP, or RENAME list has never been referenced."), line)
-    }
-  }
-  d <- d[keep]
-  sub <- function(l) l[intersect(names(l), keep)]
-  m <- list(vars = keep, type = m$type[keep], len = m$len[keep], formats = sub(m$formats), informats = sub(m$informats),
-            labels = sub(m$labels), disp = m$disp[keep])
-  if (!is.null(opts$rename)) {
-    rn <- opts$rename
-    hit <- match(names(rn), keep)
-    if (anyNA(hit)) {
-      abort_runtime(paste0("The variable ", toupper(names(rn)[is.na(hit)][1]),
-                           " in the DROP, KEEP, or RENAME list has never been referenced."), line)
-    }
-    new <- keep
-    new[hit] <- unname(rn)
-    ren <- function(l) {
-      if (length(l) == 0) return(l)
-      names(l) <- new[match(names(l), keep)]
-      l
-    }
-    names(d) <- new
-    disp <- m$disp
-    disp[hit] <- as.list(unname(rn))
-    m <- list(vars = new, type = ren(m$type), len = ren(m$len), formats = ren(m$formats), informats = ren(m$informats),
-              labels = ren(m$labels), disp = stats::setNames(disp, new))
-  }
-  list(data = d, meta = m)
-}
-
 #' Store PROC output data sets in WORK; returns their metadata
 #' @param work The WORK environment.
 #' @param outs Named list of `list(data, meta)`.

@@ -132,7 +132,7 @@ compile_notes <- function() {
 #' @keywords internal
 sas_note_read <- function(d, name, where = NULL) {
   rt <- rt_diag()
-  rt$reads[[length(rt$reads) + 1L]] <- list(name = name, n = nrow(d), where = where)
+  rt$reads[[length(rt$reads) + 1L]] <- list(name = name, n = nrow(d), where = where, nvar = sum(names(d) != ".obs"))
   d
 }
 
