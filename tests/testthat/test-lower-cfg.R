@@ -107,10 +107,10 @@ test_that("iterative DO: init, test, body, increment", {
   x <- cfg_of("data c; do i = 1 to 3; x = i; end; y = 1; run;")
   lp <- x$loops[[1]]
   expect_equal(lp[c("kind", "var")], list(kind = "iter", var = "i"))
-  # init in the entry block: start value, TO and BY evaluated once
+  # init in the entry block: start value, TO and BY evaluated once, then the index
   init <- x$blocks$B1$instrs
-  expect_equal(vapply(init, function(i) i$target$node, ""), c("var", "loop_temp", "loop_temp"))
-  expect_equal(vapply(init[2:3], function(i) i$target$name, ""), c("to", "by"))
+  expect_equal(vapply(init, function(i) i$target$node, ""), c("loop_temp", "loop_temp", "loop_temp", "var"))
+  expect_equal(vapply(init[1:3], function(i) i$target$name, ""), c("from", "to", "by"))
   expect_equal(x$blocks$B1$term$to, lp$head)
   th <- x$blocks[[lp$head]]$term
   expect_equal(th$cond$node, "loop_test")
@@ -239,9 +239,10 @@ test_that("SELECT without OTHERWISE ends in a runtime-error terminator", {
   expect_equal(ab[c("term", "kind")], list(term = "abort", kind = "select"))
   expect_equal(sum(terms_of(x) == "abort"), 1L)
   cfg_check(x)
-  # no WHEN at all: the OTHERWISE body or the error, without a chain
+  # no WHEN at all: the OTHERWISE body or the error, without a chain (the
+  # join block is the target of a LEAVE)
   x <- cfg_of("data c; set a; select (g); otherwise x = 1; end; run;")
-  expect_length(x$blocks, 3)
+  expect_length(x$blocks, 4)
 })
 
 test_that("OUTPUT records its targets", {
@@ -349,13 +350,29 @@ test_that("unreachable lists statements that give only a terminator or a head", 
   expect_length(x$unreachable, 0)
 })
 
-test_that("LEAVE inside a SELECT inside a DO loop is marked uncertain", {
-  x <- cfg_of("data c; do k = 'a', 'b'; select (k); when ('b') leave; otherwise; end; end; run;")
-  expect_equal(x$uncertain, "leave_in_select")
-  expect_equal(dsir_facts(x, sas_analyze(sas_parse("data c; do k = 'a', 'b'; select (k); when ('b') leave; otherwise; end; end; run;")$steps[[1]]))$uncertain,
-               "leave_in_select")
-  x <- cfg_of("data c; do i = 1 to 3; if i = 2 then leave; end; run;")
-  expect_length(x$uncertain, 0)
+test_that("LEAVE inside a SELECT jumps to the end of the SELECT, not the loop exit", {
+  x <- cfg_of("data c; do k = 'a', 'b'; select (k); when ('b') leave; otherwise; end; x = 1; end; run;")
+  lp <- x$loops[[1]]
+  jumps <- unlist(lapply(x$blocks, function(b) if (b$term$term == "jump") b$term$to))
+  expect_false(lp$exit %in% jumps[names(jumps) != lp$head])
+  # the block after the SELECT (x = 1) is reached from the LEAVE
+  after <- block_assigning(x, "x")
+  expect_true(sum(jumps == after) >= 2)
+  # a LEAVE in an IF inside a DO group inside the SELECT acts on the SELECT too
+  x <- cfg_of("data c; do i = 1 to 3; select; when (i = 2) do; if i > 1 then leave; end; otherwise; end; end; run;")
+  lp <- x$loops[[1]]
+  expect_false(any(vapply(x$blocks, function(b) identical(b$loop, 1L) && b$term$term == "jump" &&
+                                     identical(b$term$to, lp$exit), NA)))
+  cfg_check(x)
+})
+
+test_that("an iterative DO evaluates the start, TO and BY before it assigns the index", {
+  x <- cfg_of("data c; i = 10; do i = 1 to i; x = i; end; run;")
+  ins <- x$blocks$B1$instrs
+  tg <- vapply(ins, function(i) if (i$target$node == "var") i$target$name else i$target$name, "")
+  expect_equal(tg, c("i", "from", "to", "by", "i"))
+  expect_equal(ins[[5]]$expr$node, "loop_temp")
+  cfg_check(x)
 })
 
 facts_of <- function(code, meta = cfg_meta) {

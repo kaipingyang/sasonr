@@ -1025,10 +1025,12 @@ gen_row_do <- function(s, cx) {
     return(block(head, c(sprintf("%s <- %s", ref, coerce_var(paste0(".v", k), s$var, cx$an)), body)))
   }
   wu <- s$while_until
+  # the start, TO and BY are evaluated before the index is assigned
   c(
-    sprintf("%s <- %s", ref, g(s$from)),
+    sprintf(".from%d <- %s", k, g(s$from)),
     sprintf(".to%d <- %s", k, g(s$to)),
     sprintf(".by%d <- %s", k, if (is.null(s$by)) "1" else g(s$by)),
+    sprintf("%s <- .from%d", ref, k),
     sprintf(".first%d <- TRUE", k),
     block("repeat {", c(
       block(sprintf("if (!.first%d) {", k), c(
@@ -1059,8 +1061,28 @@ gen_row_select <- function(s, cx) {
     first <- FALSE
   }
   other <- if (s$has_otherwise) gen_row_stmt(s$otherwise, cx) else sprintf("sas_select_error(%dL)", as.integer(s$line))
-  if (first) return(other)
-  c(out, "} else {", indent_lines(other, 1L), "}")
+  out <- if (first) c(out, other) else c(out, "} else {", indent_lines(other, 1L), "}")
+  # LEAVE leaves the SELECT group: the SELECT runs inside a one-pass loop
+  # whose `break` is the LEAVE
+  if (!select_ctl(s, "leave")) return(out)
+  if (select_ctl(s, "continue", nested = TRUE)) {
+    abort_unsupported("CONTINUE inside a SELECT group that holds a LEAVE", s$line)
+  }
+  c("repeat {", indent_lines(c(out, "break"), 1L), "}")
+}
+
+# Does a WHEN or OTHERWISE body of SELECT `s` hold statement `what` that acts
+# on this SELECT (outside an iterative DO loop; also inside nested SELECT
+# groups when `nested`)?
+select_ctl <- function(s, what, nested = FALSE) {
+  has <- function(x) {
+    if (is.null(x)) return(FALSE)
+    if (x$stmt == what) return(TRUE)
+    if (x$stmt == "do" && x$kind != "block") return(FALSE)
+    if (x$stmt == "select" && !nested) return(FALSE)
+    any(vapply(stmt_children(x), has, NA))
+  }
+  any(vapply(stmt_children(s), has, NA))
 }
 
 # Translation driver ------------------------------------------------------

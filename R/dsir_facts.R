@@ -37,8 +37,6 @@
 #'     GOTO.}
 #'   \item{iteration_ends}{Blocks ending in `end_iteration` or `return` (the
 #'     two are equivalent iteration ends).}
-#'   \item{uncertain}{Open semantic points from the lowering
-#'     (`"leave_in_select"`).}
 #' }
 #' The other elements (`events`, `succ`, `dom`, `pdom`, `sites`) are the
 #' working data `dsir_level()` reads.
@@ -240,7 +238,6 @@ dsir_facts <- function(ir, an) {
     ),
     needs_state_machine = FALSE,
     iteration_ends = ids[is_end],
-    uncertain = ir$uncertain %||% character(),
     array_refs = has_array_ref,
     events = events, succ = succ, dom = dom, pdom = pdom, sites = sites, lags = lags, ir = ir
   ), class = "sas_dsir_facts")

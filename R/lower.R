@@ -207,9 +207,8 @@ slot_where_effective <- function(wheres) {
 #' @return The `sas_dsir` object of `an` (its slots) with `blocks` (named by
 #'   id), `entry`, `labels` (statement labels: always empty, the parser
 #'   rejects them), `loops`, `lag_sites` (data frame `id, fn, n, block`),
-#'   `unreachable` and `uncertain` (open semantic points of the step:
-#'   `"leave_in_select"` for a LEAVE inside a SELECT inside a DO loop, which the
-#'   engine treats as leaving the loop).
+#'   and `unreachable`. A LEAVE leaves the innermost DO loop or SELECT group
+#'   (inside a SELECT it jumps to the end of the SELECT).
 #' @noRd
 dsir_lower <- function(an) {
   d <- an$dsir %||% dsir_slots(an)
@@ -221,7 +220,6 @@ dsir_lower <- function(an) {
   g$reader <- 0L
   g$cur <- NULL
   g$starts <- list()
-  g$uncertain <- character()
   out_names <- vapply(d$slots$outputs, `[[`, "", "name")
 
   new_block <- function(loop = NULL) {
@@ -312,11 +310,8 @@ dsir_lower <- function(an) {
       delete = transfer("delete", s, ctx),
       stop = transfer("stop", s, ctx),
       "return" = transfer("return", s, ctx),
-      leave = {
-        # the engine leaves the loop, also from inside a SELECT (open point)
-        if (isTRUE(ctx$in_select)) g$uncertain <- union(g$uncertain, "leave_in_select")
-        transfer("jump", s, ctx, to = ctx$loops[[length(ctx$loops)]]$exit)
-      },
+      # LEAVE leaves the innermost DO loop or SELECT group
+      leave = transfer("jump", s, ctx, to = if (isTRUE(ctx$in_select)) ctx$select_join else ctx$loops[[length(ctx$loops)]]$exit),
       continue = transfer("jump", s, ctx, to = ctx$loops[[length(ctx$loops)]]$latch),
       do = lower_do(s, ctx),
       select = lower_select(s, ctx),
@@ -338,9 +333,11 @@ dsir_lower <- function(an) {
     g$loops[[k]] <- lp
     if (s$kind %in% c("iter", "list")) {
       if (s$kind == "iter") {
-        emit("assign", s, target = list(node = "var", name = s$var), expr = s$from)
+        # the start, TO and BY are evaluated before the index is assigned
+        emit("assign", s, target = loop_temp(k, "from"), expr = s$from)
         emit("assign", s, target = loop_temp(k, "to"), expr = s$to)
         emit("assign", s, target = loop_temp(k, "by"), expr = s$by %||% list(node = "num", value = 1, text = "1"))
+        emit("assign", s, target = list(node = "var", name = s$var), expr = loop_temp(k, "from"))
       } else {
         # every value is evaluated once, before the first iteration
         for (j in seq_along(s$values)) emit("assign", s, target = loop_temp(k, paste0("v", j)), expr = s$values[[j]])
@@ -405,14 +402,14 @@ dsir_lower <- function(an) {
     g$n_select <- g$n_select + 1L
     k <- g$n_select
     loop <- cur_loop(ctx)
+    join <- new_block(loop)
     ctx$in_select <- TRUE
+    ctx$select_join <- join
     if (!is.null(s$expr)) emit("assign", s, target = list(node = "select_temp", select = k), expr = s$expr)
     no_match <- function() {
       if (isTRUE(s$has_otherwise)) lower_stmt(s$otherwise, ctx)
       else transfer("abort", s, ctx, kind = "select", msg = "no WHEN clause matched and there is no OTHERWISE clause")
     }
-    if (length(s$whens) == 0) return(no_match())
-    join <- new_block(loop)
     for (w in s$whens) {
       body <- new_block(loop)
       nxt <- new_block(loop)
@@ -456,7 +453,6 @@ dsir_lower <- function(an) {
   d$loops <- g$loops
   d$lag_sites <- lags
   d$unreachable <- unreachable
-  d$uncertain <- g$uncertain
   d
 }
 
