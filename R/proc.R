@@ -41,6 +41,22 @@ parse_global_stmt <- function(p, open_code = FALSE) {
     return(list(type = "global", kind = "title", level = if (is.na(sp$width)) 1L else sp$width,
                 text = paste(parts, collapse = " "), line = line))
   }
+  if (low == "ods") {
+    # `ODS HTML;` and `ODS HTML CLOSE;` open and close the HTML destination of
+    # the result (sas_html()); file options and other destinations fail loud
+    if (is_kw(p, "html", 1L) && tk_type(p, 2L) == "semi") {
+      advance(p, 3L)
+      return(list(type = "global", kind = "ods_html", open = TRUE, line = line))
+    }
+    if (is_kw(p, "html", 1L) && is_kw(p, "close", 2L) && tk_type(p, 3L) == "semi") {
+      advance(p, 4L)
+      return(list(type = "global", kind = "ods_html", open = FALSE, line = line))
+    }
+    if (is_kw(p, "html", 1L)) {
+      abort_unsupported("ODS HTML options (FILE= and the other options are not supported; use sas_html(file =))", line)
+    }
+    abort_unsupported(paste0("ODS ", toupper(tk_val(p, 1L)), " statement"), line)
+  }
   if (low == "filename") {
     advance(p)
     # `FILENAME 'text';` is not an ERROR: the log gets "WARNING: No logical

@@ -203,6 +203,7 @@ public sas_f_year
 public sas_f_yrdif
 public sas_lex
 public sas_listing
+public sas_html
 public sas_log
 public sas_macro_vars
 public sas_meta

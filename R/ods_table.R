@@ -17,7 +17,9 @@
 #                      attributes, list)
 #   header             tibble of header cells: level, text (list of heading
 #                      parts), span, columns (list of the data columns under
-#                      the cell), role
+#                      the cell), role ("class", "stat", "var", "label", or
+#                      "title" for a heading that spans the columns below it);
+#                      the deepest level holds one cell per printed column
 #   notes              lines that belong to the table
 
 ods_table_roles <- c("class", "stat", "var", "label")

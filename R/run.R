@@ -38,6 +38,8 @@ new_engine <- function(session, level, execute) {
   log_engine_init(eng)
   eng$listing <- character()
   eng$ods <- list()
+  # the procedure outputs sent to the HTML destination (sas_html())
+  eng$html <- list()
   eng$sql_open <- FALSE
   eng$sql_opts <- list()
   ses <- session$macro
@@ -285,6 +287,10 @@ engine_exec_steps <- function(eng, text, line) {
                    notes = isTRUE(eng$session$options$notes) && eng$step_notes)
     engine_add_listing(eng, env$.lst, step$line)
     eng$ods <- c(eng$ods, env$.ods)
+    if (length(env$.ods) > 0 && isTRUE(eng$session$ods_html)) {
+      eng$html <- c(eng$html, list(list(proc = step$name, titles = env$.titles, footnotes = eng$session$footnotes,
+                                          tables = env$.ods)))
+    }
     if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = if (isTRUE(eng$syntax_check)) 3 else 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
     if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
@@ -541,6 +547,7 @@ engine_global <- function(eng, g) {
     if (!is.null(g$ps)) o$pagesize <- g$ps
     if (!is.null(g$formdlim)) o$formdlim <- g$formdlim
   }
+  if (g$kind == "ods_html") eng$session$ods_html <- g$open
   if (g$kind == "title") {
     keep <- eng$session$titles[seq_len(min(length(eng$session$titles), g$level - 1L))]
     if (length(keep) < g$level - 1L) keep <- c(keep, rep("", g$level - 1L - length(keep)))
@@ -848,6 +855,8 @@ engine_result <- function(eng) {
                                  class = "sasonr_translation"),
          macro_vars = mv, status = eng$status, errors = eng$errors %||% character(),
          error_line = eng$error_line %||% NA_integer_),
+    # the procedure outputs of the HTML destination (sas_html())
+    html_output = eng$html,
     class = "sasonr_result"
   )
 }

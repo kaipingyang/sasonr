@@ -50,6 +50,8 @@ SasSession <- R6::R6Class("SasSession",
     titles = NULL,
     # footnotes: FOOTNOTE1-FOOTNOTE10 text (FOOTNOTE statements still fail loud).
     footnotes = NULL,
+    # ods_html: TRUE while the HTML destination of the results is open (ODS HTML; / ODS HTML CLOSE;).
+    ods_html = TRUE,
     # formats: User format catalog (WORK.FORMATS): environment, key -> format definition.
     formats = NULL,
     # filerefs: FILENAME assignments: fileref -> path.

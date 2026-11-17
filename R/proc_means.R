@@ -1122,12 +1122,22 @@ means_tables <- function(d, sp, cells_by, print_types) {
         stat_cols[[s]] <- c(stat_cols[[s]], nm)
       }
       for (s in stats) add_head(means_stat_heading(s, sp$alpha), stat_cols[[s]], "stat")
+      level <- rep(1L, length(header))
+      span <- rep(1L, length(header))
+      if (!multi) {
+        # one analysis variable: a spanning heading above the column headings
+        v1 <- info[[sp$vars[[1]]]]
+        header <- c(list(list(text = paste0("Analysis Variable : ", v1$disp, " ", v1$label %||% ""),
+                              columns = names(x), role = "title")), header)
+        span <- c(length(level), span)
+        level <- c(1L, level + 1L)
+      }
       path <- if (is.null(by)) "Means.Summary" else paste0("Means.ByGroup", gi, ".Summary")
       tb <- new_sas_ods_table(
         tibble::new_tibble(x, nrow = length(cells)), name = "Summary", label = "Summary statistics", path = path,
         proc = "Means", template = "base.summary", by = by, cols = vctrs::vec_rbind(ods_cols(), !!!cols),
-        header = ods_header(level = rep(1L, length(header)), text = lapply(header, `[[`, "text"),
-                            span = rep(1L, length(header)), columns = lapply(header, `[[`, "columns"),
+        header = ods_header(level = level, text = lapply(header, `[[`, "text"),
+                            span = span, columns = lapply(header, `[[`, "columns"),
                             role = vapply(header, `[[`, "", "role"))
       )
       tables[[length(tables) + 1L]] <- validate_sas_ods_table(tb)

@@ -1,4 +1,4 @@
-/* Style sheet of the HTML views of sasonr (sas_log(format = "html")). */
+/* Style sheet of the HTML views of sasonr (sas_log(format = "html"), sas_html()). */
 .sas-log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; }
 .sas-log-summary { font-weight: bold; margin: 0 0 0.5em 0; }
 .sas-log details.sas-step { margin: 0 0 0.25em 0; }
@@ -16,3 +16,20 @@
   .sas-warning { color: #75d17b; }
   .sas-error { color: #ff6b6b; }
 }
+/* Procedure output (sas_html()): light page, white data cells, dark blue
+   headings, light grey grid lines, small sans-serif text. */
+.sasonr-output { background-color: #fafbfe; color: #000000; font-family: Arial, Helvetica, sans-serif; font-size: x-small; padding: 7px; }
+.sasonr-output .sas-proc { margin: 0 0 1.5em 0; }
+.sasonr-output .sas-title, .sasonr-output .sas-proctitle, .sasonr-output .sas-byline { color: #112277; font-weight: bold; margin: 0.5em 0; }
+.sasonr-output .sas-title { text-align: center; }
+.sasonr-output .sas-proctitle { text-align: center; font-style: italic; }
+.sasonr-output .sas-footnote { color: #112277; margin: 0.5em 0; }
+.sasonr-output .sas-note-text { margin: 0.25em 0; }
+.sasonr-output table.sas-table { border-collapse: separate; border-spacing: 1px; background-color: #fafbfe; border: 1px solid #c1c1c1; margin: 0.5em 0; }
+.sasonr-output table.sas-table th, .sasonr-output table.sas-table td { padding: 5px; border-style: solid; border-color: #c1c1c1; border-width: 0 1px 1px 0; text-align: left; }
+.sasonr-output table.sas-table th.sas-header { color: #112277; font-weight: bold; background-color: #fafbfe; vertical-align: bottom; }
+.sasonr-output table.sas-table th[colspan] { text-align: center; }
+.sasonr-output table.sas-table th.sas-rowheader { color: #112277; font-weight: bold; background-color: #fafbfe; vertical-align: top; }
+.sasonr-output table.sas-table td.sas-data { background-color: #ffffff; font-weight: normal; vertical-align: top; }
+.sasonr-output table.sas-table .sas-num { text-align: right; }
+.sasonr-output .sas-stack { white-space: nowrap; }
