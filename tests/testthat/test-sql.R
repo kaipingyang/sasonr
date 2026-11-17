@@ -254,3 +254,12 @@ test_that("||, LIKE and CONTAINS take character operands in PROC SQL and WHERE",
   expect_identical(r$work$q$r, "xx")
   expect_identical(r$work$q$k, 1)
 })
+
+test_that("INSERT SET with a column missing from some SET clauses fails loud", {
+  code <- "data t; length a 8 b $3; stop; run;
+    proc sql; insert into t set a = 1, b = 'x' set a = 2; quit;"
+  expect_error(sas_run(code, on_error = "abort"), class = "sasonr_unsupported")
+  r <- sas_run("data t; length a 8 b $3; stop; run;
+    proc sql; insert into t set a = 1, b = 'x' set a = 2, b = 'y'; quit;")
+  expect_equal(r$work$t$b, c("x", "y"))
+})

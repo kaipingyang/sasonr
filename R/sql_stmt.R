@@ -279,7 +279,12 @@ sql_stmt_insert <- function(eng, st) {
     add[[v]] <- if (v %in% names(new)) {
       x <- new[[v]]
       if (is.list(x)) x <- sql_values_col(x, type, v, st$line)
-      if (st$kind == "insert_set") x <- rep_len(x, nrows)
+      # a column named in only some SET clauses: the value of the rows whose
+      # SET clause omits it is not implemented (rep_len() would recycle the
+      # other rows' values into them)
+      if (st$kind == "insert_set" && length(x) != nrows) {
+        abort_unsupported("INSERT ... SET with a column that is missing from some SET clauses", st$line)
+      }
       sql_coerce_col(x, type, len, v, st$line)
     } else if (type == "char") rep(strrep(" ", len), nrows) else rep(NA_real_, nrows)
   }
