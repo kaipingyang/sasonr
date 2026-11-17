@@ -231,7 +231,7 @@ an_expr <- function(e, st) {
       if (e$name %in% c("_n_", "_error_")) {
         reg_var(st, e$name, "num", kind = "auto", disp = toupper(e$name))
       } else if (startsWith(e$name, "first.") || startsWith(e$name, "last.")) {
-        if (is.null(st$info[[e$name]])) abort_unsupported(paste0(toupper(e$name), " without a matching top-level BY statement"), e$line)
+        if (is.null(st$info[[e$name]])) abort_unsupported(paste0(toupper(e$name), " without a BY statement at the top level of the step (a BY inside a DO loop, the DOW pattern, is not supported)"), e$line)
       } else if (is.null(st$info[[e$name]])) {
         reg_var(st, e$name, disp = e$text %||% e$name)
       }
