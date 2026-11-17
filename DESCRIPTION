@@ -23,6 +23,7 @@ Imports:
 Suggests:
     haven,
     testthat (>= 3.0.0),
+    tidylog,
     withr
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)

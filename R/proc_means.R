@@ -409,7 +409,7 @@ translate_proc_means <- function(step, meta, last) {
   code <- c(
     header,
     paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_proc_means(.d, ", r_lit(spec), ")"),
+    paste0(".r <- sas_rt_proc_means(.d, ", r_lit(spec), ")"),
     ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
@@ -660,7 +660,7 @@ means_types_wanted <- function(sp, k, for_print) {
 #' @param sp Specification built by the translator.
 #' @export
 #' @keywords internal
-sas_proc_means <- function(d, sp) {
+sas_rt_proc_means <- function(d, sp) {
   rt <- rt_diag()
   cn <- vapply(sp$class, `[[`, "", "name")
   k <- length(cn)

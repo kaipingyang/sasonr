@@ -50,11 +50,14 @@ check_session <- function(session) {
 #' closes the PROC SQL connection.
 #'
 #' @param session A session from [sas_session()].
+#' @param trim `TRUE` (trailing blanks of character values removed) or
+#'   `FALSE` (the values as stored, padded to the variable length).
+#' @param work Named list of data frames to add to (or replace in) `WORK`.
 #' @param scope `"global"` (user-defined global macro variables) or
 #'   `"automatic"` (automatic macro variables such as `SYSCC`).
 #' @return `sas_work()`: named list of tibbles. `sas_meta()`: named list of
 #'   variable metadata. `sas_macro_vars()`: named list of character values.
-#'   `sas_listing()`: character vector. `sas_session_close()`:
+#'   `sas_listing()`: character vector. `sas_session_add()`, `sas_session_close()`:
 #'   the session, invisibly.
 #' @examples
 #' s <- sas_session()
@@ -68,12 +71,20 @@ NULL
 
 #' @rdname sas_session_accessors
 #' @export
-sas_work <- function(session) {
+sas_work <- function(session, trim = TRUE) {
   check_session(session)
-  out <- lapply(as.list(session$work), function(d) {
-    dplyr::mutate(d, dplyr::across(dplyr::where(is.character), sas_rtrim))
-  })
+  out <- as.list(session$work)
+  if (isTRUE(trim)) {
+    out <- lapply(out, function(d) dplyr::mutate(d, dplyr::across(dplyr::where(is.character), sas_rtrim)))
+  }
   out[sort(names(out) %||% character())]
+}
+
+#' @rdname sas_session_accessors
+#' @export
+sas_session_add <- function(session, work) {
+  check_session(session)
+  session_add_work(session, work)
 }
 
 #' @rdname sas_session_accessors

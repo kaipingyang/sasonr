@@ -23,10 +23,16 @@ sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
   # a chunk that continues an open PROC SQL (statements are executed one by one)
   if (sql_open) {
     res <- parse_sql_stmts(p)
-    steps <- res$steps
+    steps <- step_span(p, res$steps, 0L, 1L)
     sql_open <- res$open
   }
+  n0 <- length(steps)
+  from <- p$pos
   while (!at_eof(p)) {
+    # the steps the previous pass added end where this one starts
+    if (length(steps) > n0) steps <- step_span(p, steps, n0, from)
+    n0 <- length(steps)
+    from <- p$pos
     t <- tk_type(p)
     line <- tk_line(p)
     if (t == "semi") {
@@ -58,7 +64,21 @@ sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
     }
     steps <- c(steps, list(parse_global_stmt(p, open_code = TRUE)))
   }
+  if (length(steps) > n0) steps <- step_span(p, steps, n0, from)
   structure(list(steps = steps), class = "sasonr_program", sql_open = sql_open)
+}
+
+# The source span of the steps `n0 + 1` ... that one pass of sas_parse()
+# added: from token `from` to the token at the parser position (exclusive;
+# NA at the end of the text).  The first of them gets the span, the others
+# (the statements of a PROC SQL block) are covered by it (`span` NULL).
+step_span <- function(p, steps, n0, from) {
+  if (length(steps) <= n0) return(steps)
+  to <- p$pos
+  end <- if (to <= p$n) c(p$line[to], p$col[to]) else c(NA_integer_, NA_integer_)
+  start <- if (from <= p$n) c(p$line[from], p$col[from]) else end
+  steps[[n0 + 1L]]$span <- c(line = start[1], col = start[2], end_line = end[1], end_col = end[2])
+  steps
 }
 
 parse_data_step <- function(p) {

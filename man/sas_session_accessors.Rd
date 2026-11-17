@@ -3,13 +3,16 @@
 \name{sas_session_accessors}
 \alias{sas_session_accessors}
 \alias{sas_work}
+\alias{sas_session_add}
 \alias{sas_meta}
 \alias{sas_macro_vars}
 \alias{sas_listing}
 \alias{sas_session_close}
 \title{Inspect a session}
 \usage{
-sas_work(session)
+sas_work(session, trim = TRUE)
+
+sas_session_add(session, work)
 
 sas_meta(session)
 
@@ -22,13 +25,18 @@ sas_session_close(session)
 \arguments{
 \item{session}{A session from \code{\link[=sas_session]{sas_session()}}.}
 
+\item{trim}{\code{TRUE} (trailing blanks of character values removed) or
+\code{FALSE} (the values as stored, padded to the variable length).}
+
+\item{work}{Named list of data frames to add to (or replace in) \code{WORK}.}
+
 \item{scope}{\code{"global"} (user-defined global macro variables) or
 \code{"automatic"} (automatic macro variables such as \code{SYSCC}).}
 }
 \value{
 \code{sas_work()}: named list of tibbles. \code{sas_meta()}: named list of
 variable metadata. \code{sas_macro_vars()}: named list of character values.
-\code{sas_listing()}: character vector. \code{sas_session_close()}:
+\code{sas_listing()}: character vector. \code{sas_session_add()}, \code{sas_session_close()}:
 the session, invisibly.
 }
 \description{

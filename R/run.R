@@ -69,6 +69,11 @@ new_engine <- function(session, level, execute) {
 
 engine_exec <- function(eng, text, line) {
   if (!is.null(eng$check)) return(engine_check_exec(eng, text, line))
+  # sas_translate(): a chunk whose text depends on run-time values is kept as
+  # SAS text (script.R)
+  if (!eng$execute && script_defer(eng, text, line)) return(invisible())
+  script_open_code(eng, text, line)
+  if (!eng$execute && isTRUE(eng$sql_seen)) return(script_exec_after_sql(eng, text, line))
   if (!identical(eng$on_error, "sas")) return(engine_exec_steps(eng, text, line))
   eng$phase <- "compile"
   eng$cur_step <- NULL
@@ -125,6 +130,7 @@ engine_exec_steps <- function(eng, text, line) {
     if (isTRUE(eng$syntax_check) && isTRUE(eng$sql_noexec) && step$type %in% c("data", "proc")) {
       abort_unsupported("a PROC SQL step in syntax-check mode that ends without QUIT (not supported)", step$line)
     }
+    if (step$type %in% c("global", "sql_begin", "sql", "sql_end")) script_record(eng, step, text, line)
     if (step$type == "global") {
       if (identical(step$kind, "filename_noref")) step$quote <- engine_quote_at(text, line, step)
       engine_global(eng, step)
@@ -193,6 +199,7 @@ engine_exec_steps <- function(eng, text, line) {
       for (t in step$titles) engine_global(eng, t)
       eng$steps <- c(eng$steps, list(list(code = untranslated_code("PROC DATASETS", step$line),
                                           level = "PROC", reasons = "PROC DATASETS", line = step$line, outputs = character(), meta = list())))
+      script_record(eng, step, text, line)
       if (eng$execute) {
         rt_reset(rt)
         engine_datasets(eng, step)
@@ -205,11 +212,17 @@ engine_exec_steps <- function(eng, text, line) {
       tr <- translate_proc(step, eng$session$meta, eng$session$last)
     } else {
       tr <- translate_step(step, eng$session$meta, eng$level)
+      # sas_data_step(): the step runs the code of the script
+      if (!is.null(eng$override)) {
+        tr$exprs <- eng$override
+        eng$override <- NULL
+      }
     }
     eng$session$meta[names(tr$meta)] <- tr$meta
     eng$session$unordered <- setdiff(eng$session$unordered, tr$outputs)
     if (length(tr$outputs) > 0) session_set_last(eng$session, tr$outputs[length(tr$outputs)])
     eng$steps <- c(eng$steps, list(tr))
+    node <- script_record(eng, step, text, line, tr)
     if (!eng$execute) next
     vec <- step$type == "data" && tr$level %in% c("L1", "L2")
     eng$phase <- if (step$type == "data") "execute_data" else "execute"
@@ -237,6 +250,8 @@ engine_exec_steps <- function(eng, text, line) {
       tr$reasons <- c(if (branch) "unsupported value or step exception in vectorised code (re-run row by row)" else
         "data error at run time (re-run of the vectorised step)", tr$reasons)
       eng$steps[[length(eng$steps)]] <- tr
+      eng$script[[node]]$tr <- tr
+      eng$script[[node]]$rerun <- TRUE
       env <- tryCatch(engine_eval(eng, tr, stage = FALSE),
                       sasonr_step_exception = function(e) engine_step_exception(eng, step, tr, e))
       if (!is.environment(env)) next
@@ -604,6 +619,7 @@ engine_program <- function(eng, code) {
   sink <- code_sink(eng$session$macro)
   mp_scan(mp_src(text, line_of = TRUE), eng$session$macro, sink, mode = "code")
   sink$finish()
+  if (!isTRUE(eng$deferred)) script_open_code(eng, "", length(eng$program$lines) + 1L, end = TRUE)
   if (isTRUE(eng$sc_pending)) {
     abort_unsupported("the end of a program after an ERROR in a global statement (supported: a DATA step follows)")
   }
@@ -647,8 +663,13 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
   old <- .active$session
   on.exit(sas_rt_active(old), add = TRUE)
   sas_rt_active(session)
-  engine_program(eng, code)
-  structure(list(steps = eng$steps), class = "sasonr_translation")
+  eng$dynamic <- script_dynamic(code)
+  # in a program that can depend on run-time values, macro code that fails
+  # without them ends the translation: the rest is deferred (script.R)
+  tryCatch(engine_program(eng, code), sasonr_runtime_error = function(e) script_defer_rest(eng, e),
+           sasonr_syntax_error = function(e) script_defer_rest(eng, e))
+  structure(list(steps = eng$steps, script = script_raw(eng$script, "translation", tolower(names(work)))),
+            class = "sasonr_translation")
 }
 
 #' Run a SAS program on the R engine
@@ -716,6 +737,7 @@ sas_run <- function(code, work = list(), level = c("auto", "L3"),
   eng <- new_engine(session, level, execute = TRUE)
   eng$on_error <- on_error
   eng$status <- "ok"
+  eng$inputs <- tolower(names(work))
   # bind the session for the generated code and the run-time helpers (the
   # restore is registered first: an interrupt in between leaves nothing bound)
   old <- .active$session
@@ -817,7 +839,8 @@ engine_result <- function(eng) {
     list(log = log_view_plain(ev <- log_result_events(eng), log_echo_default), log_events = ev,
          listing = eng$listing, work = out[dsn], meta = eng$session$meta[intersect(dsn, names(eng$session$meta))],
          unordered = intersect(eng$session$unordered, dsn),
-         translation = structure(list(steps = eng$steps), class = "sasonr_translation"),
+         translation = structure(list(steps = eng$steps, script = script_raw(eng$script, "trace", eng$inputs %||% character())),
+                                 class = "sasonr_translation"),
          macro_vars = mv, status = eng$status, errors = eng$errors %||% character(),
          error_line = eng$error_line %||% NA_integer_),
     class = "sasonr_result"
