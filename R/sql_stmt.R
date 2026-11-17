@@ -236,6 +236,15 @@ sql_values_col <- function(x, type, name, line) {
   vctrs::list_unchop(x, ptype = if (char) character() else double(), name_spec = rlang::zap())
 }
 
+# INSERT ... SET with a value whose type is not the column's type.  Whether
+# this ERROR starts syntax-check mode at QUIT is not established (sql_timing
+# "unknown", errors.R).
+sql_set_type_error <- function(char_value, line) {
+  msg <- if (char_value) "a character expression to a numeric value" else "a numeric expression to a character value"
+  rlang::abort(paste0("Syntax error: It is invalid to assign ", msg, " using the SET clause. (SAS line ", line, ")"),
+               class = c("sasonr_syntax_error", "sasonr_error"), sas_line = line, sql_timing = "unknown")
+}
+
 sql_stmt_insert <- function(eng, st) {
   tg <- sql_target(eng, st$table, st$line)
   m <- tg$meta
@@ -265,10 +274,26 @@ sql_stmt_insert <- function(eng, st) {
           abort_runtime(paste0("Value ", k, " of VALUES clause ", ri, " does not match the data type of the corresponding ",
                                "column in the object-item list (in the SELECT clause)."), st$line)
         }
-        new[[cols[k]]] <- c(new[[cols[k]]], list(v))
+        if (st$kind == "insert_set") {
+          # a value of the other type in any SET clause: no row is inserted
+          if (cols[k] %in% vars && is.character(v) != identical(type, "char")) sql_set_type_error(is.character(v), st$line)
+          if (is.null(new[[cols[k]]])) new[[cols[k]]] <- vector("list", length(rows))
+          new[[cols[k]]][ri] <- list(v)
+        } else {
+          new[[cols[k]]] <- c(new[[cols[k]]], list(v))
+        }
       }
     }
     nrows <- length(rows)
+    # a column that a SET clause leaves out is missing in that row (blank
+    # for a character column)
+    if (st$kind == "insert_set") {
+      for (nm in intersect(names(new), vars)) {
+        char <- identical(m$type[[nm]] %||% (if (is.character(tg$data[[nm]])) "char" else "num"), "char")
+        omitted <- vapply(new[[nm]], is.null, NA)
+        new[[nm]][omitted] <- list(if (char) "" else NA_real_)
+      }
+    }
   }
   miss <- setdiff(names(new), vars)
   if (length(miss) > 0) abort_syntax(paste0("Column ", miss[1], " could not be found in the table/view identified with the correlation name ", toupper(st$table), "."), st$line)
@@ -279,12 +304,6 @@ sql_stmt_insert <- function(eng, st) {
     add[[v]] <- if (v %in% names(new)) {
       x <- new[[v]]
       if (is.list(x)) x <- sql_values_col(x, type, v, st$line)
-      # a column named in only some SET clauses: the value of the rows whose
-      # SET clause omits it is not implemented (rep_len() would recycle the
-      # other rows' values into them)
-      if (st$kind == "insert_set" && length(x) != nrows) {
-        abort_unsupported("INSERT ... SET with a column that is missing from some SET clauses", st$line)
-      }
       sql_coerce_col(x, type, len, v, st$line)
     } else if (type == "char") rep(strrep(" ", len), nrows) else rep(NA_real_, nrows)
   }

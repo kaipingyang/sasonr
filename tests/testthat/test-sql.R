@@ -255,13 +255,28 @@ test_that("||, LIKE and CONTAINS take character operands in PROC SQL and WHERE",
   expect_identical(r$work$q$k, 1)
 })
 
-test_that("INSERT SET with a column missing from some SET clauses fails loud", {
-  code <- "data t; length a 8 b $3; stop; run;
-    proc sql; insert into t set a = 1, b = 'x' set a = 2; quit;"
-  expect_error(sas_run(code, on_error = "abort"), class = "sasonr_unsupported")
-  r <- sas_run("data t; length a 8 b $3; stop; run;
-    proc sql; insert into t set a = 1, b = 'x' set a = 2, b = 'y'; quit;")
-  expect_equal(r$work$t$b, c("x", "y"))
+test_that("INSERT SET leaves a column that a SET clause omits missing in that row", {
+  r <- sas_run("proc sql; create table u (a num, b num, c char(4));
+    insert into u set a = 1, b = 2, c = 'x' set a = 3 set b = 8, c = 'yy'; quit;")
+  expect_identical(r$work$u$a, c(1, 3, NA))
+  expect_identical(r$work$u$b, c(2, NA, 8))
+  expect_identical(sub(" +$", "", r$work$u$c), c("x", "", "yy"))
+})
+
+test_that("INSERT SET with a value of the other type inserts no row", {
+  withr::local_options(sasonr.on_error = "sas")
+  r <- sas_run("options nosyntaxcheck; proc sql; create table v (a num, c char(4));
+    insert into v set a = 1, c = 'x' set a = 2, c = 5;
+    select count(*) as n from v; quit;
+    proc sql; create table w (a num, c char(4)); insert into w set a = 1, c = 'x' set a = 'q', c = 'y'; quit;")
+  expect_true(any(r$log == "ERROR: It is invalid to assign a numeric expression to a character value using the SET clause."))
+  expect_true(any(r$log == "ERROR: It is invalid to assign a character expression to a numeric value using the SET clause."))
+  expect_true(any(r$log == "NOTE: Statement not executed due to NOEXEC option."))
+  expect_identical(nrow(r$work$v), 0L)
+  expect_identical(nrow(r$work$w), 0L)
+  # INSERT VALUES keeps its message
+  r <- sas_run("options nosyntaxcheck; proc sql; create table v (a num, c char(4)); insert into v values(1, 5); quit;")
+  expect_true(any(grepl("^ERROR: Value 2 of VALUES clause 1 does not match the data type", r$log)))
 })
 
 test_that("OUTOBS= and INOBS= take an integer constant in the PROC SQL statement", {
