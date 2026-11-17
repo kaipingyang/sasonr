@@ -300,9 +300,12 @@ test_that("GROUP BY and ORDER BY positions must be positive whole numbers", {
   withr::local_options(sasonr.on_error = "sas")
   base <- "options nosyntaxcheck; data have; input g $ x; datalines;\nb 3\na 1\n;\nproc sql; "
   run1 <- function(q) sas_run(paste0(base, q, " quit;"))
-  r <- run1("create table s as select g, sum(x) as t from have group by 1.5;")
-  expect_true(any(r$log == "ERROR: GROUP BY clause requires a positive column number."))
-  expect_null(r$work$s)
+  for (q in c("create table s as select g, sum(x) as t from have group by 1.5;",
+              "create table s as select g, sum(x) as t from have group by -1;")) {
+    r <- run1(q)
+    expect_true(any(r$log == "ERROR: GROUP BY clause requires a positive column number."))
+    expect_null(r$work$s)
+  }
   for (q in c("create table s as select g, x from have order by 2.5;",
               "create table s as select g, x from have order by -1;",
               "create table s as select g, x from have union select g, x from have order by 1.5;")) {
@@ -312,4 +315,58 @@ test_that("GROUP BY and ORDER BY positions must be positive whole numbers", {
   }
   r <- run1("create table s as select g, x from have order by 2;")
   expect_identical(r$work$s$x, c(1, 3))
+})
+
+test_that("RESET OUTOBS=, INOBS= and LOOPS= take an integer constant", {
+  withr::local_options(sasonr.on_error = "sas")
+  base <- "options nosyntaxcheck; data have; x = 1; output; x = 2; output; x = 3; output; run; proc sql; reset "
+  for (o in c("outobs=2.5", "outobs=-1", "inobs=2.5", "loops=2.5", "loops=-1", "outobs=abc", "inobs=abc")) {
+    r <- sas_run(paste0(base, o, "; create table s as select * from have; quit; %put syserr=&syserr;"))
+    err <- grep("^ERROR", r$log, value = TRUE)
+    expect_match(err[1], "^ERROR 22-322: Syntax error, expecting one of the following: an integer constant, ;, CHECK,")
+    expect_identical(err[2], if (grepl("abc", o)) "ERROR 202-322: The option or parameter is not recognized and will be ignored." else
+      "ERROR 200-322: The symbol is not recognized and will be ignored.")
+    expect_true(any(r$log == "NOTE: Statement not executed due to NOEXEC option."))
+    expect_null(r$work$s)
+    expect_true(any(r$log == "syserr=1012"))
+  }
+  r <- sas_run(paste0(base, "outobs=2; create table s as select * from have; quit;"))
+  expect_identical(r$work$s$x, c(1, 2))
+  expect_error(sas_run("data have; x = 1; run; proc sql; reset outobs=2.5; select * from have; quit;", on_error = "abort"),
+               class = "sasonr_syntax_error")
+})
+
+# The PROC SQL step with an ERROR, then a DATA step and PROC PRINT (default
+# options, so syntax-check mode can start at QUIT).
+sql_error_then_data <- function(stmt) {
+  sas_run(paste0("data have; input g $ x; datalines;\nb 3\na 1\nc 5\n;\nproc sql; ", stmt,
+                 " create table after_sql as select * from have; quit; %put e2 syserr=&syserr;",
+                 " data after; set have; y = x + 1; run; proc print data=after; run; %put end syserr=&syserr;"))
+}
+
+test_that("after a GROUP BY, ORDER BY or RESET ERROR in PROC SQL the next steps run", {
+  withr::local_options(sasonr.on_error = "sas")
+  for (stmt in c("create table s as select g, sum(x) as t from have group by 1.5;",
+                 "create table s as select g, sum(x) as t from have group by -1;",
+                 "create table s as select g, x from have order by -1;",
+                 "create table s as select g, x from have union select g, x from have order by 1.5;",
+                 "reset outobs=2.5;")) {
+    r <- sql_error_then_data(stmt)
+    expect_false(any(grepl("enabling syntax check mode", r$log)))
+    expect_null(r$work$after_sql)
+    expect_identical(r$work$after$y, c(4, 2, 6))
+    expect_true(any(r$log == "e2 syserr=1012"))
+    expect_true(any(r$log == "end syserr=0"))
+  }
+})
+
+test_that("after an INSERT SET type ERROR syntax-check mode starts at QUIT", {
+  withr::local_options(sasonr.on_error = "sas")
+  r <- sql_error_then_data("create table v (a num, c char(4)); insert into v set a=1, c='x' set a=2, c=5;")
+  expect_true(any(r$log == "ERROR: It is invalid to assign a numeric expression to a character value using the SET clause."))
+  expect_true(any(grepl("set option OBS=0, enabling syntax check mode", r$log)))
+  expect_identical(nrow(r$work$v), 0L)
+  expect_identical(nrow(r$work$after), 0L)
+  expect_true(any(r$log == "e2 syserr=1012"))
+  expect_true(any(r$log == "end syserr=3"))
 })

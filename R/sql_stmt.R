@@ -236,13 +236,12 @@ sql_values_col <- function(x, type, name, line) {
   vctrs::list_unchop(x, ptype = if (char) character() else double(), name_spec = rlang::zap())
 }
 
-# INSERT ... SET with a value whose type is not the column's type.  Whether
-# this ERROR starts syntax-check mode at QUIT is not established (sql_timing
-# "unknown", errors.R).
+# INSERT ... SET with a value whose type is not the column's type.  This
+# ERROR starts syntax-check mode at QUIT (sql_timing "run", errors.R).
 sql_set_type_error <- function(char_value, line) {
   msg <- if (char_value) "a character expression to a numeric value" else "a numeric expression to a character value"
   rlang::abort(paste0("Syntax error: It is invalid to assign ", msg, " using the SET clause. (SAS line ", line, ")"),
-               class = c("sasonr_syntax_error", "sasonr_error"), sas_line = line, sql_timing = "unknown")
+               class = c("sasonr_syntax_error", "sasonr_error"), sas_line = line, sql_timing = "run")
 }
 
 sql_stmt_insert <- function(eng, st) {

@@ -160,11 +160,20 @@ engine_exec_steps <- function(eng, text, line) {
           eng$syntax_check <- TRUE
         }
         eng$sql_error_kind <- NULL
-        if (isTRUE(eng$syntax_check)) err_set_macro(eng, syserr = 1012)
+        # a step that stopped: SYSERR is 1012 (also without syntax-check mode)
+        err_set_macro(eng, syserr = 1012)
       }
       next
     }
     if (step$type == "sql") {
+      if (!is.null(step$stmt$error)) {
+        # a syntax ERROR in a RESET statement is handled like one in the PROC SQL
+        # statement
+        if (isTRUE(eng$syntax_check)) abort_unsupported("a RESET option ERROR in syntax-check mode", step$line)
+        if (!identical(eng$on_error, "sas")) rlang::cnd_signal(step$stmt$error)
+        engine_step_error(eng, step$stmt$error, text, sql = TRUE)
+        next
+      }
       if (isTRUE(eng$sql_noexec) || isTRUE(eng$syntax_check)) {
         if (isTRUE(eng$sql_noexec)) log_emit(eng, id = "sql.not_executed")
         if (isTRUE(eng$syntax_check)) sql_set_status(eng, 0, 0)

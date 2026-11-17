@@ -318,12 +318,12 @@ sql_needs_remerge <- function(e, group, ctx, item_k = NULL) {
 # when the item is not a number.  A number with a fraction (1.5) or a
 # negated number (-1) is the ERROR "<clause> clause requires a positive
 # column number."; other spellings of a whole number (1.0, 1e0) fail loud.
-# Whether that ERROR starts syntax-check mode at QUIT is not established
-# (sql_timing "unknown", errors.R).
+# This ERROR does not start syntax-check mode at QUIT (sql_timing "syntax",
+# errors.R).
 sql_item_position <- function(e, clause) {
   bad <- function() {
     rlang::abort(paste0("Syntax error: ", clause, " clause requires a positive column number. (SAS line ", e$line, ")"),
-                 class = c("sasonr_syntax_error", "sasonr_error"), sas_line = e$line, sql_timing = "unknown")
+                 class = c("sasonr_syntax_error", "sasonr_error"), sas_line = e$line, sql_timing = "syntax")
   }
   is_num <- function(x) identical(x$node, "num") && identical(x$kind, "num")
   if (identical(e$node, "unary") && identical(e$op, "-") && is_num(e$arg) && !isTRUE(e$arg$paren)) bad()
