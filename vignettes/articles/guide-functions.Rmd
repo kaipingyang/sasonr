@@ -30,7 +30,7 @@ data _null_;
   put w2= wl= c= x= d= date9.;
 run;
 ")
-res$log
+sas_log(res)
 ```
 
 ## Calling them from R

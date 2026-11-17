@@ -36,5 +36,6 @@ Status: early development, not on CRAN.
 # pak::pak("kaipingyang/sasonr")
 library(sasonr)
 res <- sas_run("data a; do i = 1 to 3; x = i**2; output; end; run;")
+sas_log(res)                                      # the log, with the program lines
 sas_translate("data b; set a; if x > 1; run;")   # show generated R code
 ```

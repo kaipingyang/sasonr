@@ -37,7 +37,7 @@ proc sql noprint;
 quit;
 %put glist=&glist;
 ")
-res$log
+sas_log(res)
 res$work$s
 ```
 

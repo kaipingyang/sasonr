@@ -36,7 +36,7 @@ data adsl;
 run;
 "
 res <- sas_run(code)
-res$log
+sas_log(res)
 res$work$adsl
 ```
 
@@ -93,8 +93,11 @@ code3 <- "
 %mend check;
 %check(adsl)
 "
-sas_run(code3)$log
+sas_log(sas_run(code3), echo = FALSE)
 ```
+
+`echo = FALSE` leaves the program lines out: the log shows only the
+messages and the PUT output.
 
 ## Unsupported features fail loudly
 
