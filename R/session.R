@@ -52,6 +52,10 @@ SasSession <- R6::R6Class("SasSession",
     footnotes = NULL,
     # ods_html: TRUE while the HTML destination of the results is open (ODS HTML; / ODS HTML CLOSE;).
     ods_html = TRUE,
+    # ods_output: ODS OUTPUT requests for the next step (ods_output.R): list of list(object, ds, line).
+    ods_output = NULL,
+    # last_ods: TRUE after a step wrote ODS OUTPUT data sets (whether they become `_LAST_` is not modelled).
+    last_ods = FALSE,
     # formats: User format catalog (WORK.FORMATS): environment, key -> format definition.
     formats = NULL,
     # filerefs: FILENAME assignments: fileref -> path.
@@ -233,6 +237,7 @@ session_leave <- function(session) {
 session_set_last <- function(session, name, view = FALSE) {
   session$last <- name
   session$last_view <- view
+  session$last_ods <- FALSE
   mac_set_last(session$macro, name)
   invisible(session)
 }

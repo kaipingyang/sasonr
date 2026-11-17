@@ -23,6 +23,9 @@ rt_reset <- function(rt = rt_diag()) {
   rt$reads <- list()
   rt$proc_notes <- character()
   rt$flow_note <- FALSE
+  # ODS OUTPUT requests of the step and the NOTEs of the data sets written (ods_output.R)
+  rt$ods_output <- list()
+  rt$ods_notes <- list()
   invisible()
 }
 

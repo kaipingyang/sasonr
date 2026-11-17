@@ -133,6 +133,14 @@ engine_exec_steps <- function(eng, text, line) {
     if (isTRUE(eng$syntax_check) && isTRUE(eng$sql_noexec) && step$type %in% c("data", "proc")) {
       abort_unsupported("a PROC SQL step in syntax-check mode that ends without QUIT (not supported)", step$line)
     }
+    if (length(eng$session$ods_output) > 0 && step$type %in% c("data", "proc", "sql_begin")) {
+      # ODS OUTPUT requests apply to the next step: only a PROC MEANS step that runs
+      if (!(step$type == "proc" && step$name == "means") || isTRUE(eng$syntax_check)) {
+        abort_unsupported(paste0("ODS OUTPUT requests at ", if (step$type == "data") "a DATA step" else
+          paste("PROC", toupper(if (step$type == "sql_begin") "sql" else step$name)),
+          if (isTRUE(eng$syntax_check)) " in syntax-check mode", " (supported: the next step is PROC MEANS)"), step$line)
+      }
+    }
     if (step$type %in% c("global", "sql_begin", "sql", "sql_end")) script_record(eng, step, text, line)
     if (step$type == "global") {
       if (identical(step$kind, "filename_noref")) step$quote <- engine_quote_at(text, line, step)
@@ -286,6 +294,9 @@ engine_exec_steps <- function(eng, text, line) {
     log_step_close(eng, if (step$type == "data") "data" else "proc", tr = tr, env = env, stopped = stopped,
                    notes = isTRUE(eng$session$options$notes) && eng$step_notes)
     engine_add_listing(eng, env$.lst, step$line)
+    # the ODS OUTPUT requests end with the step (no PERSIST=)
+    if (length(rt$ods_notes) > 0) eng$session$last_ods <- TRUE
+    eng$session$ods_output <- NULL
     eng$ods <- c(eng$ods, env$.ods)
     if (length(env$.ods) > 0 && isTRUE(eng$session$ods_html)) {
       eng$html <- c(eng$html, list(list(proc = step$name, titles = env$.titles, footnotes = eng$session$footnotes,
@@ -302,8 +313,13 @@ engine_exec_steps <- function(eng, text, line) {
 }
 
 # A PROC step that reads `_LAST_` when `_LAST_` is a PROC SQL view: sasonr
-# reads views only in PROC SQL, so it fails loud.
+# reads views only in PROC SQL, so it fails loud.  Whether an ODS OUTPUT data
+# set becomes `_LAST_` is not modelled: reading `_LAST_` after one fails loud.
 engine_check_last_view <- function(eng, step) {
+  if (isTRUE(eng$session$last_ods) && is.null(step$options$data) &&
+      step$name %in% c("sort", "print", "means", "summary", "freq", "transpose", "contents")) {
+    abort_unsupported(paste0("PROC ", toupper(step$name), " reading _LAST_ after a step that wrote ODS OUTPUT data sets"), step$line)
+  }
   if (isTRUE(eng$session$last_view) && is.null(step$options$data) &&
       step$name %in% c("sort", "print", "means", "summary", "freq", "transpose", "contents")) {
     abort_unsupported(paste0("PROC ", toupper(step$name), " reading _LAST_, the PROC SQL view WORK.",
@@ -479,6 +495,7 @@ sas_num_store <- function(x, len) {
 engine_eval <- function(eng, tr, stage = FALSE, empty = character()) {
   rt <- eng$session$rt
   rt_reset(rt)
+  rt$ods_output <- eng$session$ods_output %||% list()
   env <- new.env(parent = asNamespace("sasonr"))
   # `empty`: data sets the step reads with 0 observations (a staged copy)
   if (stage || length(empty)) {
@@ -548,6 +565,7 @@ engine_global <- function(eng, g) {
     if (!is.null(g$formdlim)) o$formdlim <- g$formdlim
   }
   if (g$kind == "ods_html") eng$session$ods_html <- g$open
+  if (g$kind == "ods_output") eng$session$ods_output <- c(eng$session$ods_output, g$requests)
   if (g$kind == "title") {
     keep <- eng$session$titles[seq_len(min(length(eng$session$titles), g$level - 1L))]
     if (length(keep) < g$level - 1L) keep <- c(keep, rep("", g$level - 1L - length(keep)))

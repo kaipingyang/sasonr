@@ -52,6 +52,7 @@ parse_global_stmt <- function(p, open_code = FALSE) {
       advance(p, 4L)
       return(list(type = "global", kind = "ods_html", open = FALSE, line = line))
     }
+    if (is_kw(p, "output", 1L)) return(parse_ods_output(p, line))
     if (is_kw(p, "html", 1L)) {
       abort_unsupported("ODS HTML options (FILE= and the other options are not supported; use sas_html(file =))", line)
     }

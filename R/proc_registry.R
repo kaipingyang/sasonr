@@ -8,7 +8,8 @@
 # in the registry keep their own run-time helper.
 
 proc_registry <- list(
-  means = list(compute = function(d, spec) means_compute(d, spec), templates = c(Summary = "base.summary"))
+  means = list(compute = function(d, spec) means_compute(d, spec), templates = c(Summary = "base.summary"),
+               ods_output = function(tables, spec, line) means_ods_output(tables, spec, line))
 )
 proc_registry_alias <- c(summary = "means")
 
@@ -37,6 +38,17 @@ sas_rt_proc <- function(name, d, spec) {
   if (length(res$events) > 0) {
     rt <- rt_diag()
     rt$proc_notes <- c(rt$proc_notes, res$events)
+  }
+  reqs <- rt_diag()$ods_output
+  if (length(reqs) > 0) {
+    # ODS OUTPUT data sets (ods_output.R); only PROC MEANS writes them
+    if (is.null(e$ods_output) || tolower(name) != "means") {
+      abort_unsupported(paste0("ODS OUTPUT in a PROC ", toupper(name), " step"), spec$line)
+    }
+    ods <- ods_output_write(res$tables, spec, reqs, e$ods_output, name)
+    clash <- intersect(names(ods), names(res$data))
+    if (length(clash) > 0) abort_unsupported(paste0("an ODS OUTPUT data set that is also an OUTPUT data set (WORK.", toupper(clash[1]), ")"), spec$line)
+    res$data <- c(ods, res$data)
   }
   listing <- render_listing_tables(res$tables, paste0("The ", toupper(name), " Procedure"), rt_linesize())
   list(listing = listing, out = res$data, tables = res$tables)
