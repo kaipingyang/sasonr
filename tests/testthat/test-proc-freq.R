@@ -652,3 +652,22 @@ test_that("a BINOMIAL P= above 1 is a percentage", {
                                    "One-sided Pr >  Z         <.0001",
                                    "Two-sided Pr > |Z|        <.0001"))
 })
+
+test_that("the BINOMIAL test heading is centred over the test table, rounded down", {
+  d <- "data a; input r $ @@; datalines;\ny y n n n y y y n n y n\n;\n"
+  h0 <- function(opt) {
+    l <- sas_run(paste0(d, "proc freq data=a; tables r / ", opt, "; run;"))$listing
+    l <- sub(" +$", "", l[nzchar(trimws(l))])
+    i <- grep("Test of H0", l)
+    l[c(i, i + 3L)]
+  }
+  expect_identical(h0("binomial"), c("  Test of H0: Proportion = 0.5", "One-sided Pr <  Z         0.5000"))
+  expect_identical(h0("binomial(p=0.5)")[1], "  Test of H0: Proportion = 0.5")
+  expect_identical(h0("binomial(p=0.3)"), c("  Test of H0: Proportion = 0.3", "One-sided Pr >  Z         0.0653"))
+  expect_identical(h0("binomial(p=0.25)")[1], " Test of H0: Proportion = 0.25")
+  expect_identical(h0("binomial(p=0.125)")[1], " Test of H0: Proportion = 0.125")
+  expect_identical(h0("binomial(p=0.1234)")[1], "Test of H0: Proportion = 0.1234")
+  expect_identical(h0("binomial(p=0.95)")[1], " Test of H0: Proportion = 0.95")
+  expect_identical(h0("binomial(p=0.05)")[1], " Test of H0: Proportion = 0.05")
+  expect_identical(h0("binomial(p=12.5)")[1], " Test of H0: Proportion = 0.125")
+})

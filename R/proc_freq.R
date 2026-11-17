@@ -2152,14 +2152,16 @@ freq_binomial_listing <- function(st, info) {
     }
     out <- c(out, "")
   }
-  # centred over the 32 columns of the test table (rounded down)
+  # centred over the 32 columns of the test table, rounded down: P= 0.5 -> 2
+  # spaces, 0.25 / 0.125 / 0.95 -> 1, 0.1234 -> 0 (heading lengths 28..31)
   h0 <- paste0("Test of H0: Proportion = ", freq_num(st$p0))
   out <- c(out, paste0(strrep(" ", max(0L, (32L - nchar(h0)) %/% 2L)), h0), "")
   use_c <- isTRUE(st$correct) && !is.null(cl)
   zt <- if (use_c) st$zc_bin else st$z_bin
   pone <- if (use_c) st$plc_bin else st$pl_bin
   ptwo <- if (use_c) st$p2c_bin else st$p2_bin
-  side <- if (zt >= 0) ">" else "<"
+  # Z = 0 reads "Pr <  Z"; only a positive Z reads "Pr >  Z"
+  side <- if (zt > 0) ">" else "<"
   out <- c(out,
            line("ASE under H0", f4(st$e0_bin), w_test),
            line("Z", f4(zt), w_test),
