@@ -241,3 +241,59 @@ test_that("a comment after the last step follows it; a statement without code pu
   txt <- as.character(sc)
   expect_equal(txt[length(txt)], "# the end")
 })
+
+test_that("a tidy step reads earlier data sets as R variables in one pipeline", {
+  skip_if_not_installed("tidylog")
+  prog <- paste("data in; input g x; datalines;\n1 2\n2 3\n;\nrun;",
+                "data out; set in; y = x*2; run;",
+                "data out2; set out(keep = g y); if y > 4; run;", sep = "\n")
+  ref <- sas_run(prog)
+  sc <- sas_script(ref, tidy = TRUE)
+  txt <- as.character(sc)
+  expect_false(any(grepl("sas_session|sas_data_step|^\\.d <- |sas_note_read|\\.at = ", txt)))
+  expect_true("out <- `in` |>" %in% txt)
+  expect_true("out2 <- out |> sas_ds(keep = c(\"g\", \"y\")) |>" %in% txt)
+  expect_true(any(grepl("^  select\\(g, x, y\\)$", txt)))
+  env <- sasonr_tidy_log(run_script(sc))
+  for (nm in names(ref$work)) {
+    got <- dplyr::mutate(tibble::as_tibble(env[[nm]]), dplyr::across(dplyr::where(is.character), sas_rtrim))
+    expect_identical(got, ref$work[[nm]])
+  }
+})
+
+test_that("a tidy step after a session block reads the data sets the block returned", {
+  skip_if_not_installed("tidylog")
+  prog <- "data a; x = 1; put x=; run;\ndata b; set a; y = x + 1; run;"
+  ref <- sas_run(prog)
+  txt <- as.character(sas_script(ref, tidy = TRUE))
+  expect_true(any(grepl("^# In a sasonr session: the step writes to the log", txt)))
+  expect_true("b <- a |>" %in% txt)
+  env <- run_script(sas_script(ref, tidy = TRUE))
+  expect_identical(tibble::as_tibble(env$b), ref$work$b)
+})
+
+test_that("a variable assigned before it is read starts without its missing value", {
+  txt <- as.character(sas_script(sas_translate("data a; x = 1; y = y + x; if x then z = 2; w = 3; w = w + 1; run;")))
+  expect_false("      x = NA_real_," %in% txt)
+  expect_true(all(c("      y = NA_real_,", "      z = NA_real_,") %in% txt))
+  expect_false("      w = NA_real_," %in% txt)
+  ref <- sas_run("data a; x = 1; y = y + x; if x then z = 2; w = 3; w = w + 1; run;")
+  expect_identical(sas_work(run_script(sas_script(ref))$s), ref$work)
+})
+
+test_that("the tidy form keeps body comments where a pipeline was merged", {
+  a <- data.frame(x = c(1, 2))
+  prog <- "data b;\n  set a;\n  y = x;\n  /* double it */\n  z = y * 2;\nrun;"
+  txt <- as.character(sas_script(sas_translate(prog, work = list(a = a)), tidy = TRUE))
+  k <- match("    # double it", txt)
+  expect_false(is.na(k))
+  expect_match(txt[k + 1L], "^    z = ")
+  expect_true("b <- a |>" %in% txt)
+})
+
+test_that("a MERGE step runs in a session block that says why", {
+  prog <- "data a; k = 1; x = 1; run;\ndata b; k = 1; y = 2; run;\ndata c; merge a b; by k; run;"
+  txt <- as.character(sas_script(sas_translate(prog), tidy = TRUE))
+  expect_true("# In a sasonr session: a MERGE step (MERGE runs row by row, L3)" %in% txt)
+  expect_true(all(c("a <- tibble::tibble(.rows = 1L) |>", "b <- tibble::tibble(.rows = 1L) |>") %in% txt))
+})

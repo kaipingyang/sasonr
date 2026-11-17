@@ -18,7 +18,9 @@
 # comment of a later statement in a DATA step goes above the line of the
 # generated code that carries the SAS position of the statement (the
 # `.at = c(line, col)` arguments of L3 statements and mutate() arguments);
-# when no such line exists it goes above the step and records why.  The
+# when no such line exists it goes above the step and records why.  The tidy
+# form has no `.at` arguments: the node keeps the line of the step code of each
+# line of its tidy code (`tidy_map`), and the comment goes above that line.  The
 # comments change only the text: the code parses to the same objects.
 
 # The comments of `tok` with the statement each one belongs to.  `starts`:
@@ -184,8 +186,13 @@ script_comments_render <- function(nd) {
     new_text <- if (any(ok)) script_insert_comments(tl, ifelse(ok, at + 1L, NA_integer_), cms[body]) else NULL
     tidy <- nd$tidy
     new_tidy <- if (!is.null(new_text) && !is.null(tidy)) {
+      # the lines of the tidy code map to lines of the step code (tidy_map)
       tdl <- strsplit(tidy, "\n", fixed = TRUE)[[1]]
-      if (length(tdl) == length(code)) script_insert_comments(tdl, ifelse(ok, at, NA_integer_), cms[body])
+      map <- nd$tidy_map %||% seq_along(tdl)
+      at_t <- match(at, map)
+      if (length(map) == length(tdl) && !any(ok & is.na(at_t))) {
+        script_insert_comments(tdl, ifelse(ok, at_t, NA_integer_), cms[body])
+      }
     }
     if (any(ok) && (is.null(new_text) || (!is.null(tidy) && is.null(new_tidy)))) {
       for (j in which(ok)) {

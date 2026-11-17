@@ -271,9 +271,11 @@ script_node <- function(nd, mode) {
                    paste0("  ", strsplit(code, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n}, sas = ", r_raw(stext),
                    ", line = ", line, "L", if (!is.null(level)) ", level = \"L3\"", ")")
     why <- script_why_data(tr, level)
-    tidy <- if (is.null(why)) script_tidy_code(code) else NULL
-    if (is.null(why) && is.null(tidy)) why <- "the step reads or writes WORK in a way the tidy form does not cover"
-    return(new_script_node("data", lang, text, stext, lines, kind, outs, why, tidy))
+    td <- if (is.null(why)) script_tidy_code(code) else NULL
+    if (is.null(why) && is.null(td)) why <- "the step reads or writes WORK in a way the tidy form does not cover"
+    node <- new_script_node("data", lang, text, stext, lines, kind, outs, why, td$code)
+    node$tidy_map <- td$map
+    return(node)
   }
   name <- nd$name %||% ""
   if (identical(nd$type, "proc") && name %in% c("sort", "means")) {
@@ -313,28 +315,70 @@ script_node_sql <- function(stext, first, last, mode) {
 
 # Why a DATA step needs the session in the tidy form (NULL: it does not).
 script_why_data <- function(tr, level) {
-  if (!is.null(level) || !tr$level %in% c("L1", "L2")) return("a row-by-row (L3) step")
   nm <- all.names(as.call(c(quote(`{`), as.list(cg_exec(tr$exprs)))))
+  # MERGE has only a row-by-row form
+  if ("sas_merge_read" %in% nm) return("a MERGE step (MERGE runs row by row, L3)")
+  if (!is.null(level) || !tr$level %in% c("L1", "L2")) return("a row-by-row (L3) step")
   if (any(c(".log", ".lst") %in% nm)) return("the step writes to the log or the listing (PUT, INFILE ...)")
   if (any(c(".symtab", ".titles", ".meta") %in% nm)) return("the step uses macro variables, titles or run-time attributes")
   NULL
 }
 
 # The tidy form of the code of a step: WORK reads and writes become R
-# variables, dplyr verbs lose their prefix (so that tidylog can report them).
-# NULL when the result still refers to WORK or does not parse.
+# variables (`sas_ds(work, "a", keep = ...)` -> `a |> sas_ds(keep = ...)`),
+# what only serves the log goes (sas_note_read() calls, the `.at = c(line,
+# col)` positions of the log NOTEs), dplyr verbs lose their prefix (so that
+# tidylog can report them) and the step pipeline `.d <- src |> ...` with its
+# output `out <- .d |> select(...)` becomes one pipeline.  Returns `code` and
+# `map` (for each line of the tidy code, its line in `code`), NULL when the
+# result still refers to WORK or does not parse.
 script_tidy_code <- function(code) {
-  nm <- "([a-z][a-z0-9_]*)"
-  x <- gsub(paste0("sas_ds\\(work, \"", nm, "\"\\) \\|> sas_note_read\\(\"\\1\"\\)"), "\\1", code)
-  x <- gsub(paste0("sas_ds\\(work, \"", nm, "\"\\)"), "\\1", x)
-  x <- gsub(paste0("(^|\n)work\\$", nm, " <- "), "\\1\\2 <- ", x)
+  str <- "\"(?:[^\"\\\\]|\\\\.)*\""
+  x <- gsub(paste0(" [|]> sas_note_read\\(", str, "(?:, where = ", str, ")?\\)"), "", code, perl = TRUE)
+  x <- gsub(", \\.at = c\\(-?[0-9]+L, (?:-?[0-9]+L|NA(?:_integer_)?)\\)", "", x, perl = TRUE)
+  nm <- "([A-Za-z_][A-Za-z0-9_]*)"
+  # replace each match of `pattern` by f(<its first group>)
+  sub_fn <- function(pattern, x, f) {
+    m <- gregexpr(pattern, x, perl = TRUE)
+    regmatches(x, m) <- lapply(regmatches(x, m), function(h) {
+      vapply(h, function(one) f(regmatches(one, regexec(pattern, one, perl = TRUE))[[1]][2]), "", USE.NAMES = FALSE)
+    })
+    x
+  }
+  x <- sub_fn(paste0("sas_ds\\(work, \"", nm, "\"\\)"), x, r_name)
+  x <- sub_fn(paste0("sas_ds\\(work, \"", nm, "\", "), x, function(n) paste0(r_name(n), " |> sas_ds("))
+  x <- sub_fn(paste0("(?m)^work\\$`?", nm, "`? <- "), x, function(n) paste0(r_name(n), " <- "))
   verbs <- c("mutate", "select", "filter", "arrange", "rename", "summarise", "summarize", "group_by", "ungroup",
              "distinct", "transmute", "relocate", "left_join", "right_join", "inner_join", "full_join",
              "anti_join", "semi_join", "count", "slice")
   x <- gsub(paste0("dplyr::(", paste(verbs, collapse = "|"), ")\\("), "\\1(", x)
   ex <- tryCatch(parse(text = x, keep.source = FALSE), error = function(e) NULL)
   if (is.null(ex) || any(c("work", ".log", ".lst", ".meta", ".symtab", ".titles") %in% all.names(ex))) return(NULL)
-  x
+  lines <- strsplit(x, "\n", fixed = TRUE)[[1]]
+  script_tidy_merge(lines, ex)
+}
+
+# One pipeline for `.d <- src |> stages` followed by `out <- .d |> select()`
+# when `.d` is used nowhere else (no PUT reads it).
+script_tidy_merge <- function(lines, ex) {
+  keep <- list(code = paste(lines, collapse = "\n"), map = seq_along(lines))
+  nm <- all.names(as.call(c(quote(`{`), as.list(ex))))
+  if (sum(nm == ".d") != 2L) return(keep)
+  pd <- utils::getParseData(parse(text = lines, keep.source = TRUE))
+  top <- pd[pd$parent == 0L & pd$token == "expr", ]
+  top <- top[order(top$line1), ]
+  a <- which(startsWith(lines[top$line1], ".d <- "))
+  if (length(a) != 1L || a == nrow(top)) return(keep)
+  b1 <- top$line1[a + 1L]
+  m <- regmatches(lines[b1], regexec("^([^ ]+) <- \\.d( [|]>)?$", lines[b1]))[[1]]
+  if (!length(m) || b1 != top$line2[a] + 1L) return(keep)
+  a1 <- top$line1[a]
+  a2 <- top$line2[a]
+  lines[a1] <- paste0(m[2], " <- ", substring(lines[a1], 7L))
+  if (nzchar(m[3])) lines[a2] <- paste0(lines[a2], " |>")
+  out <- lines[-b1]
+  if (is.null(tryCatch(parse(text = out, keep.source = FALSE), error = function(e) NULL))) return(keep)
+  list(code = paste(out, collapse = "\n"), map = seq_along(lines)[-b1])
 }
 
 # The statements of SAS text (split at the semicolon tokens): `key` (the
@@ -465,7 +509,8 @@ format.sasonr_script <- function(x, ...) {
   out <- c(head, "# Tidy form: steps that need a sasonr session run in a session block.",
            "library(sasonr)", "library(dplyr)", "library(tidylog)", "")
   for (nm in inputs) {
-    out <- c(out, paste0(nm, " <- sas_work(sas_session(work = list(", nm, " = ", nm, ")), trim = FALSE)$", nm,
+    rn <- r_name(nm)
+    out <- c(out, paste0(rn, " <- sas_work(sas_session(work = list(", rn, " = ", rn, ")), trim = FALSE)$", rn,
                          "  # SAS character values"))
   }
   fresh <- inputs
@@ -495,7 +540,7 @@ format.sasonr_script <- function(x, ...) {
     }
     why <- unique(vapply(block, function(b) b$why %||% "it runs in the session", ""))
     out <- c(out, paste0("# In a sasonr session: ", paste(why, collapse = "; ")))
-    push <- if (length(fresh)) paste0("list(", paste0(fresh, " = ", fresh, collapse = ", "), ")") else NULL
+    push <- if (length(fresh)) paste0("list(", paste0(r_name(fresh), " = ", r_name(fresh), collapse = ", "), ")") else NULL
     # the session is `.s` here: a data set can be called `s`
     if (!has_s) {
       out <- c(out, paste0(".s <- sas_session(", if (!is.null(push)) paste0("work = ", push), ")"))

@@ -1111,10 +1111,13 @@ sas_put_rows <- function(lines, guards, n = NULL) {
 # Data sets ---------------------------------------------------------------
 
 #' Fetch a WORK data set and apply KEEP=/DROP=/RENAME=/FIRSTOBS=/OBS=
+#'
+#' `work` is the WORK library (a list) or the data set itself (a data frame,
+#' as in the tidy form of a script; `name` is then not used).
 #' @export
 #' @keywords internal
 sas_ds <- function(work, name, keep = NULL, drop = NULL, rename = NULL, firstobs = NULL, obs = NULL) {
-  d <- work[[name]]
+  d <- if (is.data.frame(work)) work else work[[name]]
   if (is.null(d)) abort_runtime(paste0("data set WORK.", toupper(name), " does not exist"))
   if (!is.null(keep)) d <- d[intersect(keep, names(d))]
   if (!is.null(drop)) d <- d[setdiff(names(d), drop)]
