@@ -4,17 +4,26 @@
 \alias{sas_lex}
 \title{Tokenize SAS source code}
 \usage{
-sas_lex(text)
+sas_lex(text, lossless = FALSE)
 }
 \arguments{
 \item{text}{SAS source (character; multiple elements are joined by newlines).}
+
+\item{lossless}{If \code{TRUE}, return the lossless token table instead: every
+character of the source belongs to one row, comments, whitespace and line
+feeds included, so \code{paste0(tok$text, collapse = "")} gives the source back.}
 }
 \value{
-A tibble with columns \code{type}, \code{value}, \code{line}, \code{col}.
+A tibble with columns \code{type}, \code{value}, \code{line}, \code{col}; with
+\code{lossless = TRUE}, a tibble with columns \code{id}, \code{kind}, \code{text}, \code{value},
+\code{line}, \code{col}, \code{end_line}, \code{end_col}, where \code{kind} is a token type or one
+of \code{ws}, \code{newline}, \code{comment} (and \code{error} for characters that do not form
+a token).
 }
 \description{
 Tokenize SAS source code
 }
 \examples{
 sas_lex("x = substr(name, 1, 3); /* comment */")
+sas_lex("x = 1; /* comment */", lossless = TRUE)
 }

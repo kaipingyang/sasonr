@@ -16,11 +16,20 @@ value_expecting_kw <- c(
 #' Tokenize SAS source code
 #'
 #' @param text SAS source (character; multiple elements are joined by newlines).
-#' @return A tibble with columns `type`, `value`, `line`, `col`.
+#' @param lossless If `TRUE`, return the lossless token table instead: every
+#'   character of the source belongs to one row, comments, whitespace and line
+#'   feeds included, so `paste0(tok$text, collapse = "")` gives the source back.
+#' @return A tibble with columns `type`, `value`, `line`, `col`; with
+#'   `lossless = TRUE`, a tibble with columns `id`, `kind`, `text`, `value`,
+#'   `line`, `col`, `end_line`, `end_col`, where `kind` is a token type or one
+#'   of `ws`, `newline`, `comment` (and `error` for characters that do not form
+#'   a token).
 #' @examples
 #' sas_lex("x = substr(name, 1, 3); /* comment */")
+#' sas_lex("x = 1; /* comment */", lossless = TRUE)
 #' @export
-sas_lex <- function(text) {
+sas_lex <- function(text, lossless = FALSE) {
+  if (isTRUE(lossless)) return(sas_tokens(text))
   text <- paste(text, collapse = "\n")
   cp <- utf8ToInt(enc2utf8(text))
   cp <- cp[cp != 13L] # normalise CRLF

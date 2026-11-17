@@ -65,3 +65,86 @@ test_that("line and column are tracked", {
   expect_equal(t$line, c(1L, 1L, 1L, 2L, 2L, 2L, 2L))
   expect_equal(t$col[4], 3L)
 })
+
+# ---- lossless token table --------------------------------------------------
+
+# round trip and equality with the sas_lex() stream
+expect_lossless <- function(code) {
+  tok <- sas_lex(code, lossless = TRUE)
+  expect_identical(paste0(tok$text, collapse = ""), enc2utf8(paste(code, collapse = "\n")))
+  expect_identical(tokens_semantic(tok), sas_lex(code))
+  invisible(tok)
+}
+kinds_of <- function(tok) paste(tok$kind, tok$text, sep = ":")
+
+test_that("the lossless table keeps whitespace, line feeds and comments", {
+  tok <- expect_lossless("data out; x = 1; run;")
+  expect_named(tok, c("id", "kind", "text", "value", "line", "col", "end_line", "end_col"))
+  expect_equal(sum(tok$kind == "ws"), 5L)
+  tok <- expect_lossless("x = 1; /* a ; b */\n* stmt comment;\ny = 2 * 3;")
+  expect_equal(tok$text[tok$kind == "comment"], c("/* a ; b */", "* stmt comment;"))
+  expect_equal(tok$kind[tok$text == "*"], "op")
+  expect_equal(tok$end_col[tok$kind == "comment"][1], 18L)
+})
+
+test_that("nested-looking comments end at the first */", {
+  tok <- expect_lossless("/* a /* b */ x = 1; */")
+  expect_equal(tok$text[1], "/* a /* b */")
+  # the `*` after `;` starts a statement comment that runs to the end
+  expect_equal(tail(kinds_of(tok), 1), "comment:*/")
+})
+
+test_that("comments inside macro code", {
+  tok <- expect_lossless("%macro m;\n  %* note it''s;\n  * stmt;\n  data a; /* c */ run;\n%mend m;")
+  expect_equal(tok$text[tok$kind == "comment"], c("%* note it''s;", "* stmt;", "/* c */"))
+})
+
+test_that("DATALINES and CARDS4 data round-trip", {
+  tok <- expect_lossless("data a; input s $; datalines4;  \na;b\n;;;;\nrun;")
+  expect_equal(tok$text[tok$kind == "datalines"], "a;b")
+  expect_equal(tok$text[tok$kind == "datalines_end"], ";;;;")
+  tok <- expect_lossless("data a; input s $; cards4;\nx;y\n\n;;;;\nrun;")
+  expect_equal(tok$text[tok$kind == "datalines"], c("x;y", ""))
+  tok <- expect_lossless("data a; input s $; cards; ignored\nx\n  ;\nrun;")
+  expect_equal(tok$text[tok$kind == "comment"], " ignored")
+  expect_equal(tok$text[tok$kind == "datalines_end"], "  ;")
+  expect_lossless("data a; input s $; datalines;\nx\ny")
+})
+
+test_that("quoted strings, hex and date literals keep their source text", {
+  tok <- expect_lossless("t = \"c\"\"d\"; u = 'it''s;'; h = 0FFx; d = '15mar2026'd; x = 'AB'x;")
+  expect_equal(tok$text[tok$kind %in% c("str", "date", "hexstr")], c("\"c\"\"d\"", "'it''s;'", "'15mar2026'd", "'AB'x"))
+  expect_equal(tok$text[tok$kind == "num"], "0FFx")
+  expect_equal(tok$value[tok$kind == "num"], "255")
+  expect_lossless("a ~= b !! c")
+})
+
+test_that("CRLF, tabs, trailing blanks and latin1 round-trip", {
+  tok <- expect_lossless("data a;\r\n\tx = 1;   \r\nrun;\r\n")
+  expect_equal(tok$text[tok$kind == "newline"], rep("\r\n", 3))
+  expect_equal(tok$text[tok$kind == "ws"][2], "\t")
+  expect_lossless("x = 1;\r")
+  expect_lossless("\r")
+  expect_lossless(c("x = 1;", "y = 2;"))
+  expect_lossless("")
+  lat <- "x = 'caf\xe9';"
+  Encoding(lat) <- "latin1"
+  expect_lossless(lat)
+})
+
+test_that("inputs sas_lex() rejects still round-trip and fail in tokens_semantic()", {
+  for (code in c("x = 1; /* open", "x = 'open", "x = 1 ` 2;", "x = 12345678901234x;",
+                 "data a; input s $; datalines;\nc;d\n;\nrun;")) {
+    tok <- sas_lex(code, lossless = TRUE)
+    expect_identical(paste0(tok$text, collapse = ""), code)
+    e1 <- tryCatch(sas_lex(code), error = function(e) e)
+    e2 <- tryCatch(tokens_semantic(tok), error = function(e) e)
+    expect_s3_class(e1, "sasonr_error")
+    expect_identical(class(e2), class(e1))
+    expect_identical(conditionMessage(e2), conditionMessage(e1))
+  }
+  tok <- sas_lex("x = 1; /* open", lossless = TRUE)
+  expect_equal(tail(tok$kind, 1), "comment")
+  expect_warning(tok <- sas_lex("%* it's ;\nx = 1;", lossless = TRUE), class = "sasonr_unmatched_quote_in_comment")
+  expect_equal(tok$kind, "comment")
+})
