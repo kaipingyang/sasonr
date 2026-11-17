@@ -26,6 +26,7 @@ rt_reset <- function(rt = rt_diag()) {
   # ODS OUTPUT requests of the step and the NOTEs of the data sets written (ods_output.R)
   rt$ods_output <- list()
   rt$ods_notes <- list()
+  rt$ods_missing <- character()
   invisible()
 }
 

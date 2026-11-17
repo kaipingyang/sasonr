@@ -134,11 +134,17 @@ engine_exec_steps <- function(eng, text, line) {
       abort_unsupported("a PROC SQL step in syntax-check mode that ends without QUIT (not supported)", step$line)
     }
     if (length(eng$session$ods_output) > 0 && step$type %in% c("data", "proc", "sql_begin")) {
-      # ODS OUTPUT requests apply to the next step: only a PROC MEANS step that runs
-      if (!(step$type == "proc" && step$name == "means") || isTRUE(eng$syntax_check)) {
+      # ODS OUTPUT requests apply to the next PROC step (a DATA step leaves them
+      # pending): PROC MEANS, or PROC PRINT of an existing data set with one
+      # request (the WARNING "not created", ods_output.R)
+      ok_print <- step$type == "proc" && step$name == "print" && length(eng$session$ods_output) == 1L &&
+        length(eng$session$ods_output[[1]]$object) == 1L && length(step$options$data$options) == 0L && !is.null(step$options$data$name %||% eng$session$last) &&
+        exists(tolower(step$options$data$name %||% eng$session$last), envir = eng$session$work, inherits = FALSE)
+      ok <- step$type == "data" || (step$type == "proc" && step$name == "means") || ok_print
+      if (!ok || isTRUE(eng$syntax_check)) {
         abort_unsupported(paste0("ODS OUTPUT requests at ", if (step$type == "data") "a DATA step" else
           paste("PROC", toupper(if (step$type == "sql_begin") "sql" else step$name)),
-          if (isTRUE(eng$syntax_check)) " in syntax-check mode", " (supported: the next step is PROC MEANS)"), step$line)
+          if (isTRUE(eng$syntax_check)) " in syntax-check mode", " (supported: PROC MEANS, PROC PRINT with one request, a DATA step in between)"), step$line)
       }
     }
     if (step$type %in% c("global", "sql_begin", "sql", "sql_end")) script_record(eng, step, text, line)
@@ -291,12 +297,21 @@ engine_exec_steps <- function(eng, text, line) {
       log_buffer_add(env, log_render("step.stopped"))
     }
     if (step$type == "data") engine_store_numlen(eng, tr$outputs)
+    # PROC PRINT with an ODS OUTPUT request pending: the table is not created
+    if (step$type == "proc" && step$name == "print" && length(eng$session$ods_output) > 0) {
+      rt$ods_missing <- eng$session$ods_output[[1]]$object
+    }
     log_step_close(eng, if (step$type == "data") "data" else "proc", tr = tr, env = env, stopped = stopped,
                    notes = isTRUE(eng$session$options$notes) && eng$step_notes)
     engine_add_listing(eng, env$.lst, step$line)
-    # the ODS OUTPUT requests end with the step (no PERSIST=)
-    if (length(rt$ods_notes) > 0) eng$session$last_ods <- TRUE
-    eng$session$ods_output <- NULL
+    # the ODS OUTPUT requests end with the PROC step (no PERSIST=).  A step
+    # that wrote one ODS OUTPUT data set and no other data set makes it _LAST_.
+    if (length(rt$ods_notes) == 1L && length(tr$outputs) == 0L) {
+      session_set_last(eng$session, tolower(rt$ods_notes[[1]]$name))
+    } else if (length(rt$ods_notes) > 0L && length(tr$outputs) == 0L) {
+      eng$session$last_ods <- TRUE
+    }
+    if (step$type == "proc") eng$session$ods_output <- NULL
     eng$ods <- c(eng$ods, env$.ods)
     if (length(env$.ods) > 0 && isTRUE(eng$session$ods_html)) {
       eng$html <- c(eng$html, list(list(proc = step$name, titles = env$.titles, footnotes = eng$session$footnotes,
@@ -313,8 +328,9 @@ engine_exec_steps <- function(eng, text, line) {
 }
 
 # A PROC step that reads `_LAST_` when `_LAST_` is a PROC SQL view: sasonr
-# reads views only in PROC SQL, so it fails loud.  Whether an ODS OUTPUT data
-# set becomes `_LAST_` is not modelled: reading `_LAST_` after one fails loud.
+# reads views only in PROC SQL, so it fails loud.  Which of several ODS OUTPUT
+# data sets of one step becomes `_LAST_` is not modelled: reading `_LAST_` after
+# such a step fails loud.
 engine_check_last_view <- function(eng, step) {
   if (isTRUE(eng$session$last_ods) && is.null(step$options$data) &&
       step$name %in% c("sort", "print", "means", "summary", "freq", "transpose", "contents")) {

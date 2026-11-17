@@ -110,13 +110,14 @@ log_catalog <- list(
 # message id (input.new_line, mv.generated, math.failed: from the counters
 # of the step), "reads" the observations read, "proc" the NOTEs and WARNINGs
 # of the procedure, "datasets" the output data sets, "ods" the ODS OUTPUT
-# data sets of the step (ods_output.R).  `notes`: written only
+# data sets of the step and "ods.warn" the WARNING for a requested ODS table
+# the step did not produce (ods_output.R).  `notes`: written only
 # under NOTES (and sasonr.step_notes).  PROC SQL writes no "Missing values
 # were generated" NOTE.
 log_close_order <- list(
   data = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "reads", "proc", "datasets"),
                     notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)),
-  proc = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "ods", "reads", "proc", "datasets"),
-                    notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)),
+  proc = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "ods", "ods.warn", "reads", "proc", "datasets"),
+                    notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE)),
   sql = data.frame(part = c("input.new_line", "math.failed"), notes = c(TRUE, TRUE))
 )

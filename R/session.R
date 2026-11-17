@@ -54,7 +54,7 @@ SasSession <- R6::R6Class("SasSession",
     ods_html = TRUE,
     # ods_output: ODS OUTPUT requests for the next step (ods_output.R): list of list(object, ds, line).
     ods_output = NULL,
-    # last_ods: TRUE after a step wrote ODS OUTPUT data sets (whether they become `_LAST_` is not modelled).
+    # last_ods: TRUE after a step wrote several ODS OUTPUT data sets and no other data set (which one becomes `_LAST_` is not modelled).
     last_ods = FALSE,
     # formats: User format catalog (WORK.FORMATS): environment, key -> format definition.
     formats = NULL,
