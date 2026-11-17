@@ -34,8 +34,6 @@ test_that("several analysis variables stack one value per variable in a cell", {
 })
 
 test_that("repeated CLASS values are left blank", {
-  r <- sas_run(paste0(html_prog, "proc means data=a; class grp; var x y; run;"))
-  expect_error(sasonr:::render_html(r$ods[[1]]), class = "sasonr_unsupported")
   r <- sas_run("data b; input g $ h $ x; datalines;
 a p 1
 a q 2
@@ -44,6 +42,52 @@ run;
 proc means data=b; class g h; var x; run;")
   tb <- sasonr:::render_html(r$ods[[1]])
   expect_true(any(grepl('<tr><th class="sas-rowheader" scope="row">&nbsp;</th><th class="sas-rowheader" scope="row">q</th>', tb, fixed = TRUE)))
+})
+
+test_that("CLASS with several analysis variables keeps one row per class level and stacks the variables", {
+  r <- sas_run(paste0(html_prog, "proc means data=a; class grp; var x y; label y='LY'; run;"))
+  tb <- sasonr:::render_html(r$ods[[1]])
+  head <- tb[which(tb == "<thead>") + 1L]
+  expect_identical(lengths(regmatches(head, gregexpr("<th ", head))), 9L)
+  expect_match(head, '<th class="sas-header" scope="col">grp</th><th class="sas-header sas-num" scope="col">N Obs</th><th class="sas-header" scope="col">Variable</th><th class="sas-header" scope="col">Label</th>', fixed = TRUE)
+  expect_no_match(head, "colspan", fixed = TRUE)
+  body <- tb[seq(which(tb == "<tbody>") + 1L, which(tb == "</tbody>") - 1L)]
+  expect_length(body, 2L)
+  expect_match(body[1], '<th class="sas-rowheader" scope="row">a</th><td class="sas-data sas-num">2</td>', fixed = TRUE)
+  expect_match(body[1], '<div class="sas-stack">x</div><div class="sas-stack">y</div>', fixed = TRUE)
+  expect_match(body[1], '<div class="sas-stack">&nbsp;</div><div class="sas-stack">LY</div>', fixed = TRUE)
+  expect_match(body[1], '<div class="sas-stack">1.5000000</div><div class="sas-stack">15.0000000</div>', fixed = TRUE)
+  # a one-observation group: the standard deviations are missing in both blocks
+  expect_match(body[2], '<div class="sas-stack">.</div><div class="sas-stack">.</div>', fixed = TRUE)
+})
+
+test_that("two CLASS variables with several analysis variables blank the repeated outer level", {
+  r <- sas_run("data b; input g $ h $ x y; datalines;
+a p 1 10
+a q 2 20
+b p 3 30
+;
+run;
+proc means data=b; class g h; var x y; run;")
+  tb <- sasonr:::render_html(r$ods[[1]])
+  body <- tb[seq(which(tb == "<tbody>") + 1L, which(tb == "</tbody>") - 1L)]
+  expect_length(body, 3L)
+  expect_match(body[2], '^<tr><th class="sas-rowheader" scope="row">&nbsp;</th><th class="sas-rowheader" scope="row">q</th>')
+  expect_identical(lengths(regmatches(body[2], gregexpr('class="sas-data sas-num sas-stacked"', body[2]))), 5L)
+})
+
+test_that("BY groups under a TITLE: the title once, one byline and one two-row table per group", {
+  r <- sas_run(paste0(html_prog, "title 'BY groups';\nproc means data=a; by grp; var x; run;\ntitle;"))
+  body <- html_body(sas_html(r))
+  count <- function(pat) lengths(regmatches(body, gregexpr(pat, body, fixed = TRUE)))
+  expect_identical(count('<div class="sas-title">BY groups</div>'), 1L)
+  expect_identical(count("The MEANS Procedure"), 1L)
+  expect_identical(count('<table class="sas-table"'), 2L)
+  expect_identical(count('colspan="5">Analysis Variable : x </th>'), 2L)
+  expect_true(regexpr("sas-title", body) < regexpr("sas-proctitle", body))
+  expect_true(regexpr("sas-proctitle", body) < regexpr("grp=a", body))
+  expect_true(regexpr("grp=a", body) < regexpr("sas-table", body))
+  expect_true(regexpr("</table>", body) < regexpr("grp=b", body))
 })
 
 test_that("sas_html() writes titles, the procedure title, bylines and the CSS", {

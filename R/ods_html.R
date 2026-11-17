@@ -44,12 +44,6 @@ render_html <- function(table) {
   scols <- cols[cols$role == "stat" & !is.na(cols$var), ]
   vars <- unique(scols$var)
   vinfo <- scols$info[match(vars, scols$var)]
-  stacked <- any(leaves$role %in% c("var", "label"))
-  if (stacked && any(cols$role == "class")) {
-    # several analysis variables next to CLASS columns: the HTML layout of
-    # that table is not implemented
-    abort_unsupported("HTML output of a PROC MEANS table with CLASS variables and several analysis variables")
-  }
   is_num <- function(h) {
     if (h$role == "stat") return(TRUE)
     if (h$role == "class") return(proc_right_align(col_of(h$columns[[1]])$info[[1]]))
@@ -94,15 +88,9 @@ render_html <- function(table) {
     if (length(notes)) paste0('<p class="sas-note-text">', html_escape(notes), "</p>"))
 }
 
-# One procedure output: titles, the procedure title, per BY group its byline,
-# the tables, then the footnotes.
+# One procedure output: the titles and the procedure title once, per BY group
+# its byline and tables, then the footnotes.
 render_html_output <- function(o) {
-  has_by <- any(vapply(o$tables, function(tb) !is.null(attr(tb, "by", exact = TRUE)), TRUE))
-  if (has_by && length(o$titles)) {
-    # where the titles stand among the BY groups of the HTML output is not
-    # implemented
-    abort_unsupported("HTML output of a BY-group procedure under TITLE statements")
-  }
   out <- c('<div class="sas-proc">',
            if (length(o$titles)) paste0('<div class="sas-title">', html_escape(o$titles), "</div>"),
            paste0('<div class="sas-proctitle">The ', html_escape(toupper(o$proc)), " Procedure</div>"))

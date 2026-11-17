@@ -19,7 +19,13 @@
 #                      parts), span, columns (list of the data columns under
 #                      the cell), role ("class", "stat", "var", "label", or
 #                      "title" for a heading that spans the columns below it);
-#                      the deepest level holds one cell per printed column
+#                      the deepest level holds one cell per printed column;
+#                      a deepest-level cell over several data columns is a
+#                      stacked cell (one value per column, top to bottom, in
+#                      every body row), a cell with role "var" or "label" and
+#                      no columns stacks the names or labels of the analysis
+#                      variables; a cell with span > 1 spans that many cells
+#                      of the level below
 #   notes              lines that belong to the table
 
 ods_table_roles <- c("class", "stat", "var", "label")
