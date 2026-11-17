@@ -476,7 +476,7 @@ add_input_stages <- function(cx, include_n = TRUE) {
     add_stage(cx, "raw", call("sas_check_sorted", cg_val(an$by$vars), cg_val(an$by$descending)))
     flags <- list()
     for (k in seq_along(an$by$vars)) {
-      keys <- lapply(an$by$vars[seq_len(k)], sym)
+      keys <- rlang::syms(an$by$vars[seq_len(k)])
       v <- an$by$vars[k]
       flags[[paste0("first.", v)]] <- cg_call("sas_first", keys)
       flags[[paste0("last.", v)]] <- cg_call("sas_last", keys)
@@ -541,7 +541,7 @@ new_guard <- function(cx) {
   paste0(".g", cx$n_guard)
 }
 
-and_guard <- function(guard, cond) if (is.null(guard)) cond else call("&", sym(guard), cond)
+and_guard <- function(guard, cond) if (is.null(guard)) cond else call("&", rlang::sym(guard), cond)
 
 gen_vec_step <- function(an) {
   cx <- new_cx("vec", an)
@@ -565,9 +565,9 @@ gen_vec_step <- function(an) {
 # computed once).
 vec_put_lang <- function(cx) {
   if (length(cx$puts) == 0) return(NULL)
-  sink <- sym(cx$sink)
+  sink <- rlang::sym(cx$sink)
   lines <- cg_call("list", lapply(cx$puts, `[[`, "line"))
-  guards <- cg_call("list", lapply(cx$puts, function(p) if (is.null(p$guard)) TRUE else call("$", sym(".d"), sym(p$guard))))
+  guards <- cg_call("list", lapply(cx$puts, function(p) if (is.null(p$guard)) TRUE else call("$", rlang::sym(".d"), rlang::sym(p$guard))))
   assign_lang(sink, call("c", sink, cg_call("sas_put_rows", list(lines, guards, n = quote(nrow(.d))))))
 }
 
@@ -582,7 +582,7 @@ vec_put_item <- function(cx) {
 }
 
 select_lang <- function(o) {
-  cols <- lapply(o$vars, sym)
+  cols <- rlang::syms(o$vars)
   if (any(o$vars != o$out_names)) names(cols) <- ifelse(o$vars == o$out_names, "", o$out_names)
   cg_call("dplyr::select", cols)
 }
@@ -591,9 +591,9 @@ select_code <- function(o) cg_text(select_lang(o))
 vec_output_item <- function(an) {
   if (length(an$dsir$slots$outputs) == 0) return(list())
   o <- an$dsir$slots$outputs[[1]]
-  x <- cgi(sym(".d"))
+  x <- cgi(rlang::sym(".d"))
   if (!is.null(an$output_pattern$cond)) {
-    x <- cgi_pipe(x, as.call(list(quote(dplyr::filter), call("sas_true", sym(an$output_pattern$cond)))), sep = " |>\n  ")
+    x <- cgi_pipe(x, as.call(list(quote(dplyr::filter), call("sas_true", rlang::sym(an$output_pattern$cond)))), sep = " |>\n  ")
   }
   x <- cgi_pipe(x, select_lang(o), sep = " |>\n  ")
   list(work_assign(o$name, x))
@@ -601,7 +601,7 @@ vec_output_item <- function(an) {
 
 # `work$name <- x`
 work_assign <- function(name, x) {
-  target <- call("$", sym("work"), sym(name))
+  target <- call("$", rlang::sym("work"), rlang::sym(name))
   cgi(call("<-", target, x$lang), paste0(cg_text(target), " <- ", x$text))
 }
 
@@ -632,7 +632,7 @@ gen_vec_carry <- function(i, cx) {
     cx$inexact <- FALSE
     add_stage(cx, "mutate", stats::setNames(list(val, cond), c(cv[k], cs[k])))
     if (i == plan$last) {
-      carry <- call("sas_carry", cg_call("list", lapply(cv, sym)), cg_call("list", lapply(cs, sym)),
+      carry <- call("sas_carry", cg_call("list", rlang::syms(cv)), cg_call("list", rlang::syms(cs)),
                     proto_lang(an$info[[v]]))
       add_stage(cx, "mutate", stats::setNames(list(carry), v))
     }
@@ -643,8 +643,8 @@ gen_vec_carry <- function(i, cx) {
 # `v = val` (or `v = if_else(guard, val, v)`) as a one-item mutate list.
 # `guard`: the name of a guard column or a condition.
 assign_item <- function(v, val, guard) {
-  if (is.character(guard)) guard <- sym(guard)
-  stats::setNames(list(if (is.null(guard)) val else cg_call("dplyr::if_else", list(guard, val, sym(v)))), v)
+  if (is.character(guard)) guard <- rlang::sym(guard)
+  stats::setNames(list(if (is.null(guard)) val else cg_call("dplyr::if_else", list(guard, val, rlang::sym(v)))), v)
 }
 
 gen_vec_stmt <- function(s, guard, cx) {
@@ -665,28 +665,28 @@ gen_vec_stmt <- function(s, guard, cx) {
       if (is.null(plan$reset_var)) {
         add_stage(cx, "mutate", cum(plan$init))
       } else {
-        add_stage(cx, "raw", call("::", sym("dplyr"), sym("group_by")) |> list() |>
-                    c(list(.grp = call("cumsum", sym(plan$reset_var)))) |> as.call())
+        add_stage(cx, "raw", call("::", rlang::sym("dplyr"), rlang::sym("group_by")) |> list() |>
+                    c(list(.grp = call("cumsum", rlang::sym(plan$reset_var)))) |> as.call())
         add_stage(cx, "mutate", cum(plan$reset_value))
         add_stage(cx, "raw", quote(dplyr::ungroup()))
       }
     },
     substr_assign = {
       v <- s$var
-      val <- cg_call("sas_substr_assign", c(list(sym(v), gen_lang(s$pos, cx), if (!is.null(s$len)) gen_lang(s$len, cx),
+      val <- cg_call("sas_substr_assign", c(list(rlang::sym(v), gen_lang(s$pos, cx), if (!is.null(s$len)) gen_lang(s$len, cx),
                                                  gen_lang(s$value, cx)), cg_at(s$line, s$col)))
       add_stage(cx, "mutate", assign_item(v, val, guard))
     },
     "if" = gen_vec_if(s, guard, cx),
     subset_if = {
       cond <- call("sas_true", gen_lang(s$cond, cx))
-      add_stage(cx, "filter", if (is.null(guard)) cond else call("!", call("(", call("&", sym(guard), call("!", cond)))))
+      add_stage(cx, "filter", if (is.null(guard)) cond else call("!", call("(", call("&", rlang::sym(guard), call("!", cond)))))
     },
-    delete = add_stage(cx, "filter", if (is.null(guard)) FALSE else call("!", sym(guard))),
+    delete = add_stage(cx, "filter", if (is.null(guard)) FALSE else call("!", rlang::sym(guard))),
     do = gen_vec_block(s$body, guard, cx),
     select = gen_vec_select(s, guard, cx),
     put = {
-      g <- if (is.null(guard)) quote(rep(TRUE, nrow(.d))) else call("$", sym(".d"), sym(guard))
+      g <- if (is.null(guard)) quote(rep(TRUE, nrow(.d))) else call("$", rlang::sym(".d"), rlang::sym(guard))
       cx$puts <- c(cx$puts, list(list(guard = guard, line = put_line_lang(s, with_mode(cx, "out"), g))))
     },
     NULL
@@ -720,7 +720,7 @@ if_chain <- function(s) {
 case_when_item <- function(target, conds, vals, default, guard) {
   arms <- unname(Map(function(c, v) call("~", and_guard(guard, c), v), conds, vals))
   tail <- if (!is.null(default) && is.null(guard)) list(.default = default) else {
-    c(if (!is.null(default)) list(call("~", sym(guard), default)), list(.default = sym(target)))
+    c(if (!is.null(default)) list(call("~", rlang::sym(guard), default)), list(.default = rlang::sym(target)))
   }
   stats::setNames(list(cg_call("dplyr::case_when", c(arms, tail))), target)
 }
@@ -752,7 +752,7 @@ gen_vec_if <- function(s, guard, cx) {
   gen_vec_stmt(s$then, g, cx)
   if (!is.null(s[["else"]])) {
     g2 <- new_guard(cx)
-    add_stage(cx, "mutate", stats::setNames(list(and_guard(guard, call("!", sym(g)))), g2))
+    add_stage(cx, "mutate", stats::setNames(list(and_guard(guard, call("!", rlang::sym(g)))), g2))
     gen_vec_stmt(s[["else"]], g2, cx)
   }
 }
@@ -787,7 +787,7 @@ gen_vec_select <- function(s, guard, cx) {
     cx$n_tmp <- cx$n_tmp + 1L
     tmp <- paste0(".s", cx$n_tmp)
     add_stage(cx, "mutate", stats::setNames(list(sel), tmp))
-    sel <- sym(tmp)
+    sel <- rlang::sym(tmp)
   }
   rem <- guard
   for (w in s$whens) {
@@ -795,7 +795,7 @@ gen_vec_select <- function(s, guard, cx) {
     add_stage(cx, "mutate", stats::setNames(list(and_guard(rem, when_cond_lang(w, sel, cx))), g))
     gen_vec_stmt(w$body, g, cx)
     r <- new_guard(cx)
-    add_stage(cx, "mutate", stats::setNames(list(and_guard(rem, call("!", sym(g)))), r))
+    add_stage(cx, "mutate", stats::setNames(list(and_guard(rem, call("!", rlang::sym(g)))), r))
     rem <- r
   }
   gen_vec_stmt(s$otherwise, rem, cx)
@@ -826,10 +826,10 @@ gen_row_step <- function(an) {
   if (!is.null(rd) && rd$stmt == "merge") {
     srcs <- lapply(rd$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
     merged_vars <- unique(unlist(lapply(rd$datasets, `[[`, "out_names")))
-    add(cgi(call("<-", sym(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang"))),
+    add(cgi(call("<-", rlang::sym(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang"))),
             paste0(".m_in <- list(\n  ", paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n  "), "\n)")),
         quote(.m <- lapply(.m_in, sas_rows)),
-        call("<-", sym(".plan"), call("sas_merge_plan", sym(".m_in"), cg_val(an$by$vars), cg_val(an$by$descending))),
+        call("<-", rlang::sym(".plan"), call("sas_merge_plan", rlang::sym(".m_in"), cg_val(an$by$vars), cg_val(an$by$descending))),
         quote(.n_in <- nrow(.plan)), quote(.p <- 0L))
     cx$merge_reset <- merged_vars
   }
@@ -841,9 +841,9 @@ gen_row_step <- function(an) {
           if (arr$type == "char") sas_char(arr$init[[k]], arr$len) else cg_num(arr$init[[k]])
         } else miss
       })
-      add(call("<-", sym(paste0(".ta_", arr$name)), as.call(c(list(sym("c")), vals))))
+      add(call("<-", rlang::sym(paste0(".ta_", arr$name)), as.call(c(list(rlang::sym("c")), vals))))
     } else {
-      add(call("<-", sym(paste0(".arr_", arr$name)), cg_val(arr$elems)))
+      add(call("<-", rlang::sym(paste0(".arr_", arr$name)), cg_val(arr$elems)))
     }
   }
 
@@ -853,7 +853,7 @@ gen_row_step <- function(an) {
     if (is.null(inf) || inf$kind == "auto") return(if (v == "_error_") 0 else NA_real_)
     proto_lang(inf, use_init = isTRUE(inf$retained))
   })
-  add(cgi(call("<-", sym("pdv"), cg_call("list", stats::setNames(pdv_vals, pdv_order))),
+  add(cgi(call("<-", rlang::sym("pdv"), cg_call("list", stats::setNames(pdv_vals, pdv_order))),
           paste0("pdv <- list(\n", paste0("  ", r_name(pdv_order), " = ", vapply(pdv_vals, cg_text, ""), collapse = ",\n"), "\n)")))
   dump_vars <- setdiff(an$order, c("_error_", "_n_"))
   dump_names <- vapply(dump_vars, function(v) an$info[[v]]$disp %||% v, "", USE.NAMES = FALSE)
@@ -865,22 +865,22 @@ gen_row_step <- function(an) {
   }
   dump_fmts <- Filter(Negate(is.null), lapply(stats::setNames(dump_vars, dump_vars), function(v) an$formats[[v]]))
   add(quote(.proto <- pdv),
-      call("<-", sym(".dump"), call("sas_dump_spec", cg_val(dump_vars), cg_val(dump_names),
+      call("<-", rlang::sym(".dump"), call("sas_dump_spec", cg_val(dump_vars), cg_val(dump_names),
                                      if (length(dump_fmts) == 0) quote(list())
                                      else cg_val(lapply(dump_fmts, function(f) f[c("name", "w", "d", "char", "text")])))))
   if (!is.null(rd) && !is.null(rd$nobs)) {
     nobs <- Reduce(function(a, b) call("+", a, b), lapply(vapply(rd$datasets, `[[`, "", "name"), function(nm) {
-      call("nrow", call("[[", sym("work"), nm))
+      call("nrow", call("[[", rlang::sym("work"), nm))
     }))
     add(call("<-", pdv_ref(rd$nobs), nobs))
   }
   reset_vars <- Filter(function(v) an$info[[v]]$kind == "data" && !isTRUE(an$info[[v]]$retained), an$order)
-  if (length(reset_vars) > 0) add(call("<-", sym(".reset"), call("[", sym("pdv"), cg_val(reset_vars))))
-  if (!is.null(cx$merge_reset)) add(call("<-", sym(".m_reset"), call("[", sym("pdv"), cg_val(cx$merge_reset))))
+  if (length(reset_vars) > 0) add(call("<-", rlang::sym(".reset"), call("[", rlang::sym("pdv"), cg_val(reset_vars))))
+  if (!is.null(cx$merge_reset)) add(call("<-", rlang::sym(".m_reset"), call("[", rlang::sym("pdv"), cg_val(cx$merge_reset))))
   if (an$lag_sites > 0) add(quote(.lags <- new.env()))
   for (k in seq_along(an$dsir$slots$outputs)) {
-    add(call("<-", sym(paste0(".out", k)), quote(list())),
-        call("<-", sym(paste0(".vars", k)), cg_val(an$dsir$slots$outputs[[k]]$vars)))
+    add(call("<-", rlang::sym(paste0(".out", k)), quote(list())),
+        call("<-", rlang::sym(paste0(".vars", k)), cg_val(an$dsir$slots$outputs[[k]]$vars)))
   }
 
   body <- gen_row_block(an$stmts, cx)
@@ -888,11 +888,11 @@ gen_row_step <- function(an) {
   # the loop body: one-line statements, the tryCatch() of the step's
   # statements and the implicit OUTPUT block
   handler <- function(v) cg_fn(alist(e = ), v)
-  status <- call("<-", sym(".status"), as.call(list(sym("tryCatch"), brace(c(body, list("ok"))),
+  status <- call("<-", rlang::sym(".status"), as.call(list(rlang::sym("tryCatch"), brace(c(body, list("ok"))),
     sasonr_delete = handler("delete"), sasonr_stop = handler("stop"), sasonr_return = handler("ok"))))
   status_text <- c("  .status <- tryCatch({", indent_lines(row_lines(body), 2L), "    \"ok\"",
                    "  }, sasonr_delete = function(e) \"delete\", sasonr_stop = function(e) \"stop\", sasonr_return = function(e) \"ok\")")
-  dump <- as.call(c(list(sym("sas_iter_dump"), sym("pdv"), sym(".dump")), if (has_input) list(sym(".inf"))))
+  dump <- as.call(c(list(rlang::sym("sas_iter_dump"), rlang::sym("pdv"), rlang::sym(".dump")), if (has_input) list(rlang::sym(".inf"))))
   outs <- output_langs(seq_along(an$dsir$slots$outputs))
   out_if <- if (implicit_output) call("if", quote(.status == "ok"), brace(outs))
   loop <- list(
@@ -904,7 +904,7 @@ gen_row_step <- function(an) {
     status,
     if (has_input) quote(if (.status == "stop" && !is.null(.inf$pdv)) pdv[names(.inf$pdv)] <- .inf$pdv),
     err_sync(),
-    call("<-", sym(".log"), call("c", sym(".log"), dump)),
+    call("<-", rlang::sym(".log"), call("c", rlang::sym(".log"), dump)),
     if (has_input) quote(sas_input_iter_end(.inf)),
     quote(if (.status == "stop") break),
     out_if,
@@ -922,7 +922,7 @@ gen_row_step <- function(an) {
   if (!is.null(set_rd)) add(quote(sas_reads_consumed(.p)))
   for (k in seq_along(an$dsir$slots$outputs)) {
     o <- an$dsir$slots$outputs[[k]]
-    x <- cgi(call("sas_rows_to_tibble", sym(paste0(".out", k)), call("[", sym(".proto"), sym(paste0(".vars", k)))))
+    x <- cgi(call("sas_rows_to_tibble", rlang::sym(paste0(".out", k)), call("[", rlang::sym(".proto"), rlang::sym(paste0(".vars", k)))))
     if (any(o$vars != o$out_names)) x <- cgi_pipe(x, select_lang(o), sep = " |>\n  ")
     add(work_assign(o$name, x))
   }
@@ -931,10 +931,9 @@ gen_row_step <- function(an) {
 
 # The L3 statement emitters return lists of language objects.
 
-sym <- function(x) as.name(x)
-pdv_ref <- function(v) call("$", sym("pdv"), sym(v))
+pdv_ref <- function(v) call("$", rlang::sym("pdv"), rlang::sym(v))
 assign_lang <- function(target, value) call("<-", target, value)
-brace <- function(body) as.call(c(list(sym("{")), body))
+brace <- function(body) as.call(c(list(rlang::sym("{")), body))
 err_sync <- function() quote(pdv <- sas_err_sync(pdv))
 
 coerce_lang <- function(x, type, len) if (type == "char") call("sas_char", x, as.integer(len)) else x
@@ -960,7 +959,7 @@ row_lines <- function(objs) unlist(lapply(objs, function(x) strsplit(cg_deparse(
 row_cond <- function(e, cx, out_name) {
   if (!expr_may_error(e)) return(list(pre = list(), cond = call("sas_true", gen_lang(e, cx))))
   cx$n_tmp <- cx$n_tmp + 1L
-  v <- sym(paste0(".c", cx$n_tmp))
+  v <- rlang::sym(paste0(".c", cx$n_tmp))
   list(pre = list(assign_lang(v, call("sas_true", gen_lang(e, cx))), err_sync()), cond = v)
 }
 
@@ -1007,12 +1006,12 @@ gen_row_stmt <- function(s, cx) {
       quote(.read <- TRUE)
     ),
     input = c(
-      list(assign_lang(sym("pdv"), call("sas_input_stmt", sym(".inf"), sym("pdv"), input_spec_lang(s, an))), quote(.read <- TRUE)),
+      list(assign_lang(rlang::sym("pdv"), call("sas_input_stmt", rlang::sym(".inf"), rlang::sym("pdv"), input_spec_lang(s, an))), quote(.read <- TRUE)),
       if (!is.null(an$infile$opts$end)) list(assign_lang(pdv_ref(an$infile$opts$end), quote(sas_input_at_end(.inf))))
     ),
     merge = c(
       list(quote(.p <- .p + 1L), quote(if (.p > .n_in) sas_stop_step()),
-           assign_lang(sym("pdv"), call("sas_merge_read", sym("pdv"), sym(".m"), sym(".plan"), sym(".p"), sym(".m_reset"),
+           assign_lang(rlang::sym("pdv"), call("sas_merge_read", rlang::sym("pdv"), rlang::sym(".m"), rlang::sym(".plan"), rlang::sym(".p"), rlang::sym(".m_reset"),
                                          cg_val(vapply(s$datasets, function(d) d$options$in_var %||% NA_character_, "")),
                                          cg_val(an$by$vars)))),
       if (!is.null(s$end)) list(assign_lang(pdv_ref(s$end), quote(as.numeric(.p == .n_in)))),
@@ -1026,10 +1025,10 @@ gen_row_stmt <- function(s, cx) {
       }
       output_langs(targets)
     },
-    put = list(assign_lang(sym(cx$sink), call("c", sym(cx$sink), put_line_lang(s, cx)))),
+    put = list(assign_lang(rlang::sym(cx$sink), call("c", rlang::sym(cx$sink), put_line_lang(s, cx)))),
     call = if (s$routine %in% c("missing", "sortn", "sortc")) gen_row_call_vars(s, cx) else {
       args <- lapply(s$args, g)
-      list(cg_call("sas_symput", c(list(sym(".symtab"), args[[1]], args[[2]], trim = s$routine == "symputx"),
+      list(cg_call("sas_symput", c(list(rlang::sym(".symtab"), args[[1]], args[[2]], trim = s$routine == "symputx"),
                                    if (length(args) >= 3) list(scope = args[[3]]))))
     },
     list()
@@ -1038,8 +1037,8 @@ gen_row_stmt <- function(s, cx) {
 
 output_langs <- function(ks) {
   lapply(ks, function(k) {
-    out <- sym(paste0(".out", k))
-    assign_lang(call("[[", out, call("+", call("length", out), 1L)), call("[", sym("pdv"), sym(paste0(".vars", k))))
+    out <- rlang::sym(paste0(".out", k))
+    assign_lang(call("[[", out, call("+", call("length", out), 1L)), call("[", rlang::sym("pdv"), rlang::sym(paste0(".vars", k))))
   })
 }
 
@@ -1054,7 +1053,7 @@ gen_row_call_vars <- function(s, cx) {
     }, refs, s$targets))
   }
   cx$n_tmp <- cx$n_tmp + 1L
-  tmp <- sym(paste0(".srt", cx$n_tmp))
+  tmp <- rlang::sym(paste0(".srt", cx$n_tmp))
   c(list(assign_lang(tmp, call("sas_sort_values", cg_call("list", refs)))),
     Map(function(ref, k) assign_lang(ref, call("[[", tmp, k)), refs, seq_along(refs)))
 }
@@ -1065,7 +1064,7 @@ gen_row_do <- function(s, cx) {
   if (s$kind == "block") return(body)
   cx$n_tmp <- cx$n_tmp + 1L
   k <- cx$n_tmp
-  tmp <- function(stem) sym(paste0(".", stem, k))
+  tmp <- function(stem) rlang::sym(paste0(".", stem, k))
   brk_unless <- function(cond) call("if", call("!", cond), quote(break))
   if (s$kind == "while") return(list(call("repeat", brace(c(list(brk_unless(call("sas_true", g(s$cond)))), body)))))
   if (s$kind == "until") {
@@ -1104,11 +1103,11 @@ gen_row_select <- function(s, cx) {
   if (!is.null(s$expr)) {
     cx$n_tmp <- cx$n_tmp + 1L
     sel <- paste0(".s", cx$n_tmp)
-    pre <- list(assign_lang(sym(sel), gen_lang(s$expr, cx)))
+    pre <- list(assign_lang(rlang::sym(sel), gen_lang(s$expr, cx)))
   }
   other <- if (s$has_otherwise) gen_row_stmt(s$otherwise, cx) else list(call("sas_select_error", as.integer(s$line)))
   # the WHEN chain from the last clause up: `if (c1) {..} else if (c2) {..} else {..}`
-  conds <- lapply(s$whens, when_cond_lang, sel = if (!is.null(sel)) sym(sel), cx = cx)
+  conds <- lapply(s$whens, when_cond_lang, sel = if (!is.null(sel)) rlang::sym(sel), cx = cx)
   bodies <- lapply(s$whens, function(w) brace(gen_row_stmt(w$body, cx)))
   chain <- if (length(s$whens) == 0) other else {
     acc <- brace(other)
