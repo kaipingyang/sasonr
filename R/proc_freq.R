@@ -1059,7 +1059,7 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
   dims <- dim(tab)
   tot <- sum(tab)
   combos <- as.matrix(expand.grid(lapply(rev(dims), seq_len)))[, k:1, drop = FALSE]
-  combos <- combos[do.call(order, as.data.frame(combos)), , drop = FALSE]
+  combos <- combos[rlang::exec(order, !!!as.data.frame(combos)), , drop = FALSE]
   cnt <- tab[combos]
   nobs <- obs[combos]
   lst <- character()
@@ -1112,7 +1112,7 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
     # one crosstabulation per stratum (combination of the leading variables)
     sdims <- dims[seq_len(k - 2L)]
     strata <- as.matrix(expand.grid(lapply(rev(sdims), seq_len)))[, (k - 2L):1, drop = FALSE]
-    strata <- strata[do.call(order, as.data.frame(strata)), , drop = FALSE]
+    strata <- strata[rlang::exec(order, !!!as.data.frame(strata)), , drop = FALSE]
     ti <- 0L
     for (s in seq_len(nrow(strata))) {
       sidx <- strata[s, ]

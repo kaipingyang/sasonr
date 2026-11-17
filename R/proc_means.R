@@ -675,7 +675,7 @@ sas_proc_means <- function(d, sp) {
       sel <- means_type_vars(ty, k)
       if (k > 0 && any(sel)) {
         idx_per <- lapply(which(sel), function(j) match(lv[[j]]$key, lv[[j]]$keys))
-        ord <- do.call(order, unname(idx_per))
+        ord <- rlang::exec(order, !!!unname(idx_per))
         combo <- do.call(paste, c(lapply(idx_per, function(v) v[ord]), sep = "\r"))
         ucombo <- unique(combo)
         split_rows <- split(ord, factor(combo, levels = ucombo))

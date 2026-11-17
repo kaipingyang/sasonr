@@ -641,7 +641,7 @@ sas_f_index <- function(x, s) {
 #' @export
 sas_f_indexc <- function(x, ...) {
   # the characters of all excerpts form one set (INDEXC(source, excerpt-1, ..., excerpt-n))
-  ab <- do.call(recycle_n, c(list(as_sas_chr(x)), lapply(list(...), as_sas_chr)))
+  ab <- rlang::exec(recycle_n, as_sas_chr(x), !!!lapply(list(...), as_sas_chr))
   vapply(seq_along(ab[[1]]), function(i) {
     set <- unlist(lapply(ab[-1], function(e) strsplit(e[i], "")[[1]]))
     w <- which(strsplit(ab[[1]][i], "")[[1]] %in% set)
@@ -1114,7 +1114,7 @@ sas_order <- function(d, by, descending = rep(FALSE, length(by))) {
   if (nrow(d) == 0) return(integer())
   keys <- sort_keys(d, by)
   dec <- unlist(lapply(seq_along(by), function(k) rep(descending[k], if (is.character(d[[by[k]]])) 1L else 2L)))
-  do.call(order, c(unname(keys), list(decreasing = dec, method = "radix")))
+  rlang::exec(order, !!!unname(keys), decreasing = dec, method = "radix")
 }
 
 #' Stop with a SAS-style error when a data set is not sorted by the BY variables
@@ -1219,7 +1219,7 @@ sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars
     k
   }))
   keys <- keys[sas_order(keys, c(by, ".src", ".row"), c(descending, FALSE, FALSE)), ]
-  grp <- cumsum(do.call(key_change, unname(as.list(keys[by]))))
+  grp <- cumsum(rlang::exec(key_change, !!!unname(as.list(keys[by]))))
   plan <- list()
   for (g in unique(grp)) {
     sub <- keys[grp == g, ]
@@ -1238,8 +1238,8 @@ sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars
   plan <- dplyr::bind_rows(plan)
   for (k in seq_along(by)) {
     keyset <- unname(as.list(plan[by[seq_len(k)]]))
-    plan[[paste0("first.", by[k])]] <- do.call(sas_first, keyset)
-    plan[[paste0("last.", by[k])]] <- do.call(sas_last, keyset)
+    plan[[paste0("first.", by[k])]] <- rlang::exec(sas_first, !!!keyset)
+    plan[[paste0("last.", by[k])]] <- rlang::exec(sas_last, !!!keyset)
   }
   plan
 }

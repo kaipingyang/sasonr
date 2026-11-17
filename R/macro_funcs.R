@@ -262,7 +262,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
     if (fname %in% names(fn_policy)) {
       # invalid arguments: one NOTE for the %SYSFUNC call, not the DATA step NOTEs
       old <- list(err = rt$err, notes = rt$notes, places = log_places_save(rt))
-      r <- do.call(sas_fcall, c(list(fname, f), vals))
+      r <- rlang::exec(sas_fcall, fname, f, !!!vals)
       bad <- isTRUE(rt$err) && !isTRUE(old$err)
       rt$err <- old$err
       rt$notes <- old$notes
@@ -286,7 +286,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
       }
       r
     } else {
-      do.call(f, vals)
+      rlang::exec(f, !!!vals)
     }
   )
   if (is.numeric(res)) {

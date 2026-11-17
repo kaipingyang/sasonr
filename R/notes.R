@@ -38,7 +38,7 @@ mv_note_fns <- c("round", "rounde", "roundz", "int", "intz", "floor", "floorz", 
 sas_mv_args <- function(.at, ..., .exact = TRUE) {
   args <- list(...)
   num <- Filter(function(a) is.numeric(a) && length(a) > 0, args)
-  if (length(num)) do.call(sas_mv_count, c(list(.at), unname(num), list(.exact = .exact)))
+  if (length(num)) rlang::exec(sas_mv_count, .at, !!!unname(num), .exact = .exact)
   args
 }
 

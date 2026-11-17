@@ -67,8 +67,8 @@ fn_layer_call <- function(name, impl, call, env) {
       # code passes them: formals in order, NULL for an empty or omitted one
       # before a given one, `...` in place; the implementation gets the call
       # as written
-      do.call(sas_fcall, c(list(name, run), fn_layer_positional(impl, nms, vals, empty),
-                           if (".at" %in% nms) list(.at = vals[[match(".at", nms)]])))
+      rlang::exec(sas_fcall, name, run, !!!fn_layer_positional(impl, nms, vals, empty),
+                  !!!if (".at" %in% nms) list(.at = vals[[match(".at", nms)]]))
     } else {
       eval(exact, env)
     },

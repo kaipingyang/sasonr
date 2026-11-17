@@ -492,7 +492,7 @@ sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   # the NOTEs come from the policy above.  Only that warning class is
   # muffled; any other warning reaches the caller.
   res <- if (all(miss & p$miss != "none" | dom != "ok")) rep(blank, n) else withCallingHandlers(
-    do.call(.f, fargs),
+    rlang::exec(.f, !!!fargs),
     warning = function(w) if (grepl("NaNs produced|value out of range", conditionMessage(w))) invokeRestart("muffleWarning"),
     # outside the exact domain (sasonr.strict = FALSE) the implementation
     # may not handle the arguments at all: that is not implemented

@@ -511,7 +511,7 @@ sas_f_ifn <- function(cond, a, b, m = NULL) {
 #' @export
 sas_f_choosec <- function(k, ...) {
   vals <- lapply(list(...), as_sas_chr)
-  ab <- do.call(recycle_n, c(list(k), vals))
+  ab <- rlang::exec(recycle_n, k, !!!vals)
   vapply(seq_along(ab[[1]]), function(i) {
     j <- floor(ab[[1]][i])
     m <- length(vals)
@@ -535,7 +535,7 @@ sas_f_choosen <- function(k, ...) {
 #' @export
 sas_f_whichc <- function(x, ...) {
   vals <- lapply(list(...), as_sas_chr)
-  ab <- do.call(recycle_n, c(list(as_sas_chr(x)), vals))
+  ab <- rlang::exec(recycle_n, as_sas_chr(x), !!!vals)
   vapply(seq_along(ab[[1]]), function(i) {
     v <- vapply(ab[-1], `[`, "", i)
     w <- which(sas_rtrim(v) == sas_rtrim(ab[[1]][i]))
@@ -1011,7 +1011,7 @@ trig <- function(f, name, dom = NULL) {
   force(f)
   force(dom)
   function(x, .at = NULL) {
-    bad <- if (is.null(dom)) rep(FALSE, length(x)) else !is.na(x) & !do.call(dom, list(x))
+    bad <- if (is.null(dom)) rep(FALSE, length(x)) else !is.na(x) & !rlang::exec(dom, x)
     out <- suppressWarnings(f(x))
     out[bad] <- NA_real_
     out
@@ -1475,13 +1475,13 @@ dist_fun <- function(kind, dist, x, args) {
   # log(0) is written as -SQRT(BIG) in LOGPDF/LOGCDF/LOGSDF
   logz <- function(v) ifelse(!is.na(v) & v == -Inf, -sqrt(.Machine$double.xmax), v)
   out <- suppressWarnings(switch(kind,
-    cdf = do.call(f$p, c(list(x), fa)),
-    sdf = do.call(f$p, c(list(x), fa, lower.tail = FALSE)),
-    pdf = do.call(f$d, c(list(x), fa)),
-    quantile = do.call(f$q, c(list(x), fa)),
-    logpdf = logz(do.call(f$d, c(list(x), fa, log = TRUE))),
-    logcdf = logz(do.call(f$p, c(list(x), fa, log.p = TRUE))),
-    logsdf = logz(do.call(f$p, c(list(x), fa, lower.tail = FALSE, log.p = TRUE)))
+    cdf = rlang::exec(f$p, x, !!!fa),
+    sdf = rlang::exec(f$p, x, !!!fa, lower.tail = FALSE),
+    pdf = rlang::exec(f$d, x, !!!fa),
+    quantile = rlang::exec(f$q, x, !!!fa),
+    logpdf = logz(rlang::exec(f$d, x, !!!fa, log = TRUE)),
+    logcdf = logz(rlang::exec(f$p, x, !!!fa, log.p = TRUE)),
+    logsdf = logz(rlang::exec(f$p, x, !!!fa, lower.tail = FALSE, log.p = TRUE))
   ))
   # discrete distributions: p = 0 and p = 1 are valid quantiles; continuous ones: invalid
   if (kind == "quantile" && !isTRUE(f$discrete)) out[!is.na(x) & (x <= 0 | x >= 1)] <- NaN

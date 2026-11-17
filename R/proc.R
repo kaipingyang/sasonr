@@ -351,7 +351,7 @@ sas_sort_df <- function(d, by, descending = rep(FALSE, length(by)), nodupkey = F
   d <- d[sas_order(d, by, descending), , drop = FALSE]
   if (nodupkey && nrow(d) > 0) {
     n0 <- nrow(d)
-    d <- d[do.call(key_change, unname(as.list(d[by]))), , drop = FALSE]
+    d <- d[rlang::exec(key_change, !!!unname(as.list(d[by]))), , drop = FALSE]
     rt$proc_notes <- c(rt$proc_notes, sprintf("NOTE: %d observations with duplicate key values were deleted.", n0 - nrow(d)))
   }
   if (noduprecs && nrow(d) > 1) {
