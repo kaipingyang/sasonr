@@ -37,6 +37,7 @@ new_engine <- function(session, level, execute) {
   eng$steps <- list()
   log_engine_init(eng)
   eng$listing <- character()
+  eng$ods <- list()
   eng$sql_open <- FALSE
   eng$sql_opts <- list()
   ses <- session$macro
@@ -283,6 +284,7 @@ engine_exec_steps <- function(eng, text, line) {
     log_step_close(eng, if (step$type == "data") "data" else "proc", tr = tr, env = env, stopped = stopped,
                    notes = isTRUE(eng$session$options$notes) && eng$step_notes)
     engine_add_listing(eng, env$.lst, step$line)
+    eng$ods <- c(eng$ods, env$.ods)
     if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = if (isTRUE(eng$syntax_check)) 3 else 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
     if (length(env$.meta) > 0) eng$session$meta[names(env$.meta)] <- env$.meta
@@ -484,6 +486,7 @@ engine_eval <- function(eng, tr, stage = FALSE, empty = character()) {
   }
   log_buffer_init(env)
   env$.lst <- character()
+  env$.ods <- list()
   env$.meta <- list()
   env$.symtab <- eng$session$macro
   env$.titles <- eng$session$titles
@@ -697,7 +700,9 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #'   afterwards.
 #' @return A `sasonr_result`: `$log` (the log: the program lines with the
 #'   NOTEs, WARNINGs, ERRORs and PUT output; see [sas_log()]), `$log_events`
-#'   (a tibble of the log events), `$listing` (procedure output), `$work` (output data sets with trailing blanks removed),
+#'   (a tibble of the log events), `$listing` (procedure output), `$ods` (the
+#'   ODS tables of the procedure output in output order, each a
+#'   `sas_ods_table`; PROC MEANS and SUMMARY), `$work` (output data sets with trailing blanks removed),
 #'   `$translation`, `$macro_vars` (global macro variables), `$status`
 #'   (`"ok"` or `"error"`), `$errors` (the ERROR messages) and `$error_line`
 #'   (SAS line of the first ERROR). With a `session`, `$log`, `$log_events`, `$listing`,
@@ -837,7 +842,7 @@ engine_result <- function(eng) {
   dsn <- sort(names(out) %||% character())
   structure(
     list(log = log_view_plain(ev <- log_result_events(eng), log_echo_default), log_events = ev,
-         listing = eng$listing, work = out[dsn], meta = eng$session$meta[intersect(dsn, names(eng$session$meta))],
+         listing = eng$listing, ods = eng$ods, work = out[dsn], meta = eng$session$meta[intersect(dsn, names(eng$session$meta))],
          unordered = intersect(eng$session$unordered, dsn),
          translation = structure(list(steps = eng$steps, script = script_raw(eng$script, "trace", eng$inputs %||% character())),
                                  class = "sasonr_translation"),
