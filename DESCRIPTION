@@ -18,6 +18,7 @@ Imports:
     purrr (>= 1.0.0),
     R6 (>= 2.4.0),
     rlang,
+    stringr,
     tibble,
     vctrs
 Suggests:

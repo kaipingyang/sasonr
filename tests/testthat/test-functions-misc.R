@@ -69,6 +69,38 @@ test_that("blank literals: QUOTE and TRANWRD", {
   expect_equal(sas_f_tranwrd("abc", "b", " "), "a c")
 })
 
+test_that("STRIP and TRIM: blanks only, all-blank values, missing values, other characters kept", {
+  x <- c("  ab  ", "", "   ", strrep(" ", 5000), NA, "\tx\t", "ab \n", "straße  ", " İstanbul",
+         " ﬁﬀ ")
+  expect_identical(sas_f_strip(x), c("ab", "", "", "", NA, "\tx\t", "ab \n", "straße", "İstanbul",
+                                     "ﬁﬀ"))
+  expect_identical(sas_f_trim(c("ab  ", "", "   ", strrep(" ", 5000), NA, " a\t ", "été ")),
+                   c("ab", " ", " ", " ", NA, " a\t", "été"))
+  expect_identical(sas_f_strip(c(a = " x ")), c(a = "x"))
+})
+
+test_that("COUNT: non-overlapping matches, empty and missing substrings, T and I modifiers", {
+  expect_identical(sas_f_count(c("aaa", "abab", NA, "", "AbA "), "a"), c(3, 2, NA, 0, 0))
+  expect_identical(sas_f_count("aaaa", "aa"), 2)
+  expect_identical(sas_f_count(c(NA, "x", "   "), ""), c(0, 0, 0)) # empty substring before missing x
+  expect_identical(sas_f_count("AbA ", "a ", "it"), 2)
+  expect_identical(sas_f_count(c("a a ", "a a "), "a ", c("", "t")), c(2, 2))
+  expect_identical(sas_f_count("straße", "SS", "i"), 0)
+  expect_identical(sas_f_count(strrep(" ", 3000), "  "), 1500)
+  expect_error(sas_f_count("abc", NA_character_), class = "sasonr_unsupported")
+})
+
+test_that("COMPRESS with a character list and modifiers; LENGTHC counts characters", {
+  expect_identical(sas_f_compress(c("a b\tc", "", "   ")), c("ab\tc", "", ""))
+  expect_identical(sas_f_compress(c("A1b2", "x"), "", "kd"), c("12", ""))
+  expect_identical(sas_f_compress(c("Straße 1", "ß"), "ß"), c("Strae 1", ""))
+  expect_identical(sas_f_compress(c("ﬁ ﬀ", "a"), "ﬁ"), c(" ﬀ", "a"))
+  expect_identical(sas_f_compress(c("aAbB", "AA"), "a", "i"), c("bB", ""))
+  expect_identical(sas_f_compress(c("a]b^c-d\\e", "x"), "]^-\\"), c("abcde", "x"))
+  expect_identical(sas_f_compress(c("a\tb c", " "), "", "s"), c("abc", ""))
+  expect_identical(sas_f_lengthc(c("", "  ", "straße", "é", NA)), c(0, 2, 6, 2, NA))
+})
+
 test_that("TRANWRD with one target: blanks, empty and missing values", {
   expect_identical(sas_f_tranwrd(c("a b a", "", NA, "aa  "), "a", "xy"), c("xy b xy", "", NA, "xyxy  "))
   expect_identical(sas_f_tranwrd(c(n = "straße"), "ß", "ss"), "strasse")

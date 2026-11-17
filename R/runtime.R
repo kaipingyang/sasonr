@@ -438,6 +438,18 @@ sas_f_coalesce <- function(...) {
 
 strip_both <- function(x) sub("^ +", "", sas_rtrim(x))
 
+# STRIP: remove the blanks matched by `pattern` with stringr (ICU regex; `\z` is the
+# absolute end, since ICU's `$` also matches before a final line feed).  The
+# result keeps the attributes of `x`, as sub() does.  A value that is not
+# valid UTF-8 (a latin1 value, or invalid bytes, which must stay an error)
+# takes the base function `base`.
+remove_blanks <- function(x, pattern, base) {
+  if (!is.character(x) || !all(validUTF8(x))) return(base(x))
+  out <- stringr::str_remove_all(x, pattern)
+  attributes(out) <- attributes(x)
+  out
+}
+
 #' @export
 sas_f_trim <- function(x) {
   out <- sas_rtrim(as_sas_chr(x))
@@ -447,7 +459,7 @@ sas_f_trim <- function(x) {
 #' @export
 sas_f_trimn <- function(x) sas_rtrim(as_sas_chr(x))
 #' @export
-sas_f_strip <- function(x) strip_both(as_sas_chr(x))
+sas_f_strip <- function(x) remove_blanks(as_sas_chr(x), "\\A +| +\\z", strip_both)
 #' @export
 sas_f_left <- function(x) {
   x <- as_sas_chr(x)

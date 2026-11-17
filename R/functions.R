@@ -121,6 +121,39 @@ sas_f_compbl <- function(x) gsub(" {2,}", " ", as_sas_chr(x))
 sas_f_compress <- function(x, chars = NULL, mods = NULL) {
   x <- as_sas_chr(x)
   if (is.null(chars) && is.null(mods)) return(gsub(" ", "", x, fixed = TRUE))
+  one <- function(a) is.null(a) || (is.character(a) && length(a) == 1L && !is.na(a))
+  if (length(x) > 1L && is.character(x) && one(chars) && one(mods) &&
+      all(validUTF8(c(x, chars, mods)))) {
+    return(compress_vec(x, chars %||% "", mods %||% ""))
+  }
+  compress_rowwise(x, chars, mods)
+}
+
+# COMPRESS with one character list and one modifier string for all values: the
+# set is built once (as in compress_rowwise()) and removed, or kept (K), with
+# one stringr call.  Missing values go through compress_rowwise().
+compress_vec <- function(x, cs, md) {
+  md <- tolower(md)
+  set <- c(chars_of(cs), class_chars(md))
+  if (grepl("i", md, fixed = TRUE)) set <- unique(c(set, toupper(set), tolower(set)))
+  set <- unique(set)
+  keep <- grepl("k", md, fixed = TRUE)
+  s <- x
+  na <- is.na(s)
+  if (grepl("t", md, fixed = TRUE)) s[!na] <- sas_rtrim(s[!na])
+  out <- s
+  if (length(set) > 0L) {
+    cls <- paste0("[", if (keep) "^", paste0("\\x{", sprintf("%X", utf8ToInt(paste(set, collapse = ""))), "}", collapse = ""), "]")
+    out[!na] <- stringr::str_remove_all(s[!na], cls)
+  } else if (keep) {
+    out[!na] <- ""
+  }
+  if (any(na)) out[na] <- compress_rowwise(x[na], cs, md)
+  attributes(out) <- NULL
+  out
+}
+
+compress_rowwise <- function(x, chars, mods) {
   rowwise(function(s, cs, md) {
     md <- tolower(md)
     set <- c(chars_of(cs), class_chars(md))
@@ -261,6 +294,35 @@ sas_f_verify <- function(x, ...) {
 
 #' @export
 sas_f_count <- function(x, sub, mods = "") {
+  a <- recycle_n(as_sas_chr(x), sub, mods)
+  s <- a[[1]]
+  b <- a[[2]]
+  if (anyNA(b)) abort_unsupported("COUNT with a missing substring")
+  if (!is.character(s) || !is.character(b) || !is.character(a[[3]]) ||
+      !all(validUTF8(s)) || !all(validUTF8(b))) {
+    return(count_rowwise(s, b, a[[3]]))
+  }
+  md <- tolower(a[[3]])
+  tm <- grepl("t", md, fixed = TRUE)
+  if (any(tm)) {
+    s[tm] <- sas_rtrim(s[tm])
+    b[tm] <- sas_rtrim(b[tm])
+  }
+  im <- grepl("i", md, fixed = TRUE)
+  if (any(im)) {
+    s[im] <- tolower(s[im])
+    b[im] <- tolower(b[im])
+  }
+  # an empty substring counts 0, also for a missing value
+  out <- numeric(length(s))
+  hit <- nzchar(b)
+  out[hit] <- as.numeric(stringr::str_count(s[hit], stringr::fixed(b[hit])))
+  out
+}
+
+# COUNT one row at a time with base R (values that are not valid UTF-8,
+# arguments that are not character).
+count_rowwise <- function(x, sub, mods) {
   rowwise(function(s, b, md) {
     md <- tolower(md)
     if (grepl("t", md, fixed = TRUE)) {
@@ -391,7 +453,13 @@ sas_f_propcase <- function(x, dlm = " /-(.\t") {
 
 # a zero-length value (from TRIMN, STRIP, ...) has length 0; variables and literals are at least 1 long
 #' @export
-sas_f_lengthc <- function(x) as.numeric(nchar(as_sas_chr(x)))
+sas_f_lengthc <- function(x) as.numeric(char_length(as_sas_chr(x)))
+
+# Number of characters: stringr for valid UTF-8 text, nchar() otherwise.
+char_length <- function(x) {
+  if (!is.character(x) || !all(validUTF8(x))) return(nchar(x))
+  stringr::str_length(x)
+}
 #' @export
 sas_f_lengthm <- function(x) sas_f_lengthc(x)
 
