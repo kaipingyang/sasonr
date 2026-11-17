@@ -40,3 +40,24 @@ test_that("print shows name, path, columns with roles and rows", {
   expect_true("    x_Mean [stat] \"Mean\"" %in% out)
   expect_identical(out[length(out)], "  rows:     2")
 })
+
+test_that("r$ods holds the MEANS Summary tables in output order", {
+  r <- sas_run("data a; input grp $ x; datalines;
+a 1
+a 2
+b 3
+;
+run;
+proc means data=a; class grp; var x; run;
+proc means data=a noprint; var x; output out=o mean=m; run;
+proc means data=a mean; by grp; var x; run;")
+  expect_identical(r$status, "ok")
+  expect_length(r$ods, 3L)
+  expect_identical(vapply(r$ods, attr, "", "path"),
+                   c("Means.Summary", "Means.ByGroup1.Summary", "Means.ByGroup2.Summary"))
+  t1 <- r$ods[[1]]
+  expect_identical(names(t1), c("grp", "NObs", "x_N", "x_Mean", "x_StdDev", "x_Min", "x_Max"))
+  expect_identical(t1$x_Mean, c(1.5, 3))
+  expect_identical(attr(r$ods[[3]], "by")$text, "grp=b")
+  expect_identical(sasonr:::render_listing(t1, 132L)[1], "Analysis Variable : x ")
+})

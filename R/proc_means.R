@@ -409,8 +409,9 @@ translate_proc_means <- function(step, meta, last) {
   code <- c(
     header,
     paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_rt_proc_means(.d, ", r_lit(spec), ")"),
+    paste0(".r <- sas_rt_proc(\"", pname, "\", .d, ", r_lit(spec), ")"),
     ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+    ".ods <- c(.ods, .r$tables)",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   outs <- vapply(outputs, `[[`, "", "name")
@@ -655,12 +656,10 @@ means_types_wanted <- function(sp, k, for_print) {
   sort(unique(vctrs::vec_cast(out, integer())))
 }
 
-#' PROC MEANS / SUMMARY engine
-#' @param d Input data (after WHERE).
-#' @param sp Specification built by the translator.
-#' @export
-#' @keywords internal
-sas_rt_proc_means <- function(d, sp) {
+# PROC MEANS / SUMMARY compute step (proc_registry.R): the Summary tables of
+# the printed output and the OUTPUT data sets.  `d` is the input data (after
+# WHERE), `sp` the specification built by the translator.
+means_compute <- function(d, sp) {
   rt <- rt_diag()
   cn <- vapply(sp$class, `[[`, "", "name")
   k <- length(cn)
@@ -731,8 +730,8 @@ sas_rt_proc_means <- function(d, sp) {
     res <- proc_out_options(data, lay$meta, o$ds_opts, o$line, file = o$name, warned = TRUE)
     out[[o$name]] <- res
   }
-  listing <- if (sp$print) means_listing(d, sp, cells_by, means_types_wanted(sp, k, TRUE)) else character()
-  list(listing = listing, out = out)
+  tables <- if (sp$print) means_tables(d, sp, cells_by, means_types_wanted(sp, k, TRUE)) else list()
+  list(tables = tables, data = out, events = character())
 }
 
 means_id_value <- function(x, idmin) {
@@ -1061,96 +1060,163 @@ means_render <- function(cols, gaps) {
   c(hl, rule, body, rule)
 }
 
-means_listing <- function(d, sp, cells_by, print_types) {
+# ODS tables ------------------------------------------------------------------------
+#
+# The printed MEANS output is the ODS table Summary: one table per BY group
+# (and per printed _TYPE_), one row per class level combination, the
+# statistics as columns <var>_<statistic> with raw values.  The listing is
+# rendered from it by the base.summary template (render_listing()).
+means_tables <- function(d, sp, cells_by, print_types) {
   info <- sp$info
   cn <- vapply(sp$class, `[[`, "", "name")
   k <- length(cn)
   stats <- sp$stats
   multi <- length(sp$vars) > 1
   has_label <- any(vapply(sp$vars, function(v) !is.null(info[[v]]$label), TRUE))
-  out <- character()
-  proc_title <- paste0("The ", toupper(sp$pname), " Procedure")
-  titled <- FALSE
   by_nw <- means_by_count_width(d, sp, k)
-  for (g in cells_by) {
+  stat_fmt <- function(s) {
+    list(engine = "means", stat = s, fw = sp$fw, maxdec = sp$maxdec, alpha = sp$alpha,
+         freq = !is.null(sp$freq), count_width = by_nw)
+  }
+  tables <- list()
+  for (gi in seq_along(cells_by)) {
+    g <- cells_by[[gi]]
+    by <- NULL
     if (!is.null(sp$by)) {
       if (length(g$rows) == 0) next
-      out <- c(out, "", proc_by_line(d, g$first, sp$by, info), "")
-    }
-    if (!titled) {
-      out <- c(out, proc_title, "")
-      titled <- TRUE
+      by <- list(values = stats::setNames(lapply(sp$by, function(v) d[[v]][g$first]), sp$by),
+                 text = proc_by_line(d, g$first, sp$by, info), group = gi)
     }
     for (ty in print_types) {
       cells <- Filter(function(c) c$type == ty, g$cells)
       sel <- means_type_vars(ty, k)
       tvars <- cn[sel]
-      # fixed columns
-      fixed <- list()
-      nrow_cell <- if (multi) length(sp$vars) else 1L
-      prev <- NULL
-      class_cells <- lapply(seq_along(tvars), function(z) character())
-      nobs_cells <- character()
-      var_cells <- character()
-      lab_cells <- character()
-      stat_vals <- lapply(stats, function(s) character())
-      for (cell in cells) {
-        vals <- lapply(which(sel), function(j) cell$class_vals[[j]])
-        txt <- vapply(seq_along(tvars), function(z) proc_value_text(vals[[z]], info[[tvars[z]]]), "")
-        same <- if (is.null(prev)) rep(FALSE, length(txt)) else cumprod(txt == prev) == 1
-        prev <- txt
-        for (z in seq_along(tvars)) class_cells[[z]] <- c(class_cells[[z]], if (same[z]) "" else txt[z], rep("", nrow_cell - 1L))
-        nobs_cells <- c(nobs_cells, sprintf("%.0f", cell$freq), rep("", nrow_cell - 1L))
-        for (v in sp$vars) {
-          var_cells <- c(var_cells, info[[v]]$disp)
-          lab_cells <- c(lab_cells, info[[v]]$label %||% "")
-          for (si in seq_along(stats)) stat_vals[[si]] <- c(stat_vals[[si]], means_stat_text(stats[si], cell$stats[[v]][[stats[si]]], sp))
-          if (!multi) break
-        }
+      x <- list()
+      cols <- list()
+      header <- list()
+      add_head <- function(text, columns, role) {
+        header[[length(header) + 1L]] <<- list(text = text, columns = columns, role = role)
       }
-      for (z in seq_along(tvars)) {
-        i <- info[[tvars[z]]]
-        w <- if (i$char) (if (is.null(i$fmt)) i$len else fmt_width(i$fmt, TRUE) %|NA|% i$len) else if (is.null(i$fmt)) 12L else fmt_width(i$fmt, FALSE)
-        w <- max(w, nchar(i$disp), nchar(class_cells[[z]]))
-        fixed[[length(fixed) + 1L]] <- list(parts = i$disp, width = w, right = proc_right_align(i), cells = class_cells[[z]])
+      for (j in which(sel)) {
+        v <- cn[j]
+        x[[info[[v]]$disp]] <- vctrs::vec_c(d[[v]][0], !!!lapply(cells, function(c) c$class_vals[[j]]))
+        cols[[length(cols) + 1L]] <- ods_cols(info[[v]]$disp, label = info[[v]]$label %||% NA_character_,
+                                              format = list(info[[v]]$fmt), role = "class", var = v, info = list(info[[v]]))
+        add_head(info[[v]]$disp, info[[v]]$disp, "class")
       }
       if (k > 0 && any(sel) && !sp$nonobs) {
-        fixed[[length(fixed) + 1L]] <- list(parts = c("N", "Obs"), width = max(3L, nchar(nobs_cells)), right = TRUE, cells = nobs_cells)
+        x[["NObs"]] <- vctrs::vec_c(numeric(), !!!lapply(cells, `[[`, "freq"))
+        cols[[length(cols) + 1L]] <- ods_cols("NObs", label = "N Obs", format = list(list(engine = "count")), stat = "nobs")
+        add_head(c("N", "Obs"), "NObs", "stat")
       }
       if (multi) {
-        fixed[[length(fixed) + 1L]] <- list(parts = "Variable", width = max(8L, nchar(var_cells)), right = FALSE, cells = var_cells)
-        if (has_label) fixed[[length(fixed) + 1L]] <- list(parts = "Label", width = max(5L, nchar(lab_cells)), right = FALSE, cells = lab_cells)
+        add_head("Variable", character(), "var")
+        if (has_label) add_head("Label", character(), "label")
       }
-      scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp, by_nw))
-      # panel layout (means_panel_layout())
-      ls <- rt_linesize()
-      panels <- means_panel_layout(vapply(scols, function(c) vctrs::vec_cast(c$width, integer()), 1L),
-                                   vapply(fixed, function(c) vctrs::vec_cast(c$width, integer()), 1L), ls)
-      bad <- Filter(function(p) p$width > ls, panels)
-      if (length(bad) > 0) {
-        # an over-long fixed part (a CLASS variable with a long length, or a
-        # very wide Variable column) would have to be narrowed and the spare
-        # columns redistributed; that rule is not implemented
-        abort_unsupported("PROC MEANS listing wider than LINESIZE= (narrowing the class/fixed columns is not supported)")
+      stat_cols <- list()
+      for (v in sp$vars) for (s in stats) {
+        nm <- paste0(info[[v]]$disp, "_", means_autoname[[s]])
+        x[[nm]] <- vctrs::vec_c(numeric(), !!!lapply(cells, function(c) as.numeric(c$stats[[v]][[s]])))
+        cols[[length(cols) + 1L]] <- ods_cols(nm, label = paste(means_stat_heading(s, sp$alpha), collapse = " "),
+                                              format = list(stat_fmt(s)), var = v, stat = s, info = list(info[[v]]))
+        stat_cols[[s]] <- c(stat_cols[[s]], nm)
       }
-      if (length(fixed) > 0 && (length(panels) >= 3L || ls < 120L)) {
-        # The fixed columns follow this layout for one or two panels and
-        # LINESIZE= 120 or more.  Below LINESIZE=120 and across three or more
-        # statistic panels the fixed part (the "N Obs" field and the gaps
-        # around the CLASS columns) is narrowed by a rule that is not
-        # implemented.
-        abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not supported)")
-      }
-      for (p in panels) {
-        cols <- c(fixed, scols[p$first:p$last])
-        gaps <- c(rep.int(p$fixed_gap, length(fixed)), rep.int(p$gap, p$last - p$first))
-        if (!multi) {
-          v <- sp$vars[1]
-          out <- c(out, paste0("Analysis Variable : ", info[[v]]$disp, " ", info[[v]]$label %||% ""), "")
-        }
-        out <- c(out, means_render(cols, gaps), "")
-      }
+      for (s in stats) add_head(means_stat_heading(s, sp$alpha), stat_cols[[s]], "stat")
+      path <- if (is.null(by)) "Means.Summary" else paste0("Means.ByGroup", gi, ".Summary")
+      tb <- new_sas_ods_table(
+        tibble::new_tibble(x, nrow = length(cells)), name = "Summary", label = "Summary statistics", path = path,
+        proc = "Means", template = "base.summary", by = by, cols = vctrs::vec_rbind(ods_cols(), !!!cols),
+        header = ods_header(level = rep(1L, length(header)), text = lapply(header, `[[`, "text"),
+                            span = rep(1L, length(header)), columns = lapply(header, `[[`, "columns"),
+                            role = vapply(header, `[[`, "", "role"))
+      )
+      tables[[length(tables) + 1L]] <- validate_sas_ods_table(tb)
     }
+  }
+  tables
+}
+
+# Listing template base.summary: the printed MEANS table of one Summary table
+# (panels of statistics after the class, N Obs, Variable and Label columns).
+listing_base_summary <- function(tb, ls) {
+  cols <- attr(tb, "cols", exact = TRUE)
+  header <- attr(tb, "header", exact = TRUE)
+  ccols <- cols[cols$role == "class", ]
+  scols <- cols[cols$role == "stat" & !is.na(cols$var), ]
+  vars <- unique(scols$var)
+  vinfo <- scols$info[match(vars, scols$var)]
+  stats <- unique(scols$stat)
+  f1 <- scols$format[[1]]
+  sp <- list(fw = f1$fw, maxdec = f1$maxdec, alpha = f1$alpha, freq = if (isTRUE(f1$freq)) TRUE)
+  by_nw <- f1$count_width
+  multi <- length(vars) > 1
+  has_label <- "label" %in% header$role
+  nobs <- "NObs" %in% cols$name
+  n <- nrow(tb)
+  nrow_cell <- if (multi) length(vars) else 1L
+  out <- character()
+  prev <- NULL
+  class_cells <- lapply(seq_len(nrow(ccols)), function(z) character())
+  nobs_cells <- character()
+  var_cells <- character()
+  lab_cells <- character()
+  stat_vals <- lapply(stats, function(s) character())
+  for (i in seq_len(n)) {
+    txt <- vapply(seq_len(nrow(ccols)), function(z) proc_value_text(tb[[ccols$name[z]]][i], ccols$info[[z]]), "")
+    same <- if (is.null(prev)) rep(FALSE, length(txt)) else cumprod(txt == prev) == 1
+    prev <- txt
+    for (z in seq_len(nrow(ccols))) class_cells[[z]] <- c(class_cells[[z]], if (same[z]) "" else txt[z], rep("", nrow_cell - 1L))
+    if (nobs) nobs_cells <- c(nobs_cells, sprintf("%.0f", tb[["NObs"]][i]), rep("", nrow_cell - 1L))
+    for (vi in seq_along(vars)) {
+      var_cells <- c(var_cells, vinfo[[vi]]$disp)
+      lab_cells <- c(lab_cells, vinfo[[vi]]$label %||% "")
+      for (si in seq_along(stats)) {
+        nm <- scols$name[scols$var == vars[vi] & scols$stat == stats[si]]
+        stat_vals[[si]] <- c(stat_vals[[si]], means_stat_text(stats[si], tb[[nm]][i], sp))
+      }
+      if (!multi) break
+    }
+  }
+  fixed <- list()
+  for (z in seq_len(nrow(ccols))) {
+    i <- ccols$info[[z]]
+    w <- if (i$char) (if (is.null(i$fmt)) i$len else fmt_width(i$fmt, TRUE) %|NA|% i$len) else if (is.null(i$fmt)) 12L else fmt_width(i$fmt, FALSE)
+    w <- max(w, nchar(i$disp), nchar(class_cells[[z]]))
+    fixed[[length(fixed) + 1L]] <- list(parts = i$disp, width = w, right = proc_right_align(i), cells = class_cells[[z]])
+  }
+  if (nobs) {
+    fixed[[length(fixed) + 1L]] <- list(parts = c("N", "Obs"), width = max(3L, nchar(nobs_cells)), right = TRUE, cells = nobs_cells)
+  }
+  if (multi) {
+    fixed[[length(fixed) + 1L]] <- list(parts = "Variable", width = max(8L, nchar(var_cells)), right = FALSE, cells = var_cells)
+    if (has_label) fixed[[length(fixed) + 1L]] <- list(parts = "Label", width = max(5L, nchar(lab_cells)), right = FALSE, cells = lab_cells)
+  }
+  scl <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp, by_nw))
+  # panel layout (means_panel_layout())
+  panels <- means_panel_layout(vapply(scl, function(c) vctrs::vec_cast(c$width, integer()), 1L),
+                               vapply(fixed, function(c) vctrs::vec_cast(c$width, integer()), 1L), ls)
+  bad <- Filter(function(p) p$width > ls, panels)
+  if (length(bad) > 0) {
+    # an over-long fixed part (a CLASS variable with a long length, or a
+    # very wide Variable column) would have to be narrowed and the spare
+    # columns redistributed; that rule is not implemented
+    abort_unsupported("PROC MEANS listing wider than LINESIZE= (narrowing the class/fixed columns is not supported)")
+  }
+  if (length(fixed) > 0 && (length(panels) >= 3L || ls < 120L)) {
+    # The fixed columns follow this layout for one or two panels and
+    # LINESIZE= 120 or more.  Below LINESIZE=120 and across three or more
+    # statistic panels the fixed part (the "N Obs" field and the gaps
+    # around the CLASS columns) is narrowed by a rule that is not
+    # implemented.
+    abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not supported)")
+  }
+  for (p in panels) {
+    pcols <- c(fixed, scl[p$first:p$last])
+    gaps <- c(rep.int(p$fixed_gap, length(fixed)), rep.int(p$gap, p$last - p$first))
+    if (!multi) {
+      out <- c(out, paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""), "")
+    }
+    out <- c(out, means_render(pcols, gaps), "")
   }
   out
 }
