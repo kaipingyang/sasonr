@@ -25,8 +25,8 @@ cg_pipe <- function(src, stages = list(), target = NULL) {
 # The executable form of one element: a cg_pipe becomes the nested call.
 cg_lang <- function(x) {
   if (!inherits(x, "cg_pipe")) return(x)
-  val <- Reduce(function(acc, st) as.call(c(as.list(st)[1], list(acc), as.list(st)[-1])), x$stages, x$src)
-  if (is.null(x$target)) val else call("<-", as.name(x$target), val)
+  val <- Reduce(function(acc, st) rlang::call2(st[[1]], acc, !!!as.list(st)[-1]), x$stages, x$src)
+  if (is.null(x$target)) val else rlang::call2("<-", rlang::sym(x$target), val)
 }
 
 #' The expression vector that runs the elements
@@ -67,7 +67,7 @@ cg_render <- function(exprs, header = character()) {
     if (!inherits(x, "cg_pipe")) return(cg_deparse(x))
     parts <- c(cg_deparse(x$src), vapply(x$stages, cg_deparse, ""))
     txt <- paste(parts, collapse = " |>\n  ")
-    if (is.null(x$target)) txt else paste(cg_deparse(as.name(x$target)), "<-", txt)
+    if (is.null(x$target)) txt else paste(cg_deparse(rlang::sym(x$target)), "<-", txt)
   }, "")
   paste(c(header, body), collapse = "\n")
 }
@@ -80,19 +80,19 @@ cg_render <- function(exprs, header = character()) {
 
 cg_num <- function(x) {
   if (is.na(x) && !is.nan(x)) return(if (is.integer(x)) NA_integer_ else NA_real_)
-  if (is.nan(x)) return(as.name("NaN"))
-  if (x < 0 || (x == 0 && 1 / x < 0)) return(call("-", cg_num(-x)))
-  if (is.infinite(x)) return(as.name("Inf"))
+  if (is.nan(x)) return(rlang::sym("NaN"))
+  if (x < 0 || (x == 0 && 1 / x < 0)) return(rlang::call2("-", cg_num(-x)))
+  if (is.infinite(x)) return(rlang::sym("Inf"))
   x
 }
 
 cg_val <- function(x) {
   if (is.null(x)) return(NULL)
-  if (is.list(x)) return(as.call(c(list(as.name("list")), lapply(x, function(v) cg_val(v) %||% quote(NULL)))))
+  if (is.list(x)) return(rlang::call2("list", !!!lapply(x, function(v) cg_val(v) %||% quote(NULL))))
   x <- unname(x)
   if (length(x) == 1) return(if (is.numeric(x)) cg_num(x) else x)
-  if (length(x) == 0) return(call(switch(typeof(x), character = "character", double = "numeric", integer = "integer", logical = "logical")))
-  as.call(c(list(as.name("c")), lapply(x, cg_val)))
+  if (length(x) == 0) return(rlang::call2(switch(typeof(x), character = "character", double = "numeric", integer = "integer", logical = "logical")))
+  rlang::call2("c", !!!lapply(x, cg_val))
 }
 
 # A call of `fun` ("f" or "pkg::f") with the arguments in `args` (a list,
@@ -100,13 +100,13 @@ cg_val <- function(x) {
 cg_call <- function(fun, args = list()) {
   f <- if (grepl("::", fun, fixed = TRUE)) {
     p <- strsplit(fun, "::", fixed = TRUE)[[1]]
-    call("::", as.name(p[1]), as.name(p[2]))
-  } else as.name(fun)
-  as.call(c(list(f), args))
+    rlang::call2("::", rlang::sym(p[1]), rlang::sym(p[2]))
+  } else rlang::sym(fun)
+  rlang::call2(f, !!!args)
 }
 
 # `.at = c(line, col)`
-cg_at <- function(line, col) list(.at = call("c", as.integer(line), as.integer(col %||% NA_integer_)))
+cg_at <- function(line, col) list(.at = rlang::call2("c", as.integer(line), as.integer(col %||% NA_integer_)))
 
 # The text of an expression on one line (the display layouts of the generated code).
 # A call longer than deparse()'s widest line is joined without the line
@@ -129,7 +129,7 @@ cg_trim <- function(lines) {
 
 # A function literal as parse() gives it (the fourth element, the source
 # reference, is NULL).
-cg_fn <- function(args, body) as.call(list(as.name("function"), as.pairlist(args), body, NULL))
+cg_fn <- function(args, body) rlang::call2("function", as.pairlist(args), body, NULL)
 
 # A piece of generated code: the language object that runs and its display
 # text (built from the deparsed parts in the generated layout).
@@ -137,8 +137,8 @@ cgi <- function(lang, text = cg_text(lang)) list(lang = lang, text = text)
 
 # `x |> stage`: the stage call gets `x` as its first argument.
 cgi_pipe <- function(x, stage, sep = " |> ") {
-  cgi(as.call(c(as.list(stage)[1], list(x$lang), as.list(stage)[-1])), paste0(x$text, sep, cg_text(stage)))
+  cgi(rlang::call2(stage[[1]], x$lang, !!!as.list(stage)[-1]), paste0(x$text, sep, cg_text(stage)))
 }
 
 # `name <- x`
-cgi_assign <- function(name, x) cgi(call("<-", as.name(name), x$lang), paste0(name, " <- ", x$text))
+cgi_assign <- function(name, x) cgi(rlang::call2("<-", rlang::sym(name), x$lang), paste0(name, " <- ", x$text))

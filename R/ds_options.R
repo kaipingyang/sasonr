@@ -102,15 +102,15 @@ ds_opts_record <- function(d) {
 #' @return A [cgi()] item: the call (one expression) and its display text.
 #' @noRd
 ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
-  args <- list(as.name("work"), rec$name)
+  args <- list(rlang::sym("work"), rec$name)
   if (!is.null(rec$keep) || !is.null(rec$drop)) args$keep <- cg_val(rec$vars)
-  if (!is.null(rec$rename)) args$rename <- as.call(c(list(as.name("c")), as.list(rec$rename)))
+  if (!is.null(rec$rename)) args$rename <- rlang::call2("c", !!!as.list(rec$rename))
   x <- cgi(cg_call("sas_ds", args))
   if (obs_col) x <- cgi_pipe(x, quote(dplyr::mutate(.obs = dplyr::row_number())))
   where_stage <- function(e) {
     wcx <- new_cx("vec", an)
     wcx$where <- TRUE
-    cg_call("dplyr::filter", list(call("sas_where_cond", call("sas_true", gen_lang(e, wcx)))))
+    cg_call("dplyr::filter", list(rlang::expr(sas_where_cond(sas_true(!!gen_lang(e, wcx))))))
   }
   if (!is.null(rec$where)) x <- cgi_pipe(x, where_stage(rec$where))
   # the WHERE statement condition applies to every input data set without a
@@ -133,7 +133,7 @@ ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
         tr[[rec$out_names[j]]] <- as.integer(inf$len)
       }
     }
-    if (length(tr) > 0) x <- cgi_pipe(x, call("sas_trunc_chars", cg_val(tr)))
+    if (length(tr) > 0) x <- cgi_pipe(x, rlang::call2("sas_trunc_chars", cg_val(tr)))
   }
   wexpr <- rec$where %||% where
   cgi_pipe(x, cg_call("sas_note_read", c(list(rec$name), if (!is.null(wexpr)) list(where = where_text(wexpr)))))
