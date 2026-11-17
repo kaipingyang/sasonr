@@ -570,6 +570,9 @@ parse_format_def <- function(p, kind, line) {
       advance(p)
       if (is_op(p, "=")) {
         advance(p)
+        if (o == "default" && !tk_type(p) %in% c("num", "op")) {
+          abort_syntax("expecting one of the following: a numeric constant, a datetime constant.", line)
+        }
         opts[[o]] <- tk_val(p)
         advance(p)
       } else {

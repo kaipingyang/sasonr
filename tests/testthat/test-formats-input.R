@@ -262,3 +262,11 @@ test_that("$HEX informat turns hex digit pairs into bytes", {
   expect_true(any(startsWith(msgs(res), "NOTE: Invalid argument to function INPUT at line 1 column")))
   expect_false(any(grepl("Mathematical operations", msgs(res))))
 })
+
+test_that("PROC FORMAT DEFAULT= requires a numeric constant and truncates a fraction", {
+  expect_error(sas_run("proc format; value fd (default=abc) 1='abcdefgh'; run;"),
+               "a numeric constant, a datetime constant", class = "sasonr_syntax_error")
+  r <- sas_run("proc format; value fb (default=3.5) 1='abcdefgh'; run;
+data a; c = put(1, fb.); l = length(c); run;")
+  expect_identical(r$work$a$c, "abc")
+})
