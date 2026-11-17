@@ -226,6 +226,16 @@ sql_coerce_col <- function(v, type, len, name, line) {
   as.numeric(v)
 }
 
+# The values of one column of INSERT VALUES / SET, one per row, as a vector
+# of the column's type. A value of the other type gets the message of
+# sql_coerce_col() (INSERT VALUES has already checked every value).
+sql_values_col <- function(x, type, name, line) {
+  char <- identical(type, "char")
+  bad <- vapply(x, is.character, NA) != char
+  if (any(bad)) abort_syntax(paste0("Value for column ", name, " is not ", if (char) "character" else "numeric", "."), line)
+  vctrs::list_unchop(x, ptype = if (char) character() else double(), name_spec = rlang::zap())
+}
+
 sql_stmt_insert <- function(eng, st) {
   tg <- sql_target(eng, st$table, st$line)
   m <- tg$meta
@@ -259,7 +269,6 @@ sql_stmt_insert <- function(eng, st) {
       }
     }
     nrows <- length(rows)
-    new <- lapply(new, function(x) unlist(x))
   }
   miss <- setdiff(names(new), vars)
   if (length(miss) > 0) abort_syntax(paste0("Column ", miss[1], " could not be found in the table/view identified with the correlation name ", toupper(st$table), "."), st$line)
@@ -269,6 +278,7 @@ sql_stmt_insert <- function(eng, st) {
     len <- m$len[[v]] %||% 8L
     add[[v]] <- if (v %in% names(new)) {
       x <- new[[v]]
+      if (is.list(x)) x <- sql_values_col(x, type, v, st$line)
       if (st$kind == "insert_set") x <- rep_len(x, nrows)
       sql_coerce_col(x, type, len, v, st$line)
     } else if (type == "char") rep(strrep(" ", len), nrows) else rep(NA_real_, nrows)

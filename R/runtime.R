@@ -488,11 +488,11 @@ cat_fit <- function(out, .len) {
   out
 }
 #' @export
-sas_f_cats <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lapply(list(...), cat_item, trim = strip_both)), .len)
+sas_f_cats <- function(..., .at = NULL, .len = NULL) cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = strip_both)), .len)
 #' @export
-sas_f_catt <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lapply(list(...), cat_item, trim = sas_rtrim)), .len)
+sas_f_catt <- function(..., .at = NULL, .len = NULL) cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = sas_rtrim)), .len)
 #' @export
-sas_f_cat <- function(..., .at = NULL, .len = NULL) cat_fit(do.call(paste0, lapply(list(...), cat_item, trim = identity)), .len)
+sas_f_cat <- function(..., .at = NULL, .len = NULL) cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = identity)), .len)
 #' @export
 sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
   rt <- rt_diag()
@@ -1022,7 +1022,7 @@ sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize()) {
   # List output writes a blank after each value; literals add none.
   lit <- .lit %||% rep(FALSE, length(parts))
   parts <- Map(function(p, l) if (l) p else paste0(p, " "), parts, lit)
-  line <- do.call(paste0, parts)
+  line <- rlang::exec(paste0, !!!unname(parts))
   if (any(nchar(line) > .ls)) {
     # the log line size is 132 (a FILE: its LRECL): an item that does not fit starts a new line
     line <- vapply(seq_along(line), function(i) {
@@ -1070,8 +1070,8 @@ sas_put_rows <- function(lines, guards, n = NULL) {
   }
   lines <- lapply(lines, rep_len, n)
   guards <- lapply(guards, function(g) rep_len(sas_true(g), n))
-  txt <- do.call(rbind, lines)
-  keep <- do.call(rbind, guards)
+  txt <- vctrs::vec_interleave(!!!unname(lines), .ptype = character())
+  keep <- vctrs::vec_interleave(!!!unname(guards), .ptype = logical())
   out <- as.vector(txt)[as.vector(keep)]
   # NA: a PUT with pointer controls that writes no line (sas_put_layout())
   out[!is.na(out)]

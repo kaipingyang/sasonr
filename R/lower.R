@@ -443,7 +443,7 @@ dsir_lower <- function(an) {
   dead <- setdiff(names(g$blocks), seen)
   # every executable statement that starts in a removed block, also those
   # that give only a terminator (DELETE, STOP, ...) or a head (IF, DO, SELECT)
-  starts <- do.call(rbind, c(list(cbind(block = character(), line = character())), g$starts))
+  starts <- vctrs::vec_rbind(!!!g$starts, .ptype = data.frame(block = character(), line = character()))
   unreachable <- sort(unique(as.integer(starts[starts[, "block"] %in% dead, "line"])))
   lags <- dsir_lag_sites(g$blocks)
   lags$block[lags$block %in% dead] <- NA_character_
@@ -488,7 +488,7 @@ dsir_lag_sites <- function(blocks) {
   }
   if (!length(acc)) return(data.frame(id = integer(), fn = character(), n = integer(), block = character(),
                                       stringsAsFactors = FALSE))
-  out <- do.call(rbind, acc)
+  out <- vctrs::vec_rbind(!!!acc)
   out <- out[!duplicated(out$id), ]
   out <- out[order(out$id), ]
   rownames(out) <- NULL

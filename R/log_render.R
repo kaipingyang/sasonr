@@ -344,7 +344,7 @@ log_markers <- function(e, lines) {
     code <- regmatches(err$text[[i]][1], regexec("^ERROR ([0-9]+)-[0-9]+:", err$text[[i]][1]))[[1]]
     len <- nchar(tok)
     k <- as.character(ln)
-    by_line[[k]] <- rbind(by_line[[k]], data.frame(col = col, len = len,
+    by_line[[k]] <- vctrs::vec_rbind(by_line[[k]], data.frame(col = col, len = len,
                                                    code = if (length(code) == 2L) code[2] else ""))
   }
   lapply(by_line, function(m) {

@@ -323,6 +323,6 @@ sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
   if (length(titles) > 0) out <- c(out, titles, "")
   out <- c(out, vapply(head, function(h) sas_rtrim(paste(h, collapse = "  ")), ""),
            strrep("-", sum(widths) + 2L * (length(widths) - 1L)))
-  if (nrow(d) > 0) out <- c(out, sas_rtrim(do.call(paste, c(cells, sep = "  "))))
+  if (nrow(d) > 0) out <- c(out, sas_rtrim(rlang::exec(paste, !!!unname(cells), sep = "  ")))
   c(out, "")
 }

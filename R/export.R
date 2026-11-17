@@ -52,7 +52,7 @@ sas_export_work <- function(res, dir, values = TRUE) {
       cols <- lapply(vars, function(v) csv_field(export_values(d[[v]], m$formats[[v]])))
       lines <- csv_field(disp)
       lines <- paste(lines, collapse = ",")
-      if (nrow(d) > 0 && length(vars) > 0) lines <- c(lines, do.call(paste, c(cols, sep = ",")))
+      if (nrow(d) > 0 && length(vars) > 0) lines <- c(lines, rlang::exec(paste, !!!unname(cols), sep = ","))
       # PROC EXPORT writes records of at most LRECL=32767 bytes; longer ones are cut
       long <- nchar(lines, type = "bytes") > 32767L
       if (any(long)) lines[long] <- vapply(lines[long], function(l) rawToChar(charToRaw(l)[1:32767]), "")

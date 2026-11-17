@@ -212,7 +212,7 @@ dsir_facts <- function(ir, an) {
     site_rows[[length(site_rows) + 1L]] <- list(block = id, pos = k, op = i$op, line = i$line,
                                                 var = if (i$op == "sum") i$target$name else NA_character_)
   }
-  sites <- if (length(site_rows)) do.call(rbind, lapply(site_rows, as.data.frame, stringsAsFactors = FALSE)) else
+  sites <- if (length(site_rows)) vctrs::vec_rbind(!!!lapply(site_rows, as.data.frame, stringsAsFactors = FALSE)) else
     data.frame(block = character(), pos = integer(), op = character(), line = integer(), var = character())
   sites$once <- vapply(sites$block, once, NA)
   lags <- ir$lag_sites[!is.na(ir$lag_sites$block), ]

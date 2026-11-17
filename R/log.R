@@ -123,7 +123,7 @@ log_setting_line_check <- function(eng, line) {
 # lines wraps at it).
 log_source_ls <- function(eng, line, ls) {
   log_setting_order_check(eng$program$ls$line, line)
-  eng$program$ls <- rbind(eng$program$ls, data.frame(line = as.integer(line), ls = as.integer(ls)))
+  eng$program$ls <- vctrs::vec_rbind(eng$program$ls, data.frame(line = as.integer(line), ls = as.integer(ls)))
   invisible()
 }
 
@@ -152,7 +152,7 @@ log_step_start <- function(eng, label, line, last, tail = NULL) {
   eng$step_no <- eng$step_count
   st <- eng$program$steps
   tail <- vctrs::vec_cast(tail %||% c(NA, NA), integer())
-  eng$program$steps <- rbind(st, data.frame(step = eng$step_no, label = label, line = as.integer(line),
+  eng$program$steps <- vctrs::vec_rbind(st, data.frame(step = eng$step_no, label = label, line = as.integer(line),
                                             tail_from = tail[1], tail_to = tail[2]))
   log_source_read(eng, last)
 }
@@ -196,7 +196,7 @@ log_open_code <- function(eng) {
 log_source_option <- function(eng, line, on) {
   log_setting_line_check(eng, line)
   log_setting_order_check(eng$program$source$line, line)
-  eng$program$source <- rbind(eng$program$source, data.frame(line = as.integer(line), on = on))
+  eng$program$source <- vctrs::vec_rbind(eng$program$source, data.frame(line = as.integer(line), on = on))
   eng$session$options$source <- on
   invisible()
 }

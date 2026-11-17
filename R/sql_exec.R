@@ -615,10 +615,10 @@ sql_setop <- function(q, eng, outer) {
   }
   da <- norm(a)
   db <- norm(b)
-  keyof <- function(d) do.call(paste, c(lapply(d, function(x) {
+  keyof <- function(d) rlang::exec(paste, !!!unname(lapply(d, function(x) {
     x <- sql_norm_key(x)
     ifelse(is.na(x), "\001NA", as.character(x))
-  }), sep = "\002"))
+  })), sep = "\002")
   ka <- if (ncol(da) > 0) keyof(da) else rep("", nrow(da))
   kb <- if (ncol(db) > 0) keyof(db) else rep("", nrow(db))
   d <- switch(q$op,
