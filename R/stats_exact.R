@@ -256,7 +256,7 @@ stats_row_fma_sq <- function(d) {
 }
 
 stats_moments <- function(m, method = c("datastep", "sql", "means"), div = NULL, ...) {
-  method <- match.arg(method)
+  method <- rlang::arg_match(method)
   if (method == "means") return(stats_means_moments(m, ...))
   if (!is.matrix(m)) m <- matrix(as.numeric(m), nrow = 1L)
   stats_finite_check(m, "an argument")

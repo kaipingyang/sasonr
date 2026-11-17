@@ -125,8 +125,7 @@ fn_layer_data_errors <- function(rt, name) {
     msgs <- sprintf("_ERROR_ is set to 1 by this call of %s.", toupper(name))
   }
   for (m in unique(msgs)) {
-    warning(structure(class = c("sasonr_data_error", "warning", "condition"),
-                      list(message = m, call = NULL, name = toupper(name), note = m)))
+    rlang::warn(m, class = "sasonr_data_error", name = toupper(name), note = m)
   }
   invisible()
 }

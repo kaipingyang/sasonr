@@ -88,7 +88,7 @@ sas_meta <- function(session) {
 #' @export
 sas_macro_vars <- function(session, scope = c("global", "automatic")) {
   check_session(session)
-  scope <- match.arg(scope)
+  scope <- rlang::arg_match(scope)
   mv <- as.list(session$macro$globals)
   auto <- names(mv) %in% macro_auto_vars
   mv[sort(names(mv)[if (scope == "global") !auto else auto])]

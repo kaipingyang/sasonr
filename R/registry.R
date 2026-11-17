@@ -42,7 +42,7 @@ registry_cache <- new.env(parent = emptyenv())
 #'   types and default widths of the SAS 9.4 inventory.
 #' @keywords internal
 sas_feature_registry <- function(kind = c("functions", "formats")) {
-  kind <- match.arg(kind)
+  kind <- rlang::arg_match(kind)
   if (is.null(registry_cache[[kind]])) {
     f <- system.file("registry", paste0(kind, ".csv"), package = "sasonr")
     registry_cache[[kind]] <- if (nzchar(f)) {

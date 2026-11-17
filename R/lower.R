@@ -318,8 +318,8 @@ dsir_lower <- function(an) {
       # declarative (slots) or step-wide (FILE, INFILE): no instruction
       where = , by = , keep = , drop = , rename = , length = , format = , informat = ,
       label = , attrib = , retain = , array = , datalines = , file = , infile = , null = NULL,
-      stop(sprintf("dsir_lower(): no lowering for the %s statement (line %s)", toupper(s$stmt), s$line %||% "?"),
-           call. = FALSE)
+      rlang::abort(sprintf("dsir_lower(): no lowering for the %s statement (line %s)", toupper(s$stmt), s$line %||% "?"),
+           .internal = TRUE)
     )
     invisible()
   }

@@ -205,7 +205,7 @@ engine_exec_steps <- function(eng, text, line) {
     env <- tryCatch(engine_eval(eng, tr, stage = vec, empty = sc_empty),
                     sasonr_step_exception = function(e) if (vec) e else engine_step_exception(eng, step, tr, e),
                     sasonr_unsupported = function(e) {
-                      if (vec && !inherits(e, "sasonr_unsupported_construct")) e else stop(e)
+                      if (vec && !inherits(e, "sasonr_unsupported_construct")) e else rlang::cnd_signal(e)
                     })
     branch <- vec && inherits(env, c("sasonr_unsupported", "sasonr_step_exception"))
     if (!branch && !is.environment(env)) next
@@ -459,8 +459,8 @@ engine_eval <- function(eng, tr, stage = FALSE, empty = character()) {
     # surface a sasonr condition wrapped by dplyr (e.g. raised inside mutate())
     p <- e
     while (!is.null(p) && !inherits(p, "sasonr_error")) p <- p$parent
-    if (!is.null(p)) stop(p)
-    stop(e)
+    if (!is.null(p)) rlang::cnd_signal(p)
+    rlang::cnd_signal(e)
   })
   if (!stage && length(rt$notes) > 0) {
     log_buffer_add(env, rt$notes)
@@ -618,7 +618,7 @@ engine_program <- function(eng, code) {
 #' tr
 #' @export
 sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
-  level <- match.arg(level)
+  level <- rlang::arg_match(level)
   session <- SasSession$new()
   session_add_work(session, work)
   on.exit(session$close(), add = TRUE)
@@ -680,8 +680,8 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #' @export
 sas_run <- function(code, work = list(), level = c("auto", "L3"),
                     on_error = getOption("sasonr.on_error", c("sas", "abort")), session = NULL) {
-  level <- match.arg(level)
-  on_error <- match.arg(on_error, c("sas", "abort"))
+  level <- rlang::arg_match(level)
+  on_error <- rlang::arg_match(on_error, c("sas", "abort"))
   if (is.null(session)) {
     # a throw-away session, closed (SQL connection) when the run ends
     session <- SasSession$new()

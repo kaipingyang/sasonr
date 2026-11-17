@@ -141,7 +141,7 @@ err_assign_rest <- function(p, start) {
   p$pos <- start
   complete <- tryCatch({
     advance(p)
-    if (!is_op(p, "=")) stop("not an assignment")
+    if (!is_op(p, "=")) rlang::abort("not an assignment")
     advance(p)
     parse_expr(p)
     TRUE
