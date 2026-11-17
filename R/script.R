@@ -8,7 +8,7 @@
 # with the verb call that runs the step (`lang`), its text (`text`), the SAS
 # text and lines, the macro call chain (`macro_stack`, empty for now), the
 # %INCLUDE origin (`include`, NULL), `kind` ("static", "deferred" or "traced")
-# and `comments` (empty for now).  format() renders the nodes as a script that
+# and `comments` (the SAS comments of the step, script_comments.R).  format() renders the nodes as a script that
 # runs after library(sasonr).
 #
 # The verbs (sas_data_step(), sas_proc_sort() ...) take a session first, run
@@ -24,6 +24,7 @@
 script_record <- function(eng, step, text, line, tr = NULL) {
   stack <- lapply(eng$session$macro$frames, function(fr) fr$name)
   node <- list(type = step$type, name = step$name, kind = step$kind, line = step$line,
+               col = if (is.null(step$span)) 1L else as.integer(step$span[["col"]]),
                sas = script_slice(text, line, step$span), tr = tr, macro_stack = stack)
   if (eng$execute && !length(stack) && !is.null(node$sas)) node <- script_inner_macro(eng, node)
   eng$script <- c(eng$script, list(node))
@@ -174,14 +175,15 @@ script_exec_after_sql <- function(eng, text, line) {
 
 # The recorded nodes as kept in a translation; sas_script() builds the IR
 # from them (a run never fails because of its script).
-script_raw <- function(nodes, mode, inputs) {
-  structure(list(nodes = nodes, mode = mode, inputs = inputs), class = "sasonr_script_raw")
+script_raw <- function(nodes, mode, inputs, src = character()) {
+  structure(list(nodes = nodes, mode = mode, inputs = inputs, src = src), class = "sasonr_script_raw")
 }
 
 # ---- the IR ------------------------------------------------------------------
 
-script_ir <- function(nodes, mode, inputs) {
+script_ir <- function(nodes, mode, inputs, src = character()) {
   out <- list()
+  pos <- list()
   k <- 1L
   while (k <= length(nodes)) {
     nd <- nodes[[k]]
@@ -197,13 +199,17 @@ script_ir <- function(nodes, mode, inputs) {
         if (end || k > length(nodes) || !nodes[[k]]$type %in% c("sql", "sql_end")) break
       }
       out <- c(out, list(script_node_sql(paste(parts, collapse = "\n"), first, last, mode)))
+      pos <- c(pos, list(list(line = as.integer(first), col = nd$col %||% 1L)))
       next
     }
     node <- script_node(nd, mode)
     node$macro_stack <- nd$macro_stack %||% list()
     out <- c(out, list(node))
+    # a step a macro generated starts at the invocation
+    pos <- c(pos, list(list(line = as.integer(nd$line), col = if (length(node$macro_stack)) 1L else nd$col %||% 1L)))
     k <- k + 1L
   }
+  out <- script_comments(out, pos, src)
   structure(out, class = "sasonr_script", mode = mode, inputs = inputs, tidy = FALSE)
 }
 
@@ -386,6 +392,14 @@ r_raw <- function(x) {
 #' through the macro processor; a trace has no such steps, but it is valid for
 #' the data of that run only.
 #'
+#' SAS comments (`/* ... */` and `* ... ;`) are kept as R comment lines: a
+#' comment on the line where a statement ends belongs to that statement, any
+#' other comment to the next statement. Comments of the first statement of a
+#' step go above the step verb; comments of a later statement of a DATA step
+#' go above the line of the generated code for that statement, or above the
+#' step when there is no such line. Macro comments (`%* ... ;`) and comments
+#' in macro definitions or in code a macro generates are not copied.
+#'
 #' With `tidy = TRUE` the script has no session where it does not need one:
 #' DATA steps that run vectorised (levels L1 and L2) read and
 #' write R variables (`adsl <- dm |> mutate(...)`), and the script starts with
@@ -404,8 +418,11 @@ r_raw <- function(x) {
 #' @return A `sasonr_script`: a list of step nodes, each with `verb`, `lang`
 #'   (the call that runs the step), `text` (its R text), `sas` (the SAS text),
 #'   `sas_lines` (its SAS lines), `macro_stack` (empty list), `include` (NULL),
-#'   `kind` (`"static"`, `"deferred"` or `"traced"`) and `comments` (empty
-#'   list).
+#'   `kind` (`"static"`, `"deferred"` or `"traced"`) and `comments` (the SAS
+#'   comments of the step: `lines` (the R comment lines), `line`, `position`
+#'   (`"leading"` or `"trailing"`) and `place` (`"step"`: above the step verb,
+#'   `"body"`: above the line of the generated code of the statement,
+#'   `"after"`: below the last step)).
 #' @examples
 #' tr <- sas_translate("
 #' data b;
@@ -423,7 +440,7 @@ sas_script <- function(x, tidy = FALSE) {
     rlang::abort("`x` must be the result of `sas_translate()` or `sas_run()`.", class = "sasonr_error")
   }
   raw <- tr$script
-  ir <- script_ir(raw$nodes, raw$mode, raw$inputs)
+  ir <- script_ir(raw$nodes, raw$mode, raw$inputs, raw$src %||% character())
   attr(ir, "tidy") <- isTRUE(tidy)
   ir
 }
@@ -463,7 +480,8 @@ format.sasonr_script <- function(x, ...) {
     if (fmt && is.null(nd$why)) x[[k]]$why <- "the step can use user formats of the session"
     nd <- x[[k]]
     if (!is.null(nd$tidy)) {
-      out <- c(out, paste0("# ", script_tidy_title(nd)), nd$tidy, "")
+      above <- unlist(lapply(nd$comments, function(c) if (identical(c$place, "step")) c$lines))
+      out <- c(out, above, paste0("# ", script_tidy_title(nd)), nd$tidy, "")
       fresh <- union(fresh, nd$outputs)
         k <- k + 1L
       next

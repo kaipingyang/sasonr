@@ -712,7 +712,7 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
   # without them ends the translation: the rest is deferred (script.R)
   tryCatch(engine_program(eng, code), sasonr_runtime_error = function(e) script_defer_rest(eng, e),
            sasonr_syntax_error = function(e) script_defer_rest(eng, e))
-  structure(list(steps = eng$steps, script = script_raw(eng$script, "translation", tolower(names(work)))),
+  structure(list(steps = eng$steps, script = script_raw(eng$script, "translation", tolower(names(work)), eng$program$lines)),
             class = "sasonr_translation")
 }
 
@@ -885,7 +885,7 @@ engine_result <- function(eng) {
     list(log = log_view_plain(ev <- log_result_events(eng), log_echo_default), log_events = ev,
          listing = eng$listing, ods = eng$ods, work = out[dsn], meta = eng$session$meta[intersect(dsn, names(eng$session$meta))],
          unordered = intersect(eng$session$unordered, dsn),
-         translation = structure(list(steps = eng$steps, script = script_raw(eng$script, "trace", eng$inputs %||% character())),
+         translation = structure(list(steps = eng$steps, script = script_raw(eng$script, "trace", eng$inputs %||% character(), eng$program$lines)),
                                  class = "sasonr_translation"),
          macro_vars = mv, status = eng$status, errors = eng$errors %||% character(),
          error_line = eng$error_line %||% NA_integer_),

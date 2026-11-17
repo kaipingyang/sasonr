@@ -17,8 +17,11 @@ Details).}
 A \code{sasonr_script}: a list of step nodes, each with \code{verb}, \code{lang}
 (the call that runs the step), \code{text} (its R text), \code{sas} (the SAS text),
 \code{sas_lines} (its SAS lines), \code{macro_stack} (empty list), \code{include} (NULL),
-\code{kind} (\code{"static"}, \code{"deferred"} or \code{"traced"}) and \code{comments} (empty
-list).
+\code{kind} (\code{"static"}, \code{"deferred"} or \code{"traced"}) and \code{comments} (the SAS
+comments of the step: \code{lines} (the R comment lines), \code{line}, \code{position}
+(\code{"leading"} or \code{"trailing"}) and \code{place} (\code{"step"}: above the step verb,
+\code{"body"}: above the line of the generated code of the statement,
+\code{"after"}: below the last step)).
 }
 \description{
 \code{sas_script()} turns the result of \code{\link[=sas_translate]{sas_translate()}} (the translation of
@@ -39,6 +42,14 @@ known only at run time (CALL SYMPUT, PROC SQL INTO:, \verb{\%SYSFUNC}, automatic
 macro variables) is kept as SAS text in \code{sas_deferred()}, which runs it
 through the macro processor; a trace has no such steps, but it is valid for
 the data of that run only.
+
+SAS comments (\verb{/* ... */} and \verb{* ... ;}) are kept as R comment lines: a
+comment on the line where a statement ends belongs to that statement, any
+other comment to the next statement. Comments of the first statement of a
+step go above the step verb; comments of a later statement of a DATA step
+go above the line of the generated code for that statement, or above the
+step when there is no such line. Macro comments (\verb{\%* ... ;}) and comments
+in macro definitions or in code a macro generates are not copied.
 
 With \code{tidy = TRUE} the script has no session where it does not need one:
 DATA steps that run vectorised (levels L1 and L2) read and

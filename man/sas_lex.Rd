@@ -11,7 +11,9 @@ sas_lex(text, lossless = FALSE)
 
 \item{lossless}{If \code{TRUE}, return the lossless token table instead: every
 character of the source belongs to one row, comments, whitespace and line
-feeds included, so \code{paste0(tok$text, collapse = "")} gives the source back.}
+feeds included, so \code{paste0(tok$text, collapse = "")} gives the source back.
+\code{sas_lex(text, lossless = TRUE)} returns this token table directly; it is
+the public way to get it.}
 }
 \value{
 A tibble with columns \code{type}, \code{value}, \code{line}, \code{col}; with

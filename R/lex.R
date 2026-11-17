@@ -19,6 +19,8 @@ value_expecting_kw <- c(
 #' @param lossless If `TRUE`, return the lossless token table instead: every
 #'   character of the source belongs to one row, comments, whitespace and line
 #'   feeds included, so `paste0(tok$text, collapse = "")` gives the source back.
+#'   `sas_lex(text, lossless = TRUE)` returns this token table directly; it is
+#'   the public way to get it.
 #' @return A tibble with columns `type`, `value`, `line`, `col`; with
 #'   `lossless = TRUE`, a tibble with columns `id`, `kind`, `text`, `value`,
 #'   `line`, `col`, `end_line`, `end_col`, where `kind` is a token type or one
