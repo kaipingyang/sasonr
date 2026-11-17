@@ -1087,7 +1087,7 @@ gen_row_do <- function(s, cx) {
     assign_lang(tmp("first"), TRUE),
     rlang::call2("repeat", brace(c(
       list(rlang::call2("if", rlang::call2("!", tmp("first")), brace(c(
-        if (identical(wu$kind, "until")) list(rlang::expr(if (sas_true(!!g(wu$cond))) break)),
+        if (identical(wu$kind, "until")) list(rlang::call2("if", rlang::call2("sas_true", g(wu$cond)), quote(break))),
         list(assign_lang(ref, rlang::expr(!!ref + !!tmp("by"))))
       )))),
       list(assign_lang(tmp("first"), FALSE), brk_unless(rlang::call2("sas_do_test", ref, tmp("to"), tmp("by")))),
@@ -1165,3 +1165,7 @@ translate_step <- function(step, meta, level = "auto") {
     compile_notes = notes
   )
 }
+
+# Names that exist only in generated step code: the rlang::expr() templates
+# above mention them, and R CMD check would read them as undefined globals.
+utils::globalVariables(c(".inf", ".m_in", ".status", "pdv", "work"))
