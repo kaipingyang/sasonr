@@ -45,6 +45,7 @@ reference:
   contents:
   - sas_run
   - sas_translate
+  - sas_check
   - sas_session
   - sas_session_accessors
   - sas_log

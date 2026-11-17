@@ -212,6 +212,7 @@ public sas_parse_expr
 public sas_run
 public sas_session
 public sas_session_close
+public sas_check
 public sas_translate
 public sas_work
 internal sas_and

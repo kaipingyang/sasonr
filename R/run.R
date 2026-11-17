@@ -68,6 +68,7 @@ new_engine <- function(session, level, execute) {
 }
 
 engine_exec <- function(eng, text, line) {
+  if (!is.null(eng$check)) return(engine_check_exec(eng, text, line))
   if (!identical(eng$on_error, "sas")) return(engine_exec_steps(eng, text, line))
   eng$phase <- "compile"
   eng$cur_step <- NULL
@@ -90,6 +91,7 @@ engine_exec_steps <- function(eng, text, line) {
   if (!length(prog$steps) && log_step_tail_extend(eng, log_chunk_last(text, line), text)) return(invisible())
   for (k in seq_along(prog$steps)) {
     step <- prog$steps[[k]]
+    if (!is.null(eng$check)) engine_check_step_seen(eng, step)
     eng$phase <- "compile"
     # the AST of the step being compiled / run (errors.R derives from it what an ERROR leaves in WORK)
     eng$cur_step <- step

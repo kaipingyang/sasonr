@@ -16,6 +16,10 @@ the development version provides.
   listing and the WORK data sets; `sas_translate()` shows the R code that is
   generated for each step. `sas_lex()`, `sas_parse()`, `sas_parse_expr()` and
   `sas_analyze()` expose the lexer, the parser and the static analysis.
+* `sas_check()` lists every unsupported feature of a program before anything
+  runs (step, line, feature), where `sas_run()` stops at the first one. A step
+  that uses a macro variable set only at run time (CALL SYMPUT, `INTO :`) is
+  reported as checked when the program runs.
 * `sas_session()` creates a persistent session. Successive
   `sas_run(code, session = s)` calls are submissions to that session: WORK
   data sets, macro variables and macro definitions, user formats, `OPTIONS`,
