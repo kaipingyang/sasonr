@@ -16,6 +16,17 @@ the development version provides.
   listing and the WORK data sets; `sas_translate()` shows the R code that is
   generated for each step. `sas_lex()`, `sas_parse()`, `sas_parse_expr()` and
   `sas_analyze()` expose the lexer, the parser and the static analysis.
+* `sas_script()` writes the translation of a program (`sas_translate()`) or
+  the trace of a run (`sas_run()`) as an R script: one step verb per SAS step
+  (`sas_data_step()` with the generated code of the step, `sas_proc_sort()`
+  and `sas_proc_means()` with the options the program gave, `sas_proc_sql()`,
+  `sas_proc()`, `sas_options()`, `sas_title()`, `sas_global()`), each running
+  its step in a session; macro code whose result is known only at run time is
+  kept as SAS text in `sas_deferred()`. `tidy = TRUE` writes vectorised DATA
+  steps as dplyr pipes on R variables (with `library(tidylog)`;
+  see `sasonr_tidy_log()`) and keeps a session only for the other steps.
+  `sas_work(trim = FALSE)` and `sas_session_add()` move data sets between R
+  and a session. The internal PROC MEANS helper is now `sas_rt_proc_means()`.
 * `sas_check()` lists every unsupported feature of a program before anything
   runs (step, line, feature), where `sas_run()` stops at the first one. A step
   that uses a macro variable set only at run time (CALL SYMPUT, `INTO :`) is

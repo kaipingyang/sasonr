@@ -51,6 +51,12 @@ reference:
   - sas_log
   - sas_export_work
   - sasonr_strict
+- title: The translation as an R script
+  desc: A runnable script for a translation or for the trace of a run, and the step verbs it calls.
+  contents:
+  - sas_script
+  - sas_step_verbs
+  - sasonr_tidy_log
 - title: Front end (lexer, parser, analysis)
   contents:
   - sas_lex

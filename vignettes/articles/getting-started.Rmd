@@ -76,6 +76,37 @@ cat(tr$steps[[2]]$code)
 sas_run(code2)$work$chg
 ```
 
+## Using the translation as an R script
+
+`sas_script()` turns a translation (or the result of `sas_run()`, the trace
+of that run) into a script that runs after `library(sasonr)`. Each SAS step
+becomes one call of a step verb on a session: `sas_data_step()` holds the
+generated code of a DATA step, PROC SORT and PROC MEANS show the options the
+program gave, other steps keep their SAS text. The script gives the same WORK
+data sets and the same log as `sas_run()`.
+
+```{r}
+code3 <- "
+data adsl;
+  input usubjid $ age;
+  datalines;
+S01 70
+S02 41
+;
+run;
+proc sort data=adsl out=bysubj; by descending age; run;
+"
+sas_script(sas_translate(code3))
+```
+
+With `tidy = TRUE`, vectorised DATA steps read and write R
+variables in dplyr pipes (the script loads dplyr and tidylog); steps that need
+a session run in a short session block.
+
+```{r}
+sas_script(sas_translate(code3), tidy = TRUE)
+```
+
 ## Macro language
 
 Macro processing and step execution interleave: a step is run as soon as it
