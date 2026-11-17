@@ -7,7 +7,6 @@
       # L1: no cross-row state
       .d <- sas_ds(work, "a") |> sas_note_read("a") |>
         dplyr::mutate(
-          w = NA_real_,
           c = "   ",
           w = sas_arith(sas_arith(v, 2, "*", .at = c(6L, 22L)), 0.1, "+", .at = c(6L, 26L), .gen_a = TRUE),
           c = dplyr::if_else(sas_true(sas_gt(v, 1)), sas_char("big", 3L), c)

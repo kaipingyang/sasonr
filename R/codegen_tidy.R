@@ -553,12 +553,54 @@ gen_vec_step <- function(an) {
     inf <- an$info[[v]]
     inf$kind == "data" && !v %in% inputs && !v %in% names(an$sum_plan)
   }, an$order)
+  k0 <- NA_integer_
   if (length(init_vars) > 0) {
     add_stage(cx, "mutate", stats::setNames(lapply(init_vars, function(v) proto_lang(an$info[[v]])), init_vars))
+    k0 <- length(cx$stages)
   }
   gen_vec_block(an$stmts, NULL, cx, top = TRUE)
+  if (!is.na(k0)) cx$stages <- drop_dead_inits(cx$stages, k0)
 
   c(list(render_pipeline(".d", source_item(an), cx$stages)), vec_put_item(cx), vec_output_item(an))
+}
+
+# Drop the initial (missing) value of a variable that the mutate stages right
+# after the initial values (stage `k0`) replace before anything reads it:
+# `x = NA_real_, ..., x = 1` -> `x = 1`.  mutate() replaces the whole column,
+# so the result is the same; the output select() sets the column order.  A
+# value that names a column by a string or a selection helper reads every
+# pending column (they keep their initial value).
+drop_dead_inits <- function(stages, k0) {
+  pending <- names(stages[[k0]]$code)
+  dead <- character()
+  all_cols <- c("pick", "across", "c_across", "cur_data", "cur_data_all", "everything", "all_of", "any_of",
+                ".data", "starts_with", "ends_with", "matches", "contains", "num_range", "where", "get", "mget")
+  strings <- function(e) {
+    if (is.character(e)) return(e)
+    if (is.call(e) || is.pairlist(e)) return(unlist(lapply(as.list(e), strings)))
+    character()
+  }
+  k <- k0 + 1L
+  while (k <= length(stages) && stages[[k]]$kind == "mutate" && length(pending)) {
+    code <- stages[[k]]$code
+    for (j in seq_along(code)) {
+      e <- code[[j]]
+      used <- c(all.names(e), strings(e))
+      if (any(all_cols %in% used)) {
+        pending <- character()
+        break
+      }
+      v <- names(code)[j]
+      if (v %in% pending && !v %in% used) dead <- c(dead, v)
+      pending <- setdiff(pending, c(used, v))
+    }
+    k <- k + 1L
+  }
+  if (!length(dead)) return(stages)
+  keep <- !names(stages[[k0]]$code) %in% dead
+  if (!any(keep)) return(stages[-k0])
+  stages[[k0]]$code <- stages[[k0]]$code[keep]
+  stages
 }
 
 # The PUT statements of a vectorised step: one line per iteration of the step
