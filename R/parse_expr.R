@@ -44,7 +44,7 @@ tk_line <- function(p, k = 0L) {
   p$line[min(p$pos + k, p$n)]
 }
 # An integer constant: a number token with no decimal point or exponent
-# (where SAS expects an integer, `2.5` is a syntax error, not 2).
+# (where the grammar takes an integer constant, `2.5` is a syntax error, not 2).
 tk_int <- function(p, k = 0L) tk_type(p, k) == "num" && grepl("^[0-9]+$", tk_val(p, k))
 is_kw <- function(p, kw, k = 0L) tk_type(p, k) == "name" && tk_low(p, k) %in% kw
 is_op <- function(p, op, k = 0L) tk_type(p, k) == "op" && tk_val(p, k) %in% op
