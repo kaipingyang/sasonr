@@ -19,11 +19,11 @@ test_that("rowwise() gives a zero-length vector of the result type", {
 })
 
 test_that("rowwise() fails on a result of the wrong length or a lossy type", {
-  expect_error(rw(function(x) c(x, x), 1:2, type = numeric(1)))
-  expect_error(rw(function(x) "a", 1:2, type = numeric(1)))
-  expect_error(rw(function(x) 1, 1:2))
-  expect_error(rw(function(x) 2.7, 1:2, type = integer(1)))
-  expect_error(rw(function(x) NULL, 1:2, type = numeric(1)))
+  for (n in list(1, 1:2)) expect_error(rw(function(x) c(x, x), n, type = numeric(1)), class = "sasonr_rowwise_contract")
+  for (n in list(1, 1:2)) expect_error(rw(function(x) "a", n, type = numeric(1)), class = "sasonr_rowwise_contract")
+  for (n in list(1, 1:2)) expect_error(rw(function(x) 1, n), class = "sasonr_rowwise_contract")
+  for (n in list(1, 1:2)) expect_error(rw(function(x) 2.7, n, type = integer(1)), class = "sasonr_rowwise_contract")
+  for (n in list(1, 1:2)) expect_error(rw(function(x) NULL, n, type = numeric(1)), class = "sasonr_rowwise_contract")
 })
 
 test_that("rowwise() on one row coerces like the vector path", {
@@ -33,5 +33,14 @@ test_that("rowwise() on one row coerces like the vector path", {
     one <- tryCatch(rw(function(x) v, 1, type = ty), error = function(e) "error")
     two <- tryCatch(rw(function(x) v, c(1, 1), type = ty), error = function(e) "error")
     expect_identical(one, if (identical(two, "error")) "error" else two[1], info = paste(deparse(v), typeof(ty)))
+  }
+})
+
+test_that("rowwise() passes a condition raised by the function through unchanged", {
+  f <- function(x) rlang::abort("inner", class = "sasonr_error")
+  for (n in list(1, 1:3)) expect_error(rw(f, n, type = numeric(1)), class = "sasonr_error")
+  for (n in list(1, 1:3)) {
+    e <- tryCatch(rw(f, n, type = numeric(1)), error = identity)
+    expect_false(inherits(e, "purrr_error_indexed"))
   }
 })

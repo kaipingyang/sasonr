@@ -13,30 +13,34 @@ recycle_n <- function(...) {
 }
 
 # Apply a scalar function row-wise over recycled arguments. `type` gives the
-# result type. Each call must return one value of that type or a narrower one
-# (logical < integer < double); purrr also accepts a whole double for integer
-# and 0/1 for logical, both without loss. Anything else is an error.
+# result type. Each call must return one value of that type or of a type that
+# converts without loss (vctrs rules: a whole double for integer, 0/1 for
+# logical); anything else breaks the internal contract of the caller and is
+# an internal error of class sasonr_rowwise_contract, whatever the number of
+# rows. A condition raised by `f` itself reaches the caller unchanged.
 rowwise <- function(f, ..., type = character(1)) {
   a <- recycle_n(...)
   want <- typeof(type)
-  if (length(a[[1]]) == 0L) return(vector(want, 0L))
-  # one row (every call of row-wise code): call f directly; purrr's fixed cost
-  # per call is about ten times the work here. vec_cast() applies the same
-  # coercion rules as pmap_*() (whole double -> integer, 0/1 -> logical; a
-  # lossy or other type is an error).
-  if (length(a[[1]]) == 1L && want %in% c("integer", "double", "logical", "character")) {
-    v <- f(...)
-    if (length(v) != 1L) rlang::abort(paste0("rowwise(): the result must have length 1, not ", length(v), "."))
-    attributes(v) <- NULL
-    return(vctrs::vec_cast(v, vector(want, 0L)))
-  }
-  switch(want,
-    integer = purrr::pmap_int(a, f),
-    double = purrr::pmap_dbl(a, f),
-    logical = purrr::pmap_lgl(a, f),
-    character = purrr::pmap_chr(a, f),
+  if (!want %in% c("integer", "double", "logical", "character")) {
     rlang::abort(paste0("rowwise(): result type `", want, "` is not supported."), .internal = TRUE)
-  )
+  }
+  n <- length(a[[1]])
+  ptype <- vector(want, 0L)
+  if (n == 0L) return(ptype)
+  # one row (every call of row-wise code): call f directly, without purrr's
+  # fixed cost per call
+  if (n == 1L) return(rowwise_value(f(...), ptype))
+  out <- tryCatch(purrr::pmap(a, f), purrr_error_indexed = function(e) rlang::cnd_signal(e$parent))
+  vctrs::list_unchop(lapply(out, rowwise_value, ptype = ptype), ptype = ptype)
+}
+
+rowwise_value <- function(v, ptype) {
+  contract <- function(msg) {
+    rlang::abort(paste0("rowwise(): ", msg), class = "sasonr_rowwise_contract", .internal = TRUE)
+  }
+  if (length(v) != 1L) contract(paste0("the result must have length 1, not ", length(v), "."))
+  attributes(v) <- NULL
+  tryCatch(vctrs::vec_cast(v, ptype), vctrs_error = function(e) contract(conditionMessage(e)))
 }
 
 chars_of <- function(s) strsplit(s, "")[[1]]
