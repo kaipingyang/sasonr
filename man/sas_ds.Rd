@@ -15,6 +15,7 @@ sas_ds(
 )
 }
 \description{
-Fetch a WORK data set and apply KEEP=/DROP=/RENAME=/FIRSTOBS=/OBS=
+\code{work} is the WORK library (a list) or the data set itself (a data frame,
+as in the tidy form of a script; \code{name} is then not used).
 }
 \keyword{internal}
