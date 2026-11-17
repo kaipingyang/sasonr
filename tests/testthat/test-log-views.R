@@ -25,7 +25,7 @@ log_res <- function(code = log_prog) {
 
 test_that("the plain log echoes the program lines", {
   r <- log_res()
-  expect_identical(r$log, sas_log(r))
+  expect_identical(r$log, as.character(sas_log(r)))
   expect_snapshot(cat(r$log, sep = "\n"))
   # without the echo: the messages and PUT output
   expect_false(any(grepl("^[0-9]+ ", sas_log(r, echo = FALSE))))
@@ -88,7 +88,7 @@ test_that("the events of a result and of a session", {
   ev <- r$log_events
   expect_s3_class(ev, "tbl_df")
   expect_named(ev, c("seq", "submission", "step", "phase", "kind", "id", "args", "at", "places", "text", "source_line"))
-  expect_identical(unlist(ev$text[ev$kind != "echo"]), sas_log(r, echo = FALSE))
+  expect_identical(unlist(ev$text[ev$kind != "echo"]), as.character(sas_log(r, echo = FALSE)))
   expect_true("ds.created" %in% ev$id)
   err <- ev[ev$kind == "error", ]
   expect_identical(err$at[[1]], c(6L, 7L))
@@ -96,8 +96,8 @@ test_that("the events of a result and of a session", {
   withr::defer(sas_session_close(s))
   sas_run("%put one;", session = s)
   sas_run("%put two;", session = s)
-  expect_identical(sas_log(s), c("1          %put one;", "one", "1          %put two;", "two"))
-  expect_identical(sas_log(s, echo = FALSE), c("one", "two"))
+  expect_identical(as.character(sas_log(s)), c("1          %put one;", "one", "1          %put two;", "two"))
+  expect_identical(as.character(sas_log(s, echo = FALSE)), c("one", "two"))
   expect_error(sas_log(1), class = "sasonr_error")
   expect_error(sas_log(r, "pdf"))
 })
@@ -122,7 +122,7 @@ test_that("sasonr.strict = FALSE: one NOTE and one warning list the approximate 
                                         session = s, on_error = "abort")))
   ev <- sasonr:::log_session_events(s)
   expect_true("sasonr.approximate" %in% ev$id)
-  expect_identical(utils::tail(sas_log(s, echo = FALSE), 1), "NOTE: sasonr used approximate implementations: function PROBT.")
+  expect_identical(as.character(utils::tail(sas_log(s, echo = FALSE), 1)), "NOTE: sasonr used approximate implementations: function PROBT.")
   withr::local_options(sasonr.strict = TRUE)
   expect_error(sas_run("data a; y = probt(1.5, 10); run;"), class = "sasonr_strict_error")
 })
@@ -385,7 +385,7 @@ test_that("the blank line that ends a step's lines follows its last line, not it
   omitted(r$log, "a numbered ERROR on a line with macro references")
   expect_true("ERROR 68-185: The function NOSUCHFN is unknown, or cannot be accessed." %in% r$log)
   expect_identical(nrow(r$work$c), 0L)
-  expect_identical(sas_log(r, echo = FALSE), r$log[-1])
+  expect_identical(as.character(sas_log(r, echo = FALSE)), r$log[-1])
   r <- sas_run("options nosource;\ndata b; x = nosuchfn(1); run;\noptions source;\n%put done;", on_error = "sas")
   omitted(r$log, "an ERROR on a line that OPTIONS NOSOURCE hides")
   expect_identical(utils::tail(r$log, 1), "done")
@@ -571,4 +571,66 @@ test_that("a FILE record longer than LRECL fails loud; items that fit are wrappe
   expect_identical(readLines(file.path(d, "o.txt")), "abcdefghijklmnopqrst")
   sas_run("data _null_; file 'o.txt' lrecl=20; x = 'abcdefghijklmno'; y = 'pqrstuvwxyz'; put x y; run;")
   expect_identical(readLines(file.path(d, "o.txt")), c("abcdefghijklmno", "pqrstuvwxyz"))
+})
+
+test_that("a log view prints as its lines, without quotes or indices", {
+  r <- sas_run("data _null_;\n  put 'hi';\nrun;")
+  out <- utils::capture.output(print(sas_log(r)))
+  expect_identical(out, r$log)
+  expect_identical(utils::capture.output(sas_log(r, echo = FALSE)), "hi")
+  expect_s3_class(sas_log(r), "sasonr_log")
+  # the result keeps the log as a plain character vector
+  expect_identical(class(r$log), "character")
+})
+
+test_that("a log view keeps its character content when subset or combined", {
+  r <- sas_run("data _null_;\n  put 'hi';\nrun;")
+  x <- sas_log(r)
+  expect_identical(as.character(x), r$log)
+  expect_s3_class(x[2:3], "sasonr_log")
+  expect_identical(as.character(x[2:3]), r$log[2:3])
+  expect_identical(c(x, "more"), c(r$log, "more"))
+  expect_identical(grepl("^hi$", x), grepl("^hi$", r$log))
+  expect_identical(as.character(utils::tail(x, 1)), utils::tail(r$log, 1))
+})
+
+test_that("the compact layout numbers the lines in the columns the largest number needs", {
+  code <- paste(c("data a;", "  y = . + 3;", rep("  w = 1;", 8), "run;"), collapse = "\n")
+  r <- log_res(code)
+  x <- sas_log(r, compact = TRUE)
+  expect_identical(as.character(x[1:2]), c("1  data a;", "2    y = . + 3;"))
+  expect_true("10   w = 1;" %in% x)
+  # the places in a NOTE are program lines and columns: the message is unchanged
+  msg <- sas_log(r, echo = FALSE)
+  expect_true(all(msg %in% x))
+  expect_true("      2:9  " %in% x)
+  # the plain and ANSI views and the HTML view use the same layout
+  expect_identical(cli::ansi_strip(sas_log(r, "ansi", compact = TRUE))[-1], as.character(x))
+  expect_match(sas_log(r, "html", compact = TRUE), ">10   w = 1;<", fixed = TRUE)
+})
+
+test_that("the compact layout keeps the ERROR marker under its token", {
+  r <- sas_run("data a;\n  x = 1;\n  z = nosuchfn(1);\nrun;", on_error = "sas")
+  x <- as.character(sas_log(r, compact = TRUE))
+  i <- which(x == "3   z = nosuchfn(1);")
+  expect_length(i, 1)
+  expect_identical(x[i + 1:2], c("        ________", "        68"))
+  expect_identical(as.integer(regexpr("_", x[i + 1L])), as.integer(regexpr("nosuchfn", x[i])))
+})
+
+test_that("continued lines start with ! in the compact layout", {
+  long <- paste0("data _null_; x = 1; ", strrep("y = 2; ", 20), "put x=; run;")
+  r <- sas_run(paste0("options ls=64;\n", long))
+  x <- as.character(sas_log(r, compact = TRUE))
+  expect_true(startsWith(x[2], "2 data _null_;"))
+  expect_gt(sum(startsWith(x, "! ")), 1)
+})
+
+test_that("the default layout keeps the line numbers in 11 columns", {
+  r <- sas_run("data a;\n  x = 1;\n  z = nosuchfn(1);\nrun;", on_error = "sas")
+  expect_identical(as.character(sas_log(r)), r$log)
+  expect_identical(sas_log(r, compact = FALSE), sas_log(r))
+  expect_true("3            z = nosuchfn(1);" %in% r$log)
+  expect_error(sas_log(r, compact = NA), class = "sasonr_error")
+  expect_error(sas_log(r, "plain", TRUE, TRUE))
 })

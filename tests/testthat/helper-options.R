@@ -14,4 +14,4 @@ lenient <- function(expr) {
 }
 
 # The messages and PUT output of a result (its log without the source echo).
-msgs <- function(r) sas_log(r, echo = FALSE)
+msgs <- function(r) as.character(sas_log(r, echo = FALSE))

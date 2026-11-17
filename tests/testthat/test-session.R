@@ -34,7 +34,7 @@ test_that("the session log and listing accumulate the submissions", {
   r2 <- sas_run("%put second;", session = s)
   expect_true("first" %in% msgs(r1))
   expect_false("first" %in% msgs(r2))
-  expect_identical(sas_log(s, echo = FALSE), c(msgs(r1), msgs(r2)))
+  expect_identical(as.character(sas_log(s, echo = FALSE)), c(msgs(r1), msgs(r2)))
   r3 <- sas_run("data a; x = 1; run; proc print data = a; run;", session = s)
   expect_identical(sas_listing(s), r3$listing)
 })

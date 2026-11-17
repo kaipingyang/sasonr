@@ -106,7 +106,8 @@ log_session_events <- function(s) {
 # events, log_boundary(); before the numbered ERRORs of the step's last line,
 # log_step_end_at()).
 # One item: list(type = "src", "marker" or the event kind, step, sub, lines).
-log_items <- function(ev, echo) {
+# `compact`: the echo in the compact layout (log_compact_items()).
+log_items <- function(ev, echo, compact = FALSE) {
   progs <- attr(ev, "programs") %||% list()
   items <- list()
   subs <- unique(c(ev$submission, if (echo) as.integer(names(progs))))
@@ -130,6 +131,27 @@ log_items <- function(ev, echo) {
     }
     items <- c(items, one)
   }
+  if (compact) log_compact_items(items) else items
+}
+
+# The compact layout of the echo (sas_log(compact = TRUE)): the line number
+# left-justified in as many columns as the largest line number of the view
+# needs plus one, then the text; a continuation line starts with "!" in those
+# columns. The lines break where they do in the default layout and the marker
+# lines lose the same columns, so they stay under their tokens.
+log_compact_items <- function(items) {
+  type <- vapply(items, `[[`, "", "type")
+  if (!any(type == "src")) return(items)
+  head <- function(l) substr(l, 1L, 11L)
+  src <- unlist(lapply(items[type == "src"], `[[`, "lines"))
+  w <- max(nchar(sub(" .*$", "", head(src)))) + 1L
+  for (k in which(type == "src")) {
+    l <- items[[k]]$lines
+    num <- sub(" .*$", "", head(l))
+    num[grepl("! $", head(l))] <- "!"
+    items[[k]]$lines <- paste0(formatC(num, width = -w), substring(l, 12L))
+  }
+  for (k in which(type == "marker")) items[[k]]$lines <- substring(items[[k]]$lines, 12L - w)
   items
 }
 
@@ -382,8 +404,8 @@ log_summary_text <- function(counts, style = identity) {
   if (!length(parts)) "No ERRORs or WARNINGs" else paste(parts, collapse = ", ")
 }
 
-log_view_plain <- function(ev, echo) {
-  unlist(lapply(log_items(ev, echo), `[[`, "lines")) %||% character()
+log_view_plain <- function(ev, echo, compact = FALSE) {
+  unlist(lapply(log_items(ev, echo, compact), `[[`, "lines")) %||% character()
 }
 
 log_ansi_style <- function(type, x) {
@@ -395,8 +417,8 @@ log_ansi_style <- function(type, x) {
   )
 }
 
-log_view_ansi <- function(ev, echo) {
-  items <- log_items(ev, echo)
+log_view_ansi <- function(ev, echo, compact = FALSE) {
+  items <- log_items(ev, echo, compact)
   head <- cli::style_bold(log_summary_text(log_summary_counts(ev), function(k, x) log_ansi_style(k, x)))
   body <- unlist(lapply(items, function(it) as.character(log_ansi_style(it$type, it$lines))))
   c(as.character(head), body %||% character())
@@ -413,8 +435,8 @@ log_html_class <- c(note = "sas-note", warning = "sas-warning", error = "sas-err
 
 # One <details> block per step of each submission; the CSS classes are those
 # of inst/css/sasonr.css.
-log_view_html <- function(ev, echo) {
-  items <- log_items(ev, echo)
+log_view_html <- function(ev, echo, compact = FALSE) {
+  items <- log_items(ev, echo, compact)
   progs <- attr(ev, "programs") %||% list()
   counts <- log_summary_counts(ev)
   cls <- c(error = "sas-error", warning = "sas-warning")
@@ -444,8 +466,8 @@ log_view_html <- function(ev, echo) {
 #'
 #' The log as plain text, as text coloured for the terminal, or as HTML.
 #'
-#' * `"plain"`: the SAS-style log text, one element per line: `x$log` (for a
-#'   session: the log of all submissions).
+#' * `"plain"`: the SAS-style log text, one element per line: the lines of
+#'   `x$log` (for a session: the log of all submissions).
 #' * `"ansi"`: the same lines coloured with cli (ERROR red, WARNING green,
 #'   NOTE blue, PUT output unstyled), under a summary line that counts the
 #'   ERROR and WARNING lines of the messages (PUT output that starts with
@@ -487,13 +509,25 @@ log_view_html <- function(ev, echo) {
 #' a numbered WARNING. For now a NOTE place (`(Line):(Column)`, `at line N
 #' column M`) on a line with a macro reference fails loud.
 #'
+#' `compact = TRUE` is a narrower layout of the echo for display: the line
+#' number takes as many columns as the largest line number of the view needs,
+#' plus one blank; a continuation line starts with `!` in those columns. The
+#' lines break where they do in the default layout, and the underscore
+#' markers and error numbers under a line move with its text. The messages
+#' are unchanged (the places in a NOTE are program lines and columns).
+#'
 #' @param x A result of [sas_run()] or a session from [sas_session()].
 #' @param session The former name of `x` (a session), still accepted; with
 #'   `session`, `x` is left out (or is the format, given by position).
 #' @param format `"plain"`, `"ansi"` or `"html"`.
 #' @param echo Show the program lines (`TRUE`, the default) or only the
 #'   messages and PUT output (`FALSE`).
-#' @return `"plain"` and `"ansi"`: a character vector, one element per line.
+#' @param compact The compact layout of the echo (`TRUE`) or the default
+#'   layout with the line numbers in 11 columns (`FALSE`, the default).
+#' @param ... Not used; the arguments after it are given by name.
+#' @return `"plain"` and `"ansi"`: a character vector of class `sasonr_log`,
+#'   one element per line; it prints as the log text, one line per element.
+#'   `as.character()` gives the plain character vector; `[` keeps the class.
 #'   `"html"`: a character string.
 #' @seealso The events behind every view are the `log_events` field of a
 #'   result (a tibble: `seq`, `submission`, `step`, `phase`, `kind`, `id`,
@@ -502,10 +536,13 @@ log_view_html <- function(ev, echo) {
 #' res <- sas_run("data a;\n  x = 1;\n  put x=;\nrun;")
 #' sas_log(res)
 #' sas_log(res, echo = FALSE)
+#' sas_log(res, compact = TRUE)
 #' cat(sas_log(res, "html"))
 #' res$log_events[, c("step", "kind", "id")]
 #' @export
-sas_log <- function(x, format = c("plain", "ansi", "html"), echo = log_echo_default, session) {
+sas_log <- function(x, format = c("plain", "ansi", "html"), echo = log_echo_default, ...,
+                    compact = FALSE, session) {
+  rlang::check_dots_empty()
   # `session =`: the name of the first argument before `x`; then `x` is
   # missing or the format given by position (`sas_log(session = s, "html")`)
   if (!missing(session)) {
@@ -526,9 +563,22 @@ sas_log <- function(x, format = c("plain", "ansi", "html"), echo = log_echo_defa
     rlang::abort("`x` must be a result of `sas_run()` or a session from `sas_session()`.", class = "sasonr_error")
   }
   if (!rlang::is_bool(echo)) rlang::abort("`echo` must be `TRUE` or `FALSE`.", class = "sasonr_error")
+  if (!rlang::is_bool(compact)) rlang::abort("`compact` must be `TRUE` or `FALSE`.", class = "sasonr_error")
   switch(format,
-    plain = log_view_plain(ev, echo),
-    ansi = log_view_ansi(ev, echo),
-    html = log_view_html(ev, echo)
+    plain = new_sasonr_log(log_view_plain(ev, echo, compact)),
+    ansi = new_sasonr_log(log_view_ansi(ev, echo, compact)),
+    html = log_view_html(ev, echo, compact)
   )
 }
+
+# The lines of a log view (sas_log()) with the class that prints them as text.
+new_sasonr_log <- function(x) structure(x, class = "sasonr_log")
+
+#' @export
+print.sasonr_log <- function(x, ...) {
+  cat(paste0(x, "\n"), sep = "")
+  invisible(x)
+}
+
+#' @export
+`[.sasonr_log` <- function(x, i) new_sasonr_log(NextMethod())

@@ -8,6 +8,8 @@ sas_log(
   x,
   format = c("plain", "ansi", "html"),
   echo = log_echo_default,
+  ...,
+  compact = FALSE,
   session
 )
 }
@@ -19,11 +21,18 @@ sas_log(
 \item{echo}{Show the program lines (\code{TRUE}, the default) or only the
 messages and PUT output (\code{FALSE}).}
 
+\item{...}{Not used; the arguments after it are given by name.}
+
+\item{compact}{The compact layout of the echo (\code{TRUE}) or the default
+layout with the line numbers in 11 columns (\code{FALSE}, the default).}
+
 \item{session}{The former name of \code{x} (a session), still accepted; with
 \code{session}, \code{x} is left out (or is the format, given by position).}
 }
 \value{
-\code{"plain"} and \code{"ansi"}: a character vector, one element per line.
+\code{"plain"} and \code{"ansi"}: a character vector of class \code{sasonr_log},
+one element per line; it prints as the log text, one line per element.
+\code{as.character()} gives the plain character vector; \code{[} keeps the class.
 \code{"html"}: a character string.
 }
 \description{
@@ -31,8 +40,8 @@ The log as plain text, as text coloured for the terminal, or as HTML.
 }
 \details{
 \itemize{
-\item \code{"plain"}: the SAS-style log text, one element per line: \code{x$log} (for a
-session: the log of all submissions).
+\item \code{"plain"}: the SAS-style log text, one element per line: the lines of
+\code{x$log} (for a session: the log of all submissions).
 \item \code{"ansi"}: the same lines coloured with cli (ERROR red, WARNING green,
 NOTE blue, PUT output unstyled), under a summary line that counts the
 ERROR and WARNING lines of the messages (PUT output that starts with
@@ -72,11 +81,19 @@ out and the log starts with a NOTE that says why; the run itself goes on:
 a numbered ERROR on a line with a macro reference (a macro variable, call,
 statement or comment), a compile-time ERROR on a line that \verb{OPTIONS NOSOURCE} hides, \verb{OPTIONS SOURCE} / \verb{NOSOURCE} with more text on its line,
 a numbered WARNING. For now a NOTE place (\verb{(Line):(Column)}, \verb{at line N column M}) on a line with a macro reference fails loud.
+
+\code{compact = TRUE} is a narrower layout of the echo for display: the line
+number takes as many columns as the largest line number of the view needs,
+plus one blank; a continuation line starts with \code{!} in those columns. The
+lines break where they do in the default layout, and the underscore
+markers and error numbers under a line move with its text. The messages
+are unchanged (the places in a NOTE are program lines and columns).
 }
 \examples{
 res <- sas_run("data a;\n  x = 1;\n  put x=;\nrun;")
 sas_log(res)
 sas_log(res, echo = FALSE)
+sas_log(res, compact = TRUE)
 cat(sas_log(res, "html"))
 res$log_events[, c("step", "kind", "id")]
 }
