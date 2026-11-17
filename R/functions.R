@@ -12,11 +12,21 @@ recycle_n <- function(...) {
   lapply(args, rep_len, n)
 }
 
-# Apply a scalar function row-wise over recycled arguments.
+# Apply a scalar function row-wise over recycled arguments. `type` gives the
+# result type. Each call must return one value of that type or a narrower one
+# (logical < integer < double); purrr also accepts a whole double for integer
+# and 0/1 for logical, both without loss. Anything else is an error.
 rowwise <- function(f, ..., type = character(1)) {
   a <- recycle_n(...)
-  n <- length(a[[1]])
-  vapply(seq_len(n), function(i) do.call(f, lapply(a, `[[`, i)), type, USE.NAMES = FALSE)
+  want <- typeof(type)
+  if (length(a[[1]]) == 0L) return(vector(want, 0L))
+  switch(want,
+    integer = purrr::pmap_int(a, f),
+    double = purrr::pmap_dbl(a, f),
+    logical = purrr::pmap_lgl(a, f),
+    character = purrr::pmap_chr(a, f),
+    rlang::abort(paste0("rowwise(): result type `", want, "` is not supported."), .internal = TRUE)
+  )
 }
 
 chars_of <- function(s) strsplit(s, "")[[1]]
