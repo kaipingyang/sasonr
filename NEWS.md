@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* The `level`, `on_error` and `scope` arguments of `sas_run()`,
+  `sas_translate()` and `sas_macro_vars()` take their exact values only
+  (`rlang::arg_match()`); an abbreviation such as `level = "L"` is an error.
+* Internals: the code generator builds its R calls with rlang
+  (`call2()`, `expr()`, `sym()`, `exec()`), package-held numbers and lists go
+  through vctrs (`vec_cast()`, `list_unchop()`, `vec_rbind()`), and row-wise
+  function calls use purrr, a new dependency.
 * `sas_run()` runs a SAS program given as text and returns the log, the
   listing and the WORK data sets; `sas_translate()` shows the R code that is
   generated for each step. `sas_lex()`, `sas_parse()`, `sas_parse_expr()` and
@@ -113,6 +120,13 @@ the development version provides.
 
 ## DATA step
 
+* Lengths and other integer tokens: ATTRIB LENGTH= no longer reads `$8.5`
+  as 85 (a fractional length is truncated, `$8.5` is 8); a numeric length
+  is range-checked on the value as written (`8.5` is an error, `3.5` is 3),
+  also in LENGTH. A fractional ARRAY dimension or initial-value repetition,
+  INPUT end column, INPUT `#n` pointer and FILE LRECL= is a syntax error. A
+  PUT item wider than the FILE LRECL fails loud.
+* `VLENGTH()` of a numeric variable returns its declared length (3 to 8).
 * Hand-written lexer (strings, comments, name, date and hex literals,
   special missing values, DATALINES blocks, macro tokens), recursive-descent
   statement parser and Pratt expression parser with the SAS operator
@@ -202,6 +216,17 @@ the development version provides.
 
 ## PROC SQL
 
+* OUTOBS=, INOBS= and LOOPS= (also in RESET) take an integer constant: `2.5`,
+  `-1` or a name give ERROR 22-322 and the rest of the step is not executed.
+  A GROUP BY or ORDER BY column number that is not a positive integer gives
+  "ERROR: GROUP BY clause requires a positive column number." (ORDER BY
+  alike); `ORDER BY -1` no longer leaves the rows unordered.
+* INSERT ... SET: a column missing from a SET clause is missing in that row
+  (`.` or blank), and a value of the wrong type in any SET clause gives
+  "ERROR: It is invalid to assign a numeric expression to a character value
+  using the SET clause." (and the character-to-numeric message) with no row
+  inserted. A PROC SQL step stopped by an ERROR sets SYSERR to 1012.
+* PROC SQL expressions are evaluated as R calls, without a text round trip.
 * Own recursive-descent SQL parser; DuckDB runs joins and grouping, and SAS
   semantics are applied in R: missing values, remerging of summary
   statistics with the remerge NOTE, `CALCULATED`, `INTO :macro-variable` and
@@ -218,6 +243,14 @@ the development version provides.
 
 ## Procedures
 
+* Options that take an integer constant fail with ERROR 22-322 for a
+  fractional value instead of truncating it: PROC MEANS MAXDEC=, FW=,
+  QNTLDEF= / PCTLDEF=; PROC FREQ BINOMIAL LEVEL=, RELRISK COLUMN=. PROC FREQ
+  BINOMIAL(ALPHA=) is an ERROR (ALPHA= is not a BINOMIAL suboption), TABLES
+  ALPHA= and BINOMIAL P= need a number, and PROC FORMAT DEFAULT= needs a
+  number. BINOMIAL P= above 1 is a percentage (`P=1.5` tests 0.015). PROC
+  MEANS MAXDEC=-1, an ALPHA= outside (0, 1) and a negative WAYS value give
+  their WARNING and the procedure runs.
 * PROC SORT, PRINT, MEANS / SUMMARY, FREQ, TRANSPOSE, CONTENTS, DATASETS,
   APPEND, DELETE and FORMAT (VALUE / INVALUE).
 * PROC MEANS / SUMMARY: sums in observation order and the moment statistics
