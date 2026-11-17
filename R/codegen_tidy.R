@@ -210,7 +210,9 @@ gen_var_info <- function(e, cx) {
     inf <- an$info[[v]]
     fmt <- an$formats[[v]]
     char <- identical(inf$type, "char")
-    len <- if (char) inf$len else 8L
+    # a numeric variable reports its storage length (LENGTH / ATTRIB or the input
+    # data set), 8 by default
+    len <- if (char) inf$len else vctrs::vec_cast(an$numlen[[v]] %||% 8L, integer())
     fmt_text <- if (!is.null(fmt)) toupper(fmt$text) else if (char) paste0("$", len, ".") else "BEST12."
     switch(e$name,
       vname = inf$disp %||% v,

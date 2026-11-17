@@ -148,3 +148,19 @@ run;")
   expect_error(sas_run("data c; e = exist('other.ds'); run;"), class = "sasonr_unsupported")
   expect_error(sas_run("data c; e = exist('work.x', 'VIEW'); run;"), class = "sasonr_unsupported")
 })
+test_that("VLENGTH of a numeric variable is its storage length", {
+  vl <- function(code, ...) {
+    r <- sas_run(code, ...)
+    sub("^L ", "", grep("^L ", r$log, value = TRUE))
+  }
+  expect_identical(vl("data _null_; length x3 3 x4 4 x7 7 x8 8; x3 = 1; l3 = vlength(x3); l4 = vlength(x4);
+    l7 = vlength(x7); l8 = vlength(x8); l = vlength(z); z = 1; put 'L ' l3= l4= l7= l8= l=; run;"),
+    "l3=3 l4=4 l7=7 l8=8 l=8")
+  expect_identical(vl("data _null_; attrib x length=5; x = 1; l = vlength(x); put 'L ' l=; run;", level = "L3"), "l=5")
+  # the length travels with the data set into a later step, also through an array
+  expect_identical(vl("data a; length x 4; x = 1; run; proc sort data=a out=b; by x; run;
+    data _null_; set b; array q{2} x y; l1 = vlength(q{1}); l2 = vlength(q{2}); l = vlength(x); put 'L ' l1= l2= l=; run;"),
+    "l1=4 l2=8 l=4")
+  expect_error(sas_run("data _null_; length x 6; v = 'x'; l = vlengthx(v); run;", on_error = "abort"),
+               class = "sasonr_unsupported")
+})
