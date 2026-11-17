@@ -253,7 +253,7 @@ sql_lower_case <- function(e, ctx) {
   types <- lapply(c(vals, if (!is.null(els)) list(els)), sql_type_of, ctx = ctx)
   tt <- unique(vapply(types, `[[`, "", "type"))
   if (length(tt) > 1) abort_syntax("Result of WHEN clause is not the same data type as the preceding results.", e$line)
-  len <- max(vapply(types, function(t) as.integer(t$len), 1L))
+  len <- max(vapply(types, function(t) vctrs::vec_cast(t$len, integer()), 1L))
   if (is.null(els)) els <- if (tt == "char") list(node = "str", value = "", line = e$line) else list(node = "missing", code = ".", line = e$line)
   list(node = "call", name = "sqlcase", args = c(args, list(els)), line = e$line, construct = TRUE,
        sql_type = list(type = tt, len = if (tt == "char") len else 8L))
@@ -286,7 +286,7 @@ sql_lower_call <- function(e, ctx) {
     types <- lapply(args, sql_type_of, ctx = ctx)
     if (all(vapply(types, `[[`, "", "type") == "char")) {
       out$name <- "coalescec"
-      out$sql_type <- list(type = "char", len = max(vapply(types, function(t) as.integer(t$len), 1L)))
+      out$sql_type <- list(type = "char", len = max(vapply(types, function(t) vctrs::vec_cast(t$len, integer()), 1L)))
     }
   }
   out

@@ -631,7 +631,7 @@ means_types_wanted <- function(sp, k, for_print) {
   for (w in sp$ways) {
     for (ty in 0:all_max) if (sum(means_type_vars(ty, k)) == w) out <- c(out, ty)
   }
-  sort(unique(as.integer(out)))
+  sort(unique(vctrs::vec_cast(out, integer())))
 }
 
 #' PROC MEANS / SUMMARY engine
@@ -1023,7 +1023,7 @@ means_render <- function(cols, gaps) {
   heads <- lapply(cols, function(c) heading_lines(c$parts, c$width))
   nh <- max(vapply(heads, length, 1L))
   heads <- lapply(heads, function(h) c(rep("", nh - length(h)), h))
-  widths <- vapply(cols, function(c) as.integer(c$width), 1L)
+  widths <- vapply(cols, function(c) vctrs::vec_cast(c$width, integer()), 1L)
   right <- vapply(cols, `[[`, TRUE, "right")
   join <- function(vals) {
     cells <- mapply(function(x, w, r) formatC(x, width = if (r) w else -w), vals, widths, right)
@@ -1103,8 +1103,8 @@ means_listing <- function(d, sp, cells_by, print_types) {
       scols <- lapply(seq_along(stats), function(si) means_stat_col(stats[si], stat_vals[[si]], sp, by_nw))
       # panel layout (means_panel_layout())
       ls <- rt_linesize()
-      panels <- means_panel_layout(vapply(scols, function(c) as.integer(c$width), 1L),
-                                   vapply(fixed, function(c) as.integer(c$width), 1L), ls)
+      panels <- means_panel_layout(vapply(scols, function(c) vctrs::vec_cast(c$width, integer()), 1L),
+                                   vapply(fixed, function(c) vctrs::vec_cast(c$width, integer()), 1L), ls)
       bad <- Filter(function(p) p$width > ls, panels)
       if (length(bad) > 0) {
         # an over-long fixed part (a CLASS variable with a long length, or a

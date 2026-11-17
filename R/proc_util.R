@@ -113,7 +113,7 @@ proc_var_info <- function(st, vars) {
     char <- identical(inf$type, "char")
     f <- st$formats[[v]]
     list(name = v, disp = inf$disp %||% v, char = char,
-         len = if (char) as.integer(inf$len) else as.integer(st$numlen[[v]] %||% 8L),
+         len = if (char) vctrs::vec_cast(inf$len, integer()) else vctrs::vec_cast(st$numlen[[v]] %||% 8L, integer()),
          fmt = if (is.null(f)) NULL else f[c("name", "w", "d", "char", "text")],
          informat = if (is.null(st$informats[[v]])) NULL else st$informats[[v]][c("name", "w", "d", "char", "text")],
          label = if (v %in% names(st$labels)) unname(st$labels[[v]]) else NULL)
@@ -200,7 +200,7 @@ proc_out_meta <- function(cols) {
   m <- list(
     vars = vars,
     type = stats::setNames(lapply(cols, function(c) if (c$char) "char" else "num"), vars),
-    len = stats::setNames(lapply(cols, function(c) as.integer(c$len %||% 8L)), vars),
+    len = stats::setNames(lapply(cols, function(c) vctrs::vec_cast(c$len %||% 8L, integer())), vars),
     formats = Filter(Negate(is.null), stats::setNames(lapply(cols, `[[`, "fmt"), vars)),
     informats = Filter(Negate(is.null), stats::setNames(lapply(cols, `[[`, "informat"), vars)),
     labels = Filter(Negate(is.null), stats::setNames(lapply(cols, `[[`, "label"), vars)),
@@ -257,7 +257,7 @@ render_table <- function(cols, gap = 4L, rule = TRUE) {
   heads <- lapply(cols, function(c) heading_lines(c$parts, c$width))
   nh <- max(vapply(heads, length, 1L))
   heads <- lapply(heads, function(h) c(rep("", nh - length(h)), h))
-  widths <- vapply(cols, function(c) as.integer(c$width), 1L)
+  widths <- vapply(cols, function(c) vctrs::vec_cast(c$width, integer()), 1L)
   pad <- function(x, w, r) formatC(x, width = if (r) w else -w)
   line_of <- function(vals) {
     sas_rtrim(paste(mapply(pad, vals, widths, vapply(cols, `[[`, TRUE, "right")), collapse = strrep(" ", gap)))
@@ -269,7 +269,7 @@ render_table <- function(cols, gap = 4L, rule = TRUE) {
   if (rule) c(hl, strrep("-", total), body, strrep("-", total)) else c(hl, body)
 }
 
-table_width <- function(cols, gap) sum(vapply(cols, function(c) as.integer(c$width), 1L)) + gap * (length(cols) - 1L)
+table_width <- function(cols, gap) sum(vapply(cols, function(c) vctrs::vec_cast(c$width, integer()), 1L)) + gap * (length(cols) - 1L)
 
 # Numeric values are right aligned unless a user-defined format turns them into
 # labels.

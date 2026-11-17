@@ -2464,7 +2464,7 @@ freq_output_data <- function(rows, sp) {
   }
   cols <- c(cols, stat_cols)
   data <- lapply(cols, function(c) {
-    if (!is.null(c$key)) return(vapply(rows, function(r) as.numeric(r[[c$key]] %||% NA_real_), 1))
+    if (!is.null(c$key)) return(vapply(rows, function(r) vctrs::vec_cast(r[[c$key]] %||% NA_real_, double()), 1))
     v <- lapply(rows, function(r) r[[c$name]])
     if (c$char) vapply(v, as.character, "") else vapply(v, as.numeric, 1)
   })

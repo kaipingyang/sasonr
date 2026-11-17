@@ -191,7 +191,7 @@ expr_type <- function(e, st) {
         a <- expr_type(e$args[[1]], st)
         w <- fmt_width(e$fmt, a$type == "char")
         if (is.na(w)) w <- if (a$type == "char") a$len + if (identical(e$fmt$name, "quote")) 2L else 0L else 12L
-        return(list(type = "char", len = as.integer(w)))
+        return(list(type = "char", len = vctrs::vec_cast(w, integer())))
       }
       if (e$name == "input") {
         uf <- user_fmt(e$fmt$name, e$fmt$char, "invalue")
@@ -203,7 +203,7 @@ expr_type <- function(e, st) {
             w <- if (a$type == "char") a$len else 12L
           }
           # $HEXw. yields w/2 bytes, every other character informat keeps w
-          len <- if (identical(e$fmt$name, "hex")) as.integer(w %/% 2L) else as.integer(w)
+          len <- if (identical(e$fmt$name, "hex")) vctrs::vec_cast(w %/% 2L, integer()) else vctrs::vec_cast(w, integer())
           return(list(type = "char", len = len))
         }
         return(num)
@@ -664,7 +664,7 @@ an_stmt <- function(s, st) {
             if (!is.null(it$fmt)) infmt_default_w(it$fmt) else 8L
           )
           if (is.na(w)) w <- 8L
-          reg_var(st, it$name, "char", as.integer(w), disp = it$text)
+          reg_var(st, it$name, "char", vctrs::vec_cast(w, integer()), disp = it$text)
         } else {
           reg_var(st, it$name, "num", disp = it$text)
         }
@@ -1119,7 +1119,7 @@ out_meta <- function(an) {
     fmts <- lapply(o$vars, function(v) an$formats[[v]])
     disp <- Map(function(v, on) if (on == v) an$info[[v]]$disp %||% v else on, o$vars, o$out_names)
     names(type) <- names(len) <- names(fmts) <- names(disp) <- o$out_names
-    len <- Map(function(v, l) if (identical(an$info[[v]]$type, "char")) l else as.integer(an$numlen[[v]] %||% 8L), o$vars, len)
+    len <- Map(function(v, l) if (identical(an$info[[v]]$type, "char")) l else vctrs::vec_cast(an$numlen[[v]] %||% 8L, integer()), o$vars, len)
     infs <- lapply(o$vars, function(v) an$informats[[v]])
     labs <- lapply(o$vars, function(v) if (v %in% names(an$labels)) substr(an$labels[[v]], 1L, 256L) else NULL)
     names(labs) <- names(infs) <- names(len) <- o$out_names

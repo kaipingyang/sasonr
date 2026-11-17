@@ -42,7 +42,7 @@ sas_infile_open <- function(lines, line_no = seq_along(lines), opts = list(), in
   inf$dlm <- if (is.null(dlm)) c(" ", "\t") else strsplit(dlm, "")[[1]]
   inf$blank_dlm <- is.null(opts$dlm) && !inf$dsd
   inf$mode <- opts$mode %||% "flowover"
-  inf$N <- max(1L, as.integer(opts$lines %||% 1L))
+  inf$N <- max(1L, vctrs::vec_cast(opts$lines %||% 1L, integer()))
   inf$r <- 0L
   inf$base <- 1L
   inf$c <- 1L

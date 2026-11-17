@@ -11,16 +11,16 @@
 log_step_ends <- function(steps, text, line) {
   if (!length(steps)) return(integer())
   last <- log_chunk_last(text, line)
-  starts <- vapply(steps, function(s) as.integer(s$line %||% line), 1L)
+  starts <- vapply(steps, function(s) vctrs::vec_cast(s$line %||% line, integer()), 1L)
   maxl <- vapply(steps, log_max_line, 1L)
   nxt <- c(pmax(starts[-1] - 1L, starts[-length(starts)]), last)
-  ends <- as.integer(pmin(last, pmax(starts, maxl, nxt)))
+  ends <- vctrs::vec_cast(pmin(last, pmax(starts, maxl, nxt)), integer())
   # a DATA step with DATALINES runs when its DATALINES statement has been
   # read: the data lines are not echoed, the lines after them come later
   dl <- lapply(steps, log_step_datalines)
   has <- !vapply(dl, is.null, logical(1))
   full <- ends
-  ends[has] <- vapply(dl[has], function(d) as.integer(d$line), 1L)
+  ends[has] <- vapply(dl[has], function(d) vctrs::vec_cast(d$line, integer()), 1L)
   attr(ends, "tail") <- lapply(seq_along(ends), function(k) if (has[k]) c(ends[k] + 1L, full[k]))
   ends
 }
@@ -35,7 +35,7 @@ log_step_datalines <- function(step) {
 # The last program line of a chunk of text that starts at line `line`
 # (trailing blank lines excluded).
 log_chunk_last <- function(text, line) {
-  as.integer(line + nchar(gsub("[^\n]", "", sub("\\s+$", "", text))))
+  vctrs::vec_cast(line + nchar(gsub("[^\n]", "", sub("\\s+$", "", text))), integer())
 }
 
 # The largest `line` field in a parsed step.
@@ -44,7 +44,7 @@ log_max_line <- function(x) {
   walk <- function(y) {
     if (!is.list(y)) return()
     l <- y[["line"]]
-    if (is.numeric(l) && length(l) == 1L && !is.na(l)) m <<- max(m, as.integer(l), na.rm = TRUE)
+    if (is.numeric(l) && length(l) == 1L && !is.na(l)) m <<- max(m, vctrs::vec_cast(l, integer()), na.rm = TRUE)
     for (z in y) if (is.list(z)) walk(z)
   }
   walk(x)
@@ -68,7 +68,7 @@ log_events_table <- function(events, programs, sub = 1L) {
   col <- function(f, type) vapply(events, function(ev) ev[[f]] %||% NA, type)
   out <- tibble::tibble(
     seq = col("seq", integer(1)),
-    submission = vapply(events, function(ev) as.integer(ev$sub %||% sub), integer(1)),
+    submission = vapply(events, function(ev) vctrs::vec_cast(ev$sub %||% sub, integer()), integer(1)),
     step = col("step", integer(1)),
     phase = col("phase", character(1)),
     kind = col("kind", character(1)),
@@ -77,7 +77,7 @@ log_events_table <- function(events, programs, sub = 1L) {
     at = lapply(events, `[[`, "at"),
     places = lapply(events, `[[`, "places"),
     text = lapply(events, `[[`, "text"),
-    source_line = vapply(events, function(ev) as.integer(ev$src %||% 0L), integer(1))
+    source_line = vapply(events, function(ev) vctrs::vec_cast(ev$src %||% 0L, integer()), integer(1))
   )
   attr(out, "programs") <- programs
   out
@@ -338,8 +338,8 @@ log_markers <- function(e, lines) {
     at <- err$at[[i]]
     tok <- err$args[[i]]$token
     if (length(at) < 2L || anyNA(at[1:2]) || !is.character(tok) || length(tok) != 1L || !nzchar(tok)) next
-    ln <- as.integer(at[1])
-    col <- as.integer(at[2])
+    ln <- vctrs::vec_cast(at[1], integer())
+    col <- vctrs::vec_cast(at[2], integer())
     if (ln < 1L || ln > length(lines) || !identical(toupper(substr(lines[ln], col, col + nchar(tok) - 1L)), toupper(tok))) next
     code <- regmatches(err$text[[i]][1], regexec("^ERROR ([0-9]+)-[0-9]+:", err$text[[i]][1]))[[1]]
     len <- nchar(tok)

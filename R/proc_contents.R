@@ -61,7 +61,7 @@ contents_vars <- function(m) {
   vars <- m$vars
   disp <- vapply(vars, function(v) m$disp[[v]] %||% v, "")
   type <- vapply(vars, function(v) m$type[[v]], "")
-  len <- vapply(vars, function(v) as.integer(m$len[[v]] %||% 8L), 1L)
+  len <- vapply(vars, function(v) vctrs::vec_cast(m$len[[v]] %||% 8L, integer()), 1L)
   list(vars = vars, disp = unname(disp), type = unname(type), len = unname(len),
        fmt = unname(vapply(vars, function(v) contents_fmt_text(m$formats[[v]]), "")),
        infmt = unname(vapply(vars, function(v) contents_fmt_text(m$informats[[v]]), "")),
@@ -119,7 +119,7 @@ sas_proc_contents <- function(work, name, m, sp) {
     sorted <- if (!is.null(m$sortedby)) "YES" else "NO"
     # numeric variables come first; the record is padded to a multiple of 8
     # when it holds an 8-byte numeric (shorter numerics and characters are not aligned)
-    obslen <- if (any(cv$type == "num" & cv$len == 8L)) as.integer(ceiling(np$obslen / 8) * 8) else np$obslen
+    obslen <- if (any(cv$type == "num" & cv$len == 8L)) vctrs::vec_cast(ceiling(np$obslen / 8) * 8, integer()) else np$obslen
     two <- function(a, av, b, bv) sprintf("%-21s%-56s%-22s%s", a, av, b, bv)
     lst <- c(paste0("The ", sp$proc %||% "CONTENTS", " Procedure"), "",
              two("Data Set Name", paste0("WORK.", toupper(name)), "Observations", nobs),

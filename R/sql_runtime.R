@@ -138,7 +138,7 @@ sql_duck_pairs <- function(eng, lkeys, rkeys) {
   on <- paste(sprintf("l.%s IS NOT DISTINCT FROM r.%s", kn, kn), collapse = " AND ")
   res <- sql_duck_query(eng, list(sasonr_l = L, sasonr_r = R),
                         paste0("SELECT l.rid AS lr, r.rid AS rr FROM sasonr_l l JOIN sasonr_r r ON ", on, " ORDER BY lr, rr"))
-  list(l = as.integer(res$lr), r = as.integer(res$rr))
+  list(l = vctrs::vec_cast(res$lr, integer()), r = vctrs::vec_cast(res$rr, integer()))
 }
 
 sql_agg_sql <- function(fn, col, distinct) {
@@ -170,7 +170,7 @@ sql_agg_sql <- function(fn, col, distinct) {
 # their value does not depend on the order.
 sql_duck_aggregate <- function(eng, gid, G, aggs, order_known = TRUE, line = NULL) {
   if (length(aggs) == 0) return(list())
-  cols <- list(g = as.integer(gid))
+  cols <- list(g = vctrs::vec_cast(gid, integer()))
   exprs <- character()
   for (k in seq_along(aggs)) {
     a <- aggs[[k]]
@@ -257,9 +257,9 @@ sql_col_width <- function(c) {
   if (!is.null(c$format)) {
     w <- c$format$w
     if (is.na(w)) w <- fmt_width(c$format, c$type == "char")
-    if (!is.na(w)) return(as.integer(w))
+    if (!is.na(w)) return(vctrs::vec_cast(w, integer()))
   }
-  if (c$type == "char") as.integer(c$len) else 8L
+  if (c$type == "char") vctrs::vec_cast(c$len, integer()) else 8L
 }
 
 # A column header wider than its column is split in two at an underscore

@@ -164,7 +164,7 @@ sql_rel_to_table <- function(eng, res, line, warn_dups = TRUE) {
   meta <- list(
     vars = names,
     type = stats::setNames(lapply(cols, `[[`, "type"), names),
-    len = stats::setNames(lapply(cols, function(c) as.integer(c$len)), names),
+    len = stats::setNames(lapply(cols, function(c) vctrs::vec_cast(c$len, integer())), names),
     formats = Filter(Negate(is.null), stats::setNames(lapply(cols, `[[`, "format"), names)),
     informats = Filter(Negate(is.null), stats::setNames(lapply(cols, `[[`, "informat"), names)),
     labels = Filter(Negate(is.null), stats::setNames(lapply(cols, `[[`, "label"), names)),
@@ -199,7 +199,7 @@ sql_stmt_create_cols <- function(eng, st) {
     d[[nm]] <- if (c$type == "char") character() else numeric()
     meta$vars <- c(meta$vars, nm)
     meta$type[[nm]] <- c$type
-    meta$len[[nm]] <- as.integer(c$len)
+    meta$len[[nm]] <- vctrs::vec_cast(c$len, integer())
     meta$disp[[nm]] <- c$text
     if (!is.null(c$format)) meta$formats[[nm]] <- c$format
     if (!is.null(c$informat)) meta$informats[[nm]] <- c$informat
@@ -329,7 +329,7 @@ sql_stmt_alter <- function(eng, st) {
       d[[c$name]] <- if (c$type == "char") rep(strrep(" ", c$len), nrow(d)) else rep(NA_real_, nrow(d))
       m$vars <- c(m$vars, c$name)
       m$type[[c$name]] <- c$type
-      m$len[[c$name]] <- as.integer(c$len)
+      m$len[[c$name]] <- vctrs::vec_cast(c$len, integer())
       m$disp[[c$name]] <- c$text
       if (!is.null(c$format)) m$formats[[c$name]] <- c$format
       if (!is.null(c$informat)) m$informats[[c$name]] <- c$informat
@@ -346,7 +346,7 @@ sql_stmt_alter <- function(eng, st) {
       if (!is.null(c$type) && c$type != m$type[[v]]) abort_unsupported("changing the type of a column with ALTER TABLE MODIFY", st$line)
       if (!is.null(c$len) && identical(m$type[[v]], "char")) {
         d[[v]] <- sas_char(substr(d[[v]], 1L, c$len), c$len)
-        m$len[[v]] <- as.integer(c$len)
+        m$len[[v]] <- vctrs::vec_cast(c$len, integer())
       }
       if (!is.null(c$format)) m$formats[[v]] <- c$format
       if (!is.null(c$informat)) m$informats[[v]] <- c$informat

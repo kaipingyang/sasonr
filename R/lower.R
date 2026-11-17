@@ -477,8 +477,8 @@ dsir_lag_sites <- function(blocks) {
   walk <- function(x, b) {
     if (!is.list(x)) return(invisible())
     if (!is.null(x$site) && !is.null(x$lag)) {
-      acc[[length(acc) + 1L]] <<- data.frame(id = as.integer(x$site), fn = x$lag$kind,
-                                             n = as.integer(x$lag$n), block = b, stringsAsFactors = FALSE)
+      acc[[length(acc) + 1L]] <<- data.frame(id = vctrs::vec_cast(x$site, integer()), fn = x$lag$kind,
+                                             n = vctrs::vec_cast(x$lag$n, integer()), block = b, stringsAsFactors = FALSE)
     }
     for (y in x) walk(y, b)
   }

@@ -241,7 +241,7 @@ proc_input <- function(step, meta, last) {
 
 proc_meta <- function(st, vars, out_names = vars) {
   type <- lapply(vars, function(v) st$info[[v]]$type)
-  len <- lapply(vars, function(v) if (identical(st$info[[v]]$type, "char")) st$info[[v]]$len else as.integer(st$numlen[[v]] %||% 8L))
+  len <- lapply(vars, function(v) if (identical(st$info[[v]]$type, "char")) st$info[[v]]$len else vctrs::vec_cast(st$numlen[[v]] %||% 8L, integer()))
   fmts <- lapply(vars, function(v) st$formats[[v]])
   infs <- lapply(vars, function(v) st$informats[[v]])
   labs <- lapply(vars, function(v) if (v %in% names(st$labels)) st$labels[[v]] else NULL)

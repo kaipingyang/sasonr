@@ -54,7 +54,7 @@ log_engine_init <- function(eng) {
 log_program <- function(eng, text) {
   o <- eng$session$options
   eng$program$lines <- strsplit(text, "\n", fixed = TRUE)[[1]] %||% character()
-  eng$program$ls <- data.frame(line = 0L, ls = as.integer(o$linesize %||% 132L))
+  eng$program$ls <- data.frame(line = 0L, ls = vctrs::vec_cast(o$linesize %||% 132L, integer()))
   eng$program$source <- data.frame(line = 0L, on = !isFALSE(o$source))
   eng$program$echo_omit <- NULL
   invisible()
@@ -83,8 +83,8 @@ log_macro_line <- function(line, rt = rt_diag()) {
 # (and line) are not those of SAS, which counts the text there differently;
 # it fails loud.
 log_place_check <- function(at) {
-  if (length(at) >= 1L && !is.na(at[1]) && log_macro_line(as.integer(at[1]))) {
-    abort_unsupported_construct("a NOTE place on a line with macro references (its line and column)", as.integer(at[1]))
+  if (length(at) >= 1L && !is.na(at[1]) && log_macro_line(vctrs::vec_cast(at[1], integer()))) {
+    abort_unsupported_construct("a NOTE place on a line with macro references (its line and column)", vctrs::vec_cast(at[1], integer()))
   }
   invisible()
 }
@@ -129,7 +129,7 @@ log_source_ls <- function(eng, line, ls) {
 
 # Program lines that are not echoed (the data lines after DATALINES / CARDS).
 log_source_skip <- function(eng, lines) {
-  eng$program$skip <- union(eng$program$skip, as.integer(lines))
+  eng$program$skip <- union(eng$program$skip, vctrs::vec_cast(lines, integer()))
   invisible()
 }
 
@@ -151,7 +151,7 @@ log_step_start <- function(eng, label, line, last, tail = NULL) {
   eng$step_count <- eng$step_count + 1L
   eng$step_no <- eng$step_count
   st <- eng$program$steps
-  tail <- as.integer(tail %||% c(NA, NA))
+  tail <- vctrs::vec_cast(tail %||% c(NA, NA), integer())
   eng$program$steps <- rbind(st, data.frame(step = eng$step_no, label = label, line = as.integer(line),
                                             tail_from = tail[1], tail_to = tail[2]))
   log_source_read(eng, last)
@@ -170,18 +170,18 @@ log_step_tail_extend <- function(eng, last, text) {
       eng$src_line > st$tail_to[k]) return(FALSE)
   # the program lines between the step's lines and this chunk (a macro
   # statement such as %PUT does not move src_line) hold only blanks and comments
-  first <- as.integer(last) - lengths(regmatches(text, gregexpr("\n", text, fixed = TRUE)))
+  first <- vctrs::vec_cast(last, integer()) - lengths(regmatches(text, gregexpr("\n", text, fixed = TRUE)))
   if (first - 1L > st$tail_to[k]) {
     gap <- paste(eng$program$lines[(st$tail_to[k] + 1L):(first - 1L)], collapse = "\n")
     if (grepl("\\S", gsub("(?s)/\\*.*?\\*/", " ", gap, perl = TRUE), perl = TRUE)) return(FALSE)
   }
-  eng$program$steps$tail_to[k] <- max(st$tail_to[k], as.integer(last))
+  eng$program$steps$tail_to[k] <- max(st$tail_to[k], vctrs::vec_cast(last, integer()))
   TRUE
 }
 
 # The program has been read up to line `last`.
 log_source_read <- function(eng, last) {
-  if (length(last) == 1L && !is.na(last)) eng$src_line <- max(eng$src_line, as.integer(last))
+  if (length(last) == 1L && !is.na(last)) eng$src_line <- max(eng$src_line, vctrs::vec_cast(last, integer()))
   invisible()
 }
 
@@ -239,7 +239,7 @@ log_emit <- function(eng, kind = NULL, id = "raw", ..., text = NULL, at = NULL, 
   phase <- phase %||% log_phase_of(eng)
   if (!phase %in% log_phases) rlang::abort(paste0("log_emit(): unknown phase `", phase, "`."), .internal = TRUE)
   ev <- list(seq = length(eng$events) + 1L, step = eng$step_no %||% 0L, phase = phase, kind = kind, id = id,
-             args = list(...), at = at, places = places, text = lines, src = as.integer(src %||% eng$src_line %||% 0L))
+             args = list(...), at = at, places = places, text = lines, src = vctrs::vec_cast(src %||% eng$src_line %||% 0L, integer()))
   eng$events[[ev$seq]] <- ev
   invisible()
 }
@@ -431,7 +431,7 @@ log_place <- function(id, line = NULL, col = NULL, n = 1L, at = c(line, col)) {
   key <- if (identical(m$key, "line_col")) sprintf("%d:%d", as.integer(line), as.integer(col %||% 0L)) else at_key(at)
   v <- st$places[[id]]
   if (identical(m$places, "counted")) {
-    v[key] <- (if (key %in% names(v)) v[[key]] else 0L) + as.integer(n)
+    v[key] <- (if (key %in% names(v)) v[[key]] else 0L) + vctrs::vec_cast(n, integer())
   } else {
     v <- c(v, key)
   }

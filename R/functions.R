@@ -1995,7 +1995,7 @@ sas_f_cvt_c2n <- function(x, .at = NULL) {
   if (any(bad)) {
     log_place_check(.at)
     rt_error(sprintf("NOTE: Invalid numeric data, '%s' , at line %d column %d.", s[which(bad)[1]],
-                     as.integer(.at[1] %||% NA), as.integer(.at[2] %||% NA)))
+                     vctrs::vec_cast(.at[1] %||% NA, integer()), vctrs::vec_cast(.at[2] %||% NA, integer())))
   }
   out
 }

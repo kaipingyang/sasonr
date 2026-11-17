@@ -15,7 +15,7 @@
 
 fmt_spec <- function(name = "", w = NA_integer_, d = NA_integer_, char = FALSE) {
   text <- paste0(if (char) "$", name, if (!is.na(w)) w, ".", if (!is.na(d)) d)
-  list(name = name, w = as.integer(w), d = as.integer(d), char = char, text = text)
+  list(name = name, w = vctrs::vec_cast(w, integer()), d = vctrs::vec_cast(d, integer()), char = char, text = text)
 }
 
 #' Parse a format or informat name held in a string (`"date9."`, `"$char10."`)
@@ -614,7 +614,7 @@ sas_format <- function(x, fmt = NULL) {
   if (is.null(bn)) abort_unsupported(paste0("format ", fmt$text))
   w <- fmt$w
   if (is.na(w)) w <- registry_defw("format", fmt)
-  if (is.na(w)) w <- as.integer(num_fmt_defaults[[bn$base]])
+  if (is.na(w)) w <- vctrs::vec_cast(num_fmt_defaults[[bn$base]], integer())
   if (bn$base == "pvalue" && is.na(fmt$d)) fmt$d <- 4L
   d <- if (is.na(fmt$d)) 0L else fmt$d
   code <- sas_miss_code(x)
@@ -678,7 +678,7 @@ fmt_width <- function(fmt, x_char = fmt$char) {
   if (is.null(bn)) return(12L)
   w <- registry_defw("format", fmt)
   if (!is.na(w)) return(w)
-  as.integer(num_fmt_defaults[[bn$base]])
+  vctrs::vec_cast(num_fmt_defaults[[bn$base]], integer())
 }
 
 # User-defined formats (PROC FORMAT) ------------------------------------------

@@ -851,7 +851,7 @@ best_digits15 <- function(v, w) {
 #' @param w Width.
 #' @keywords internal
 sas_fmt_best <- function(x, w = 12L) {
-  w <- as.integer(w %||% 12L)
+  w <- vctrs::vec_cast(w %||% 12L, integer())
   code <- sas_miss_code(x)
   out <- character(length(x))
   sig <- function(s) {
@@ -1433,7 +1433,7 @@ sas_idx <- function(i, lo, dim) {
   if (length(k) != 1 || is.na(k) || k != trunc(k) || k < 1 || k > dim) {
     abort_runtime("array subscript out of range")
   }
-  as.integer(k)
+  vctrs::vec_cast(k, integer())
 }
 
 #' Normalise an arithmetic result: special missing values and overflow

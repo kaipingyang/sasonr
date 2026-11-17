@@ -130,7 +130,7 @@ ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
       inf <- an$info[[rec$out_names[j]]]
       ml <- m$len[[rec$vars[j]]]
       if (identical(m$type[[rec$vars[j]]], "char") && identical(inf$type, "char") && !is.null(ml) && ml > inf$len) {
-        tr[[rec$out_names[j]]] <- as.integer(inf$len)
+        tr[[rec$out_names[j]]] <- vctrs::vec_cast(inf$len, integer())
       }
     }
     if (length(tr) > 0) x <- cgi_pipe(x, rlang::call2("sas_trunc_chars", cg_val(tr)))

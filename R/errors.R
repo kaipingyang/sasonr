@@ -226,7 +226,7 @@ err_data_schema <- function(eng, step) {
     if (!inherits(tr, "condition")) return(tr$meta[vapply(step$outputs, `[[`, "", "name")])
     # an ERROR of the analyzer at one statement: replace it by what it contributes at compile time
     ln <- tr$sas_line
-    k <- which(vapply(step$stmts, function(s) identical(as.integer(s$line), as.integer(ln)), logical(1)))
+    k <- which(vapply(step$stmts, function(s) identical(vctrs::vec_cast(s$line, integer()), vctrs::vec_cast(ln, integer())), logical(1)))
     if (length(k) != 1L) return(NULL)
     s <- step$stmts[[k]]
     kind <- if (s$stmt == "assign" && identical(s$target$node, "var")) "assign" else s$stmt
