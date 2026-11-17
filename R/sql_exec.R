@@ -291,10 +291,10 @@ sql_col_id <- function(x, ctx) {
 # expression does not make an identical SELECT expression a group key.
 sql_needs_remerge <- function(e, group, ctx, item_k = NULL) {
   if (is.null(e)) return(FALSE)
-  gitems <- unlist(lapply(group, attr, "item"))
+  gitems <- vctrs::list_unchop(lapply(group, attr, "item"), ptype = integer(), name_spec = rlang::zap())
   if (!is.null(item_k) && item_k %in% gitems) return(FALSE)
-  galias <- unlist(lapply(ctx$items[gitems], `[[`, "alias"))
-  gids <- unlist(lapply(group, function(g) if (g$node == "col") sql_col_id(g, ctx)))
+  galias <- vctrs::list_unchop(lapply(ctx$items[gitems], `[[`, "alias"), ptype = character(), name_spec = rlang::zap())
+  gids <- vctrs::list_unchop(lapply(group, function(g) if (g$node == "col") sql_col_id(g, ctx)), ptype = character(), name_spec = rlang::zap())
   hit <- FALSE
   sql_walk(e, function(x) {
     if (hit) return(FALSE)

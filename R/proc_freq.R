@@ -427,7 +427,7 @@ translate_proc_freq <- function(step, meta, last) {
     if (!w$var %in% vars_in) abort_runtime(paste0("Variable ", toupper(w$var), " not found."), w$line)
     if (identical(st$info[[w$var]]$type, "char")) abort_runtime(paste0("Variable ", toupper(w$var), " in list does not match type prescribed for this list."), w$line)
   }
-  exact <- unique(unlist(lapply(of("exact"), `[[`, "kws")))
+  exact <- unique(vctrs::list_unchop(lapply(of("exact"), `[[`, "kws"), ptype = character(), name_spec = rlang::zap()))
   tabs <- of("tables")
   requests <- list()
   for (s in tabs) {
@@ -436,7 +436,7 @@ translate_proc_freq <- function(step, meta, last) {
       terms <- list(character())
       for (f in r) {
         vs <- proc_resolve(f, st, s$line)
-        terms <- unlist(lapply(terms, function(a) lapply(vs, function(b) c(a, b))), recursive = FALSE)
+        terms <- vctrs::list_unchop(lapply(terms, function(a) lapply(vs, function(b) c(a, b))), ptype = list(), name_spec = rlang::zap())
       }
       expanded <- c(expanded, terms)
     }
@@ -526,7 +526,7 @@ translate_proc_freq <- function(step, meta, last) {
   if (length(outs) > 1) abort_unsupported("more than one OUTPUT statement in PROC FREQ", outs[[2]]$line)
   out_stmt <- if (length(outs) > 0) outs[[1]] else NULL
   if (!is.null(out_stmt) && is.null(out_stmt$out)) abort_unsupported("OUTPUT statement without OUT=", out_stmt$line)
-  allv <- unique(c(unlist(lapply(requests, `[[`, "vars")), by$vars, w$var))
+  allv <- unique(c(vctrs::list_unchop(lapply(requests, `[[`, "vars"), ptype = character(), name_spec = rlang::zap()), by$vars, w$var))
   spec <- list(
     line = step$line, data = inp$ds$name, print = !isTRUE(o$noprint), order = o$order %||% "internal",
     nlevels = isTRUE(o$nlevels), by = by$vars, by_desc = by$descending, weight = w$var, zeros = isTRUE(w$zeros),
@@ -541,7 +541,7 @@ translate_proc_freq <- function(step, meta, last) {
     ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
-  out_names <- c(unlist(lapply(requests, function(r) r$opts$out$name)), spec$output$name)
+  out_names <- c(vctrs::list_unchop(lapply(requests, function(r) r$opts$out$name), ptype = character(), name_spec = rlang::zap()), spec$output$name)
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC FREQ", line = step$line,
        outputs = unique(out_names), meta = list())
 }
@@ -679,7 +679,7 @@ freq_col_of <- function(v, info) {
 }
 
 freq_nlevels_table <- function(db, sp) {
-  vars <- unique(unlist(lapply(sp$requests, `[[`, "vars")))
+  vars <- unique(vctrs::list_unchop(lapply(sp$requests, `[[`, "vars"), ptype = character(), name_spec = rlang::zap()))
   nl <- vapply(vars, function(v) length(unique(proc_value_text(db[[v]], sp$info[[v]]))), 1L)
   miss <- vapply(vars, function(v) length(unique(proc_value_text(db[[v]][freq_is_missing(db[[v]])], sp$info[[v]]))), 1L)
   if (any(miss > 0)) abort_unsupported("NLEVELS with missing levels (Missing Levels columns)")
@@ -2117,11 +2117,11 @@ freq_binomial_listing <- function(st, info) {
              line(paste0(conf_pct, "% Upper Conf Limit"), f4(st$cl$exact[2]), w_prop), "")
   } else {
     types <- if (identical(cl, "all")) c("wald", "wilson", "exact", "agresticoull", "jeffreys") else cl
-    types <- unique(unlist(lapply(types, function(t) {
+    types <- unique(vctrs::list_unchop(lapply(types, function(t) {
       if (t == "all") c("wald", "wilson", "exact", "agresticoull", "jeffreys")
       else if (t %in% c("wald", "wilson")) if (isTRUE(st$correct)) paste0(t, "_corrected") else t
       else t
-    })))
+    }), ptype = character(), name_spec = rlang::zap()))
     nm <- c(wald = "Wald", wilson = "Wilson", exact = "Clopper-Pearson (Exact)",
             agresticoull = "Agresti-Coull", jeffreys = "Jeffreys",
             wald_corrected = "Wald (Corrected)", wilson_corrected = "Wilson (Corrected)")
@@ -2448,11 +2448,11 @@ freq_output_data <- function(rows, sp) {
     cmhga = list(c("cmhga", "_CMHGA_", "CMH General Association"), c("df_cmhga", "DF_CMHGA", "DF for CMH General Association"),
                  c("p_cmhga", "P_CMHGA", "P-value for CMH General Association"))
   )
-  exp <- unlist(lapply(kws, function(k) switch(k,
+  exp <- vctrs::list_unchop(lapply(kws, function(k) switch(k,
     chisq = c("pchi", "lrchi", "ajchi", "mhchi", "phi", "contgy", "cramv"),
     cmh = c("cmhcor", "cmhrms", "cmhga"), cmh1 = "cmhcor", cmh2 = c("cmhcor", "cmhrms"),
     binomial = abort_unsupported("PROC FREQ OUTPUT BINOMIAL (output variable layout not supported)"),
-    k)))
+    k)), ptype = character(), name_spec = rlang::zap())
   exp <- unique(exp)
   if (length(rows) > 1 && length(sp$by) == 0) abort_unsupported("OUTPUT statement with more than one table request")
   info <- sp$info

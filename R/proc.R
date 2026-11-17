@@ -310,12 +310,12 @@ translate_proc <- function(step, meta, last = NULL) {
   var_stmts <- Filter(function(s) s$stmt == "var", step$stmts)
   pvars <- vars
   if (length(var_stmts) > 0) {
-    pvars <- unlist(lapply(var_stmts, function(s) {
+    pvars <- vctrs::list_unchop(lapply(var_stmts, function(s) {
       tmp <- new_state(list())
       tmp$order <- vars
       tmp$info <- inp$st$info[vars]
       resolve_items(s$items, tmp, s$line, register = FALSE)
-    }))
+    }), ptype = character(), name_spec = rlang::zap())
     miss <- setdiff(pvars, vars)
     if (length(miss) > 0) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found"), var_stmts[[1]]$line)
   }

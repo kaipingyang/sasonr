@@ -1113,7 +1113,7 @@ sort_keys <- function(d, by) {
 sas_order <- function(d, by, descending = rep(FALSE, length(by))) {
   if (nrow(d) == 0) return(integer())
   keys <- sort_keys(d, by)
-  dec <- unlist(lapply(seq_along(by), function(k) rep(descending[k], if (is.character(d[[by[k]]])) 1L else 2L)))
+  dec <- vctrs::list_unchop(lapply(seq_along(by), function(k) rep(descending[k], if (is.character(d[[by[k]]])) 1L else 2L)), ptype = logical(), name_spec = rlang::zap())
   rlang::exec(order, !!!unname(keys), decreasing = dec, method = "radix")
 }
 

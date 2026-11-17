@@ -52,7 +52,7 @@ translate_proc_transpose <- function(step, meta, last) {
   proc_apply_attr_stmts(step$stmts, st)
   of <- function(kind) Filter(function(s) identical(s$stmt, kind), step$stmts)
   vars_in <- inp$ds$out_names
-  res_list <- function(kind) unique(unlist(lapply(of(kind), function(s) proc_resolve(s$items, st, s$line))))
+  res_list <- function(kind) unique(vctrs::list_unchop(lapply(of(kind), function(s) proc_resolve(s$items, st, s$line)), ptype = character(), name_spec = rlang::zap()))
   by <- of("by")
   by <- if (length(by) > 0) by[[length(by)]] else NULL
   if (!is.null(by)) {

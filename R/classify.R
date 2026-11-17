@@ -51,7 +51,7 @@ stmt_exprs <- function(s) {
     subset_if = ,
     where = list(s$cond),
     do = c(list(s$from, s$to, s$by, s$cond, s$while_until$cond), s$values),
-    select = c(list(s$expr), unlist(lapply(s$whens, `[[`, "values"), recursive = FALSE)),
+    select = c(list(s$expr), vctrs::list_unchop(lapply(s$whens, `[[`, "values"), ptype = list(), name_spec = rlang::zap())),
     put = c(lapply(Filter(function(it) it$kind %in% c("value", "named"), s$items), function(it) list(node = "var", name = it$name)),
             lapply(Filter(function(it) it$kind == "ptr" && !is.null(it$v), s$items), `[[`, "v")),
     call = s$args,
@@ -69,8 +69,8 @@ stmt_children <- function(s) {
 }
 
 stmt_reads <- function(s) {
-  out <- unlist(lapply(Filter(Negate(is.null), stmt_exprs(s)), expr_reads))
-  c(out, unlist(lapply(stmt_children(s), stmt_reads)))
+  out <- vctrs::list_unchop(lapply(Filter(Negate(is.null), stmt_exprs(s)), expr_reads), ptype = character(), name_spec = rlang::zap())
+  c(out, vctrs::list_unchop(lapply(stmt_children(s), stmt_reads), ptype = character(), name_spec = rlang::zap()))
 }
 
 stmt_assigns <- function(s) {
@@ -78,10 +78,10 @@ stmt_assigns <- function(s) {
     assign = if (s$target$node == "var") s$target$name,
     sum = s$target$name,
     do = s$var,
-    call = unlist(lapply(s$targets, function(t) if (t$node == "var") t$name)),
+    call = vctrs::list_unchop(lapply(s$targets, function(t) if (t$node == "var") t$name), ptype = character(), name_spec = rlang::zap()),
     NULL
   )
-  c(out, unlist(lapply(stmt_children(s), stmt_assigns)))
+  c(out, vctrs::list_unchop(lapply(stmt_children(s), stmt_assigns), ptype = character(), name_spec = rlang::zap()))
 }
 
 is_flag_output <- function(s) {
@@ -200,7 +200,7 @@ classify_step <- function(an) {
     }
     if (rd$stmt == "input") {
       in_vars <- vapply(Filter(function(it) it$k == "var", rd$items), `[[`, "", "name")
-      ptr_reads <- unlist(lapply(Filter(function(it) !is.null(it$v), rd$items), function(it) expr_reads(it$v)))
+      ptr_reads <- vctrs::list_unchop(lapply(Filter(function(it) !is.null(it$v), rd$items), function(it) expr_reads(it$v)), ptype = character(), name_spec = rlang::zap())
       if (length(setdiff(ptr_reads, in_vars)) > 0) add3("INPUT pointer depends on non-INPUT variables")
     }
     if (rd$stmt == "merge") {
@@ -259,7 +259,7 @@ classify_step <- function(an) {
     assigned_elsewhere <- any(vapply(stmts[-c(k, reset)], function(s) v %in% stmt_assigns(s), logical(1)))
     read_before <- any(vapply(stmts[before], function(s) v %in% stmt_reads(s), logical(1))) ||
       v %in% expr_reads(entries[[1]]$stmt$value)
-    from_input <- any(vapply(readers, function(r) v %in% unlist(lapply(r$datasets, `[[`, "out_names")), logical(1)))
+    from_input <- any(vapply(readers, function(r) v %in% vctrs::list_unchop(lapply(r$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()), logical(1)))
     filtered_before <- any(sc$filters < k)
     if (assigned_elsewhere || read_before || from_input || filtered_before) {
       add3(paste0("sum variable ", v, " is used outside the accumulate pattern"))
@@ -339,9 +339,9 @@ carry_assign <- function(s, v) {
 #   * v does not come from the input data set (SET would overwrite it).
 # Returns NULL when the shape is not provably equivalent.
 carry_plan_for <- function(v, idx, stmts, an, filters, state_vars) {
-  input_vars <- unlist(lapply(an$readers, function(r) {
-    if (r$stmt == "input") input_var_names(r) else unlist(lapply(r$datasets, `[[`, "out_names"))
-  }))
+  input_vars <- vctrs::list_unchop(lapply(an$readers, function(r) {
+    if (r$stmt == "input") input_var_names(r) else vctrs::list_unchop(lapply(r$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap())
+  }), ptype = character(), name_spec = rlang::zap())
   if (v %in% input_vars) return(NULL)
   sets <- list()
   for (k in idx) {

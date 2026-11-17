@@ -18,7 +18,7 @@ ct_reset <- function(ct = ct_diag()) {
 conversion_notes <- function() {
   ct <- ct_diag()
   ids <- intersect(names(ct$places), c("conv.n2c", "conv.c2n"))
-  unlist(lapply(ids, function(id) log_place_lines(id, ct$places[[id]]))) %||% character()
+  vctrs::list_unchop(lapply(ids, function(id) log_place_lines(id, ct$places[[id]])), ptype = character(), name_spec = rlang::zap())
 }
 
 at_key <- function(.at) {
@@ -157,11 +157,11 @@ dataset_note <- function(name, d) {
 # Variables that are referenced but never given a value (compile-time NOTE).
 uninit_vars <- function(an) {
   data_vars <- an$order[vapply(an$order, function(v) identical(an$info[[v]]$kind, "data"), logical(1))]
-  assigned <- unique(unlist(lapply(an$stmts, stmt_assigns_all)))
-  inputs <- unlist(lapply(an$readers, function(r) {
-    if (r$stmt == "input") input_var_names(r) else unlist(lapply(r$datasets, `[[`, "out_names"))
-  }))
-  in_arrays <- unlist(lapply(an$arrays, `[[`, "elems"))
+  assigned <- unique(vctrs::list_unchop(lapply(an$stmts, stmt_assigns_all), ptype = character(), name_spec = rlang::zap()))
+  inputs <- vctrs::list_unchop(lapply(an$readers, function(r) {
+    if (r$stmt == "input") input_var_names(r) else vctrs::list_unchop(lapply(r$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap())
+  }), ptype = character(), name_spec = rlang::zap())
+  in_arrays <- vctrs::list_unchop(lapply(an$arrays, `[[`, "elems"), ptype = character(), name_spec = rlang::zap())
   inits <- Filter(function(v) !is.null(an$info[[v]]$init), data_vars)
   setdiff(data_vars, c(assigned, inputs, in_arrays, inits, names(an$sum_plan)))
 }
@@ -174,12 +174,12 @@ stmt_assigns_all <- function(s) {
     sum = s$target$name,
     substr_assign = s$var,
     do = s$var,
-    call = c(unlist(lapply(s$targets, function(t) if (t$node == "var") t$name)),
-             unlist(lapply(s$args, function(a) if (identical(a$node, "var")) a$name))),
+    call = c(vctrs::list_unchop(lapply(s$targets, function(t) if (t$node == "var") t$name), ptype = character(), name_spec = rlang::zap()),
+             vctrs::list_unchop(lapply(s$args, function(a) if (identical(a$node, "var")) a$name), ptype = character(), name_spec = rlang::zap())),
     input = input_var_names(s),
     NULL
   )
-  c(out, unlist(lapply(stmt_children(s), stmt_assigns_all)))
+  c(out, vctrs::list_unchop(lapply(stmt_children(s), stmt_assigns_all), ptype = character(), name_spec = rlang::zap()))
 }
 
 # A WHERE expression as its NOTE shows it: a prefix plus is dropped and a

@@ -52,7 +52,7 @@ sql_walk <- function(e, f) {
     in_list = c(list(e$lhs), e$items),
     chain = ,
     call = e$args,
-    case = c(list(e$operand, e$else_), unlist(lapply(e$whens, function(w) list(w$cond, w$value)), recursive = FALSE)),
+    case = c(list(e$operand, e$else_), vctrs::list_unchop(lapply(e$whens, function(w) list(w$cond, w$value)), ptype = list(), name_spec = rlang::zap())),
     list()
   )
   for (k in kids) sql_walk(k, f)

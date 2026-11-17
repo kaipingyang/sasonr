@@ -53,7 +53,7 @@ dsir_facts <- function(ir, an) {
   blocks <- ir$blocks
   ids <- names(blocks)
   out_vars <- lapply(ir$slots$outputs, `[[`, "vars")
-  all_instrs <- unlist(lapply(blocks, `[[`, "instrs"), recursive = FALSE)
+  all_instrs <- vctrs::list_unchop(lapply(blocks, `[[`, "instrs"), ptype = list(), name_spec = rlang::zap())
   explicit_output <- any(vapply(all_instrs, function(i) i$op == "output", NA))
 
   arr_vars <- function(name) {
@@ -64,7 +64,7 @@ dsir_facts <- function(ir, an) {
     if (is.null(e) || !is.list(e)) return(character())
     switch(e$node %||% "",
       loop_test = , loop_next = if (identical(ir$loops[[e$loop]]$kind, "iter")) ir$loops[[e$loop]]$var else character(),
-      when_test = unique(unlist(lapply(e$values, reads))),
+      when_test = unique(vctrs::list_unchop(lapply(e$values, reads), ptype = character(), name_spec = rlang::zap())),
       loop_value = , loop_first = , loop_temp = , select_temp = , eof = character(),
       {
         out <- expr_reads(e)
@@ -84,8 +84,8 @@ dsir_facts <- function(ir, an) {
   read_kills <- function(i) {
     src <- ir$slots$source[[i$reader]]
     if (i$op == "input") return(input_var_names(i$stmt))
-    c(unlist(lapply(src$datasets, `[[`, "out_names")),
-      unlist(lapply(src$datasets, function(d) d$options$in_var)),
+    c(vctrs::list_unchop(lapply(src$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()),
+      vctrs::list_unchop(lapply(src$datasets, function(d) d$options$in_var), ptype = character(), name_spec = rlang::zap()),
       src$end,
       if (!is.null(an$by)) paste0(c("first.", "last."), rep(an$by$vars, each = 2)))
   }
@@ -98,7 +98,7 @@ dsir_facts <- function(ir, an) {
         if (t$node == "var") {
           if (isTRUE(i$substr)) ev$may <- t$name else ev$kills <- t$name
         } else if (t$node == "array_ref") {
-          ev$uses <- c(ev$uses, unlist(lapply(t$index, reads)))
+          ev$uses <- c(ev$uses, vctrs::list_unchop(lapply(t$index, reads), ptype = character(), name_spec = rlang::zap()))
           ev$may <- arr_vars(t$name)
           has_array_ref <<- TRUE
         }
@@ -112,19 +112,19 @@ dsir_facts <- function(ir, an) {
       read = ev$kills <- read_kills(i),
       input = {
         ev$kills <- read_kills(i)
-        ev$uses <- unlist(lapply(Filter(function(it) !is.null(it$v), i$items), function(it) reads(it$v)))
+        ev$uses <- vctrs::list_unchop(lapply(Filter(function(it) !is.null(it$v), i$items), function(it) reads(it$v)), ptype = character(), name_spec = rlang::zap())
       },
-      output = ev$uses <- unique(unlist(out_vars[stats::na.omit(i$index)])),
-      put = ev$uses <- unique(unlist(lapply(Filter(Negate(is.null), stmt_exprs(i$stmt)), reads))),
+      output = ev$uses <- unique(vctrs::list_unchop(out_vars[stats::na.omit(i$index)], ptype = character(), name_spec = rlang::zap())),
+      put = ev$uses <- unique(vctrs::list_unchop(lapply(Filter(Negate(is.null), stmt_exprs(i$stmt)), reads), ptype = character(), name_spec = rlang::zap())),
       call = {
-        ev$uses <- unique(unlist(lapply(i$args, reads)))
-        ev$may <- unlist(lapply(i$targets, function(t) if (t$node == "var") t$name))
+        ev$uses <- unique(vctrs::list_unchop(lapply(i$args, reads), ptype = character(), name_spec = rlang::zap()))
+        ev$may <- vctrs::list_unchop(lapply(i$targets, function(t) if (t$node == "var") t$name), ptype = character(), name_spec = rlang::zap())
       }
     )
     ev$uses <- unique(ev$uses)
     ev
   }
-  implicit_uses <- if (explicit_output) character() else unique(unlist(out_vars))
+  implicit_uses <- if (explicit_output) character() else unique(vctrs::list_unchop(out_vars, ptype = character(), name_spec = rlang::zap()))
   events <- lapply(blocks, function(b) {
     evs <- lapply(b$instrs, instr_event)
     t <- b$term
@@ -197,7 +197,7 @@ dsir_facts <- function(ir, an) {
     }
     hit
   }
-  set_somewhere <- unique(unlist(lapply(unlist(events, recursive = FALSE), function(e) c(e$kills, e$may))))
+  set_somewhere <- unique(vctrs::list_unchop(lapply(unlist(events, recursive = FALSE), function(e) c(e$kills, e$may)), ptype = character(), name_spec = rlang::zap()))
   not_reset <- Filter(function(v) {
     inf <- an$info[[v]]
     !v %in% c("_n_", "_error_") && !is.null(inf) && !(inf$kind == "data" && !isTRUE(inf$retained))
@@ -280,7 +280,7 @@ dsir_level <- function(facts, an) {
   if (!is.null(rd)) {
     if (rd$stmt == "input") {
       in_vars <- input_var_names(rd)
-      ptr <- unlist(lapply(Filter(function(it) !is.null(it$v), rd$items), function(it) expr_reads(it$v)))
+      ptr <- vctrs::list_unchop(lapply(Filter(function(it) !is.null(it$v), rd$items), function(it) expr_reads(it$v)), ptype = character(), name_spec = rlang::zap())
       if (length(setdiff(ptr, in_vars))) l3 <- c(l3, "INPUT pointer depends on non-INPUT variables")
     }
     if (rd$stmt == "merge") l3 <- c(l3, "MERGE (match-merge reads)")

@@ -413,10 +413,10 @@ input_spec_code <- function(rd, an) {
 infile_open_lang <- function(an) {
   inf <- an$infile
   opts <- if (is.null(inf)) list() else inf$opts
-  n_lines <- max(c(1L, unlist(lapply(an$readers, function(r) {
+  n_lines <- max(c(1L, vctrs::list_unchop(lapply(an$readers, function(r) {
     if (r$stmt != "input") return(NULL)
-    unlist(lapply(r$items, function(it) if (it$k == "line" && it$v$node == "num") as.integer(it$v$value)))
-  }))))
+    vctrs::list_unchop(lapply(r$items, function(it) if (it$k == "line" && it$v$node == "num") as.integer(it$v$value)), ptype = integer(), name_spec = rlang::zap())
+  }), ptype = integer(), name_spec = rlang::zap())))
   ropts <- list(dlm = opts$dlm, dsd = opts$dsd, mode = opts$mode, firstobs = opts$firstobs, obs = opts$obs, ls = opts$ls,
                 pad = opts$pad, lines = max(n_lines, opts$lines %||% 1L))
   ropts <- Filter(Negate(is.null), ropts)
@@ -456,9 +456,9 @@ source_item <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] els
 input_columns <- function(an) {
   rd <- if (length(an$readers) > 0) an$readers[[1]] else NULL
   if (is.null(rd)) return(character())
-  if (rd$stmt == "input") return(unique(unlist(lapply(an$readers, function(r) if (r$stmt == "input") input_var_names(r)))))
-  c(unlist(lapply(rd$datasets, `[[`, "out_names")),
-    unlist(lapply(rd$datasets, function(d) d$options$in_var)))
+  if (rd$stmt == "input") return(unique(vctrs::list_unchop(lapply(an$readers, function(r) if (r$stmt == "input") input_var_names(r)), ptype = character(), name_spec = rlang::zap())))
+  c(vctrs::list_unchop(lapply(rd$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()),
+    vctrs::list_unchop(lapply(rd$datasets, function(d) d$options$in_var), ptype = character(), name_spec = rlang::zap()))
 }
 
 # Stages common to L1/L2/L3 input preparation: WHERE, _N_, END=, FIRST./LAST.
@@ -821,7 +821,7 @@ gen_row_step <- function(an) {
   }
   if (!is.null(rd) && rd$stmt == "merge") {
     srcs <- lapply(rd$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
-    merged_vars <- unique(unlist(lapply(rd$datasets, `[[`, "out_names")))
+    merged_vars <- unique(vctrs::list_unchop(lapply(rd$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()))
     add(cgi(rlang::call2("<-", rlang::sym(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang"))),
             paste0(".m_in <- list(\n  ", paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n  "), "\n)")),
         quote(.m <- lapply(.m_in, sas_rows)),

@@ -1068,7 +1068,7 @@ parse_input_group <- function(p, line) {
   advance(p)
   # stored names keep the spelling of the program (a range takes it from its first name)
   texts <- character()
-  names <- unlist(lapply(vars, function(it) {
+  names <- vctrs::list_unchop(lapply(vars, function(it) {
     nms <- switch(it$kind, name = it$name, range = expand_numbered_range(it$from, it$to, line),
                   abort_unsupported("this variable list form in an INPUT group", line))
     tx <- if (it$kind == "name") it$text %||% it$name else {
@@ -1077,7 +1077,7 @@ parse_input_group <- function(p, line) {
     }
     texts <<- c(texts, tx)
     nms
-  }))
+  }), ptype = character(), name_spec = rlang::zap())
   if (!any(vapply(fmts, function(f) f$k == "fmt", logical(1)))) abort_syntax("INPUT informat list without an informat", line)
   out <- list()
   j <- 0L

@@ -208,7 +208,7 @@ parse_means_types <- function(p) {
     while (is_op(p, "*")) {
       advance(p)
       f <- factor()
-      terms <- unlist(lapply(terms, function(a) lapply(f, function(b) c(a, b))), recursive = FALSE)
+      terms <- vctrs::list_unchop(lapply(terms, function(a) lapply(f, function(b) c(a, b))), ptype = list(), name_spec = rlang::zap())
     }
     out <- c(out, terms)
   }
@@ -303,11 +303,11 @@ translate_proc_means <- function(step, meta, last) {
   }
   freq <- one_var("freq")
   weight <- one_var("weight")
-  ids <- unique(unlist(lapply(of("id"), function(s) proc_resolve(s$items, st, s$line))))
+  ids <- unique(vctrs::list_unchop(lapply(of("id"), function(s) proc_resolve(s$items, st, s$line)), ptype = character(), name_spec = rlang::zap()))
   var_stmts <- of("var")
   vars <- character()
   if (length(var_stmts) > 0) {
-    vars <- unlist(lapply(var_stmts, function(s) proc_resolve(s$items, st, s$line)))
+    vars <- vctrs::list_unchop(lapply(var_stmts, function(s) proc_resolve(s$items, st, s$line)), ptype = character(), name_spec = rlang::zap())
     for (v in vars) if (identical(st$info[[v]]$type, "char")) {
       abort_runtime(paste0("Variable ", toupper(v), " in list does not match type prescribed for this list."), var_stmts[[1]]$line)
     }
@@ -326,7 +326,7 @@ translate_proc_means <- function(step, meta, last) {
       types <- c(types, list(t))
     }
   }
-  ways <- unlist(lapply(ways_stmts, `[[`, "ways"))
+  ways <- vctrs::list_unchop(lapply(ways_stmts, `[[`, "ways"), ptype = integer(), name_spec = rlang::zap())
   for (w in ways) if (w < 0 || w > length(class)) abort_syntax("WAYS value out of range", ways_stmts[[1]]$line)
 
   stats <- unique(o$stats)
@@ -396,10 +396,10 @@ translate_proc_means <- function(step, meta, last) {
   static_meta <- lapply(outputs, function(x) means_out_layout(spec, x)$meta)
   names(static_meta) <- outs
   # the WARNINGs of KEEP=/DROP=/RENAME= on the OUTPUT data sets
-  warns <- unlist(lapply(outputs, function(x) {
+  warns <- vctrs::list_unchop(lapply(outputs, function(x) {
     if (length(x$ds_opts) == 0) return(character())
     ds_out_plan(means_out_layout(spec, x)$meta$vars, x$ds_opts, x$name, x$line)$warnings
-  }))
+  }), ptype = character(), name_spec = rlang::zap())
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = paste("PROC", toupper(pname)),
        line = step$line, outputs = outs, meta = static_meta, compile_notes = warns)
 }
@@ -657,9 +657,9 @@ sas_proc_means <- function(d, sp) {
     if (length(sp$outputs) > 0) means_types_wanted(sp, k, FALSE)
   )))
   # only what the step prints or writes (as means_stat_gate() checks)
-  all_stats <- unique(c(if (sp$print) sp$stats, unlist(lapply(sp$outputs, function(o) {
+  all_stats <- unique(c(if (sp$print) sp$stats, vctrs::list_unchop(lapply(sp$outputs, function(o) {
     if (length(o$specs) == 0) c("n", "min", "max", "mean", "std") else vapply(o$specs, `[[`, "", "stat")
-  }))))
+  }), ptype = character(), name_spec = rlang::zap())))
   cells_by <- list()
   for (gi in seq_along(groups)) {
     rows <- groups[[gi]]

@@ -963,14 +963,14 @@ ds_item_text <- function(items, name) {
 }
 
 resolve_ds_items <- function(items, vars, line) {
-  unlist(lapply(items, function(it) {
+  vctrs::list_unchop(lapply(items, function(it) {
     switch(it$kind,
       name = it$name,
       range = expand_numbered_range(it$from, it$to, line),
       prefix = vars[startsWith(vars, it$prefix)],
       abort_unsupported("this variable list form in a data set option", line)
     )
-  }))
+  }), ptype = character(), name_spec = rlang::zap())
 }
 
 # Main entry --------------------------------------------------------------
@@ -1080,11 +1080,11 @@ output_specs <- function(an, sel) {
   data_vars <- an$order[vapply(an$order, function(v) an$info[[v]]$kind == "data", logical(1))]
   # A variable that appears only in RETAIN, without an initial value, is not
   # written to the output data set.
-  assigned <- unique(unlist(lapply(an$stmts, stmt_assigns)))
-  in_arrays <- unlist(lapply(an$arrays, `[[`, "elems"))
-  inputs <- unlist(lapply(an$readers, function(r) {
-    if (r$stmt == "input") input_var_names(r) else unlist(lapply(r$datasets, `[[`, "out_names"))
-  }))
+  assigned <- unique(vctrs::list_unchop(lapply(an$stmts, stmt_assigns), ptype = character(), name_spec = rlang::zap()))
+  in_arrays <- vctrs::list_unchop(lapply(an$arrays, `[[`, "elems"), ptype = character(), name_spec = rlang::zap())
+  inputs <- vctrs::list_unchop(lapply(an$readers, function(r) {
+    if (r$stmt == "input") input_var_names(r) else vctrs::list_unchop(lapply(r$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap())
+  }), ptype = character(), name_spec = rlang::zap())
   retain_only <- setdiff(an$retain_only, c(an$uses, assigned, in_arrays, inputs))
   data_vars <- setdiff(data_vars, retain_only)
   tmp <- new_state(list())
@@ -1133,5 +1133,5 @@ out_meta <- function(an) {
 expr_var_names <- function(e) {
   if (!is.list(e)) return(character())
   out <- if (identical(e$node, "var") && is.character(e$name)) e$name else character()
-  unique(c(out, unlist(lapply(e, expr_var_names))))
+  unique(c(out, vctrs::list_unchop(lapply(e, expr_var_names), ptype = character(), name_spec = rlang::zap())))
 }
