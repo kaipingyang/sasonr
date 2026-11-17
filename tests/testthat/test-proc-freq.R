@@ -625,3 +625,30 @@ test_that("PROC FREQ EXPECTED / DEVIATION / CELLCHI2 add the crosstab cell rows"
   res2 <- sas_run(paste(freq_data, "proc freq data=d; tables trt*resp / chisq; weight n; run;"))
   expect_false(any(grepl("^Expected", squish(res2$listing))))
 })
+
+test_that("BINOMIAL, RELRISK and TABLES numeric options reject invalid tokens", {
+  d <- "data a; input t $ r $ @@; datalines;\na y a y a n a n a n b y b y b y b n b n c y c n\n;\n"
+  tb <- function(opt) paste0(d, "proc freq data=a; tables r / ", opt, "; run;")
+  expect_error(sas_run(tb("binomial(p=abc)")), "a numeric constant, a datetime constant", class = "sasonr_syntax_error")
+  expect_error(sas_run(tb("binomial(level=1.5)")), "a quoted string, an integer constant", class = "sasonr_syntax_error")
+  expect_error(sas_run(tb("binomial(alpha=abc)")), "AGRESTICOULL, ALL, BLAKER, CL,", class = "sasonr_syntax_error")
+  expect_error(sas_run(tb("binomial(alpha=0.1)")), "AGRESTICOULL, ALL, BLAKER, CL,", class = "sasonr_syntax_error")
+  expect_error(sas_run(tb("binomial alpha=abc")), "a numeric constant, a datetime constant", class = "sasonr_syntax_error")
+  expect_error(sas_run(tb("binomial alpha=1.5")), class = "sasonr_unsupported")
+  expect_error(sas_run(tb("binomial(p=-0.5)")), class = "sasonr_unsupported")
+  expect_error(sas_run(tb("binomial(p=100)")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste0(d, "proc freq data=a(where=(t ne 'c')); tables t*r / relrisk(column=1.5); run;")),
+               "Expecting an integer constant", class = "sasonr_syntax_error")
+})
+
+test_that("a BINOMIAL P= above 1 is a percentage", {
+  d <- "data a; input t $ r $ @@; datalines;\na y a y a n a n a n b y b y b y b n b n c y c n\n;\n"
+  l <- sas_run(paste0(d, "proc freq data=a; tables r / binomial(p=1.5); run;"))$listing
+  l <- sub(" +$", "", l[nzchar(trimws(l))])
+  i <- grep("Test of H0", l)
+  expect_identical(l[i:(i + 4)], c(" Test of H0: Proportion = 0.015",
+                                   "ASE under H0              0.0351",
+                                   "Z                        13.8219",
+                                   "One-sided Pr >  Z         <.0001",
+                                   "Two-sided Pr > |Z|        <.0001"))
+})

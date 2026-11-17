@@ -112,10 +112,10 @@ parse_proc_freq <- function(p, line) {
   list(type = "proc", name = "freq", line = line, options = opts, stmts = body$stmts, titles = body$titles)
 }
 
-# BINOMIAL( options ): P=, LEVEL=, CL= (single value or a list), ALPHA=,
+# BINOMIAL( options ): P=, LEVEL=, CL= (single value or a list),
 # CORRECT, EXACT.  Unsupported options fail loud rather than being ignored.
 parse_freq_binomial_opts <- function(p, line) {
-  opts <- list(p0 = NULL, level = NULL, cl = NULL, correct = FALSE, exact = FALSE, alpha = NULL)
+  opts <- list(p0 = NULL, level = NULL, cl = NULL, correct = FALSE, exact = FALSE)
   expect_type(p, "lparen", "'(' after BINOMIAL")
   value_list <- function() {
     vals <- character()
@@ -136,14 +136,26 @@ parse_freq_binomial_opts <- function(p, line) {
     if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in BINOMIAL()"), line)
     k <- tk_low(p)
     kl <- tk_line(p)
+    if (k == "alpha") {
+      # ALPHA= is a TABLES option, not a BINOMIAL suboption
+      abort_syntax(paste("expecting one of the following: AC, AGRESTICOULL, ALL, BLAKER, CL, CLOPPERPEARSON, CLTYPE,",
+                         "CORRECT, CP, EQUIV, EQUIVALENCE, EXACT, J, JEFFREYS, LEVEL, LIKELIHOODRATIO, LOG, LOGIT, LR,",
+                         "MARGIN, MIDP, NONINF, NONINFERIORITY, NULL, OUTLEVEL, P, SCORE, SUP, SUPERIORITY, TESTP, VAR,",
+                         "W, WALD, WALDC, WILSON, WILSONC."), kl)
+    }
     if (is_op(p, "=", 1L)) {
       advance(p, 2L)
       if (k == "p") {
-        opts$p0 <- as.numeric(parse_opt_value(p, "P", kl))
+        p0 <- parse_opt_number(p, kl)
+        # a value above 1 is a percentage (P=1.5 tests H0: proportion = 0.015)
+        if (p0 > 1 && p0 < 100) p0 <- p0 / 100
+        if (!(p0 > 0 && p0 < 1)) abort_unsupported(paste0("BINOMIAL P=", p0, " (only 0 < P < 1 or a percentage below 100)"), kl)
+        opts$p0 <- p0
       } else if (k == "level") {
         # LEVEL=2 (a number) selects the second level of the table; LEVEL='x'
         # selects the level whose formatted value is x.
         if (tk_type(p) == "num") {
+          if (!tk_int(p)) abort_syntax("expecting one of the following: a quoted string, an integer constant.", kl)
           opts$level_index <- as.integer(as.numeric(tk_val(p)))
           advance(p)
         } else {
@@ -151,8 +163,6 @@ parse_freq_binomial_opts <- function(p, line) {
         }
       } else if (k == "cl") {
         opts$cl <- value_list()
-      } else if (k == "alpha") {
-        opts$alpha <- as.numeric(parse_opt_value(p, "ALPHA", kl))
       } else {
         abort_unsupported(paste0("BINOMIAL option ", toupper(k), "="), kl)
       }
@@ -215,7 +225,7 @@ parse_freq_relrisk_opts <- function(p, line) {
         if (length(bad) > 0) abort_unsupported(paste0("RELRISK CL=", toupper(bad[1])), kl)
         opts$cl <- types
       } else if (k == "column") {
-        opts$column <- as.integer(as.numeric(parse_opt_value(p, "COLUMN", kl)))
+        opts$column <- as.integer(parse_opt_number(p, kl, int = TRUE))
       } else {
         abort_unsupported(paste0("RELRISK option ", toupper(k), "="), kl)
       }
@@ -362,7 +372,8 @@ parse_freq_tables <- function(p) {
           o$out <- parse_ds_ref(p, "output")
         } else if (k == "alpha") {
           freq_stat_gate("alpha", kl)
-          o$alpha <- as.numeric(parse_opt_value(p, k, kl))
+          o$alpha <- parse_opt_number(p, kl)
+          if (!(o$alpha > 0 && o$alpha < 1)) abort_unsupported(paste0("TABLES option ALPHA=", o$alpha, " outside 0 < ALPHA < 1"), kl)
         } else if (k == "scores") {
           # SCORES= chooses the row/column scores of the score-based tests and
           # the CMH statistics (manual: "Scores"); TABLE and RANK are supported
@@ -1965,7 +1976,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       if (length(hit) == 0) abort_runtime(paste0("The value ", want_txt, " of the LEVEL= option is not a level of the table variable."))
       sel <- hit[1]
     }
-    alpha <- bo$alpha %||% o$alpha %||% 0.05
+    alpha <- o$alpha %||% 0.05
     if (isTRUE(bo$exact) || "binomial" %in% sp$exact) {
       n_bin <- sum(cnt_nm)
       # the exact binomial test enumerates integer tables: a fractional WEIGHT
@@ -2141,7 +2152,9 @@ freq_binomial_listing <- function(st, info) {
     }
     out <- c(out, "")
   }
-  out <- c(out, paste0("  Test of H0: Proportion = ", freq_num(st$p0)), "")
+  # centred over the 32 columns of the test table (rounded down)
+  h0 <- paste0("Test of H0: Proportion = ", freq_num(st$p0))
+  out <- c(out, paste0(strrep(" ", max(0L, (32L - nchar(h0)) %/% 2L)), h0), "")
   use_c <- isTRUE(st$correct) && !is.null(cl)
   zt <- if (use_c) st$zc_bin else st$z_bin
   pone <- if (use_c) st$plc_bin else st$pl_bin
