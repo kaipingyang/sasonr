@@ -130,6 +130,13 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "sql_begin") {
       eng$sql_opts <- step$options
+      if (!is.null(step$error)) {
+        # a syntax ERROR in the PROC SQL statement: PROC SQL sets NOEXEC and
+        # checks the statements that follow
+        if (!identical(eng$on_error, "sas")) rlang::cnd_signal(step$error)
+        engine_step_error(eng, step$error, text, sql = TRUE)
+        next
+      }
       if (isTRUE(eng$syntax_check)) {
         # sasonr models PROC SQL in syntax-check mode as follows: as with
         # NOEXEC no statement runs, SQLOBS and SQLRC are 0, the step ends
@@ -141,7 +148,9 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "sql_end") {
       if (isTRUE(eng$sql_noexec)) {
-        if ("other" %in% eng$sql_error_kind) {
+        # (under NOSYNTAXCHECK, or already in syntax-check mode, the step
+        # ends the same way for every ERROR)
+        if ("other" %in% eng$sql_error_kind && !isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {
           abort_unsupported("whether this PROC SQL ERROR starts syntax-check mode (not supported)", step$line)
         }
         log_emit(eng, id = "step.stopped")

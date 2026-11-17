@@ -23,7 +23,21 @@ sql_proc_options <- c("noprint", "print", "number", "nonumber", "double", "nodou
                       "warnrecurs", "nowarnrecurs", "threads", "nothreads", "exec", "remerge", "noremerge",
                       "sortmsg", "nosortmsg", "nowarn", "warn")
 
-parse_sql_options <- function(p, line) {
+# The options of the PROC SQL statement (`proc = TRUE`) or of RESET.  OUTOBS=,
+# INOBS= and LOOPS= take an integer constant: another token (2.5, -1, abc) in
+# the PROC SQL statement is the syntax ERROR 22-322 with the statement's
+# expecting list, followed by 200-322 (a symbol) or 202-322 (a name).  That
+# ERROR is returned as attribute "error" of the options (the step reports it
+# when it starts, run.R) and the rest of the statement is skipped.
+sql_option_expecting <- paste(
+  "Syntax error, expecting one of the following: an integer constant, ;, CHECK, CODEGEN, CONSTDATETIME, DICTDIAG,",
+  "DOUBLE, DQUOTE, ERRORSTOP, EXEC, EXITCODE, FEEDBACK, FLOW, INOBS, IPASSTHRU, LOOPS, NOCHECK, NOCODEGEN,",
+  "NOCONSTDATETIME, NODICTDIAG, NODOUBLE, NOERRORSTOP, NOEXEC, NOFEEDBACK, NOFLOW, NOIPASSTHRU, NONUMBER, NOPRINT,",
+  "NOPROMPT, NOREMERGE, NOSORTMSG, NOSTIMER, NOSTOPONTRUNC, NOTHREADS, NOWARNRECURS, NUMBER, OUTOBS, PRINT, PROMPT,",
+  "REDUCEPUT, REDUCEPUTOBS, REDUCEPUTVALUES, REMERGE, SORTMSG, SORTSEQ, STIMER, STOPONTRUNC, THREADS, UBUFSIZE,",
+  "UNDO_POLICY, WARNRECURS. (ERROR 22-322)")
+
+parse_sql_options <- function(p, line, proc = FALSE) {
   opts <- list()
   while (tk_type(p) != "semi") {
     if (at_eof(p)) abort_syntax("missing semicolon after PROC SQL", line)
@@ -33,7 +47,21 @@ parse_sql_options <- function(p, line) {
       advance(p, 2L)
       if (!opt %in% c("outobs", "inobs", "loops", "undo_policy")) abort_unsupported(paste0("PROC SQL option ", toupper(opt), "="), line)
       if (opt %in% c("outobs", "inobs", "loops")) {
-        if (tk_type(p) != "num") abort_syntax(paste0("expected a number after ", toupper(opt), "="), line)
+        if (!tk_int(p)) {
+          if (!proc) abort_syntax(paste0("expecting an integer constant after ", toupper(opt), "="), line)
+          if (at_eof(p)) abort_syntax("missing semicolon after PROC SQL", line)
+          e <- tryCatch(abort_syntax(sql_option_expecting, tk_line(p), tk_col(p), tk_val(p)),
+                        sasonr_syntax_error = function(e) e)
+          e$sql_also <- if (tk_type(p) == "name") {
+            "ERROR 202-322: The option or parameter is not recognized and will be ignored."
+          } else {
+            "ERROR 200-322: The symbol is not recognized and will be ignored."
+          }
+          while (!at_eof(p) && tk_type(p) != "semi") advance(p)
+          if (at_eof(p)) abort_syntax("missing semicolon after PROC SQL", line)
+          advance(p)
+          return(structure(opts, error = e))
+        }
         opts[[opt]] <- as.numeric(tk_val(p))
       }
       advance(p)
@@ -52,9 +80,9 @@ parse_sql_options <- function(p, line) {
 parse_sql_block <- function(p) {
   line <- tk_line(p)
   advance(p, 2L)
-  opts <- parse_sql_options(p, line)
+  opts <- parse_sql_options(p, line, proc = TRUE)
   res <- parse_sql_stmts(p)
-  res$steps <- c(list(list(type = "sql_begin", options = opts, line = line)), res$steps)
+  res$steps <- c(list(list(type = "sql_begin", options = opts, error = attr(opts, "error"), line = line)), res$steps)
   res
 }
 

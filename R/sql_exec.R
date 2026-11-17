@@ -314,11 +314,31 @@ sql_needs_remerge <- function(e, group, ctx, item_k = NULL) {
   hit
 }
 
+# A GROUP BY / ORDER BY item that is a number: its column position, or NULL
+# when the item is not a number.  A number with a fraction (1.5) or a
+# negated number (-1) is the ERROR "<clause> clause requires a positive
+# column number."; other spellings of a whole number (1.0, 1e0) fail loud.
+# Whether that ERROR starts syntax-check mode at QUIT is not established
+# (sql_timing "unknown", errors.R).
+sql_item_position <- function(e, clause) {
+  bad <- function() {
+    rlang::abort(paste0("Syntax error: ", clause, " clause requires a positive column number. (SAS line ", e$line, ")"),
+                 class = c("sasonr_syntax_error", "sasonr_error"), sas_line = e$line, sql_timing = "unknown")
+  }
+  is_num <- function(x) identical(x$node, "num") && identical(x$kind, "num")
+  if (identical(e$node, "unary") && identical(e$op, "-") && is_num(e$arg) && !isTRUE(e$arg$paren)) bad()
+  if (!is_num(e)) return(NULL)
+  txt <- e$text %||% ""
+  if (grepl("^[0-9]+$", txt)) return(as.integer(e$value))
+  if (e$value != trunc(e$value)) bad()
+  abort_unsupported(paste0(clause, " column position written as ", txt), e$line)
+}
+
 # Resolve a GROUP BY / ORDER BY item that is a position or a SELECT alias.
 sql_resolve_item_ref <- function(e, items, rel) {
   item <- function(k) structure(items[[k]]$expr, item = k)
-  if (e$node == "num") {
-    k <- as.integer(e$value)
+  k <- sql_item_position(e, "GROUP BY")
+  if (!is.null(k)) {
     if (k < 1 || k > length(items)) abort_syntax(paste0("Invalid column position ", k, "."), e$line)
     return(item(k))
   }
@@ -490,8 +510,8 @@ sql_select <- function(q, eng, outer) {
     ctx$allow_alias <- TRUE
     okeys <- lapply(order, function(o) {
       e <- o$expr
-      if (e$node == "num") {
-        k <- as.integer(e$value)
+      k <- sql_item_position(e, "ORDER BY")
+      if (!is.null(k)) {
         if (k < 1 || k > length(out_cols)) abort_syntax(paste0("ORDER BY item ", k, " is out of range."), e$line)
         return(out$data[[out_cols[[k]]$id]])
       }
@@ -548,8 +568,7 @@ sql_new_rows <- function(ctx, rel) {
 sql_order_result <- function(res, order, line) {
   keys <- lapply(order, function(o) {
     e <- o$expr
-    k <- NA_integer_
-    if (e$node == "num") k <- as.integer(e$value)
+    k <- sql_item_position(e, "ORDER BY") %||% NA_integer_
     if (e$node == "col") k <- which(vapply(res$cols, function(c) identical(c$name, e$name), logical(1)))[1]
     if (is.na(k) || k < 1 || k > length(res$cols)) abort_syntax("ORDER BY items of a set operation must be result columns or positions.", line)
     res$data[[res$cols[[k]]$id]]

@@ -313,13 +313,13 @@ engine_global_error <- function(eng, e) {
 }
 
 # Handle an ERROR of the program raised while compiling or running the step in `text`.
-engine_step_error <- function(eng, e, text) {
+engine_step_error <- function(eng, e, text, sql = FALSE) {
   if (inherits(e, "sasonr_global_error")) return(engine_global_error(eng, e))
   if (identical(eng$phase, "execute_data")) {
     abort_unsupported(paste0("the data sets that an execution-time ERROR leaves in WORK (", conditionMessage(e), ")"),
                       e$sas_line %||% NULL)
   }
-  in_sql <- isTRUE(eng$sql_open) || identical(eng$phase, "sql")
+  in_sql <- sql || isTRUE(eng$sql_open) || identical(eng$phase, "sql")
   rec <- if (in_sql) NULL else err_recover_step(eng, text)
   if (!in_sql && is.null(rec)) {
     abort_unsupported(paste0("the data sets that this ERROR leaves in WORK, or whether it starts syntax-check mode, ",
@@ -341,8 +341,9 @@ engine_step_error <- function(eng, e, text) {
     eng$sql_noexec <- TRUE
     # how the step ends: an ERROR found while a statement is read leaves
     # syntax-check mode off; one found while a statement runs starts it at
-    # QUIT; for other ERRORs this is not implemented
-    kind <- if (inherits(e, "sasonr_syntax_error")) "syntax" else if (inherits(e, "sasonr_runtime_error")) "run" else "other"
+    # QUIT; for other ERRORs (sql_timing "unknown") this is not implemented
+    kind <- if (identical(e$sql_timing, "unknown")) "other" else if (inherits(e, "sasonr_syntax_error")) "syntax" else
+      if (inherits(e, "sasonr_runtime_error")) "run" else "other"
     eng$sql_error_kind <- unique(c(eng$sql_error_kind, kind))
     err_set_macro(eng, syscc = 1012)
     return(invisible())
@@ -422,4 +423,6 @@ err_emit_error <- function(eng, e) {
   }
   log_emit(eng, "error", text = text, at = at, token = e$sas_token,
            src = if (exact) line, phase = if (exact) "compile")
+  # a second numbered ERROR at the same token (PROC SQL statement options)
+  if (!is.null(e$sql_also)) log_emit(eng, "error", text = e$sql_also, src = if (exact) line, phase = if (exact) "compile")
 }

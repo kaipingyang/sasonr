@@ -263,3 +263,38 @@ test_that("INSERT SET with a column missing from some SET clauses fails loud", {
     proc sql; insert into t set a = 1, b = 'x' set a = 2, b = 'y'; quit;")
   expect_equal(r$work$t$b, c("x", "y"))
 })
+
+test_that("OUTOBS= and INOBS= take an integer constant in the PROC SQL statement", {
+  withr::local_options(sasonr.on_error = "sas")
+  code <- "options nosyntaxcheck; data have; x = 1; output; x = 2; output; x = 3; output; run;
+    proc sql outobs=2.5; create table s as select * from have; quit;
+    proc sql inobs=abc; create table t as select * from have; quit;"
+  r <- sas_run(code)
+  err <- grep("^ERROR", r$log, value = TRUE)
+  expect_match(err[1], "^ERROR 22-322: Syntax error, expecting one of the following: an integer constant, ;, CHECK,")
+  expect_identical(err[2], "ERROR 200-322: The symbol is not recognized and will be ignored.")
+  expect_identical(err[4], "ERROR 202-322: The option or parameter is not recognized and will be ignored.")
+  expect_true(any(r$log == "NOTE: Statement not executed due to NOEXEC option."))
+  expect_null(r$work$s)
+  expect_null(r$work$t)
+  expect_error(sas_run("data have; x = 1; run; proc sql outobs=-1; select * from have; quit;", on_error = "abort"),
+               class = "sasonr_syntax_error")
+})
+
+test_that("GROUP BY and ORDER BY positions must be positive whole numbers", {
+  withr::local_options(sasonr.on_error = "sas")
+  base <- "options nosyntaxcheck; data have; input g $ x; datalines;\nb 3\na 1\n;\nproc sql; "
+  run1 <- function(q) sas_run(paste0(base, q, " quit;"))
+  r <- run1("create table s as select g, sum(x) as t from have group by 1.5;")
+  expect_true(any(r$log == "ERROR: GROUP BY clause requires a positive column number."))
+  expect_null(r$work$s)
+  for (q in c("create table s as select g, x from have order by 2.5;",
+              "create table s as select g, x from have order by -1;",
+              "create table s as select g, x from have union select g, x from have order by 1.5;")) {
+    r <- run1(q)
+    expect_true(any(r$log == "ERROR: ORDER BY clause requires a positive column number."))
+    expect_null(r$work$s)
+  }
+  r <- run1("create table s as select g, x from have order by 2;")
+  expect_identical(r$work$s$x, c(1, 3))
+})
