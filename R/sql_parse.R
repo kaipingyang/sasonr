@@ -250,6 +250,11 @@ parse_sql_select <- function(p) {
     items <- c(items, list(parse_sql_select_item(p)))
     if (tk_type(p) != "comma") break
     advance(p)
+    # FROM and a name right after the comma of the select list: FROM is read
+    # as a column, so the name after it is ERROR 79-322
+    if (is_kw(p, "from") && tk_type(p, 1L) == "name") {
+      abort_syntax_numbered("Expecting a FROM. (ERROR 79-322)", tk_line(p, 1L), tk_col(p, 1L), tk_val(p, 1L))
+    }
   }
   q <- list(node = "select", distinct = distinct, items = items, into = NULL, from = list(), where = NULL,
             group = list(), having = NULL, order = list(), line = line)

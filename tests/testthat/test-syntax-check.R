@@ -261,3 +261,107 @@ test_that("a submission leaves no closures or step options on the session", {
   expect_identical(msgs(r), log_wrap(note, ls = 100L))
   sas_session_close(s)
 })
+
+# Syntax errors in a step: the numbered ERROR, what the stopped step leaves in
+# WORK, syntax-check mode and SYSERR / SYSCC.
+sc_note_se <- "NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode."
+se_have <- "data have; input g $ x; datalines;\nb 3\na 1\nc 5\n;\n"
+se_tail <- "%put @@ e2 syserr=&syserr syscc=&syscc;\ndata after; set have; y = x + 1; run;\n%put @@ e3 syserr=&syserr syscc=&syscc;\n"
+se_run <- function(step, opts = "") {
+  withr::local_options(sasonr.step_notes = TRUE)
+  sas_run(paste0(opts, se_have, step, "\n", se_tail), on_error = "sas")
+}
+se_put <- function(r) grep("^@@", msgs(r), value = TRUE)
+se_dim <- function(r, nm) c(nrow(r$work[[nm]]), ncol(r$work[[nm]]))
+
+test_that("an invalid DATA step statement is ERROR 180-322 and leaves a 0-observation data set", {
+  r <- se_run("data out; set have; z = 2; foo x; w = 3; run;")
+  m <- msgs(r)
+  expect_true("ERROR 180-322: Statement is not valid or it is used out of proper order." %in% m)
+  expect_true(sc_note_se %in% m)
+  expect_true(any(grepl("WORK.OUT may be incomplete.*0 observations and 4 variables", m)))
+  expect_identical(names(r$work$out), c("g", "x", "z", "w"))
+  expect_identical(se_dim(r, "out"), c(0L, 4L))
+  expect_identical(se_dim(r, "after"), c(0L, 3L))
+  expect_identical(se_put(r), c("@@ e2 syserr=3000 syscc=3000", "@@ e3 syserr=3 syscc=3000"))
+  # a new variable named in the invalid statement: what it adds is not supported
+  expect_error(se_run("data out; set have; foo newvar; run;"), class = "sasonr_unsupported")
+  # a statement word that sasonr does not implement still fails loud
+  expect_error(se_run("data out; set have; describe x; run;"), class = "sasonr_unsupported")
+})
+
+test_that("an empty ELSE assignment after a valid SET compiles the variables of the whole step", {
+  r <- se_run("data out; set have; z = x * 2; length c $ 4; c = 'k'; if x > 1 then w = 1; else w = ; v = 9; run;")
+  m <- msgs(r)
+  expect_true(any(startsWith(m, "ERROR 22-322: Syntax error, expecting one of the following: a name, a quoted string,")))
+  expect_true("              a missing value, INPUT, PUT." %in% m)
+  expect_false(any(startsWith(m, "ERROR 76-322")))
+  expect_identical(names(r$work$out), c("g", "x", "z", "c", "w", "v"))
+  expect_identical(se_dim(r, "out"), c(0L, 6L))
+  expect_identical(se_put(r), c("@@ e2 syserr=1012 syscc=1012", "@@ e3 syserr=3 syscc=1012"))
+})
+
+test_that("an unknown PROC SORT, PRINT or MEANS option is ERROR 22-322 and 202-322", {
+  r <- se_run("proc sort data=have out=srt foo; by g; run;")
+  m <- msgs(r)
+  expect_true(any(startsWith(m, "ERROR 22-322: Syntax error, expecting one of the following: ;, (, ASCII, BUFFNO,")))
+  expect_true("ERROR 202-322: The option or parameter is not recognized and will be ignored." %in% m)
+  expect_true(any(grepl("WORK.SRT may be incomplete.*0 observations and 0 variables", m)))
+  expect_identical(se_dim(r, "srt"), c(0L, 0L))
+  expect_true(sc_note_se %in% m)
+  expect_identical(se_put(r), c("@@ e2 syserr=3000 syscc=3000", "@@ e3 syserr=3 syscc=3000"))
+  for (step in c("proc print data=have foo; run;", "proc means data=have foo; var x; run;")) {
+    r <- se_run(step)
+    m <- msgs(r)
+    expect_true("ERROR 202-322: The option or parameter is not recognized and will be ignored." %in% m, label = step)
+    expect_false(sc_note_se %in% m, label = step)
+    expect_identical(se_dim(r, "after"), c(3L, 3L))
+    expect_identical(se_put(r), c("@@ e2 syserr=3000 syscc=3000", "@@ e3 syserr=0 syscc=3000"))
+  }
+  # a listed option that sasonr does not implement still fails loud
+  expect_error(se_run("proc sort data=have out=srt presorted; by g; run;"), class = "sasonr_unsupported")
+})
+
+test_that("FROM after the last comma of a select list is ERROR 79-322 at the next name", {
+  r <- se_run("proc sql;\n  create table s as select g, from have;\n  create table after_sql as select * from have;\nquit;")
+  m <- msgs(r)
+  expect_true("ERROR 79-322: Expecting a FROM." %in% m)
+  expect_true("NOTE: Statement not executed due to NOEXEC option." %in% m)
+  expect_false(any(c("s", "after_sql") %in% names(r$work)))
+  expect_identical(se_put(r), c("@@ e2 syserr=1012 syscc=1012", "@@ e3 syserr=0 syscc=1012"))
+  # the marker is under HAVE
+  l <- as.character(sas_log(r))
+  k <- grep("select g, from have;", l)
+  expect_identical(regexpr("_", l[k + 1L])[[1]], regexpr("have;", l[k])[[1]])
+})
+
+test_that("a second step error in syntax-check mode writes its ERROR but not the NOTE again", {
+  r <- se_run("data out; set have; x = (1 + ; run;\ndata out2; set have; foo x; run;")
+  m <- msgs(r)
+  expect_identical(sum(m == sc_note_se), 1L)
+  expect_true("ERROR 76-322: Syntax error, statement will be ignored." %in% m)
+  expect_true("ERROR 180-322: Statement is not valid or it is used out of proper order." %in% m)
+  expect_identical(se_dim(r, "out2"), c(0L, 2L))
+  expect_identical(se_put(r), c("@@ e2 syserr=3000 syscc=3000", "@@ e3 syserr=3 syscc=3000"))
+})
+
+test_that("under NOSYNTAXCHECK a PROC SORT option error leaves OUT= and the next steps run", {
+  r <- se_run("proc sort data=have out=srt foo; by g; run;", opts = "options nosyntaxcheck;\n")
+  m <- msgs(r)
+  expect_false(sc_note_se %in% m)
+  expect_identical(se_dim(r, "srt"), c(0L, 0L))
+  expect_identical(se_dim(r, "after"), c(3L, 3L))
+  expect_identical(se_put(r), c("@@ e2 syserr=3000 syscc=3000", "@@ e3 syserr=0 syscc=3000"))
+})
+
+test_that("numbered ERRORs at one token share one marker with the numbers stacked", {
+  r <- se_run("data out; set have; z = 2; x = (1 + ; w = 3; run;")
+  l <- as.character(sas_log(r))
+  k <- grep("x = \\(1 \\+ ;", l)
+  col <- regexpr("; w", l[k])[[1]]
+  expect_identical(trimws(l[k + 1:3]), c("_", "22", "76"))
+  expect_identical(regexpr("_", l[k + 1L])[[1]], col)
+  expect_true("              a missing value, arrayname, (, +, -, INPUT, NOT, PUT, ^, _NEW_, ~." %in% l)
+  # on_error = "abort" keeps aborting
+  expect_error(sas_run(paste0(se_have, "data out; set have; foo x; run;"), on_error = "abort"), class = "sasonr_syntax_error")
+})
