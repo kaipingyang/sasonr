@@ -39,7 +39,7 @@ cg_exec <- function(exprs) as.expression(lapply(exprs, cg_lang))
 # spans lines: deparse() writes its newlines as \n).
 cg_deparse <- function(x, width = 80L, collapse = "\n") {
   lines <- deparse(x, width.cutoff = width, backtick = TRUE, control = cg_deparse_opts15)
-  back <- tryCatch(parse(text = lines, keep.source = FALSE), error = function(e) NULL)
+  back <- tryCatch(rlang::parse_exprs(paste(lines, collapse = "\n")), error = function(e) NULL)
   if (!(length(back) == 1L && identical(back[[1]], x, num.eq = FALSE))) {
     lines <- deparse(x, width.cutoff = width, backtick = TRUE, control = cg_deparse_opts)
   }

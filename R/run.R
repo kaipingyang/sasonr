@@ -454,7 +454,7 @@ engine_eval <- function(eng, tr, stage = FALSE, empty = character()) {
   env$.titles <- eng$session$titles
   # a DATA step runs its language objects (its text is for display only);
   # PROC code is still built as text
-  run <- if (!is.null(tr$exprs)) cg_exec(tr$exprs) else parse(text = tr$code, keep.source = FALSE)
+  run <- if (!is.null(tr$exprs)) cg_exec(tr$exprs) else as.expression(rlang::parse_exprs(paste(tr$code, collapse = "\n")))
   tryCatch(eval(run, envir = env), error = function(e) {
     # surface a sasonr condition wrapped by dplyr (e.g. raised inside mutate())
     p <- e

@@ -353,7 +353,7 @@ sql_eval_lowered <- function(low, ctx, rows = NULL) {
   rt <- rt_diag()
   low <- an_expr(low, ctx$st)
   cx <- new_cx("vec", as.list(ctx$st))
-  code <- gen_expr(low, cx)
+  lang <- gen_lang(low, cx)
   env <- new.env(parent = ctx$env)
   d <- ctx$rel$data
   if (!is.null(rows)) d <- d[rows, , drop = FALSE]
@@ -369,7 +369,7 @@ sql_eval_lowered <- function(low, ctx, rows = NULL) {
   rt$err <- FALSE
   rt$notes <- character()
   log_places_reset(rt)
-  v <- eval(parse(text = code, keep.source = FALSE), env)
+  v <- eval(lang, env)
   sql_function_notes(rt$notes, ctx)
   sql_count_notes(log_places_get(rt, "mv.generated"), log_places_get(rt, "math.failed"), function_note = length(rt$notes) > 0L)
   if (length(v) == 1 && n != 1) v <- rep(v, n)

@@ -73,9 +73,6 @@ gen_missing_node <- function(x, cx) {
   x$node == "binary" && x$op %in% c("+", "-", "*", "/") || x$node == "unary" && identical(x$op, "-")
 }
 
-# The text of an expression (the statement emitters still build text).
-gen_expr <- function(e, cx) cg_text(gen_lang(e, cx))
-
 # Missing value literal: `.` or a special missing value.
 missing_lang <- function(code) if (code == ".") NA_real_ else rlang::call2("sas_missing", code)
 
