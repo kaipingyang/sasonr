@@ -667,8 +667,10 @@ parse_length <- function(p) {
       next
     }
     if (t == "num") {
-      len <- as.integer(tk_val(p))
-      if (is.na(len) || len < 3 || len > 8) abort_syntax("the length of numeric variables is 3-8", line)
+      # the range is checked on the value as written (8.5 is an ERROR), then truncated (3.5 is 3)
+      raw <- suppressWarnings(as.numeric(tk_val(p)))
+      if (is.na(raw) || raw < 3 || raw > 8) abort_syntax("the length of numeric variables is 3-8", line)
+      len <- as.integer(raw)
       specs <- c(specs, list(list(vars = cur, type = "num", len = len)))
       advance(p)
       cur <- list()
@@ -718,9 +720,12 @@ parse_attrib <- function(p) {
         char <- is_op(p, "$")
         if (char) advance(p)
         if (tk_type(p) != "num") abort_syntax("expected a length in ATTRIB", line)
-        g$len <- list(type = if (char) "char" else "num", len = as.integer(sub(".", "", tk_val(p), fixed = TRUE)))
+        # a fractional length is truncated ($8.5 is 8, 3.5 is 3); a numeric length is
+        # range-checked on the value as written (8.5 and 2.5 are ERRORs), as in LENGTH
+        raw <- suppressWarnings(as.numeric(tk_val(p)))
+        g$len <- list(type = if (char) "char" else "num", len = suppressWarnings(as.integer(raw)))
         if (char && (is.na(g$len$len) || g$len$len < 1 || g$len$len > 32767)) abort_syntax("The length of character variables is 1-32767", line)
-        if (!char && (is.na(g$len$len) || g$len$len < 3 || g$len$len > 8)) abort_syntax("The length of numeric variables is 3-8", line)
+        if (!char && (is.na(raw) || raw < 3 || raw > 8)) abort_syntax("The length of numeric variables is 3-8", line)
         advance(p)
       } else if (o %in% c("format", "informat")) {
         g[[o]] <- parse_format(p)
@@ -773,6 +778,7 @@ parse_array <- function(p) {
     signed_int <- function(what) {
       neg <- is_op(p, "-")
       if (neg) advance(p)
+      if (tk_type(p) == "num" && !tk_int(p)) abort_syntax("expecting one of the following: an integer constant, *.", line)
       v <- as.integer(tk_val(p))
       expect_type(p, "num", what)
       if (neg) -v else v
@@ -822,6 +828,7 @@ parse_array <- function(p) {
       }
       reps <- 1L
       if (tk_type(p) == "num" && is_op(p, "*", 1L)) {
+        if (!tk_int(p)) abort_syntax("Expecting iterator.", line)
         reps <- as.integer(tk_val(p))
         advance(p, 2L)
       }
@@ -1024,6 +1031,7 @@ parse_input_var <- function(p, line) {
     item$to <- item$from
     advance(p)
     if (is_op(p, "-") && tk_type(p, 1L) == "num") {
+      if (!tk_int(p, 1L)) abort_syntax("Invalid decimal specification. Expecting an integer constant.", line)
       item$to <- as.integer(tk_val(p, 1L))
       advance(p, 2L)
     }
@@ -1137,6 +1145,7 @@ parse_input <- function(p) {
     }
     if (is_op(p, "#")) {
       advance(p)
+      if (tk_type(p) == "num" && !tk_int(p)) abort_syntax("expecting one of the following: a name, an integer constant, (.", line)
       items <- c(items, list(list(k = "line", v = parse_ptr_operand(p, line))))
       next
     }
@@ -1235,6 +1244,7 @@ parse_file <- function(p) {
       next
     }
     if (o == "lrecl" && is_op(p, "=", 1L) && tk_type(p, 2L) == "num") {
+      if (!tk_int(p, 2L)) abort_syntax("Invalid value for the LRECL option.", line)
       opts$lrecl <- as.integer(tk_val(p, 2L))
       if (is.na(opts$lrecl) || opts$lrecl < 1L || opts$lrecl > 1073741823L) abort_syntax("invalid LRECL= value", line)
       advance(p, 3L)

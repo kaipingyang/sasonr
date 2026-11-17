@@ -91,3 +91,31 @@ test_that("syntax errors are classed", {
   expect_error(sas_parse("data a; else x = 1; run;"), class = "sasonr_syntax_error")
   expect_error(sas_parse("data a; x = (1 + ; run;"), class = "sasonr_syntax_error")
 })
+
+test_that("fractional lengths: truncated, and range-checked on the value as written", {
+  attrib_len <- function(code) stmts(code)[[1]]$groups[[1]]$len$len
+  expect_identical(attrib_len("data a; attrib a length=$8.5; run;"), 8L)
+  expect_identical(attrib_len("data a; attrib a length=$1.5; run;"), 1L)
+  expect_identical(attrib_len("data a; attrib a length=$8.; run;"), 8L)
+  expect_identical(attrib_len("data a; attrib n length=3.5; run;"), 3L)
+  expect_error(sas_parse("data a; attrib n length=8.5; run;"), "numeric variables is 3-8", class = "sasonr_syntax_error")
+  expect_error(sas_parse("data a; attrib n length=2.5; run;"), "numeric variables is 3-8", class = "sasonr_syntax_error")
+  expect_identical(stmts("data a; length n 3.5; run;")[[1]]$specs[[1]]$len, 3L)
+  expect_error(sas_parse("data a; length n 8.5; run;"), "numeric variables is 3-8", class = "sasonr_syntax_error")
+})
+
+test_that("an integer is required for ARRAY dimensions, repetitions and INPUT columns and lines", {
+  expect_identical(stmts("data a; array b{2} x1-x2; run;")[[1]]$dim, 2L)
+  expect_error(sas_parse("data a; array b{2.5} x1-x2; run;"), "an integer constant, \\*", class = "sasonr_syntax_error")
+  expect_error(sas_parse("data a; array b{1.5:3} x1-x2; run;"), "an integer constant, \\*", class = "sasonr_syntax_error")
+  expect_length(stmts("data a; array v{3} (2*7 9); run;")[[1]]$init, 3)
+  expect_error(sas_parse("data a; array v{3} (2.5*7 9); run;"), "Expecting iterator", class = "sasonr_syntax_error")
+  expect_error(sas_parse("data a; input x 1-3.5; datalines;\n12345\n;\nrun;"), "Invalid decimal specification",
+               class = "sasonr_syntax_error")
+  expect_error(sas_parse("data a; input #1 a 1-2 #2.5 b 1-2; datalines;\n11\n22\n;\nrun;"), "a name, an integer constant",
+               class = "sasonr_syntax_error")
+  expect_error(sas_parse("data a; input #1.5 a 1-2; datalines;\n11\n;\nrun;"), "a name, an integer constant",
+               class = "sasonr_syntax_error")
+  expect_error(sas_parse("data _null_; file 'o.txt' lrecl=20.5; put 'abc'; run;"), "Invalid value for the LRECL option",
+               class = "sasonr_syntax_error")
+})
