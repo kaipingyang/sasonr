@@ -25,3 +25,13 @@ test_that("rowwise() fails on a result of the wrong length or a lossy type", {
   expect_error(rw(function(x) 2.7, 1:2, type = integer(1)))
   expect_error(rw(function(x) NULL, 1:2, type = numeric(1)))
 })
+
+test_that("rowwise() on one row coerces like the vector path", {
+  vals <- list(2, 2.5, TRUE, 1L, 0L, 2L, "a", NA, NA_character_, c(a = 1), factor("a"), as.Date(0), list(1), NULL, c(1, 2))
+  types <- list(integer(1), numeric(1), logical(1), character(1))
+  for (v in vals) for (ty in types) {
+    one <- tryCatch(rw(function(x) v, 1, type = ty), error = function(e) "error")
+    two <- tryCatch(rw(function(x) v, c(1, 1), type = ty), error = function(e) "error")
+    expect_identical(one, if (identical(two, "error")) "error" else two[1], info = paste(deparse(v), typeof(ty)))
+  }
+})

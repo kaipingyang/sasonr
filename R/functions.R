@@ -20,6 +20,16 @@ rowwise <- function(f, ..., type = character(1)) {
   a <- recycle_n(...)
   want <- typeof(type)
   if (length(a[[1]]) == 0L) return(vector(want, 0L))
+  # one row (every call of row-wise code): call f directly; purrr's fixed cost
+  # per call is about ten times the work here. vec_cast() applies the same
+  # coercion rules as pmap_*() (whole double -> integer, 0/1 -> logical; a
+  # lossy or other type is an error).
+  if (length(a[[1]]) == 1L && want %in% c("integer", "double", "logical", "character")) {
+    v <- f(...)
+    if (length(v) != 1L) rlang::abort(paste0("rowwise(): the result must have length 1, not ", length(v), "."))
+    attributes(v) <- NULL
+    return(vctrs::vec_cast(v, vector(want, 0L)))
+  }
   switch(want,
     integer = purrr::pmap_int(a, f),
     double = purrr::pmap_dbl(a, f),
