@@ -165,7 +165,10 @@ parse_proc_step <- function(p) {
       sort = opt %in% c("nodupkey", "nodupkeys", "noduprecs", "noduprec", "nodup", "force", "tagsort", "threads", "nothreads", "equals", "overwrite"),
       print = opt %in% c("noobs", "double", "uniform")
     )
-    if (!ok) abort_unsupported(paste0("PROC ", toupper(name), " option ", toupper(opt)), oline)
+    if (!ok) {
+      proc_option_error(name, p)
+      abort_unsupported(paste0("PROC ", toupper(name), " option ", toupper(opt)), oline)
+    }
     opts[[opt]] <- TRUE
     advance(p)
   }
@@ -705,4 +708,42 @@ translate_proc_format <- function(step) {
             vapply(defs, function(d) paste0("sas_define_format(", r_lit(d), ")"), ""))
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC FORMAT", line = step$line,
        outputs = character(), meta = list())
+}
+
+# The syntax ERROR of an unknown option word in the PROC SORT, PRINT and
+# MEANS statements: 22-322 with the procedure's expecting list, then 202-322,
+# both at the word; SYSERR and SYSCC 3000.  The expecting lists name the
+# options; a word in the list, or one of the documented short forms that the
+# lists leave out, is a valid option that sasonr does not implement (fail
+# loud, the caller).
+proc_option_expecting <- list(
+  sort = paste(
+    "Syntax error, expecting one of the following: ;, (, ASCII, BUFFNO, DANISH, DATA, DATECOPY, DETAILS, DIAG,",
+    "DUPOUT, EBCDIC, EQUALS, FINNISH, FORCE, IN, ISA, L, LEAVE, LIST, MESSAGE, MSG, NATIONAL, NODUP, NODUPKEY,",
+    "NODUPKEYS, NODUPLICATE, NODUPLICATES, NODUPREC, NODUPRECS, NODUPS, NOEQUALS, NORWEGIAN, NOTHREADS,",
+    "NOUNIKEY, NOUNIKEYS, NOUNIQUEKEY, NOUNIQUEKEYS, NOUNIQUEREC, NOUNIQUERECS, NOUNIREC, NOUNIRECS, OSA, OUT,",
+    "OVERWRITE, PAGESIZE, PRESORTED, PSIZE, REVERSE, SIZE, SORTSEQ, SORTSIZE, SORTWKNO, SWEDISH, T, TAGSORT,",
+    "TECH, TECHNIQUE, TESTHSI, THREADS, UNIOUT, UNIQUEOUT, WKNO, WORKNO."),
+  print = paste(
+    "Syntax error, expecting one of the following: ;, (, BLANKLINE, CONTENTS, DATA, DOUBLE, GRANDTOTAL_LABEL,",
+    "GRANDTOT_LABEL, GRAND_LABEL, GTOTAL_LABEL, GTOT_LABEL, HEADING, LABEL, N, NOOBS, NOSUMLABEL, OBS, ROUND,",
+    "ROWS, SPLIT, STYLE, SUMLABEL, UNIFORM, WIDTH."),
+  means = paste(
+    "Syntax error, expecting one of the following: ;, (, ALPHA, CHARTYPE, CLASSDATA, CLM, COMPLETETYPES, CSS,",
+    "CV, DATA, DESCEND, DESCENDING, DESCENDTYPES, EXCLNPWGT, EXCLNPWGTS, EXCLUSIVE, FW, IDMIN, INCAS, KURTOSIS,",
+    "LCLM, MAX, MAXDEC, MEAN, MEDIAN, MIN, MISSING, MODE, N, NDEC, NMISS, NOLABELS, NONOBS, NOPRINT, NOTHREADS,",
+    "NOTRAP, NWAY, ORDER, P1, P10, P20, P25, P30, P40, P5, P50, P60, P70, P75, P80, P90, P95, P99, PCTLDEF,",
+    "PRINT, PRINTALL, PRINTALLTYPES, PRINTIDS, PRINTIDVARS, PROBT, Q1, Q3, QMARKERS, QMETHOD, QNTLDEF, QRANGE,",
+    "RANGE, SKEWNESS, STACKODS, STACKODSOUTPUT, STDDEV, STDERR, SUM, SUMSIZE, SUMWGT, T, THREADS, UCLM, USS,",
+    "VAR, VARDEF."))
+
+proc_option_aliases <- list(sort = character(), print = c("l", "r", "d", "u", "h"),
+                            means = c("std", "stdmean", "prt", "skew", "kurt"))
+
+proc_option_error <- function(proc, p) {
+  w <- tk_low(p)
+  known <- tolower(trimws(strsplit(sub("^Syntax error, expecting one of the following: ", "", sub("\\.$", "", proc_option_expecting[[proc]])), ",")[[1]]))
+  if (w %in% c(known, proc_option_aliases[[proc]])) return(invisible())
+  abort_syntax_numbered(paste0(proc_option_expecting[[proc]], " (ERROR 22-322)"), tk_line(p), tk_col(p), tk_val(p),
+                        also = "ERROR 202-322: The option or parameter is not recognized and will be ignored.", syserr = 3000)
 }

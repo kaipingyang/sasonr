@@ -64,7 +64,14 @@ err_parse_recover <- function(text) {
     sub <- toks[c(p$pos:end, end, end), , drop = FALSE]
     sub$type[nrow(sub) - 1L] <- "name"
     sub$value[nrow(sub) - 1L] <- "run"
-    st <- tryCatch(sas_parse(sub, resolved = TRUE), error = function(e) NULL)
+    st <- tryCatch(sas_parse(sub, resolved = TRUE), error = function(e) e)
+    # an option word that is ignored after its ERROR (22-322 + 202-322): the
+    # statement without it
+    if (inherits(st, "sasonr_syntax_error") && any(grepl("202-322", st$sas_also %||% ""))) {
+      drop <- which(sub$line == st$sas_line & sub$col == st$sas_col)
+      st <- if (length(drop) == 1L) tryCatch(sas_parse(sub[-drop, , drop = FALSE], resolved = TRUE), error = function(e) NULL)
+    }
+    if (inherits(st, "condition")) st <- NULL
     if (is.null(st) || length(st$steps) != 1L || st$steps[[1]]$type != "proc") return(NULL)
     return(st$steps[[1]])
   }

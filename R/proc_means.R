@@ -125,6 +125,7 @@ parse_proc_means <- function(p, line, pname) {
                         "threads", "nothreads", "notrap", "stackodsoutput")) {
       opts[[o]] <- TRUE
     } else {
+      if (pname == "means") proc_option_error("means", p)
       abort_unsupported(paste0("PROC ", toupper(pname), " option ", toupper(o)), oline)
     }
     advance(p)

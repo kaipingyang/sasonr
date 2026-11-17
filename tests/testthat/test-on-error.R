@@ -144,8 +144,8 @@ test_that("another stopped PROC, or the OUT= data sets of a stopped PROC MEANS o
 })
 
 test_that("what a stopped PROC MEANS leaves unknown fails loud", {
-  # SYSERR and SYSCC after a stopped PROC MEANS are not implemented
-  expect_error(sas_run("data a; x = 1; run;\nproc means data=a frobnicate; var x; run;\n%put &syscc;", on_error = "sas"),
+  # SYSERR and SYSCC after PROC MEANS stopped by an ERROR in a later statement are not implemented
+  expect_error(sas_run("data a; x = 1; run;\nproc means data=a;\n  frobnicate;\nrun;\n%put &syscc;", on_error = "sas"),
                class = "sasonr_unsupported")
   # an ERROR found after the statements were read (a variable that is not there)
   expect_error(sas_run("data a; x = 1; run;\nproc means data=a; var nosuchvar; run;", on_error = "sas"),
