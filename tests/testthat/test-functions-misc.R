@@ -68,3 +68,9 @@ test_that("blank literals: QUOTE and TRANWRD", {
   expect_equal(sas_f_quote(" "), "\" \"")
   expect_equal(sas_f_tranwrd("abc", "b", " "), "a c")
 })
+
+test_that("TRANWRD with one target: blanks, empty and missing values", {
+  expect_identical(sas_f_tranwrd(c("a b a", "", NA, "aa  "), "a", "xy"), c("xy b xy", "", NA, "xyxy  "))
+  expect_identical(sas_f_tranwrd(c(n = "straße"), "ß", "ss"), "strasse")
+  expect_identical(sas_f_tranwrd(c("ab", "b"), "b", ""), c("a", ""))
+})

@@ -658,6 +658,13 @@ sas_f_lengthn <- function(x) as.numeric(nchar(sas_rtrim(as_sas_chr(x))))
 #' @export
 sas_f_tranwrd <- function(x, from, to) {
   x <- as_sas_chr(x)
+  # one target and one replacement: a single vectorised gsub(); its result
+  # carries no attributes, like the element-wise path
+  if (length(x) > 0L && length(from) == 1L && length(to) == 1L) {
+    out <- gsub(from, to, x, fixed = TRUE)
+    attributes(out) <- NULL
+    return(out)
+  }
   vapply(x, function(s) gsub(from, to, s, fixed = TRUE), character(1), USE.NAMES = FALSE)
 }
 #' @export
