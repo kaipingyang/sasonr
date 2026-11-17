@@ -2155,6 +2155,8 @@ freq_binomial_listing <- function(st, info) {
   # centred over the 32 columns of the test table, rounded down: P= 0.5 -> 2
   # spaces, 0.25 / 0.125 / 0.95 -> 1, 0.1234 -> 0 (heading lengths 28..31)
   h0 <- paste0("Test of H0: Proportion = ", freq_num(st$p0))
+  # longer headings (P= with five or more decimals) have no measured layout
+  if (nchar(h0) > 31L) abort_unsupported(paste0("BINOMIAL P=", freq_num(st$p0), " (heading layout)"))
   out <- c(out, paste0(strrep(" ", max(0L, (32L - nchar(h0)) %/% 2L)), h0), "")
   use_c <- isTRUE(st$correct) && !is.null(cl)
   zt <- if (use_c) st$zc_bin else st$z_bin
