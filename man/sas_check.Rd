@@ -19,20 +19,30 @@ feature; \code{"info"}: checked when the program runs), \code{feature} (what is 
 supported) and \code{message} (the full condition message).
 }
 \description{
-Walks the program as \code{\link[=sas_translate]{sas_translate()}} does (the macro processor runs, each
-step is parsed, analysed and translated, and the variables a step creates
-are passed on to the steps that follow) without running any step. A step
-that uses a feature sasonr does not support is reported and the walk goes on
-with the next step, so one call lists all of them, where \code{\link[=sas_run]{sas_run()}} stops
-at the first one.
+\code{sas_check()} answers one question: which features does this program use
+that sasonr does not implement? It walks the program as \code{\link[=sas_translate]{sas_translate()}}
+does (the macro processor runs, each step is parsed, analysed and
+translated, and the variables a step creates are passed on to the steps
+that follow) without running any step. A step that uses a feature sasonr
+does not support is reported and the walk goes on with the next step, so
+one call lists all of them, where \code{\link[=sas_run]{sas_run()}} stops at the first one.
 }
 \details{
 A step whose text depends on a macro variable that only a run sets (CALL
 SYMPUT, CALL SYMPUTX or \verb{INTO :} in an earlier step) is not guessed: it is
 reported with severity \code{"info"} and checked when the program runs.
-Syntax errors are not reported; \code{\link[=sas_run]{sas_run()}} writes them to the log. Some
-features can only be found while a step runs (a value outside the supported
-domain of a function, for example); \code{\link[=sas_run]{sas_run()}} still stops at those.
+
+What \code{sas_check()} does not tell you:
+\itemize{
+\item Syntax errors are not reported. They are part of the program, and
+\code{\link[=sas_run]{sas_run()}} writes them to the log when the program runs.
+\item Some refusals depend on the data and appear only when the program runs:
+a value outside the supported domain of a function, a summary over rows
+whose order is not known, a date difference that spans years in a basis
+that is not implemented, for example. \code{\link[=sas_run]{sas_run()}} still stops at those.
+}
+
+Passing \code{sas_check()} therefore does not mean that the program will run.
 }
 \examples{
 chk <- sas_check("

@@ -2,19 +2,27 @@
 
 #' List the unsupported features of a SAS program
 #'
-#' Walks the program as [sas_translate()] does (the macro processor runs, each
-#' step is parsed, analysed and translated, and the variables a step creates
-#' are passed on to the steps that follow) without running any step. A step
-#' that uses a feature sasonr does not support is reported and the walk goes on
-#' with the next step, so one call lists all of them, where [sas_run()] stops
-#' at the first one.
+#' `sas_check()` answers one question: which features does this program use
+#' that sasonr does not implement? It walks the program as [sas_translate()]
+#' does (the macro processor runs, each step is parsed, analysed and
+#' translated, and the variables a step creates are passed on to the steps
+#' that follow) without running any step. A step that uses a feature sasonr
+#' does not support is reported and the walk goes on with the next step, so
+#' one call lists all of them, where [sas_run()] stops at the first one.
 #'
 #' A step whose text depends on a macro variable that only a run sets (CALL
 #' SYMPUT, CALL SYMPUTX or `INTO :` in an earlier step) is not guessed: it is
 #' reported with severity `"info"` and checked when the program runs.
-#' Syntax errors are not reported; [sas_run()] writes them to the log. Some
-#' features can only be found while a step runs (a value outside the supported
-#' domain of a function, for example); [sas_run()] still stops at those.
+#'
+#' What `sas_check()` does not tell you:
+#' * Syntax errors are not reported. They are part of the program, and
+#'   [sas_run()] writes them to the log when the program runs.
+#' * Some refusals depend on the data and appear only when the program runs:
+#'   a value outside the supported domain of a function, a summary over rows
+#'   whose order is not known, a date difference that spans years in a basis
+#'   that is not implemented, for example. [sas_run()] still stops at those.
+#'
+#' Passing `sas_check()` therefore does not mean that the program will run.
 #'
 #' @inheritParams sas_translate
 #' @return A tibble of class `sasonr_check`, one row per finding: `step` (the
@@ -67,14 +75,20 @@ engine_check_exec <- function(eng, text, line) {
               "Checked when the program runs: the step uses a macro variable set by an earlier step at run time.")
     return(invisible())
   }
+  eng$cur_step <- NULL
+  step_error <- function(e) {
+    k <- max(eng$check$step, step0 + 1L)
+    eng$check$step <- k
+    check_step_error(eng, e, text, k)
+  }
   tryCatch(engine_exec_steps(eng, text, line),
            sasonr_unsupported = function(e) {
              k <- max(eng$check$step, step0 + 1L)
              eng$check$step <- k
              check_add_condition(eng, k, e, line)
            },
-           sasonr_syntax_error = function(e) eng$check$step <- max(eng$check$step, step0 + 1L),
-           sasonr_runtime_error = function(e) eng$check$step <- max(eng$check$step, step0 + 1L))
+           sasonr_syntax_error = step_error,
+           sasonr_runtime_error = step_error)
   invisible()
 }
 
@@ -83,6 +97,64 @@ engine_check_exec <- function(eng, text, line) {
 engine_check_step_seen <- function(eng, step) {
   if (step$type %in% c("data", "proc", "sql_begin")) eng$check$step <- eng$check$step + 1L
   if (!isTRUE(eng$check$runtime_macro) && check_sets_macro_vars(step)) eng$check$runtime_macro <- TRUE
+  check_static_step(eng, step)
+}
+
+# Refusals that sas_run() makes while a step runs but that the program text
+# decides: a SASHELP member missing from the SASHELP directory (PROC SQL FROM)
+# and an INTCK / INTNX interval given as a literal that is not implemented.
+# The condition comes from the function that refuses at run time, so the
+# message and class are the same.
+check_static_step <- function(eng, step) {
+  k <- max(eng$check$step, 1L)
+  walk <- function(x) {
+    if (!is.list(x)) return(invisible())
+    if (identical(x$libref, "sashelp") && is.character(x$name) && length(x$name) == 1L && !sashelp_has(x$name)) {
+      check_static_try(eng, k, x$line, sashelp_member(x$name, x$line))
+    }
+    if (identical(x$node, "call") && is.character(x$name) && tolower(x$name) %in% c("intck", "intnx") &&
+        length(x$args) >= 1L && identical(x$args[[1]]$node, "str")) {
+      fname <- tolower(x$name)
+      check_static_try(eng, k, x$line, {
+        iv <- interval_or_fail(x$args[[1]]$value, fname, NULL)
+        if (fname == "intck" && !is.null(iv) && iv$base %in% interval_narrow && length(x$args) >= 4L) {
+          abort_unsupported(paste0("INTCK with the ", toupper(iv$base), " interval and an explicit method (only the default is supported)"))
+        }
+      })
+    }
+    for (el in x) walk(el)
+    invisible()
+  }
+  walk(step)
+}
+
+check_static_try <- function(eng, step, line, expr) {
+  tryCatch(expr, sasonr_unsupported = function(e) {
+    if (is.null(e$sas_line) && !is.null(line) && !is.na(line)) {
+      e <- tryCatch(abort_unsupported(sub("^Unsupported: ", "", conditionMessage(e)), line), sasonr_unsupported = identity)
+    }
+    check_add_condition(eng, step, e, line)
+  })
+  invisible()
+}
+
+# An ERROR found while a step is read (outside PROC SQL): sas_run() refuses
+# the program when the data sets that the ERROR leaves in WORK cannot be
+# derived from the parsed step (engine_step_error(), with the default
+# on_error = "sas"); for a syntax ERROR that is decided before the step runs.
+check_step_error <- function(eng, e, text, step) {
+  # under on_error = "abort" sas_run() stops at the ERROR itself; a run-time
+  # ERROR in a check is often a consequence of an earlier refused step
+  if (!identical(getOption("sasonr.on_error", "sas")[1], "sas") || !inherits(e, "sasonr_syntax_error")) return(invisible())
+  if (inherits(e, "sasonr_global_error") || isTRUE(eng$sql_open)) return(invisible())
+  if (!is.null(eng$cur_step) && eng$cur_step$type %in% c("sql_begin", "sql", "sql_end")) return(invisible())
+  if (!is.null(err_recover_step(eng, text))) return(invisible())
+  cnd <- tryCatch(abort_unsupported(paste0("the data sets that this ERROR leaves in WORK, or whether it starts syntax-check mode, ",
+                                           "could not be derived from the parsed step (", conditionMessage(e), ")"),
+                                    e$sas_line %||% NULL),
+                  sasonr_unsupported = identity)
+  check_add_condition(eng, step, cnd, e$sas_line %||% NA_integer_)
+  invisible()
 }
 
 # Does a step's AST call SYMPUT / SYMPUTX / SYMPUTN or select INTO :?
