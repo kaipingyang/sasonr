@@ -472,10 +472,26 @@ sas_f_right <- function(x) {
   s <- sas_rtrim(x)
   paste0(strrep(" ", nchar(x) - nchar(s)), s)
 }
+# UPCASE and LOWCASE change only the ASCII letters a-z / A-Z and keep every other
+# character (accented letters, sharp s, ligatures).  This rule holds for a latin1
+# session; a UTF-8 session is not measured.  All-ASCII values take stringr; values
+# with non-ASCII characters take chartr() on the ASCII letters only.  A value that
+# is not valid UTF-8 (a latin1 value, or invalid bytes, which must stay an error)
+# takes the base function `base`.  The result keeps the attributes of `x`.
+ascii_case <- function(x, from, to, str_fn, base) {
+  if (!is.character(x) || !all(validUTF8(x))) return(base(x))
+  out <- x
+  ok <- !is.na(x)
+  asc <- ok & !grepl("[^\\x01-\\x7F]", x, perl = TRUE)
+  if (any(asc)) out[asc] <- str_fn(x[asc])
+  wide <- ok & !asc
+  if (any(wide)) out[wide] <- chartr(from, to, x[wide])
+  out
+}
 #' @export
-sas_f_upcase <- function(x) toupper(as_sas_chr(x))
+sas_f_upcase <- function(x) ascii_case(as_sas_chr(x), "abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", stringr::str_to_upper, toupper)
 #' @export
-sas_f_lowcase <- function(x) tolower(as_sas_chr(x))
+sas_f_lowcase <- function(x) ascii_case(as_sas_chr(x), "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", stringr::str_to_lower, tolower)
 # CAT, CATS, CATT and CATX write a numeric item with BEST32. (whole numbers)
 # or BEST12. without blanks; missing values are written ('.', 'A').
 cat_num_text <- function(a) {
