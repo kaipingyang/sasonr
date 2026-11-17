@@ -36,6 +36,7 @@ means_stat_heading <- function(s, alpha = 0.05) {
 }
 
 format_pct_level <- function(alpha) {
+  if (is.na(alpha)) return(".")
   v <- (1 - alpha) * 100
   if (abs(v - round(v)) < 1e-9) display_fixed(v, 0L) else sub("0+$", "", display_fixed(v, 4L))
 }
@@ -65,18 +66,32 @@ parse_proc_means <- function(p, line, pname) {
         opts$data <- parse_ds_ref(p, "input")
         next
       }
-      v <- parse_opt_value(p, o, oline)
+      if (o %in% c("maxdec", "fw", "alpha", "pctldef", "qntldef")) {
+        v <- parse_opt_number(p, oline, int = o != "alpha")
+      } else {
+        v <- parse_opt_value(p, o, oline)
+      }
       switch(o,
         maxdec = {
-          opts$maxdec <- as.integer(v)
-          if (is.na(opts$maxdec) || opts$maxdec < 0 || opts$maxdec > 8) abort_syntax("MAXDEC= must be 0 to 8", oline)
+          if (v < 0) {
+            # a negative MAXDEC= is ignored with a WARNING (the default BEST formats)
+            opts$warnings <- c(opts$warnings, "WARNING: NDec value is inappropriate, BEST format will be used.")
+            opts$maxdec <- NULL
+          } else {
+            if (v > 8) abort_syntax("MAXDEC= must be 0 to 8", oline)
+            opts$maxdec <- as.integer(v)
+          }
         },
         fw = {
           opts$fw <- as.integer(v)
         },
         alpha = {
-          opts$alpha <- as.numeric(v)
-          if (is.na(opts$alpha) || opts$alpha <= 0 || opts$alpha >= 1) abort_syntax("ALPHA= must be between 0 and 1", oline)
+          if (v <= 0 || v >= 1) {
+            # out of range: a WARNING, and the confidence limits are missing
+            opts$warnings <- c(opts$warnings, "WARNING: Invalid ALPHA value provided.  Confidence limits will be missing.  Valid range: 0 < ALPHA < 1.")
+            v <- NA_real_
+          }
+          opts$alpha <- v
         },
         vardef = {
           v <- tolower(v)
@@ -132,9 +147,8 @@ parse_proc_means <- function(p, line, pname) {
       ways = {
         advance(p)
         w <- integer()
-        while (tk_type(p) == "num") {
-          w <- c(w, as.integer(tk_val(p)))
-          advance(p)
+        while (tk_type(p) == "num" || (is_op(p, "-") && tk_type(p, 1L) == "num")) {
+          w <- c(w, as.integer(parse_opt_number(p, sline)))
         }
         expect_semi(p, "WAYS")
         list(stmt = "ways", ways = w, line = sline)
@@ -327,7 +341,10 @@ translate_proc_means <- function(step, meta, last) {
     }
   }
   ways <- vctrs::list_unchop(lapply(ways_stmts, `[[`, "ways"), ptype = integer(), name_spec = rlang::zap())
-  for (w in ways) if (w < 0 || w > length(class)) abort_syntax("WAYS value out of range", ways_stmts[[1]]$line)
+  # a negative way value is ignored with a WARNING
+  for (w in ways[ways < 0]) o$warnings <- c(o$warnings, paste0("WARNING: The way value ", w, " is out of range and will be ignored."))
+  ways <- ways[ways >= 0]
+  for (w in ways) if (w > length(class)) abort_syntax("WAYS value out of range", ways_stmts[[1]]$line)
 
   stats <- unique(o$stats)
   printing <- if (pname == "summary") isTRUE(o$print) else !isTRUE(o$noprint)
@@ -367,6 +384,9 @@ translate_proc_means <- function(step, meta, last) {
   if (length(vars) == 0 && (printing || any(vapply(outputs, function(x) length(x$specs) > 0 || TRUE, TRUE)))) {
     if (length(outputs) > 0 || printing) abort_runtime("No analysis variables are available (no numeric variables in the VAR list)", step$line)
   }
+  if (!is.null(o$alpha) && is.na(o$alpha) && length(outputs) > 0) {
+    abort_unsupported("OUTPUT statement with an ALPHA= value outside 0 < ALPHA < 1", step$line)
+  }
   info <- proc_var_info(st, unique(c(vars, class, by$vars, freq, weight, ids)))
   cls <- lapply(class, function(v) {
     co <- class_opts[[v]]
@@ -401,7 +421,7 @@ translate_proc_means <- function(step, meta, last) {
     ds_out_plan(means_out_layout(spec, x)$meta$vars, x$ds_opts, x$name, x$line)$warnings
   }), ptype = character(), name_spec = rlang::zap())
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = paste("PROC", toupper(pname)),
-       line = step$line, outputs = outs, meta = static_meta, compile_notes = warns)
+       line = step$line, outputs = outs, meta = static_meta, compile_notes = c(o$warnings, warns))
 }
 
 # Every statistic the step computes (printed table and OUTPUT data sets) is

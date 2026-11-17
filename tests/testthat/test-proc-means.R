@@ -224,3 +224,44 @@ test_that("default decimals of the printed table (FW=12, no MAXDEC) follow the d
   expect_identical(n(1e-10, 12L, NULL), "1E-10")
   expect_identical(n(1.23456789e-100, 12L, NULL), "1.23457E-100")
 })
+test_that("MAXDEC=, FW= and QNTLDEF= require an integer constant", {
+  d <- "data a; input x; datalines;\n1.234\n2.345\n;\n"
+  for (opt in c("maxdec=2.5", "maxdec=abc", "fw=12.5", "fw=8.5", "qntldef=2.5", "pctldef=3.5")) {
+    expect_error(sas_run(paste0(d, "proc means data=a ", opt, " mean; var x; run;")),
+                 "Expecting an integer constant", class = "sasonr_syntax_error")
+  }
+  expect_error(sas_run(paste0(d, "proc means data=a alpha=abc clm; var x; run;")),
+               "a numeric constant, a datetime constant", class = "sasonr_syntax_error")
+})
+
+test_that("a negative MAXDEC= warns and the default formats are used", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  d <- "data a; input x; datalines;\n1.234\n2.345\n3.456\n4.567\n;\n"
+  r <- sas_run(paste0(d, "proc means data=a maxdec=-1 mean; var x; run;"))
+  expect_true("WARNING: NDec value is inappropriate, BEST format will be used." %in% msgs(r))
+  expect_identical(squish(r$listing)[5], "2.9005000")
+})
+
+test_that("an ALPHA= outside 0 to 1 warns and the confidence limits are missing", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  d <- "data a; input x; datalines;\n1.234\n2.345\n3.456\n4.567\n;\n"
+  for (a in c("1.5", "-0.1")) {
+    r <- run_approx(paste0(d, "proc means data=a alpha=", a, " clm; var x; run;"))
+    expect_true(paste("WARNING: Invalid ALPHA value provided.  Confidence limits will be missing.",
+                      " Valid range: 0 < ALPHA < 1.") %in% msgs(r))
+    expect_identical(squish(r$listing)[c(3, 4, 6)], c("Lower .% Upper .%", "CL for Mean CL for Mean", ". ."))
+  }
+  expect_error(run_approx(paste0(d, "proc means data=a alpha=1.5 noprint; var x; output out=o lclm=l; run;")),
+               class = "sasonr_unsupported")
+})
+
+test_that("a negative WAYS value warns and is ignored; a fractional one is truncated", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  d <- "data a; input g $ h $ x; datalines;\na p 1\na q 2\nb p 3\nb q 4\n;\n"
+  r <- sas_run(paste0(d, "proc means data=a mean; class g h; ways -1; var x; run;"))
+  expect_true("WARNING: The way value -1 is out of range and will be ignored." %in% msgs(r))
+  expect_identical(squish(sas_run(paste0(d, "proc means data=a mean; class g h; var x; run;"))$listing),
+                   squish(r$listing))
+  expect_identical(squish(sas_run(paste0(d, "proc means data=a mean; class g h; ways 1.5; var x; run;"))$listing),
+                   squish(sas_run(paste0(d, "proc means data=a mean; class g h; ways 1; var x; run;"))$listing))
+})

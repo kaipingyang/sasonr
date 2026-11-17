@@ -60,6 +60,21 @@ parse_opt_value <- function(p, opt, line) {
   v
 }
 
+# A numeric option value: a number token, optionally after a minus sign.
+# `int = TRUE`: an integer constant is required, so `2.5` or a name is a
+# syntax error (not truncated to 2).
+parse_opt_number <- function(p, line, int = FALSE) {
+  neg <- is_op(p, "-") && tk_type(p, 1L) == "num"
+  if (neg) advance(p)
+  if (int && !tk_int(p)) abort_syntax("Expecting an integer constant.", line)
+  if (tk_type(p) != "num") {
+    abort_syntax("expecting one of the following: a numeric constant, a datetime constant.", line)
+  }
+  v <- as.numeric(tk_val(p))
+  advance(p)
+  if (neg) -v else v
+}
+
 # Resolve variable list items against an input PDV (the analysed state).
 proc_resolve <- function(items, st, line) {
   tmp <- new_state(list())
