@@ -164,3 +164,22 @@ test_that("VLENGTH of a numeric variable is its storage length", {
   expect_error(sas_run("data _null_; length x 6; v = 'x'; l = vlengthx(v); run;", on_error = "abort"),
                class = "sasonr_unsupported")
 })
+
+test_that("YEAR, MONTH, DAY, QTR, WEEKDAY: 1582, 1960, year 4000 (no 29 February), 19950, missing values", {
+  y <- c(1582, 1582, 1959, 1960, 3999, 4000, 19950, 20000)
+  m <- c(10, 10, 12, 1, 12, 2, 6, 12)
+  dd <- c(14, 15, 31, 1, 31, 28, 30, 31)
+  d <- lenient(sas_f_mdy(m, dd, y))
+  expect_identical(lenient(sas_f_year(d)), y)
+  expect_identical(lenient(sas_f_month(d)), m)
+  expect_identical(lenient(sas_f_day(d)), dd)
+  expect_identical(lenient(sas_f_qtr(d)), c(4, 4, 4, 1, 4, 1, 2, 4))
+  expect_identical(lenient(sas_f_weekday(c(0, -1, -0.5, 6, 0.9))), c(6, 5, 5, 5, 6))
+  feb28 <- lenient(sas_f_mdy(2, 28, 4000))
+  expect_identical(lenient(sas_f_mdy(3, 1, 4000)) - feb28, 1)
+  expect_identical(lenient(c(sas_f_month(feb28 + 1), sas_f_day(feb28 + 1))), c(3, 1))
+  miss <- c(NA, sas_missing(".A"), sas_missing("._"))
+  for (f in list(sas_f_year, sas_f_month, sas_f_day, sas_f_qtr, sas_f_weekday)) {
+    expect_identical(lenient(f(miss)), rep(NA_real_, 3))
+  }
+})

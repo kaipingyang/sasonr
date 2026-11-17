@@ -104,9 +104,12 @@ month_full <- c("January", "February", "March", "April", "May", "June", "July", 
                 "September", "October", "November", "December")
 day_full <- c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
+# Year, month and day only (the fields of civil() that need the calendar).
+civil_ymd <- function(day) greg_civil(sas_day_to_greg(floor(as.numeric(day))))
+
 civil <- function(day) {
   day <- floor(as.numeric(day))
-  p <- greg_civil(sas_day_to_greg(day))
+  p <- civil_ymd(day)
   # weekday: 1 = Sunday (1960-01-01, day 0, was a Friday)
   p$wday <- (day + 5) %% 7 + 1
   p$yday <- day - from_ymd(p$y, 1, 1) + 1

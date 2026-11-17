@@ -764,10 +764,17 @@ skip4000_sas <- skip4000_g - seq_along(skip4000_g)
 sas_day_to_greg <- function(d) d + findInterval(d, skip4000_sas)
 greg_to_sas_day <- function(g) g - findInterval(g, skip4000_g)
 
+# One field of civil(); each computes only what it needs (the weekday needs
+# no calendar).
 date_part <- function(x, what) {
-  p <- civil(x)
-  out <- switch(what, year = p$y, month = p$m, day = p$d, wday = p$wday)
-  as.numeric(ifelse(is.na(x), NA, out))
+  out <- if (what == "wday") {
+    (floor(as.numeric(x)) + 5) %% 7 + 1 # 1 = Sunday
+  } else {
+    civil_ymd(x)[[switch(what, year = "y", month = "m", day = "d")]]
+  }
+  out <- as.numeric(out)
+  out[is.na(x)] <- NA_real_
+  out
 }
 from_ymd <- function(y, m, d) {
   n <- max(length(y), length(m), length(d))

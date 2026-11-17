@@ -1798,28 +1798,28 @@ interval_index <- function(v, iv) {
     day = d,
     week = floor((d + 5 - (iv$wshift %||% 0)) / 7), # weeks start on Sunday; 1960-01-01 was a Friday
     month = {
-      p <- civil(d)
+      p <- civil_ymd(d)
       (p$y - 1960) * 12 + p$m - 1
     },
     qtr = {
-      p <- civil(d)
+      p <- civil_ymd(d)
       (p$y - 1960) * 4 + (p$m - 1) %/% 3
     },
     semiyear = {
-      p <- civil(d)
+      p <- civil_ymd(d)
       (p$y - 1960) * 2 + (p$m - 1) %/% 6
     },
     semimonth = {
       # two blocks per month: days 1-15 and 16-end
-      p <- civil(d)
+      p <- civil_ymd(d)
       (p$y - 1960) * 24 + (p$m - 1) * 2 + (p$d > 15)
     },
     tenday = {
       # three blocks per month: days 1-10, 11-20, 21-end
-      p <- civil(d)
+      p <- civil_ymd(d)
       (p$y - 1960) * 36 + (p$m - 1) * 3 + pmin(p$d - 1, 20) %/% 10
     },
-    year = civil(d)$y - 1960
+    year = civil_ymd(d)$y - 1960
   )
 }
 
