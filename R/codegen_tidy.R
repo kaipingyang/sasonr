@@ -347,7 +347,9 @@ put_line_lang <- function(s, cx, guard = NULL) {
   items <- lapply(s$items, function(it) if (it$kind == "lit") it$text else put_item_lang(it, cx))
   # literals and formatted (unnamed, explicit format) items add no trailing blank
   lit <- vapply(s$items, function(it) it$kind == "lit" || (it$kind == "value" && !is.null(it$fmt)), logical(1))
-  cg_call("sas_put_line", c(items, if (any(lit)) list(.lit = cg_val(lit)), put_ls_arg(cx)))
+  ln <- if (is.numeric(s$line) && length(s$line) == 1L) as.integer(s$line)
+  file_args <- if (!is.null(cx$an$file)) list(.file = TRUE, .line = ln)
+  cg_call("sas_put_line", c(items, if (any(lit)) list(.lit = cg_val(lit)), put_ls_arg(cx), file_args))
 }
 
 # PUT with pointer controls: every item becomes a positioned piece of text.

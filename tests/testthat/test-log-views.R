@@ -562,3 +562,13 @@ test_that("the echo of a long line always ends", {
   # a line size that cannot hold the text: an internal error, not a loop
   expect_error(echo(4L, strrep("z", 40), 10L))
 })
+
+test_that("a FILE record longer than LRECL fails loud; items that fit are wrapped", {
+  d <- withr::local_tempdir(); withr::local_dir(d)
+  expect_error(sas_run("data _null_; file 'o.txt' lrecl=20; put 'abcdefghijklmnopqrstuvwxyz'; run;"),
+               "PUT item longer than the FILE LRECL", class = "sasonr_unsupported")
+  sas_run("data _null_; file 'o.txt' lrecl=20; put 'abcdefghij' 'klmnopqrst'; run;")
+  expect_identical(readLines(file.path(d, "o.txt")), "abcdefghijklmnopqrst")
+  sas_run("data _null_; file 'o.txt' lrecl=20; x = 'abcdefghijklmno'; y = 'pqrstuvwxyz'; put x y; run;")
+  expect_identical(readLines(file.path(d, "o.txt")), c("abcdefghijklmno", "pqrstuvwxyz"))
+})

@@ -4,7 +4,7 @@
 \alias{sas_put_line}
 \title{Assemble one PUT line per row}
 \usage{
-sas_put_line(..., .lit = NULL, .ls = rt_linesize())
+sas_put_line(..., .lit = NULL, .ls = rt_linesize(), .file = FALSE, .line = NULL)
 }
 \description{
 Assemble one PUT line per row

@@ -1015,7 +1015,7 @@ sas_put_named <- function(name, value, fmt = NULL) {
 #' Assemble one PUT line per row
 #' @export
 #' @keywords internal
-sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize()) {
+sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize(), .file = FALSE, .line = NULL) {
   parts <- list(...)
   if (length(parts) == 0) return("")
   if (any(lengths(parts) == 0)) return(character())
@@ -1038,6 +1038,11 @@ sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize()) {
       }
       paste(c(out, sas_rtrim(cur)), collapse = "\n")
     }, "")
+    # a FILE record still longer than LRECL (one item wider than the record) is
+    # split across records by SAS; that is not implemented yet
+    if (.file && any(nchar(sas_rtrim(unlist(strsplit(line, "\n", fixed = TRUE)))) > .ls)) {
+      abort_unsupported_construct("PUT item longer than the FILE LRECL", .line)
+    }
   }
   sas_rtrim(line)
 }
