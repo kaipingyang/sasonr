@@ -332,9 +332,32 @@ parse_statement <- function(p) {
     when = ,
     otherwise = abort_syntax(paste(toupper(low), "outside a SELECT group"), line),
     run = abort_syntax("RUN before the enclosing DO/SELECT block was closed", line),
-    abort_unsupported(paste0("DATA step statement ", toupper(tk_val(p))), line)
+    {
+      # a word that begins no SAS statement, followed by a name (`foo x;`):
+      # ERROR 180-322 at the word; any other unknown statement fails loud
+      if (!low %in% sas_statement_words && tk_type(p, 1L) == "name") {
+        abort_syntax_numbered("Statement is not valid or it is used out of proper order. (ERROR 180-322)",
+                              line, tk_col(p), tk_val(p), syserr = 3000)
+      }
+      abort_unsupported(paste0("DATA step statement ", toupper(tk_val(p))), line)
+    }
   )
 }
+
+# The words that begin a statement of the SAS 9.4 language in a DATA step:
+# the DATA step statements, the global statements and the words of the
+# statements that sasonr does not implement, so that only a word that is no
+# statement at all is ERROR 180-322.
+sas_statement_words <- c(
+  "abort", "array", "attrib", "by", "call", "cards", "cards4", "catname", "checkpoint", "comment", "continue",
+  "data", "datalines", "datalines4", "dcl", "declare", "delete", "describe", "display", "dm", "do", "drop",
+  "else", "end", "endrsubmit", "endsas", "error", "execute", "file", "filename", "footnote", "format", "go",
+  "goto", "if", "infile", "informat", "input", "keep", "label", "leave", "length", "libname", "link", "list",
+  "lines", "lines4", "lock", "lostcard", "merge", "missing", "modify", "ods", "options", "otherwise", "output",
+  "page", "proc", "put", "putlog", "redirect", "remove", "rename", "replace", "resetline", "retain", "return",
+  "rsubmit", "run", "sasfile", "select", "set", "signoff", "signon", "skip", "stop", "sysecho", "title",
+  "update", "when", "where", "window", "x",
+  paste0("footnote", 1:10), paste0("title", 1:10))
 
 # SUBSTR(target, position <, length>) = value; replaces part of a character
 # variable in place (the "left-hand SUBSTR").
@@ -376,6 +399,7 @@ parse_assign <- function(p) {
   if (is_op(p, "+") && target$node == "array_ref") abort_unsupported("sum statement on an array element", line)
   if (!is_op(p, "=")) abort_syntax(paste("expected '=' but found", tok_desc(p)), line)
   advance(p)
+  p$assign_value <- TRUE
   value <- parse_expr(p)
   expect_semi(p, "assignment")
   list(stmt = "assign", target = target, value = value, line = line)

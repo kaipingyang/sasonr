@@ -229,6 +229,9 @@ parse_prefix <- function(p, min_bp = 1L) {
   p$prefix_sign <- NULL
   operand_of <- p$operand_of
   p$operand_of <- NULL
+  # the first operand of an assignment's value (parse_assign())
+  value_start <- isTRUE(p$assign_value)
+  p$assign_value <- NULL
   t <- tk_type(p)
   v <- tk_val(p)
   line <- tk_line(p)
@@ -265,6 +268,8 @@ parse_prefix <- function(p, min_bp = 1L) {
     bitstr = abort_unsupported("bit-mask constants", line),
     lparen = {
       advance(p)
+      p$paren_depth <- (p$paren_depth %||% 0L) + 1L
+      on.exit(p$paren_depth <- p$paren_depth - 1L, add = TRUE)
       e <- parse_expr(p)
       expect_type(p, "rparen", "')'")
       return(e)
@@ -283,7 +288,25 @@ parse_prefix <- function(p, min_bp = 1L) {
     },
     name = return(parse_name_primary(p, min_bp, operand_of))
   )
+  if (t == "semi") expr_missing_operand(p, value_start, operand_of, line, col)
   abort_syntax(paste("unexpected", tok_desc(p), "in expression"), line)
+}
+
+# A semicolon where an operand is expected: the numbered ERRORs of the two
+# places whose expecting lists are known -- the first operand of an
+# assignment's value (`w = ;`) and the right operand of a binary `+` inside
+# parentheses (`x = (1 + ;`, followed by 76-322).  Elsewhere: returns, and the
+# caller raises the plain message.
+expr_missing_operand <- function(p, value_start, operand_of, line, col) {
+  head <- "Syntax error, expecting one of the following: a name, a quoted string, a numeric constant, a datetime constant, a missing value,"
+  if (value_start) {
+    abort_syntax_numbered(paste(head, "INPUT, PUT. (ERROR 22-322)"), line, col, ";")
+  }
+  if (identical(operand_of, "+") && (p$paren_depth %||% 0L) >= 1L) {
+    abort_syntax_numbered(paste(head, "arrayname, (, +, -, INPUT, NOT, PUT, ^, _NEW_, ~. (ERROR 22-322)"), line, col, ";",
+                          also = "ERROR 76-322: Syntax error, statement will be ignored.")
+  }
+  invisible()
 }
 
 parse_name_primary <- function(p, min_bp = 1L, operand_of = NULL) {

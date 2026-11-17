@@ -375,14 +375,21 @@ log_markers <- function(e, lines) {
     u <- cl <- ""
     for (j in seq_len(nrow(m))) {
       pos <- 11L + m$col[j] - 1L
-      if (nchar(u) > pos || nchar(cl) > pos) {
-        out <- c(out, u, if (nzchar(cl)) cl)
+      # several ERRORs at the same token: one underline, the numbers stacked
+      # under it (22 above 76)
+      if (j > 1L && m$col[j] == m$col[j - 1L] && m$len[j] == m$len[j - 1L] && nzchar(m$code[j]) &&
+          nzchar(cl[length(cl)])) {
+        cl <- c(cl, paste0(strrep(" ", pos), m$code[j]))
+        next
+      }
+      if (nchar(u) > pos || nchar(cl[length(cl)]) > pos || length(cl) > 1L) {
+        out <- c(out, u, cl[nzchar(cl)])
         u <- cl <- ""
       }
       u <- paste0(u, strrep(" ", pos - nchar(u)), strrep("_", m$len[j]))
-      if (nzchar(m$code[j])) cl <- paste0(cl, strrep(" ", pos - nchar(cl)), m$code[j])
+      if (nzchar(m$code[j])) cl[1L] <- paste0(cl[1L], strrep(" ", pos - nchar(cl[1L])), m$code[j])
     }
-    c(out, u, if (nzchar(cl)) cl)
+    c(out, u, cl[nzchar(cl)])
   })
 }
 

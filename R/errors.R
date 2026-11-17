@@ -100,6 +100,24 @@ err_parse_recover <- function(text) {
     if (is.null(s)) return(NULL)
     if (inherits(s, "condition")) {
       kind <- if (p$type[start] == "name" && start < p$n && p$type[start + 1L] == "op" && p$value[start + 1L] == "=") "assign" else p$low[start]
+      if (grepl("(ERROR 180-322)", conditionMessage(s), fixed = TRUE)) {
+        # an invalid statement: the names it holds (checked against the compiled variables)
+        end <- start
+        while (end <= p$n && p$type[end] != "semi") end <- end + 1L
+        k <- seq.int(start + 1L, length.out = max(0L, end - start - 1L))
+        stmts <- c(stmts, list(list(stmt = "failed", kind = "invalid", vars = unique(p$low[k][p$type[k] == "name"]),
+                                    line = p$line[start])))
+        p$pos <- end
+        advance(p)
+        next
+      }
+      if (kind == "if") {
+        # IF-THEN whose ELSE branch fails: the IF-THEN, then the failing branch
+        r <- err_recover_if(p, start)
+        if (is.null(r)) return(NULL)
+        stmts <- c(stmts, r)
+        next
+      }
       if (kind == "assign") {
         rest <- err_assign_rest(p, start)
         if (is.null(rest)) return(NULL)
@@ -115,6 +133,35 @@ err_parse_recover <- function(text) {
     if (s$stmt == "datalines") break
   }
   list(type = "data", line = line, null = any(is_null), outputs = if (any(is_null)) list() else outputs, stmts = stmts)
+}
+
+# An IF-THEN/ELSE statement at token `start` whose ELSE branch is an
+# assignment that fails: list(the IF-THEN without ELSE, the failed
+# assignment), with the parser after the failing statement; NULL when the
+# failure is elsewhere (fail loud).
+err_recover_if <- function(p, start) {
+  p$pos <- start
+  line <- p$line[start]
+  head <- tryCatch({
+    advance(p)
+    cond <- parse_expr(p)
+    expect_kw(p, "then")
+    then_s <- parse_branch(p)
+    list(stmt = "if", cond = cond, then = then_s, "else" = NULL, line = line)
+  }, error = function(e) NULL)
+  if (is.null(head) || !is_kw(p, "else") || is_op(p, "=", 1L)) return(NULL)
+  advance(p)
+  start2 <- p$pos
+  if (!(p$type[start2] == "name" && start2 < p$n && p$type[start2 + 1L] == "op" && p$value[start2 + 1L] == "=")) return(NULL)
+  p$seen <- character()
+  s <- tryCatch(parse_statement(p), sasonr_syntax_error = function(e) e, error = function(e) NULL)
+  seen <- p$seen
+  if (!inherits(s, "sasonr_syntax_error")) return(NULL)
+  rest <- err_assign_rest(p, start2)
+  if (is.null(rest)) return(NULL)
+  while (!at_eof(p) && tk_type(p) != "semi") advance(p)
+  advance(p)
+  list(head, list(stmt = "failed", kind = "assign", vars = unique(c(seen, rest)), line = p$line[start2]))
 }
 
 # Words that begin DATA step statements (and the step boundaries).
@@ -197,7 +244,7 @@ err_assign_rest <- function(p, start) {
 # What a failing DATA step statement contributes at compile time: a list of
 # statements, or NULL when that is not supported (fail loud).
 err_failed_stmt <- function(kind, vars, target, line) {
-  if (kind %in% c("set", "merge")) return(list())
+  if (kind %in% c("set", "merge", "invalid")) return(list())
   if (kind != "assign" || is.null(target)) return(NULL)
   tv <- list(node = "var", name = target, text = target, line = line)
   c(list(list(stmt = "assign", target = tv, value = list(node = "missing", code = ".", line = line), line = line)),
@@ -209,6 +256,9 @@ err_failed_stmt <- function(kind, vars, target, line) {
 # Output metadata (eng$session$meta form) of a DATA step as compiled, or NULL.
 err_data_schema <- function(eng, step) {
   stmts <- list()
+  # the names in an invalid statement (ERROR 180-322) must be variables the
+  # step compiles anyway: what a new name there adds is not supported
+  invalid_names <- unlist(lapply(step$stmts, function(s) if (identical(s$stmt, "failed") && s$kind == "invalid") s$vars))
   for (s in step$stmts) {
     if (identical(s$stmt, "failed")) {
       r <- err_failed_stmt(s$kind, s$vars, if (s$kind == "assign") s$vars[1] else NULL, s$line)
@@ -223,7 +273,11 @@ err_data_schema <- function(eng, step) {
     tr <- tryCatch(translate_step(step, eng$session$meta, eng$level),
                    sasonr_syntax_error = function(e) e, sasonr_runtime_error = function(e) e, error = function(e) NULL)
     if (is.null(tr)) return(NULL)
-    if (!inherits(tr, "condition")) return(tr$meta[vapply(step$outputs, `[[`, "", "name")])
+    if (!inherits(tr, "condition")) {
+      meta <- tr$meta[vapply(step$outputs, `[[`, "", "name")]
+      if (!all(vapply(meta, function(m) all(invalid_names %in% m$vars), logical(1)))) return(NULL)
+      return(meta)
+    }
     # an ERROR of the analyzer at one statement: replace it by what it contributes at compile time
     ln <- tr$sas_line
     k <- which(vapply(step$stmts, function(s) identical(vctrs::vec_cast(s$line, integer()), vctrs::vec_cast(ln, integer())), logical(1)))
@@ -382,7 +436,7 @@ engine_step_error <- function(eng, e, text, sql = FALSE) {
                                                                          e$sas_line %||% "?", ")"))
     }
   }
-  if (identical(rec$kind, "proc") && rec$step$name %in% c("means", "summary", "freq")) {
+  if (identical(rec$kind, "proc") && rec$step$name %in% c("means", "summary", "freq") && is.null(e$sas_syserr)) {
     # the SYSERR and SYSCC values after a stopped PROC MEANS, SUMMARY or FREQ
     # are not implemented: a reference fails loud
     mac_auto_unknown(eng$session$macro, c("syserr", "syscc"),
@@ -390,7 +444,28 @@ engine_step_error <- function(eng, e, text, sql = FALSE) {
   } else {
     err_set_macro(eng, syserr = 1012, syscc = if (identical(rec$kind, "proc")) 3000 else 1012)
   }
+  # an ERROR that names its code (ERROR 180-322, PROC option ERRORs): SYSERR and SYSCC
+  if (!is.null(e$sas_syserr)) err_set_macro(eng, syserr = e$sas_syserr, syscc = e$sas_syserr)
   invisible()
+}
+
+# Message `text` on lines of at most `ls` columns, broken after the commas
+# of its list, continuation lines indented under the text after the number.
+err_wrap_items <- function(text, ls) {
+  indent <- strrep(" ", nchar(sub("^(ERROR [0-9]+-[0-9]+: ).*$", "\\1", text)))
+  items <- strsplit(text, "(?<=,) ", perl = TRUE)[[1]]
+  lines <- character()
+  cur <- ""
+  for (w in items) {
+    cand <- if (nzchar(cur)) paste(cur, w) else w
+    if (nchar(cand) > ls && nzchar(cur)) {
+      lines <- c(lines, cur)
+      cur <- paste0(indent, w)
+    } else {
+      cur <- cand
+    }
+  }
+  c(lines, cur)
 }
 
 # A data set with 0 observations and the variables (types, lengths, formats)
@@ -413,6 +488,10 @@ err_emit_error <- function(eng, e) {
   exact <- identical(eng$phase, "compile") && length(line) == 1L && !is.na(line)
   at <- if (exact && length(e$sas_col) == 1L && !is.na(e$sas_col)) c(line, e$sas_col)
   text <- err_message_lines(e)
+  # a numbered syntax ERROR longer than LINESIZE continues on lines indented
+  # under its text ("ERROR 22-322: " is 14 columns), broken between the items
+  # of the expecting list ("a missing value" stays on one line)
+  if (isTRUE(e$sas_wrap) && log_error_numbered(text)) text <- err_wrap_items(text, rt_linesize())
   # the source echo around a numbered ERROR on a macro-affected line (SAS
   # shows the generated line; the column of the marker is not known) and
   # around an ERROR on a line that NOSOURCE hides is not implemented: the echo
@@ -425,6 +504,11 @@ err_emit_error <- function(eng, e) {
   }
   log_emit(eng, "error", text = text, at = at, token = e$sas_token,
            src = if (exact) line, phase = if (exact) "compile")
+  # further numbered ERRORs at the same token, their numbers stacked under the
+  # marker (22-322 followed by 76-322 or 202-322)
+  for (t in e$sas_also) {
+    log_emit(eng, "error", text = t, at = at, token = e$sas_token, src = if (exact) line, phase = if (exact) "compile")
+  }
   # a second numbered ERROR at the same token (PROC SQL statement options)
   if (!is.null(e$sql_also)) log_emit(eng, "error", text = e$sql_also, src = if (exact) line, phase = if (exact) "compile")
 }

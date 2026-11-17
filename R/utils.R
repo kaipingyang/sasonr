@@ -23,6 +23,17 @@ abort_syntax <- function(msg, line = NULL, col = NULL, token = NULL) {
   sasonr_abort(paste("Syntax error:", msg), "sasonr_syntax_error", line, col, token)
 }
 
+# A numbered syntax ERROR (`msg` ends in "(ERROR nn-322)"): `also`, further
+# numbered ERROR lines at the same token; `syserr`, the SYSERR and SYSCC value
+# the stopped step sets when it differs from the default of its kind
+# (engine_step_error()).
+abort_syntax_numbered <- function(msg, line, col, token, also = NULL, syserr = NULL) {
+  msg <- paste("Syntax error:", msg)
+  if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
+  rlang::abort(msg, class = c("sasonr_syntax_error", "sasonr_error"), sas_line = line, sas_col = col,
+               sas_token = token, sas_also = also, sas_syserr = syserr, sas_wrap = TRUE)
+}
+
 abort_runtime <- function(msg, line = NULL) {
   sasonr_abort(paste("Runtime error:", msg), "sasonr_runtime_error", line)
 }
