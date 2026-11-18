@@ -44,12 +44,13 @@ Missing values have SAS semantics (a missing numeric value is smaller than
 any number), and character variables have a fixed length, here set by the
 `LENGTH` statement.
 
-## See the generated R code
+## Translate a program into an R script
 
-`sas_translate()` shows the R code that sasonr generates for each step. Simple
-steps become vectorised `dplyr` pipelines; steps with cross-row state such as
-`RETAIN`, `LAG` or `FIRST.`/`LAST.` use grouped vectorised code when the
-result can be proven identical, and an explicit row loop otherwise.
+`sas_script()` writes the translation of a program as an R script that runs
+after `library(sasonr)`. With `tidy = TRUE`, each vectorised DATA step becomes
+a dplyr pipe on R data frames (the script loads dplyr and tidylog, so every
+step reports what it did); steps that need sasonr's own runtime run in a short
+session block.
 
 ```{r}
 code2 <- "
@@ -71,19 +72,14 @@ data chg;
   chg = aval - base;
 run;
 "
-tr <- sas_translate(code2)
-cat(tr$steps[[2]]$code)
-sas_run(code2)$work$chg
+sas_script(sas_translate(code2), tidy = TRUE)
 ```
 
-## Using the translation as an R script
-
-`sas_script()` turns a translation (or the result of `sas_run()`, the trace
-of that run) into a script that runs after `library(sasonr)`. Each SAS step
-becomes one call of a step verb on a session: `sas_data_step()` holds the
-generated code of a DATA step, PROC SORT and PROC MEANS show the options the
-program gave, other steps keep their SAS text. The script gives the same WORK
-data sets and the same log as `sas_run()`.
+Without `tidy`, every SAS step becomes one call of a step verb on a session:
+`sas_data_step()` holds the generated code of a DATA step and the SAS text it
+came from, `sas_proc_sort()` and `sas_proc_means()` show the options the
+program gave, and other steps keep their SAS text. This script gives the same
+WORK data sets and the same log as `sas_run()`.
 
 ```{r}
 code3 <- "
@@ -99,12 +95,21 @@ proc sort data=adsl out=bysubj; by descending age; run;
 sas_script(sas_translate(code3))
 ```
 
-With `tidy = TRUE`, vectorised DATA steps read and write R
-variables in dplyr pipes (the script loads dplyr and tidylog); steps that need
-a session run in a short session block.
+`sas_script()` also takes the result of `sas_run()`: the script is then the
+trace of that run, including the steps that macro code generated.
+
+## Look at the code of one step
+
+`sas_translate()` returns the generated R code step by step, for debugging.
+Simple steps become vectorised `dplyr` pipelines; steps with cross-row state
+such as `RETAIN`, `LAG` or `FIRST.`/`LAST.` use grouped vectorised code when
+the result can be proven identical, and an explicit row loop otherwise. The
+header of each step names its level and the reason.
 
 ```{r}
-sas_script(sas_translate(code3), tidy = TRUE)
+tr <- sas_translate(code2)
+cat(tr$steps[[2]]$code)
+sas_run(code2)$work$chg
 ```
 
 ## Macro language

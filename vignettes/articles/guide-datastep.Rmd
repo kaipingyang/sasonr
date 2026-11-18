@@ -13,7 +13,9 @@ library(sasonr)
 The DATA step is compiled into R code. Simple steps become vectorised
 `dplyr` pipelines; steps with cross-row state use grouped vectorised code when
 it is provably equivalent, and an explicit row loop that follows the SAS
-program data vector (PDV) otherwise. Use `sas_translate()` to see the code.
+program data vector (PDV) otherwise. `sas_script(sas_translate(code), tidy = TRUE)`
+writes the translation as an R script; `sas_translate()` shows the code of each
+step for debugging.
 
 This chapter is organised by topic and grows with the implementation.
 
@@ -90,10 +92,10 @@ run;
 sas_run(code)$work$chg
 ```
 
-The generated code for the second step is vectorised (level L2):
+The second step is vectorised (level L2). As a tidy R script:
 
 ```{r}
-cat(sas_translate(code)$steps[[2]]$code)
+sas_script(sas_translate(code), tidy = TRUE)
 ```
 
 ## LAG inside a condition
