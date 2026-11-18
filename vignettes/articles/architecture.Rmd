@@ -7,33 +7,45 @@ engine. Nothing is translated "once and handed over": the SAS program is
 parsed and executed every time, and the generated R code can be inspected.
 
 ```
-SAS source
-  │
-  ├─ 1 Lexer (state machine)
-  │      strings, comments, name/date/hex literals, special missing values,
-  │      DATALINES blocks, macro tokens
-  │
-  ├─ 2 Macro processor (pull-based)
-  │      %LET, &&-resolution, %MACRO/%MEND, %IF/%DO, quoting functions,
-  │      global/local symbol tables. It yields one complete step at a time;
-  │      after the step runs, CALL SYMPUT(X) and SQL INTO: values are written
-  │      back before expansion continues.
-  │
-  ├─ 3 Parser → faithful AST
-  │      recursive descent for statements, Pratt parser for expressions with
-  │      the SAS operator precedence (including comparison chains, IN, ><, <>)
-  │      IF/ELSE, DO/END, SELECT/WHEN are kept as written; desugaring happens
-  │      in a separate lowering step.
-  │
-  ├─ 4 Execution
-  │      DATA step → generated tidyverse code (L1 / L2 / L3, see below)
-  │      PROC SQL  → own SQL parser; DuckDB for joins and grouping,
-  │                  SAS semantics (missing values, remerge, CALCULATED) in R
-  │      PROC SORT, PRINT, MEANS/SUMMARY, FREQ, TRANSPOSE, CONTENTS,
-  │      DATASETS, APPEND, DELETE, FORMAT → R implementations
-  │
-  └─ 5 Runtime: SAS value semantics, formats/informats, functions,
-         variable attributes, _ERROR_ and SAS-style log notes
+SAS program text
+   │
+   ▼
+Macro processor ──────────────── macro symbol tables, macro definitions (session)
+   │  expands %LET, %IF, %DO, &x into SAS text; yields one complete step at
+   │  a time. After the step runs, CALL SYMPUT(X) and SQL INTO: values are
+   │  written back before expansion continues (expansion and execution
+   │  interleave).
+   ▼
+Lexer: text → token table (line, column, kind; comments and blanks kept,
+   │   so the tokens give the source back exactly)
+   ▼
+Parser: recursive descent for statements, Pratt parser for expressions
+   │   (SAS operator precedence: comparison chains, IN, MIN/MAX, ...)
+   ▼
+AST: one tree per step (DATA, PROC SQL, PROC MEANS, ...), kept as written
+   ├──► sas_check(): rules that list every unsupported feature before
+   │    anything runs
+   ▼
+Analysis: types and lengths, readers (SET / MERGE / INPUT), BY, arrays
+   ▼
+Intermediate representation: declarations in slots (KEEP, LENGTH, RETAIN,
+   │   BY, ...), executable statements as a control-flow graph
+   ▼
+Data-flow facts: which level can run this step?
+   ├─ L1 / L2: dplyr pipelines (whole columns, BY groups, accumulators, LAG)
+   └─ L3     : an explicit row loop (PDV, implicit OUTPUT, RETAIN)
+   ▼
+Code generation: R calls built with rlang; SAS functions become sas_f_*()
+   │   PROC SQL → own SQL parser, DuckDB for joins and grouping
+   │   other procedures → R implementations
+   ▼
+Engine: evaluates the step in its environment with the run-time helpers
+   │   (fixed-length character storage, missing values, NOTEs, _ERROR_)
+   ▼
+Session: WORK data sets, options, titles, formats (carry over between steps)
+   ▼
+Output: log events      → the log (plain, coloured, HTML)
+        ODS tables      → the listing, the HTML document, ODS OUTPUT data sets
 ```
 
 ## DATA step compilation levels
@@ -48,7 +60,7 @@ equivalent to row-by-row execution:
 | **L2** | recognised patterns: BY groups with `FIRST.`/`LAST.`, `RETAIN` accumulators, baseline carry-forward, unconditional `LAG` | grouped vectorised code |
 | **L3** | anything else (conditional `LAG`, `OUTPUT` to several data sets, `DO` loops creating rows, ...) | an explicit row loop that follows the DATA step execution rules |
 
-The level is decided by analysing the AST. If a vectorised step meets a
+The level is decided by data-flow facts on the control-flow graph. If a vectorised step meets a
 condition that needs row-by-row diagnostics (for example invalid data that
 sets `_ERROR_`), it is re-run as L3.
 
@@ -112,13 +124,42 @@ Parsed programs, translations and results are plain S3 values; the function,
 format and procedure-option registries are built once at load time and are
 never changed by a run.
 
-## Why not regular expressions
+## Why not keyword mapping or regular expressions
 
-SAS syntax is not a regular language: nested `DO`/`END` blocks, nested
-parentheses, operator precedence, context-dependent keywords (`set`, `if`
-and `end` can be variable names) and macro expansion all require a real
-lexer and parser. Regex-based translators reach a ceiling quickly and need
-a fallback such as a language model; sasonr is fully deterministic instead.
+A simpler design would tokenise the program and map each keyword to an R
+function. sasonr does map SAS functions to `sas_f_*()` at the end, but the
+layers in between are needed because the meaning of SAS code is rarely local
+to one keyword:
+
+* **Context decides the statement.** `IF x;` is a subsetting IF and
+  `IF x THEN` a condition; `=` assigns or compares; `PUT` is a statement or a
+  function; `set`, `if` and `end` can be variable names; `a <= b in (0, 5)`
+  is `a <= (b in (0, 5))`. This needs a grammar, not a keyword table.
+* **A DATA step is compiled before it runs.** Types and lengths come from the
+  first appearance of a variable, LENGTH, RETAIN and the data sets read; the
+  program data vector exists before the first observation. A statement-by-
+  statement mapping does not know the length of a variable when it meets it.
+* **Many rules are implicit.** Variables read by SET are retained, every
+  iteration ends with an implicit OUTPUT, and in a match-merge the variables
+  of a data set that has run out of rows in a BY group keep their last value.
+  None of this is written in any statement; the intermediate representation
+  holds it for the whole step.
+* **Vectorisation needs the whole step.** Only after the data-flow analysis
+  shows that no value crosses rows can a step run as whole-column dplyr code;
+  a mapping per statement can only produce a row loop.
+* **Macros rewrite the program.** What `%IF &n > 0 %THEN ...` generates is
+  known only after an earlier step has set `n` with CALL SYMPUT, so macro
+  expansion and execution have to interleave.
+* **The log needs positions and structure.** NOTEs give `(Line):(Column)`
+  places taken from the tokens; line wrapping and syntax-check mode after an
+  ERROR depend on the step structure.
+* **Unsupported features are found before anything runs**, and the same
+  intermediate representation feeds the executed code, `sas_translate()` and
+  the scripts of `sas_script()`.
+
+SAS syntax is not a regular language either (nested `DO`/`END` blocks,
+nested parentheses, operator precedence, macro expansion), so regex-based
+translation reaches a ceiling quickly; sasonr is fully deterministic.
 
 ## Fail loud
 
