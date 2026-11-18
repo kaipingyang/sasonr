@@ -17,7 +17,7 @@ Converts to lowercase. See the \href{https://documentation.sas.com/doc/en/lefunc
 }
 
 \section{Letters outside ASCII}{
- letters outside ASCII get the upper or lower case of a UTF-8 session (e with acute accent becomes E with acute accent). In an R session that is not UTF-8, and for a letter whose other case has a different number of bytes, the function fails loud.
+ Letters outside ASCII get the upper or lower case of a UTF-8 session (e with acute accent becomes E with acute accent). In an R session that is not UTF-8, and for a letter whose other case has a different number of bytes, the function fails loud.
 }
 
 \examples{
