@@ -1231,11 +1231,11 @@ NULL
 #' Extracts a substring, counting positions and the length in characters. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
 #'
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. A value with bytes outside ASCII is not supported (fails loud): the length of a variable that takes its length from `KSUBSTR()` is not implemented for such values.
-#' @param pos Starting character, an integer from 1 to the number of characters of `x`; an invalid position writes a note and sets the error flag.
-#' @param len Optional number of characters; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log).
+#' @param pos Starting character, an integer from 1 to the number of characters of `x`; a missing, smaller or larger position writes a note and sets the error flag.
+#' @param len Optional number of characters; when omitted the rest of the string is returned. A length running past the end returns the rest of the string; a missing or nonpositive length is invalid (blank result).
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: For ASCII values `KSUBSTR()` is `SUBSTR()`: invalid positions or lengths set `_ERROR_` and write a NOTE; the result length is that of the source. `SUBSTR()` counts bytes, `KSUBSTR()` counts characters, as `substr()` does.
+#' @section Differences from R: An invalid position or length gives a blank result, sets `_ERROR_` and writes a NOTE (a nonpositive length also an ERROR); unlike `SUBSTR()`, a missing or nonpositive length does not return the rest, and a length past the end writes no NOTE. Arguments of magnitude between 32767 and 1E300, and lengths between 0 and 1, are not supported (fail loud). The result length is that of the source. `SUBSTR()` counts bytes, `KSUBSTR()` counts characters, as `substr()` does.
 #' @example inst/examples/sas_f_ksubstr.R
 #' @family character functions
 #' @name sas_f_ksubstr
@@ -2283,8 +2283,8 @@ NULL
 #' Extracts a substring. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
 #'
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format.
-#' @param pos Starting position, an integer from 1 to the length of `x`; an invalid position writes a note and sets the error flag. In a UTF-8 session positions count bytes: a character outside ASCII takes two to four positions.
-#' @param len Optional number of bytes; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log). A start or end inside a multi-byte character is not supported (fails loud).
+#' @param pos Starting position, an integer from 1 to the length of `x`; a missing, smaller or larger position writes a note and sets the error flag. In a UTF-8 session positions count bytes: a character outside ASCII takes two to four positions.
+#' @param len Optional number of bytes; when omitted the rest of the string is returned. A length running past the end returns the rest of the string; a missing or nonpositive length is invalid (blank result). A start or end inside a multi-byte character is not supported (fails loud).
 #' @param .at Internal: source position `c(line, column)` used in log NOTEs.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: Invalid positions or lengths set `_ERROR_` and write a NOTE; the result length is that of the source. `SUBSTR()` counts bytes, `substr()` counts characters (see `KSUBSTR()`). SUBSTR on the left of `=` with a value that has bytes outside ASCII, and `%SYSFUNC(SUBSTR())` or PROC SQL calls with such a value, are not supported.

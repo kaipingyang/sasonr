@@ -6,9 +6,9 @@
 \arguments{
 \item{x}{Character string. A numeric value is first converted to character with the BEST12. format. A value with bytes outside ASCII is not supported (fails loud): the length of a variable that takes its length from \code{KSUBSTR()} is not implemented for such values.}
 
-\item{pos}{Starting character, an integer from 1 to the number of characters of \code{x}; an invalid position writes a note and sets the error flag.}
+\item{pos}{Starting character, an integer from 1 to the number of characters of \code{x}; a missing, smaller or larger position writes a note and sets the error flag.}
 
-\item{len}{Optional number of characters; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log).}
+\item{len}{Optional number of characters; when omitted the rest of the string is returned. A length running past the end returns the rest of the string; a missing or nonpositive length is invalid (blank result).}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,7 +19,7 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 Extracts a substring, counting positions and the length in characters. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm}{SAS documentation} (Functions and CALL Routines).
 }
 \section{Differences from R}{
- For ASCII values \code{KSUBSTR()} is \code{SUBSTR()}: invalid positions or lengths set \verb{_ERROR_} and write a NOTE; the result length is that of the source. \code{SUBSTR()} counts bytes, \code{KSUBSTR()} counts characters, as \code{substr()} does.
+ An invalid position or length gives a blank result, sets \verb{_ERROR_} and writes a NOTE (a nonpositive length also an ERROR); unlike \code{SUBSTR()}, a missing or nonpositive length does not return the rest, and a length past the end writes no NOTE. Arguments of magnitude between 32767 and 1E300, and lengths between 0 and 1, are not supported (fail loud). The result length is that of the source. \code{SUBSTR()} counts bytes, \code{KSUBSTR()} counts characters, as \code{substr()} does.
 }
 
 \examples{
@@ -28,7 +28,7 @@ Extracts a substring, counting positions and the length in characters. See the \
 # Three characters from position 2.
 sas_f_ksubstr("abcdef", 2, 3)  # ksubstr('abcdef',2,3) = "bcd"
 
-# For ASCII values KSUBSTR is SUBSTR: a position beyond the end is invalid
+# A position beyond the end is invalid
 # (blank result, NOTE and _ERROR_ = 1 in a DATA step).
 sas_f_ksubstr("abcdef", 7)  # ksubstr('abcdef',7) = ""
 }

@@ -606,14 +606,63 @@ sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
 }
 #' @export
 sas_f_substr <- function(x, pos, len = NULL, .at = NULL) substr_impl(x, pos, len, .at, "substr")
-# KSUBSTR: positions and length in characters.  For ASCII values it is SUBSTR;
-# an invalid position or length of a value with bytes outside ASCII is not
-# supported.
+# KSUBSTR(x, pos <, len>): positions and length in characters; n is the length
+# of x (trailing blanks included); the result has the length of x.
+#   - pos or len of magnitude 1E300 or more: "Invalid argument to function
+#     KSUBSTR(args)", _ERROR_ = 1, blank result.
+#   - pos (truncated) missing (any kind), < 1 or > n: "Argument 2 to function
+#     KSUBSTR(args) ... is invalid.", _ERROR_ = 1, blank result.
+#   - len missing (any kind): "Argument 3 ... is invalid.", _ERROR_ = 1, blank.
+#   - len <= 0: "ERROR: Argument three to KSUBSTR is invalid. The value must be
+#     greater than zero." then the Argument 3 NOTE, _ERROR_ = 1, blank.
+#   - len (truncated) past the end of x: the rest of x, no NOTE.
+# Not supported (fail loud): an argument of magnitude between 32767 and 1E300;
+# len between 0 and 1; an invalid pos together with an invalid or huge len (or
+# a huge pos with an invalid len); a value with bytes outside ASCII whose pos
+# or len is invalid or past the end.
 #' @export
-sas_f_ksubstr <- function(x, pos, len = NULL, .at = NULL) substr_impl(x, pos, len, .at, "ksubstr")
+sas_f_ksubstr <- function(x, pos, len = NULL, .at = NULL) {
+  x <- as_sas_chr(x)
+  m <- max(length(x), length(pos), length(len))
+  x <- rep_len(x, m)
+  pos <- rep_len(as.numeric(pos), m)
+  has_len <- !is.null(len)
+  len <- if (has_len) rep_len(as.numeric(len), m) else rep(NA_real_, m)
+  wide <- chr_wide(x) & !is.na(x)
+  if (any(wide)) x[wide] <- chr_utf8(x[wide])
+  n <- nchar(x, type = "chars")
+  huge_p <- !is.na(pos) & abs(pos) >= 1e300
+  huge_l <- has_len & !is.na(len) & abs(len) >= 1e300
+  mid <- (!is.na(pos) & abs(pos) > 32767 & !huge_p) | (has_len & !is.na(len) & abs(len) > 32767 & !huge_l)
+  p <- trunc(pos)
+  bad_p <- !huge_p & (is.na(p) | p < 1 | p > n)
+  miss_l <- has_len & is.na(len)
+  neg_l <- has_len & !is.na(len) & !huge_l & len <= 0
+  bad_l <- miss_l | neg_l
+  frac_l <- has_len & !is.na(len) & len > 0 & len < 1
+  over <- !bad_p & !huge_p & has_len & !bad_l & !huge_l & p + trunc(len) - 1 > n
+  if (any(mid | frac_l | (bad_p & (bad_l | huge_l)) | (huge_p & bad_l))) {
+    abort_unsupported("KSUBSTR with these position and length arguments")
+  }
+  if (any(wide & (bad_p | bad_l | huge_p | huge_l | over))) {
+    abort_unsupported("KSUBSTR with an invalid position or length for a value with bytes outside ASCII")
+  }
+  args <- if (has_len) list(x, pos, len) else list(x, pos)
+  huge <- huge_p | huge_l
+  if (any(huge)) note_invalid_arg("ksubstr", NULL, .at, args, huge, math = FALSE)
+  if (any(bad_p)) note_invalid_arg("ksubstr", 2L, .at, args, bad_p, numbered = TRUE, math = FALSE)
+  bad_l <- bad_l & !bad_p & !huge_p
+  if (any(neg_l & bad_l)) rt_error("ERROR: Argument three to KSUBSTR is invalid. The value must be greater than zero.")
+  if (any(bad_l)) note_invalid_arg("ksubstr", 3L, .at, args, bad_l, numbered = TRUE, math = FALSE)
+  ok <- !(huge | bad_p | bad_l)
+  end <- if (has_len) pmin(p + trunc(len) - 1, n) else n
+  out <- character(m)
+  out[ok] <- substr(x[ok], p[ok], end[ok])
+  out
+}
 
-# SUBSTR counts positions and lengths in bytes (a UTF-8 session), KSUBSTR in
-# characters.  ASCII values: one byte per character.
+# SUBSTR counts positions and lengths in bytes (a UTF-8 session).  ASCII
+# values: one byte per character.
 substr_impl <- function(x, pos, len, .at, fname) {
   x <- as_sas_chr(x)
   m <- max(length(x), length(pos), length(len))
@@ -631,9 +680,6 @@ substr_impl <- function(x, pos, len, .at, fname) {
     # a nonpositive or missing length returns the remainder (a NOTE: invalid argument)
     bad_len <- !bad_pos & (is.na(len) | len <= 0 | pos + len - 1 > n)
     end <- ifelse(is.na(len) | len <= 0, n, pmin(pos + len - 1, n))
-  }
-  if (fname == "ksubstr" && any(wide & (bad_pos | bad_len))) {
-    abort_unsupported("KSUBSTR with an invalid position or length for a value with bytes outside ASCII")
   }
   if (any(bad_len)) note_invalid_arg(fname, 3L, .at)
   if (any(bad_pos)) note_invalid_arg(fname, 2L, .at)

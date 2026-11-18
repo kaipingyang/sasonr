@@ -184,25 +184,49 @@ test_that("SUBSTR outside a DATA step and on the left of = fail loud outside ASC
 test_that("KSUBSTR counts characters", {
   skip_utf8()
   # the computation in characters (a value outside ASCII is not supported yet)
-  expect_identical(hex(substr_impl(hotel, 1, 3, NULL, "ksubstr")), "C3A974C3A9")
+  ks <- sasonr:::fn_layer_impl[["ksubstr"]]
+  expect_identical(hex(ks(hotel, 1, 3)), "C3A974C3A9")
   expect_error(run_a(paste0("s = '", hotel, "'; t = ksubstr(s, 1, 3);")), class = "sasonr_strict_error")
   expect_error(sas_f_ksubstr(hotel, 1, 3), class = "sasonr_strict_error")
-  expect_error(substr_impl(hotel, 20, 1, NULL, "ksubstr"), class = "sasonr_unsupported")
-  expect_error(substr_impl(hotel, 1, 20, NULL, "ksubstr"), class = "sasonr_unsupported")
+  expect_error(ks(hotel, 20, 1), class = "sasonr_unsupported")
+  expect_error(ks(hotel, 1, 20), class = "sasonr_unsupported")
 })
 
-test_that("KSUBSTR of ASCII values is SUBSTR; ASCII SUBSTR is unchanged", {
-  for (a in list(list(2), list(2, 3), list(7), list(0, 2), list(2, 10), list(2, 0), list(2, NA))) {
-    s <- suppressWarnings(rlang::exec(sas_f_substr, "abcdef", !!!a))
-    k <- suppressWarnings(rlang::exec(sas_f_ksubstr, "abcdef", !!!a))
-    expect_identical(k, s)
+test_that("KSUBSTR invalid positions and lengths", {
+  ks_log <- function(expr) {
+    r <- sas_run(paste0("data a; length r $6; r = ", expr, "; e = _error_; run;"))
+    list(r = r$work$a$r, e = r$work$a$e, log = sas_log(r))
   }
-  expect_identical(sas_f_substr("abcdef", 2, 3), "bcd")
   expect_identical(sas_f_ksubstr("abcdef", 2, 3), "bcd")
-  r <- sas_run("data a; length s $6; s = 'abcdef'; t = ksubstr(s, 2, 9); u = substr(s, 2, 9); n = lengthc(t); run;")
-  expect_identical(r$work$a$t, "bcdef")
+  # a length past the end: the rest, no NOTE
+  x <- ks_log("ksubstr('abc', 2, 5)")
+  expect_identical(x$r, "bc")
+  expect_identical(x$e, 0)
+  expect_false(any(grepl("KSUBSTR", x$log, fixed = TRUE)))
+  # an invalid position
+  x <- ks_log("ksubstr('abc', 4)")
+  expect_identical(x$r, "")
+  expect_identical(x$e, 1)
+  expect_true(any(grepl("NOTE: Argument 2 to function KSUBSTR('abc',4) at line 1 column", x$log, fixed = TRUE)))
+  # a missing length: blank (SUBSTR returns the rest)
+  x <- ks_log("ksubstr('abcdef', 2, .)")
+  expect_identical(x$r, "")
+  expect_true(any(grepl("NOTE: Argument 3 to function KSUBSTR('abcdef',2,.) at line 1 column", x$log, fixed = TRUE)))
+  # a nonpositive length: ERROR and NOTE
+  x <- ks_log("ksubstr('abcdef', 2, 0)")
+  expect_identical(x$r, "")
+  expect_identical(x$e, 1)
+  expect_true(any(grepl("ERROR: Argument three to KSUBSTR is invalid. The value must be greater than zero.", x$log, fixed = TRUE)))
+  # a huge argument
+  x <- ks_log("ksubstr('abcdef', 1e300, 3)")
+  expect_identical(x$r, "")
+  expect_true(any(grepl("NOTE: Invalid argument to function KSUBSTR('abcdef',1E300,3) at line 1 column", x$log, fixed = TRUE)))
+  # undetermined: fails loud
+  expect_error(sas_run("data a; r = ksubstr('abcdef', 1e6, 3); run;"), class = "sasonr_unsupported")
+  expect_error(sas_run("data a; r = ksubstr('abcdef', 2, 0.5); run;"), class = "sasonr_unsupported")
+  expect_error(sas_run("data a; r = ksubstr('abcdef', 0, 0); run;"), class = "sasonr_unsupported")
+  # ASCII SUBSTR is unchanged
+  r <- sas_run("data a; length s $6; s = 'abcdef'; u = substr(s, 2, 9); run;")
   expect_identical(r$work$a$u, "bcdef")
-  expect_identical(r$work$a$n, 6)
-  expect_true(any(grepl("NOTE: Invalid third argument to function KSUBSTR", sas_log(r), fixed = TRUE)))
   expect_true(any(grepl("NOTE: Invalid third argument to function SUBSTR", sas_log(r), fixed = TRUE)))
 })
