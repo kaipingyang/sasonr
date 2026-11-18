@@ -220,7 +220,7 @@ sql_target <- function(eng, name, line) {
 sql_coerce_col <- function(v, type, len, name, line) {
   if (type == "char") {
     if (!is.character(v)) abort_syntax(paste0("Value for column ", name, " is not character."), line)
-    return(sas_char(substr(v, 1L, len), len))
+    return(sas_char(v, len))
   }
   if (is.character(v)) abort_syntax(paste0("Value for column ", name, " is not numeric."), line)
   as.numeric(v)
@@ -378,7 +378,7 @@ sql_stmt_alter <- function(eng, st) {
       if (!v %in% names(d)) abort_syntax(paste0("Column ", v, " could not be found in table WORK.", toupper(st$table), "."), st$line)
       if (!is.null(c$type) && c$type != m$type[[v]]) abort_unsupported("changing the type of a column with ALTER TABLE MODIFY", st$line)
       if (!is.null(c$len) && identical(m$type[[v]], "char")) {
-        d[[v]] <- sas_char(substr(d[[v]], 1L, c$len), c$len)
+        d[[v]] <- sas_char(d[[v]], c$len)
         m$len[[v]] <- sql_col_len(c$len)
       }
       if (!is.null(c$format)) m$formats[[v]] <- c$format

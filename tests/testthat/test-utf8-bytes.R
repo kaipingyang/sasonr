@@ -103,3 +103,35 @@ test_that("ASCII values are unchanged", {
   expect_identical(c(d$l, d$c), c(3, 3))
   expect_identical(sas_f_klength("ab "), 2)
 })
+
+test_that("SET into a shorter declared length cuts by bytes", {
+  skip_utf8()
+  ee <- paste0("'", e1, e1, "'")
+  src <- paste0("data a; length s $4; s = ", ee, "; run; ")
+  r <- sas_run(paste0(src, "data b; length s $2; set a; h = put(s, $hex4.); run;"))
+  expect_identical(r$work$b$h, "C3A9")
+  expect_error(sas_run(paste0(src, "data b; length s $3; set a; run;")), class = "sasonr_unsupported")
+  # a later data set of the SET statement
+  src2 <- paste0("data a1; length s $3; s = 'abc'; run; ", src)
+  expect_error(sas_run(paste0(src2, "data b; set a1 a; run;")), class = "sasonr_unsupported")
+})
+
+test_that("PROC SQL INSERT, UPDATE and ALTER cut by bytes", {
+  skip_utf8()
+  ee <- paste0("'", e1, e1, "'")
+  r <- sas_run(paste0("proc sql; create table t (s char(2)); insert into t values(", ee, "); quit; ",
+                      "data u; set t; h = put(s, $hex4.); run;"))
+  expect_identical(r$work$u$h, "C3A9")
+  expect_error(sas_run(paste0("proc sql; create table t (s char(3)); insert into t values(", ee, "); quit;")),
+               class = "sasonr_unsupported")
+  expect_error(sas_run(paste0("proc sql; create table t (s char(3)); insert into t values('a'); ",
+                              "update t set s = ", ee, "; quit;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste0("proc sql; create table t (s char(4)); insert into t values(", ee, "); ",
+                              "alter table t modify s char(3); quit;")), class = "sasonr_unsupported")
+})
+
+test_that("a user format label outside ASCII fails loud", {
+  skip_utf8()
+  expect_error(sas_run(paste0("proc format; value $f 'a' = '", e1, "t", e1, "'; run; ",
+                              "data a; length r $10; r = put('a', $f3.); run;")), class = "sasonr_strict_error")
+})

@@ -79,7 +79,10 @@ sas_char <- function(x, len) {
     x <- substr(x, 1L, len)
     n <- pmin(n, len)
   }
-  paste0(x, strrep(" ", pmax(0L, len - n)))
+  k <- pmax(0L, len - n)
+  # short lengths: the blanks are looked up (strrep() per value is slower)
+  if (len <= 256L) return(paste0(x, strrep(" ", seq.int(0L, max(0L, len)))[k + 1L]))
+  paste0(x, strrep(" ", k))
 }
 
 # Values with a byte outside ASCII.
@@ -1619,7 +1622,7 @@ sas_num <- function(x, .at = NULL) {
 #' @export
 #' @keywords internal
 sas_trunc_chars <- function(d, lens) {
-  for (v in names(lens)) if (v %in% names(d)) d[[v]] <- sas_char(substr(d[[v]], 1L, lens[[v]]), lens[[v]])
+  for (v in names(lens)) if (v %in% names(d)) d[[v]] <- sas_char(d[[v]], lens[[v]])
   d
 }
 

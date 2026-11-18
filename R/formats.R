@@ -95,6 +95,9 @@ user_fmt <- function(name, char, kind = "value") {
 just_right <- function(s, w) if (is.na(w)) s else formatC(s, width = w)
 just_left <- function(s, w) {
   if (is.na(w)) return(s)
+  # the width counts bytes: text with bytes outside ASCII (a user format
+  # label, an aligned PUT result) is not supported
+  if (any(chr_wide(s), na.rm = TRUE)) chr_wide_gate("put")
   s <- substr(s, 1L, w)
   paste0(s, strrep(" ", pmax(0L, w - nchar(s))))
 }
