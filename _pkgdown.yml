@@ -16,6 +16,8 @@ navbar:
         href: articles/guide-datastep.html
       - text: PROC SQL
         href: articles/guide-sql.html
+      - text: "PROC MEANS: log, listing and HTML"
+        href: articles/guide-procs.html
       - text: Functions, formats and rounding
         href: articles/guide-functions.html
     developers:
@@ -34,6 +36,7 @@ articles:
   contents:
   - articles/guide-datastep
   - articles/guide-sql
+  - articles/guide-procs
   - articles/guide-functions
 - title: Developers
   contents:
