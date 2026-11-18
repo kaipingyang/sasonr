@@ -4,7 +4,7 @@
 meta_from_df <- function(d, disp = names(d)) {
   vars <- tolower(names(d))
   type <- lapply(d, function(x) if (is.character(x)) "char" else "num")
-  len <- lapply(d, function(x) if (is.character(x)) max(1L, nchar(x), na.rm = TRUE) else 8L)
+  len <- lapply(d, function(x) if (is.character(x)) max(1L, chr_bytes(x), na.rm = TRUE) else 8L)
   disp <- as.list(disp)
   names(type) <- names(len) <- names(disp) <- vars
   list(vars = vars, type = type, len = len, formats = list(), disp = disp)

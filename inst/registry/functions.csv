@@ -85,6 +85,7 @@
 "INTZ","function","1","1","num","data","supported"
 "JULDATE","function","1","1","num","data","supported"
 "JULDATE7","function","1","1","num","data","supported"
+"KLENGTH","function","1","1","char","data","supported"
 "KURTOSIS","function","4","any","num num num num num","","approximate"
 "LARGEST","function","1","any","num num","data","supported"
 "LCM","function","2","any","num num num","data","partial"

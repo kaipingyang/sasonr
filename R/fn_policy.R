@@ -365,6 +365,34 @@ case_dom <- function(a) {
                            nchar(tolower(y), type = "bytes") != n)), "?")
 }
 for (nm in c("upcase", "lowcase", "propcase")) fn_policy[[nm]] <- fpol(dom = case_dom, nan = "none", math = FALSE)
+
+# Functions whose character arguments may have bytes outside ASCII: the case
+# functions above, and the lengths (counted in bytes; KLENGTH in characters).
+# Every other function with such an argument is outside its exact domain.
+chr_wide_ok_fns <- c("upcase", "lowcase", "propcase", "length", "lengthn", "lengthc", "klength")
+
+#' Check a character argument of a SAS function for bytes outside ASCII
+#'
+#' Used by translated code: a function other than the case and length
+#' functions with an argument that has a byte outside ASCII goes through the
+#' strict gate (?sasonr_strict). Other arguments are returned unchanged.
+#' @param x Argument value.
+#' @param .name Function name.
+#' @param .line Line of the call.
+#' @param .exact `FALSE` in vectorised code (the step is re-run row by row).
+#' @keywords internal
+#' @export
+sas_chr_arg <- function(x, .name, .line = NULL, .exact = TRUE) {
+  if (!is.character(x) || !any(chr_wide(x), na.rm = TRUE)) return(x)
+  if (!length(.line) || is.na(.line[1])) .line <- NULL
+  chr_wide_gate(.name, .line, .exact)
+  x
+}
+
+chr_wide_gate <- function(name, line = NULL, exact = TRUE, context = "data") {
+  if (!exact) abort_unsupported(sprintf("%s with these arguments (not supported)", toupper(name)), line)
+  feature_check("domain", name, line, context = context)
+}
 fn_policy$indexw <- fpol(dom = function(a) {
   # delimiters that also occur in the word: not supported
   if (length(a) < 3) return(rep("ok", max(lengths(a))))

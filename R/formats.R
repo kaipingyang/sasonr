@@ -581,6 +581,9 @@ sas_format <- function(x, fmt = NULL) {
   if (is.null(uf) && is.character(x) && !fmt$char) uf <- user_fmt(fmt$name, TRUE)
   if (!is.null(uf)) return(apply_user_fmt(x, uf, fmt))
   if (is.character(x)) {
+    # the width of a format counts bytes: values with bytes outside ASCII are
+    # not supported, except with $HEXw. (which writes the bytes)
+    if (fmt$name != "hex" && any(chr_wide(x), na.rm = TRUE)) chr_wide_gate("put")
     w <- fmt$w
     if (fmt$name == "quote" && is.na(w)) w <- max(nchar(x), 0L) + 2L
     if (!fmt$name %in% char_fmt_names) abort_unsupported(paste0("format ", fmt$text))
@@ -1190,6 +1193,8 @@ sas_f_put <- function(x, fmt, align = NULL) {
 sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
   # a numeric source is converted with BEST12. (right-aligned, leading blanks kept)
   if (is.numeric(s)) s <- sas_fmt_best(s, 12L)
+  # the width of an informat counts bytes: values with bytes outside ASCII are not supported
+  if (any(chr_wide(s), na.rm = TRUE)) chr_wide_gate("input", .at[1] %||% NULL)
   w <- fmt$w
   is_char <- fmt$char || isTRUE(user_fmt(fmt$name, TRUE, "invalue")$char)
   # an informat without a width reads its default width (YYMMDD. reads 6 columns)

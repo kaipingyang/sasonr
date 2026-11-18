@@ -290,6 +290,15 @@ the development version provides.
   fail loud in an R session that is not UTF-8, for invalid UTF-8 bytes and for
   a letter whose other case has a different number of bytes. The `PROPCASE`
   page lists which characters start a word.
+* In a UTF-8 session the length of a character variable counts bytes: a
+  value is cut to its first `n` bytes and padded with blanks to `n` bytes,
+  and `LENGTH`, `LENGTHN` and `LENGTHC` count bytes. A cut inside a
+  multi-byte character fails loud. New `KLENGTH` counts characters (a blank
+  argument fails loud). Lengths taken from values (literals, R data frames,
+  PROC SQL, PROC TRANSPOSE) count bytes too. Every other function, `PUT` and
+  `INPUT` with a character argument that has a byte outside ASCII fail loud
+  (`sasonr_strict_error`), as do CALL SYMPUT, SYMPUTX and SORTC; an INPUT
+  statement reading such records is not supported.
 * About 190 SAS functions as `sas_f_<name>()`, about 100 formats and
   informats, `PUT()` / `INPUT()` and user formats from PROC FORMAT. Missing
   and invalid arguments write the log NOTEs, set `_ERROR_` and give missing

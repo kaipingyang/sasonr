@@ -10,10 +10,10 @@
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 }
 \description{
-Length without trailing blanks (0 for a blank string). See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm}{SAS documentation} (Functions and CALL Routines).
+Number of bytes without trailing blanks (0 for a blank string). See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm}{SAS documentation} (Functions and CALL Routines).
 }
 \section{Differences from R}{
- SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+ SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length. In a UTF-8 session the length counts bytes: a character outside ASCII takes two to four bytes, while \code{nchar()} counts it once.
 }
 
 \examples{
@@ -61,6 +61,7 @@ Other character functions:
 \code{\link[=sas_f_index]{sas_f_index()}},
 \code{\link[=sas_f_indexc]{sas_f_indexc()}},
 \code{\link[=sas_f_indexw]{sas_f_indexw()}},
+\code{\link[=sas_f_klength]{sas_f_klength()}},
 \code{\link[=sas_f_left]{sas_f_left()}},
 \code{\link[=sas_f_length]{sas_f_length()}},
 \code{\link[=sas_f_lengthc]{sas_f_lengthc()}},

@@ -316,7 +316,7 @@ sql_lower_subquery <- function(e, ctx) {
     v <- unlist(vals)
     attr(v, "sql_type") <- ty0
   }
-  ty <- attr(v, "sql_type") %||% list(type = if (is.character(v)) "char" else "num", len = if (is.character(v)) max(1L, nchar(v)) else 8L)
+  ty <- attr(v, "sql_type") %||% list(type = if (is.character(v)) "char" else "num", len = if (is.character(v)) max(1L, chr_bytes(v)) else 8L)
   v <- as.vector(v)
   if (!per_row) v <- v[1]
   sql_bind_vector(ctx, v, ty$type, ty$len)

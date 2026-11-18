@@ -66,9 +66,70 @@ sas_rtrim <- function(x) sub(" +$", "", x)
 #' @keywords internal
 sas_char <- function(x, len) {
   if (is.numeric(x)) x <- sas_fmt_best(x, 12L)
-  x[is.na(x)] <- ""
-  x <- substr(x, 1L, len)
-  paste0(x, strrep(" ", pmax(0L, len - nchar(x))))
+  if (anyNA(x)) x[is.na(x)] <- ""
+  wide <- chr_wide(x)
+  if (any(wide)) return(sas_char_bytes(x, len, wide))
+  if (length(len) != 1L) {
+    x <- substr(x, 1L, len)
+    return(paste0(x, strrep(" ", pmax(0L, len - nchar(x)))))
+  }
+  # ASCII values: cut only when a value is longer than `len`
+  n <- nchar(x)
+  if (any(n > len)) {
+    x <- substr(x, 1L, len)
+    n <- pmin(n, len)
+  }
+  paste0(x, strrep(" ", pmax(0L, len - n)))
+}
+
+# Values with a byte outside ASCII.
+chr_wide <- function(x) grepl("[^\\x01-\\x7f]", x, perl = TRUE, useBytes = TRUE)
+
+# The UTF-8 text of values with bytes outside ASCII: not supported in an R
+# session that is not UTF-8, nor for bytes that are not valid UTF-8.
+chr_utf8 <- function(x) {
+  if (!isTRUE(l10n_info()[["UTF-8"]])) {
+    abort_unsupported("a character value with bytes outside ASCII in an R session that is not UTF-8")
+  }
+  x <- enc2utf8(x)
+  if (!all(validUTF8(x))) abort_unsupported("a character value whose bytes are not valid UTF-8")
+  x
+}
+
+# Number of bytes of each value (the storage length of a character value).
+chr_bytes <- function(x) {
+  wide <- chr_wide(x) & !is.na(x)
+  if (!any(wide)) return(nchar(x))
+  n <- nchar(x, type = "bytes")
+  n[is.na(x)] <- NA_integer_
+  n[wide] <- nchar(chr_utf8(x[wide]), type = "bytes")
+  n
+}
+
+# sas_char() for values with bytes outside ASCII: the stored value is the
+# first `len` bytes, padded with blanks to `len` bytes.  A cut inside a
+# multi-byte character leaves bytes that are not a character: not supported.
+sas_char_bytes <- function(x, len, wide) {
+  len <- rep_len(len, length(x))
+  out <- character(length(x))
+  if (any(!wide)) out[!wide] <- sas_char(x[!wide], len[!wide])
+  w <- which(wide)
+  s <- chr_utf8(x[w])
+  for (k in seq_along(w)) {
+    r <- charToRaw(s[k])
+    n <- len[w[k]]
+    if (length(r) > n) {
+      r <- r[seq_len(n)]
+      t <- rawToChar(r)
+      if (!validUTF8(t)) {
+        abort_unsupported(sprintf("a character value cut to %d bytes inside a multi-byte character", as.integer(n)))
+      }
+    }
+    v <- rawToChar(c(r, rep(as.raw(0x20), max(0L, n - length(r)))))
+    Encoding(v) <- "UTF-8"
+    out[w[k]] <- v
+  }
+  out
 }
 
 as_sas_chr <- function(x) if (is.numeric(x)) sas_fmt_best(x, 12L) else x
@@ -662,11 +723,21 @@ sas_f_indexc <- function(x, ...) {
 }
 #' @export
 sas_f_length <- function(x) {
-  n <- nchar(sas_rtrim(as_sas_chr(x)))
+  n <- chr_bytes(sas_rtrim(as_sas_chr(x)))
   as.numeric(pmax(n, 1L))
 }
 #' @export
-sas_f_lengthn <- function(x) as.numeric(nchar(sas_rtrim(as_sas_chr(x))))
+sas_f_lengthn <- function(x) as.numeric(chr_bytes(sas_rtrim(as_sas_chr(x))))
+# Number of characters without trailing blanks.  The result for a blank value
+# is not implemented (fails loud).
+#' @export
+sas_f_klength <- function(x) {
+  s <- sas_rtrim(as_sas_chr(x))
+  if (any(!nzchar(s))) abort_unsupported("KLENGTH of a blank value")
+  wide <- chr_wide(s)
+  if (any(wide)) s[wide] <- chr_utf8(s[wide])
+  as.numeric(nchar(s, type = "chars"))
+}
 #' @export
 sas_f_tranwrd <- function(x, from, to) {
   x <- as_sas_chr(x)
@@ -1217,7 +1288,7 @@ sas_set_input <- function(dfs, in_vars = NULL, by = NULL, descending = NULL) {
 pad_char_columns <- function(d) {
   for (v in names(d)) {
     if (is.character(d[[v]]) && nrow(d) > 0) {
-      len <- max(1L, nchar(d[[v]]), na.rm = TRUE)
+      len <- max(1L, chr_bytes(d[[v]]), na.rm = TRUE)
       d[[v]] <- sas_char(d[[v]], len)
     }
   }
@@ -1376,6 +1447,7 @@ sas_rows_to_tibble <- function(rows, proto) {
 #' Read in-stream data lines according to an INPUT specification
 #' @keywords internal
 sas_read_datalines <- function(lines, spec) {
+  if (any(chr_wide(lines))) abort_unsupported("INPUT from records with bytes outside ASCII")
   cols <- lapply(spec, function(s) if (s$char) character() else numeric())
   convert <- function(txt, s) {
     if (s$char) {

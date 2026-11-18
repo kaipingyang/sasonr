@@ -93,6 +93,7 @@ public sas_f_intnx
 public sas_f_intz
 public sas_f_juldate
 public sas_f_juldate7
+public sas_f_klength
 public sas_f_kurtosis
 public sas_f_largest
 public sas_f_lcm
@@ -235,6 +236,7 @@ internal sas_carry
 internal sas_chain
 internal sas_char
 internal sas_check_sorted
+internal sas_chr_arg
 internal sas_cmp_trunc
 internal sas_concat
 internal sas_cumsum

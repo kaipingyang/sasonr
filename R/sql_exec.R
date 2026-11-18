@@ -67,7 +67,7 @@ sql_table_rel <- function(src, eng, outer) {
     char <- is.character(d[[v]])
     cols[[j]] <- list(id = id, name = out_names[j], disp = if (out_names[j] == v) (m$disp[[v]] %||% v) else out_names[j],
                       quals = unique(c(quals, name)), type = if (char) "char" else "num",
-                      len = if (char) (m$len[[v]] %||% max(1L, nchar(d[[v]]))) else (m$len[[v]] %||% 8L),
+                      len = if (char) (m$len[[v]] %||% max(1L, chr_bytes(d[[v]]))) else (m$len[[v]] %||% 8L),
                       format = m$formats[[v]], informat = m$informats[[v]], label = m$labels[[v]], src_table = name)
     data[[id]] <- d[[v]]
   }
@@ -487,7 +487,7 @@ sql_select <- function(q, eng, outer) {
       all(vapply(e$args, function(a) a$node %in% c("num", "str", "missing"), logical(1)))
     if (ty$type == "char" && is.null(it$length) && const_args && e$name %in% sql_fold_fns) {
       # constant arguments: the call is evaluated once; the column has the length of the value
-      col$len <- max(1L, nchar(v[1] %||% ""))
+      col$len <- max(1L, chr_bytes(v[1] %||% ""))
     } else if (ty$type == "char" && is.null(it$length) && const_args && identical(fn_table[[e$name]]$len, 200L) &&
                e$name %in% sql_200_fns) {
       col$len <- 200L
@@ -496,7 +496,7 @@ sql_select <- function(q, eng, outer) {
       # value is built from column arguments
       col$len <- 200L
     } else if (ty$type == "char" && is.null(it$length) && e$node == "call" && identical(fn_table[[e$name]]$len, 200L)) {
-      col$len <- max(1L, nchar(sas_rtrim(v)))
+      col$len <- max(1L, chr_bytes(sas_rtrim(v)))
     }
     if (ty$type == "char") v <- sas_char(v, col$len)
     out_cols <- c(out_cols, list(col))
