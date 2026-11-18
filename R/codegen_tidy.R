@@ -452,7 +452,7 @@ source_item <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] els
   if (rd$stmt == "merge") {
     # match-merge: the input table of the observation plan (FIRST./LAST. included)
     args <- list(cg_call("list", lapply(srcs, `[[`, "lang")), by = cg_val(an$by$vars),
-                 descending = cg_val(an$by$descending), in_vars = cg_val(in_vars))
+                 descending = cg_val(an$by$descending), in_vars = cg_val(in_vars), .line = as.integer(rd$line))
     return(cgi(cg_call("sas_merge_input", args),
                sprintf("sas_merge_input(\n  list(\n    %s\n  ),\n  %s\n)",
                        paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n    "),
@@ -880,7 +880,7 @@ gen_row_step <- function(an) {
     add(cgi(rlang::call2("<-", rlang::sym(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang"))),
             paste0(".m_in <- list(\n  ", paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n  "), "\n)")),
         quote(.m <- lapply(.m_in, sas_rows)),
-        rlang::expr(.plan <- sas_merge_plan(.m_in, !!cg_val(an$by$vars), !!cg_val(an$by$descending))),
+        rlang::expr(.plan <- sas_merge_plan(.m_in, !!cg_val(an$by$vars), !!cg_val(an$by$descending), .line = !!as.integer(rd$line))),
         quote(.n_in <- nrow(.plan)), quote(.p <- 0L))
     cx$merge_reset <- merged_vars
   }

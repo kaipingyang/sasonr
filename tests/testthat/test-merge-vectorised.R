@@ -29,7 +29,7 @@ data b; length name $5; input id name $ w v; datalines;
 ;
 data c; input id z; datalines;
 2 7
-2 8
+3 8
 3 9
 5 10
 ;
@@ -62,12 +62,32 @@ data inner; merge a(in = ina) b(in = inb); by id; if ina and inb; run;
   expect_equal(trimws(m$name[m$id %in% 3]), "gam")
 })
 
-test_that("three data sets: non-overlapping variables, many-to-many groups", {
+test_that("three data sets: non-overlapping variables, one-to-many groups", {
   code <- paste0(merge_inputs, "
 data m; merge a(in = ina) b c(in = inc); by id; k = _n_; run;
 data mm; merge b(keep = id w) c; by id; run;
 ")
   expect_merge_same(code, c("L1", "L1", "L1", "L2", "L2"))
+})
+
+test_that("repeats of BY values in more than one data set fail loud on both paths", {
+  many <- paste0(merge_inputs, "
+data c2; input id z; datalines;
+2 7
+2 8
+;
+data mm; merge b c2; by id; run;
+")
+  msg <- "MERGE with repeats of BY values in more than one data set"
+  expect_error(sas_run(many), msg, class = "sasonr_unsupported")
+  expect_error(sas_run(many, level = "L3"), msg, class = "sasonr_unsupported")
+  # three data sets: the repeats are in A and B (id 1), C has one row
+  three <- paste0(merge_inputs, "
+data b1; set b; output; if id = 1 then output; run;
+data m3; merge a b1 c; by id; run;
+")
+  expect_error(sas_run(three), msg, class = "sasonr_unsupported")
+  expect_error(sas_run(three, level = "L3"), msg, class = "sasonr_unsupported")
 })
 
 test_that("missing BY values and DESCENDING", {

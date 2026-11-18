@@ -1242,9 +1242,12 @@ sas_read_row <- function(pdv, rows, i) {
 }
 
 #' Build the observation plan of a match-merge (MERGE + BY)
+#'
+#' A BY group in which more than one data set has several rows fails loud:
+#' the log NOTE about repeats of BY values is not implemented.
 #' @export
 #' @keywords internal
-sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL) {
+sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL, .line = NULL) {
   for (df in dfs) sas_check_sorted(df, by, descending)
   keys <- dplyr::bind_rows(lapply(seq_along(dfs), function(j) {
     k <- dfs[[j]][by]
@@ -1258,6 +1261,10 @@ sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars
   for (g in unique(grp)) {
     sub <- keys[grp == g, ]
     rows_by_src <- lapply(seq_along(dfs), function(j) sub$.row[sub$.src == j])
+    if (sum(lengths(rows_by_src) > 1L) > 1L) {
+      abort_unsupported("MERGE with repeats of BY values in more than one data set (the log NOTE for it is not implemented yet)",
+                        .line)
+    }
     m <- max(lengths(rows_by_src))
     for (r in seq_len(m)) {
       idx <- vapply(rows_by_src, function(x) if (r <= length(x)) x[r] else NA_integer_, integer(1))
@@ -1310,8 +1317,8 @@ sas_merge_read <- function(pdv, rows, plan, p, reset, in_vars, by) {
 #' variable read by MERGE (the row-wise path carries the changed value).
 #' @export
 #' @keywords internal
-sas_merge_input <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL) {
-  plan <- sas_merge_plan(dfs, by, descending)
+sas_merge_input <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL, .line = NULL) {
+  plan <- sas_merge_plan(dfs, by, descending, .line = .line)
   vars <- unique(vctrs::list_unchop(lapply(dfs, names), ptype = character(), name_spec = rlang::zap()))
   n <- nrow(plan)
   pos <- seq_len(n)

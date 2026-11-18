@@ -4,9 +4,16 @@
 \alias{sas_merge_plan}
 \title{Build the observation plan of a match-merge (MERGE + BY)}
 \usage{
-sas_merge_plan(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL)
+sas_merge_plan(
+  dfs,
+  by,
+  descending = rep(FALSE, length(by)),
+  in_vars = NULL,
+  .line = NULL
+)
 }
 \description{
-Build the observation plan of a match-merge (MERGE + BY)
+A BY group in which more than one data set has several rows fails loud:
+the log NOTE about repeats of BY values is not implemented.
 }
 \keyword{internal}
