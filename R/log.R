@@ -411,6 +411,10 @@ log_render <- function(id, args = list(), ls = rt_linesize()) {
     none = lines,
     fixed = if (nchar(lines[1]) <= ls) lines else c(m$wrapped, lines[-1]),
     linesize = log_wrap(paste(lines, collapse = " "), ls = ls),
+    join = {
+      one <- paste(trimws(lines, "left"), collapse = " ")
+      if (nchar(one) <= ls) one else lines
+    },
     rlang::abort(paste0("log message `", id, "`: unknown wrap rule `", m$wrap, "`."), .internal = TRUE)
   )
 }

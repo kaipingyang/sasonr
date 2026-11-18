@@ -7,7 +7,8 @@
 #   wrap      "none": the lines as written; "fixed": `wrapped` replaces the
 #             first line when that line is longer than LINESIZE; "linesize":
 #             the message is one sentence wrapped at LINESIZE (log_wrap(),
-#             continuation lines indented by 6)
+#             continuation lines indented by 6); "join": the lines joined into
+#             one line when that line fits LINESIZE, else the lines as written
 #   places    "none"; "list": a list of (Line):(Column) places; "counted":
 #             "(Number of times) at (Line):(Column)" places.  Places go on
 #             lines of at most LINESIZE columns, indented by 6 (place_lines())
@@ -44,7 +45,7 @@ log_catalog <- list(
   step.stopped = log_msg("note", "NOTE: sasonr stopped processing this step because of errors.", neutral = TRUE),
   step.syntax_check = log_msg("note", c("NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
                                         "      This prevents execution of subsequent data modification statements."),
-                              neutral = TRUE),
+                              wrap = "join", neutral = TRUE),
   step.exception = log_msg("error", c(log_exception_block, "Traceback of the Exception:", " ", " ", log_exception_block),
                            neutral = TRUE),
   # data sets

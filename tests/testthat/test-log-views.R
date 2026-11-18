@@ -266,6 +266,20 @@ test_that("the approximate NOTE after an error wraps at the LINESIZE of the subm
   expect_true(all(nchar(note) <= 64))
 })
 
+test_that("the syntax-check NOTE is one line when it fits LINESIZE, two lines otherwise", {
+  sc <- function(opt) {
+    r <- sas_run(paste0(opt, "data a;\n  x = nosuchfn(1);\nrun;\ndata b;\n  y = 1;\nrun;"), on_error = "sas")
+    i <- which(startsWith(r$log, "NOTE: Due to ERROR(s) above"))
+    r$log[i:(i + 1L)]
+  }
+  expect_identical(sc(""), c("NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
+                             "      This prevents execution of subsequent data modification statements."))
+  one <- sc("options linesize=max;\n")
+  expect_identical(one[1], paste("NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
+                                 "This prevents execution of subsequent data modification statements."))
+  expect_false(startsWith(one[2], "      This prevents"))
+})
+
 test_that("a numbered ERROR is followed by a blank line, other ERRORs are not", {
   r <- sas_run("data a;\n  x = nosuchfn(2);\nrun;", on_error = "sas")
   i <- which(startsWith(r$log, "ERROR 68-185"))
