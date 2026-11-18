@@ -1043,7 +1043,7 @@ gen_row_stmt <- function(s, cx) {
       c(rc$pre, list(out))
     },
     subset_if = list(rlang::expr(if (!sas_true(!!g(s$cond))) sas_delete())),
-    stop = list(quote(sas_stop_step())),
+    stop = list(quote(sas_stop_step(stmt = TRUE))),
     "return" = list(quote(sas_return())),
     delete = list(quote(sas_delete())),
     leave = list(quote(break)),

@@ -1471,7 +1471,12 @@ sas_return <- function() {
   abort_runtime("RETURN signalled outside a DATA step loop")
 }
 #' @export
-sas_stop_step <- function() {
+sas_stop_step <- function(stmt = FALSE) {
+  # `stmt`: a STOP statement of the program (not the end of the input)
+  if (stmt) {
+    rt <- rt_diag()
+    rt$stop_stmt <- TRUE
+  }
   rlang::signal(message = "stop", class = "sasonr_stop")
   abort_runtime("STOP signalled outside a DATA step loop")
 }

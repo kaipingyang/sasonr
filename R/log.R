@@ -535,7 +535,12 @@ log_step_close <- function(eng, kind, tr = NULL, env = NULL, stopped = FALSE, no
 # data set says so first.
 log_emit_reads <- function(eng, tr) {
   rt <- rt_diag()
-  if (isTRUE(rt$merge_repeats)) log_emit(eng, id = "ds.merge_repeats", phase = "step_end")
+  if (isTRUE(rt$merge_repeats)) {
+    # a STOP statement before or inside the repeated BY group leaves the NOTE
+    # out; a STOP after it is not known, so any STOP fails loud
+    if (isTRUE(rt$stop_stmt)) abort_unsupported("MERGE with repeats of BY values in a step that ran a STOP statement")
+    log_emit(eng, id = "ds.merge_repeats", phase = "step_end")
+  }
   if (identical(tr$reasons, "PROC SORT")) rt$reads <- Filter(function(r) r$n > 0, rt$reads)
   print <- identical(tr$reasons, "PROC PRINT")
   for (r in rt$reads) {

@@ -210,3 +210,23 @@ data p; merge a b; by id; w = w + 1; run;
   # B has one row for id 1: the second row keeps the incremented W
   expect_equal(res$work$p$w[res$work$p$id %in% 1], c(101, 102))
 })
+
+test_that("a MERGE with repeats of BY values in a step that runs STOP fails loud", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  code <- "
+data a; input g x; datalines;
+1 1
+2 2
+2 3
+;
+data b; input g y; datalines;
+1 10
+2 20
+2 30
+;
+data m; merge a b; by g; if g = 1 then stop; run;"
+  expect_error(sas_run(code), class = "sasonr_unsupported")
+  # STOP without repeats: unchanged
+  ok <- sub("2 3\n;", ";", code, fixed = TRUE)
+  expect_no_error(sas_run(ok))
+})
