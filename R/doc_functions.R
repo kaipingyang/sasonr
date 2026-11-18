@@ -1375,6 +1375,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @section Letters outside ASCII: letters outside ASCII get the upper or lower case of a UTF-8 session (e with acute accent becomes E with acute accent). In an R session that is not UTF-8, and for a letter whose other case has a different number of bytes, the function fails loud.
 #' @example inst/examples/sas_f_lowcase.R
 #' @family character functions
 #' @name sas_f_lowcase
@@ -1788,9 +1789,10 @@ NULL
 #' Converts to proper case. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
 #'
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The first letter of each word is uppercased and all other letters lowercased.
-#' @param dlm Optional characters that start a new word, replacing the default set: blank, slash, hyphen, open parenthesis, period and tab.
+#' @param dlm Optional characters that start a new word, replacing the default set: blank, slash, hyphen, open parenthesis, period and tab. Other characters do not start a word: `"o'brien"` gives `"O'brien"`, `"a.b,c;d"` gives `"A.B,c;d"`, and `"a(b"` gives `"A(B"` while `"a)b"` gives `"A)b"`.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @section Letters outside ASCII: letters outside ASCII get the upper or lower case of a UTF-8 session (e with acute accent becomes E with acute accent). In an R session that is not UTF-8, and for a letter whose other case has a different number of bytes, the function fails loud.
 #' @example inst/examples/sas_f_propcase.R
 #' @family character functions
 #' @name sas_f_propcase
@@ -2450,6 +2452,7 @@ NULL
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
 #' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @section Letters outside ASCII: letters outside ASCII get the upper or lower case of a UTF-8 session (e with acute accent becomes E with acute accent). In an R session that is not UTF-8, and for a letter whose other case has a different number of bytes, the function fails loud.
 #' @example inst/examples/sas_f_upcase.R
 #' @family character functions
 #' @name sas_f_upcase

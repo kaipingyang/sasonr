@@ -183,3 +183,23 @@ test_that("a direct call passes the arguments as written to the implementation",
   expect_identical(sas_f_sqrt(arg()), 2)
   expect_identical(k, 1)
 })
+
+test_that("UPCASE, LOWCASE and PROPCASE map letters outside ASCII in a UTF-8 session", {
+  skip_if_not(isTRUE(l10n_info()[["UTF-8"]]))
+  e <- "été à l'hôtel"
+  expect_equal(sas_f_upcase(e), "ÉTÉ À L'HÔTEL")
+  expect_equal(sas_f_lowcase("ÉTÉ"), "été")
+  expect_equal(sas_f_propcase(e), "Été À L'hôtel")
+  # the other case has a different number of bytes: fails loud
+  expect_error(sas_f_upcase("ı"), class = "sasonr_strict_error")
+  # invalid UTF-8 bytes: fails loud
+  expect_error(sas_f_upcase(rawToChar(as.raw(c(0x61, 0xe9)))), class = "sasonr_strict_error")
+})
+
+test_that("PROPCASE starts words only after its six default delimiters", {
+  expect_equal(sas_f_propcase("o'brien"), "O'brien")
+  expect_equal(sas_f_propcase("a.b,c;d"), "A.B,c;d")
+  expect_equal(sas_f_propcase("a(b"), "A(B")
+  expect_equal(sas_f_propcase("a)b"), "A)b")
+  expect_equal(sas_f_propcase("a\tb"), "A\tB")
+})

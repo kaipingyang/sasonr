@@ -350,10 +350,19 @@ fn_policy <- list(
   choosec = fpol("mv", pos = 1L, dom = function(a) choose_dom(a), nan = "none", math = FALSE)
 )
 
-# letters outside ASCII: case mapping depends on the session encoding (not supported)
+# Letters outside ASCII follow the case mapping of a UTF-8 session. Not supported:
+# an R session that is not UTF-8, and a mapping that changes the number of bytes
+# (the stored length of a character value is counted in bytes).
 case_dom <- function(a) {
   x <- as_sas_chr(a[[1]])
-  code_if(grepl("[^\\x01-\\x7f]", x, perl = TRUE), "?")
+  wide <- grepl("[^\\x01-\\x7f]", x, perl = TRUE, useBytes = TRUE)
+  if (!any(wide, na.rm = TRUE)) return(code_if(wide, "?"))
+  if (!isTRUE(l10n_info()[["UTF-8"]])) return(code_if(wide, "?"))
+  bad <- wide & !validUTF8(x)
+  y <- ifelse(bad, "", x)
+  n <- nchar(y, type = "bytes")
+  code_if(bad | (wide & (nchar(toupper(y), type = "bytes") != n |
+                           nchar(tolower(y), type = "bytes") != n)), "?")
 }
 for (nm in c("upcase", "lowcase", "propcase")) fn_policy[[nm]] <- fpol(dom = case_dom, nan = "none", math = FALSE)
 fn_policy$indexw <- fpol(dom = function(a) {

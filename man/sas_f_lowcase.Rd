@@ -16,6 +16,10 @@ Converts to lowercase. See the \href{https://documentation.sas.com/doc/en/lefunc
  SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
 }
 
+\section{Letters outside ASCII}{
+ letters outside ASCII get the upper or lower case of a UTF-8 session (e with acute accent becomes E with acute accent). In an R session that is not UTF-8, and for a letter whose other case has a different number of bytes, the function fails loud.
+}
+
 \examples{
 # LOWCASE: each call is explained above it and followed by its result
 

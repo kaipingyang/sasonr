@@ -285,6 +285,11 @@ the development version provides.
 
 ## Functions, formats and rounding
 
+* `UPCASE`, `LOWCASE` and `PROPCASE` map letters outside ASCII with the case
+  mapping of a UTF-8 session (before: they failed loud). They still
+  fail loud in an R session that is not UTF-8, for invalid UTF-8 bytes and for
+  a letter whose other case has a different number of bytes. The `PROPCASE`
+  page lists which characters start a word.
 * About 190 SAS functions as `sas_f_<name>()`, about 100 formats and
   informats, `PUT()` / `INPUT()` and user formats from PROC FORMAT. Missing
   and invalid arguments write the log NOTEs, set `_ERROR_` and give missing

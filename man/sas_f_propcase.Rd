@@ -6,7 +6,7 @@
 \arguments{
 \item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The first letter of each word is uppercased and all other letters lowercased.}
 
-\item{dlm}{Optional characters that start a new word, replacing the default set: blank, slash, hyphen, open parenthesis, period and tab.}
+\item{dlm}{Optional characters that start a new word, replacing the default set: blank, slash, hyphen, open parenthesis, period and tab. Other characters do not start a word: \code{"o'brien"} gives \code{"O'brien"}, \code{"a.b,c;d"} gives \code{"A.B,c;d"}, and \code{"a(b"} gives \code{"A(B"} while \code{"a)b"} gives \code{"A)b"}.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -16,6 +16,10 @@ Converts to proper case. See the \href{https://documentation.sas.com/doc/en/lefu
 }
 \section{Differences from R}{
  SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+}
+
+\section{Letters outside ASCII}{
+ letters outside ASCII get the upper or lower case of a UTF-8 session (e with acute accent becomes E with acute accent). In an R session that is not UTF-8, and for a letter whose other case has a different number of bytes, the function fails loud.
 }
 
 \examples{
