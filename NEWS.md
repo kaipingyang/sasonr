@@ -258,6 +258,17 @@ the development version provides.
 
 ## Procedures
 
+* PROC MEANS builds its output as ODS tables (the `Summary` table, with the
+  BY groups, the titles and the column headers); the listing and the HTML
+  destination render the same table. `sas_html(x, file, log = FALSE)` writes
+  the procedure output of a result as an HTML document (style sheet
+  `system.file("css", "sasonr.css", package = "sasonr")`). The HTML
+  destination is open when a program starts; `ODS HTML CLOSE;` and
+  `ODS HTML;` close and reopen it. `ODS HTML FILE=` and the other ODS HTML
+  options fail loud.
+* `ODS OUTPUT Summary=<data set>;` (or `Means.Summary=`) writes the MEANS
+  Summary table to WORK, with its data set NOTEs. MATCH_ALL, PERSIST=,
+  BY groups and the ODS actions (CLOSE, SELECT, EXCLUDE, ...) fail loud.
 * Options that take an integer constant fail with ERROR 22-322 for a
   fractional value instead of truncating it: PROC MEANS MAXDEC=, FW=,
   QNTLDEF= / PCTLDEF=; PROC FREQ BINOMIAL LEVEL=, RELRISK COLUMN=. PROC FREQ
