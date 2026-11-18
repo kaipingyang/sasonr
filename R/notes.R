@@ -9,6 +9,8 @@
 # `places`: the places of the merged compile-time messages (log_place()).
 ct_reset <- function(ct = ct_diag()) {
   ct$notes <- character()
+  # a call with too many arguments compiled with its declared arguments (an_extra_args())
+  ct$extra_args <- FALSE
   log_places_reset(ct)
   invisible()
 }
