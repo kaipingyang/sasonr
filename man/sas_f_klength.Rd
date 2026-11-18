@@ -4,7 +4,7 @@
 \alias{sas_f_klength}
 \title{SAS \code{KLENGTH(string)}}
 \arguments{
-\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks; a blank string is not supported (fails loud).}
+\item{x}{Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks; it is 0 for a blank string.}
 }
 \value{
 A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
@@ -13,7 +13,7 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 Number of characters up to the last non-blank character. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm}{SAS documentation} (Functions and CALL Routines).
 }
 \section{Differences from R}{
- SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. \code{LENGTH()} counts bytes, \code{KLENGTH()} counts characters, as \code{nchar()} does.
+ SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. \code{LENGTH()} counts bytes, \code{KLENGTH()} counts characters, as \code{nchar()} does. For a blank value \code{LENGTH()} returns 1 and \code{KLENGTH()} returns 0.
 }
 
 \examples{

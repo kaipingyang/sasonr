@@ -293,8 +293,8 @@ the development version provides.
 * In a UTF-8 session the length of a character variable counts bytes: a
   value is cut to its first `n` bytes and padded with blanks to `n` bytes,
   and `LENGTH`, `LENGTHN` and `LENGTHC` count bytes. A cut inside a
-  multi-byte character fails loud. New `KLENGTH` counts characters (a blank
-  argument fails loud). Lengths taken from values (literals, R data frames,
+  multi-byte character fails loud. New `KLENGTH` counts characters (0 for a
+  blank argument). Lengths taken from values (literals, R data frames,
   PROC SQL, PROC TRANSPOSE) count bytes too. Every other function, `PUT` and
   `INPUT` with a character argument that has a byte outside ASCII fail loud
   (`sasonr_strict_error`), as do CALL SYMPUT, SYMPUTX and SORTC; an INPUT

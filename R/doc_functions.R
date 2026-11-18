@@ -1218,9 +1218,9 @@ NULL
 #'
 #' Number of characters up to the last non-blank character. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
 #'
-#' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks; a blank string is not supported (fails loud).
+#' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks; it is 0 for a blank string.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. `LENGTH()` counts bytes, `KLENGTH()` counts characters, as `nchar()` does.
+#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. `LENGTH()` counts bytes, `KLENGTH()` counts characters, as `nchar()` does. For a blank value `LENGTH()` returns 1 and `KLENGTH()` returns 0.
 #' @example inst/examples/sas_f_klength.R
 #' @family character functions
 #' @name sas_f_klength

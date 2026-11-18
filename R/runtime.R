@@ -813,12 +813,10 @@ sas_f_length <- function(x) {
 }
 #' @export
 sas_f_lengthn <- function(x) as.numeric(chr_bytes(sas_rtrim(as_sas_chr(x))))
-# Number of characters without trailing blanks.  The result for a blank value
-# is not implemented (fails loud).
+# Number of characters without trailing blanks; 0 for a blank value.
 #' @export
 sas_f_klength <- function(x) {
   s <- sas_rtrim(as_sas_chr(x))
-  if (any(!nzchar(s))) abort_unsupported("KLENGTH of a blank value")
   wide <- chr_wide(s)
   if (any(wide)) s[wide] <- chr_utf8(s[wide])
   as.numeric(nchar(s, type = "chars"))

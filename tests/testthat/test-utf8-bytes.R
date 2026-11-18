@@ -50,9 +50,21 @@ test_that("LENGTH, LENGTHN and LENGTHC count bytes; KLENGTH counts characters", 
   expect_identical(c(sas_f_length(" "), sas_f_lengthn(" ")), c(1, 0))
 })
 
-test_that("KLENGTH of a blank value fails loud", {
-  expect_error(sas_f_klength("   "), class = "sasonr_unsupported")
-  expect_error(run_a("s = ' '; k = klength(s);"), class = "sasonr_unsupported")
+test_that("KLENGTH of a blank value is 0", {
+  expect_identical(sas_f_klength(c("", " ", "   ")), c(0, 0, 0))
+  d <- run_a("length s $5; s = ' '; k = klength(s); e = klength(''); b = klength(' ');")
+  expect_identical(c(d$k, d$e, d$b), c(0, 0, 0))
+})
+
+test_that("KLENGTH of a numeric value converts it with BEST12.", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  r <- sas_run("data a;\n  k1 = klength(123); k2 = klength(3.14159); k3 = klength(-42.5); k4 = klength(.);\nrun;")
+  d <- r$work$a
+  expect_identical(c(d$k1, d$k2, d$k3, d$k4), c(12, 12, 12, 12))
+  m <- msgs(r)
+  k <- which(startsWith(m, "NOTE: Numeric values have been converted to character values"))
+  expect_length(k, 1L)
+  expect_match(m[k + 1L], "^ +2:")
 })
 
 test_that("KLENGTHN and KLENGTHC are unknown functions", {
