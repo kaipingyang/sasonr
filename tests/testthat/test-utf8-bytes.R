@@ -135,3 +135,9 @@ test_that("a user format label outside ASCII fails loud", {
   expect_error(sas_run(paste0("proc format; value $f 'a' = '", e1, "t", e1, "'; run; ",
                               "data a; length r $10; r = put('a', $f3.); run;")), class = "sasonr_strict_error")
 })
+
+test_that("a colon comparison of values outside ASCII fails loud", {
+  skip_if_not(isTRUE(l10n_info()[["UTF-8"]]))
+  expect_error(sasonr:::sas_cmp_trunc("=", "été", "é"), class = "sasonr_unsupported")
+  expect_equal(sasonr:::sas_cmp_trunc("=", "abc", "ab"), 1)
+})

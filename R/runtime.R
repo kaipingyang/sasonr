@@ -212,6 +212,10 @@ cmp_fun <- function(op) {
 #' @keywords internal
 sas_cmp_trunc <- function(op, a, b) {
   ab <- recycle2(a, b)
+  # the prefix length counts bytes; not implemented for values outside ASCII
+  if (any(chr_wide(ab[[1]]) | chr_wide(ab[[2]]), na.rm = TRUE)) {
+    abort_unsupported("colon comparison (=: and the like) of character values outside ASCII")
+  }
   len <- pmin(nchar(ab[[1]]), nchar(ab[[2]]))
   cmp_fun(op)(substr(ab[[1]], 1L, len), substr(ab[[2]], 1L, len))
 }
