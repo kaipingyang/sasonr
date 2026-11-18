@@ -62,6 +62,7 @@ Other character functions:
 \code{\link[=sas_f_indexc]{sas_f_indexc()}},
 \code{\link[=sas_f_indexw]{sas_f_indexw()}},
 \code{\link[=sas_f_klength]{sas_f_klength()}},
+\code{\link[=sas_f_ksubstr]{sas_f_ksubstr()}},
 \code{\link[=sas_f_left]{sas_f_left()}},
 \code{\link[=sas_f_length]{sas_f_length()}},
 \code{\link[=sas_f_lengthc]{sas_f_lengthc()}},

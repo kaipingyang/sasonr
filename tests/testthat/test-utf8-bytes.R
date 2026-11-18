@@ -71,13 +71,13 @@ test_that("comparisons ignore trailing blanks", {
 test_that("other character functions fail loud on an argument outside ASCII", {
   skip_utf8()
   x <- paste0("'", e1, "t", e1, "'")
-  for (call in c(paste0("r = substr(", x, ", 2, 1)"), paste0("n = index(", x, ", 't')"), paste0("r = scan(", x, ", 1)"),
+  for (call in c(paste0("r = ksubstr(", x, ", 2, 1)"), paste0("n = index(", x, ", 't')"), paste0("r = scan(", x, ", 1)"),
                  paste0("r = reverse(", x, ")"), paste0("r = put(", x, ", $8.)"), paste0("r = input(", x, ", $8.)"),
                  paste0("n = lengthm(", x, ")"))) {
     expect_error(run_a(paste0("length r $20; ", call, ";")), class = "sasonr_strict_error", info = call)
   }
   # a variable argument (row code and vectorised code)
-  expect_error(run_a(paste0("s = ", x, "; t = substr(s, 1, 2);")), class = "sasonr_strict_error")
+  expect_error(run_a(paste0("s = ", x, "; t = ksubstr(s, 1, 2);")), class = "sasonr_strict_error")
   expect_error(sas_run(paste0("data a; s = ", x, "; output; run; data b; set a; if s ne '' then t = left(s); run;")),
                class = "sasonr_error")
   # direct calls and %SYSFUNC
@@ -140,4 +140,69 @@ test_that("a colon comparison of values outside ASCII fails loud", {
   skip_if_not(isTRUE(l10n_info()[["UTF-8"]]))
   expect_error(sasonr:::sas_cmp_trunc("=", "été", "é"), class = "sasonr_unsupported")
   expect_equal(sasonr:::sas_cmp_trunc("=", "abc", "ab"), 1)
+})
+
+test_that("SUBSTR counts positions and lengths in bytes", {
+  skip_utf8()
+  lit <- paste0("'", hotel, "'")
+  d <- run_a(paste0("length s $20; s = ", lit, "; t = substr(s, 1, 3); h = put(t, $hex6.); v = put(s, $hex34.);"))
+  expect_identical(d$v, "C3A974C3A920C3A0206C2768C3B474656C")
+  expect_identical(d$h, "C3A974")
+  expect_identical(d$t, paste0(e1, "t"))
+  # the rest from byte 4; a length running past the end: the rest, NOTE and _ERROR_
+  expect_identical(sas_f_substr(paste0(e1, "t", e1), 4), e1)
+  r <- sas_run(paste0("data a; length s $5; s = '", e1, "t", e1, "'; t = substr(s, 4, 9); run;"))
+  expect_identical(r$work$a$t, e1)
+  expect_true(any(grepl("NOTE: Invalid third argument to function SUBSTR", sas_log(r), fixed = TRUE)))
+  # a position beyond the last byte: blank, NOTE and _ERROR_
+  r <- sas_run(paste0("data a; s = '", e1, "t'; t = substr(s, 4); run;"))
+  expect_identical(r$work$a$t, "")
+  expect_true(any(grepl("NOTE: Invalid second argument to function SUBSTR", sas_log(r), fixed = TRUE)))
+  # the result takes the length of the source (bytes)
+  d <- run_a(paste0("s = '", e1, "t'; t = substr(s, 3, 1); n = lengthc(t);"))
+  expect_identical(d$n, 3)
+})
+
+test_that("SUBSTR with a start or end inside a multi-byte character fails loud", {
+  skip_utf8()
+  lit <- paste0("'", e1, "t", e1, "'")
+  expect_error(run_a(paste0("s = ", lit, "; t = substr(s, 2);")), class = "sasonr_unsupported")
+  expect_error(run_a(paste0("s = ", lit, "; t = substr(s, 1, 1);")), class = "sasonr_unsupported")
+  expect_error(sas_f_substr(paste0(e1, "t", e1), 3, 2), class = "sasonr_unsupported")
+})
+
+test_that("SUBSTR outside a DATA step and on the left of = fail loud outside ASCII", {
+  skip_utf8()
+  lit <- paste0("'", e1, "t'")
+  expect_error(run_a(paste0("length s $4; s = 'abcd'; substr(s, 1, 2) = ", lit, ";")), class = "sasonr_unsupported")
+  expect_error(run_a(paste0("length s $4; s = ", lit, "; substr(s, 4, 1) = 'x';")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste0("%put %sysfunc(substr(", e1, "t, 1, 2));")), class = "sasonr_strict_error")
+  expect_error(sas_run(paste0("data a; s = ", lit, "; run; proc sql; create table b as select substr(s, 1, 2) as t from a; quit;")),
+               class = "sasonr_error")
+})
+
+test_that("KSUBSTR counts characters", {
+  skip_utf8()
+  # the computation in characters (a value outside ASCII is not supported yet)
+  expect_identical(hex(substr_impl(hotel, 1, 3, NULL, "ksubstr")), "C3A974C3A9")
+  expect_error(run_a(paste0("s = '", hotel, "'; t = ksubstr(s, 1, 3);")), class = "sasonr_strict_error")
+  expect_error(sas_f_ksubstr(hotel, 1, 3), class = "sasonr_strict_error")
+  expect_error(substr_impl(hotel, 20, 1, NULL, "ksubstr"), class = "sasonr_unsupported")
+  expect_error(substr_impl(hotel, 1, 20, NULL, "ksubstr"), class = "sasonr_unsupported")
+})
+
+test_that("KSUBSTR of ASCII values is SUBSTR; ASCII SUBSTR is unchanged", {
+  for (a in list(list(2), list(2, 3), list(7), list(0, 2), list(2, 10), list(2, 0), list(2, NA))) {
+    s <- suppressWarnings(rlang::exec(sas_f_substr, "abcdef", !!!a))
+    k <- suppressWarnings(rlang::exec(sas_f_ksubstr, "abcdef", !!!a))
+    expect_identical(k, s)
+  }
+  expect_identical(sas_f_substr("abcdef", 2, 3), "bcd")
+  expect_identical(sas_f_ksubstr("abcdef", 2, 3), "bcd")
+  r <- sas_run("data a; length s $6; s = 'abcdef'; t = ksubstr(s, 2, 9); u = substr(s, 2, 9); n = lengthc(t); run;")
+  expect_identical(r$work$a$t, "bcdef")
+  expect_identical(r$work$a$u, "bcdef")
+  expect_identical(r$work$a$n, 6)
+  expect_true(any(grepl("NOTE: Invalid third argument to function KSUBSTR", sas_log(r), fixed = TRUE)))
+  expect_true(any(grepl("NOTE: Invalid third argument to function SUBSTR", sas_log(r), fixed = TRUE)))
 })

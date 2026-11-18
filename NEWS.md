@@ -299,6 +299,11 @@ the development version provides.
   `INPUT` with a character argument that has a byte outside ASCII fail loud
   (`sasonr_strict_error`), as do CALL SYMPUT, SYMPUTX and SORTC; an INPUT
   statement reading such records is not supported.
+* In a UTF-8 session `SUBSTR` counts positions and lengths in bytes; a start
+  or end inside a multi-byte character fails loud, as do SUBSTR on the left
+  of `=`, `%SYSFUNC(SUBSTR())` and PROC SQL calls with a value that has bytes
+  outside ASCII. New `KSUBSTR` counts characters; for ASCII values it is
+  `SUBSTR`, a value with bytes outside ASCII fails loud.
 * About 190 SAS functions as `sas_f_<name>()`, about 100 formats and
   informats, `PUT()` / `INPUT()` and user formats from PROC FORMAT. Missing
   and invalid arguments write the log NOTEs, set `_ERROR_` and give missing

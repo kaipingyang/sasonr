@@ -94,6 +94,7 @@ public sas_f_intz
 public sas_f_juldate
 public sas_f_juldate7
 public sas_f_klength
+public sas_f_ksubstr
 public sas_f_kurtosis
 public sas_f_largest
 public sas_f_lcm

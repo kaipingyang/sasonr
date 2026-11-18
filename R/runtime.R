@@ -605,26 +605,54 @@ sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
   }, character(1))
 }
 #' @export
-sas_f_substr <- function(x, pos, len = NULL, .at = NULL) {
+sas_f_substr <- function(x, pos, len = NULL, .at = NULL) substr_impl(x, pos, len, .at, "substr")
+# KSUBSTR: positions and length in characters.  For ASCII values it is SUBSTR;
+# an invalid position or length of a value with bytes outside ASCII is not
+# supported.
+#' @export
+sas_f_ksubstr <- function(x, pos, len = NULL, .at = NULL) substr_impl(x, pos, len, .at, "ksubstr")
+
+# SUBSTR counts positions and lengths in bytes (a UTF-8 session), KSUBSTR in
+# characters.  ASCII values: one byte per character.
+substr_impl <- function(x, pos, len, .at, fname) {
   x <- as_sas_chr(x)
   m <- max(length(x), length(pos), length(len))
   x <- rep_len(x, m)
-  n <- nchar(x)
+  wide <- chr_wide(x) & !is.na(x)
+  if (any(wide)) x[wide] <- chr_utf8(x[wide])
+  n <- nchar(x, type = if (fname == "substr") "bytes" else "chars")
   pos <- rep_len(trunc(pos), m)
   bad_pos <- is.na(pos) | pos < 1 | pos > n
+  bad_len <- rep(FALSE, m)
   if (is.null(len)) {
     end <- n
   } else {
     len <- rep_len(trunc(len), m)
     # a nonpositive or missing length returns the remainder (a NOTE: invalid argument)
     bad_len <- !bad_pos & (is.na(len) | len <= 0 | pos + len - 1 > n)
-    if (any(bad_len)) note_invalid_arg("substr", 3L, .at)
     end <- ifelse(is.na(len) | len <= 0, n, pmin(pos + len - 1, n))
   }
-  if (any(bad_pos)) note_invalid_arg("substr", 2L, .at)
-  out <- substr(x, pos, end)
+  if (fname == "ksubstr" && any(wide & (bad_pos | bad_len))) {
+    abort_unsupported("KSUBSTR with an invalid position or length for a value with bytes outside ASCII")
+  }
+  if (any(bad_len)) note_invalid_arg(fname, 3L, .at)
+  if (any(bad_pos)) note_invalid_arg(fname, 2L, .at)
+  out <- character(m)
+  byte_cut <- fname == "substr" & wide & !bad_pos
+  chr_cut <- !bad_pos & !byte_cut
+  out[chr_cut] <- substr(x[chr_cut], pos[chr_cut], end[chr_cut])
+  for (i in which(byte_cut)) {
+    v <- rawToChar(charToRaw(x[i])[pos[i]:end[i]])
+    # a start or end inside a multi-byte character leaves bytes that are not a
+    # character: not supported
+    if (!validUTF8(v)) {
+      abort_unsupported(sprintf("SUBSTR from byte %d to byte %d inside a multi-byte character",
+                                as.integer(pos[i]), as.integer(end[i])))
+    }
+    Encoding(v) <- "UTF-8"
+    out[i] <- v
+  }
   # an invalid position returns blank (a NOTE: invalid argument)
-  out[bad_pos] <- ""
   out
 }
 #' @export
@@ -636,6 +664,10 @@ sas_f_substr <- function(x, pos, len = NULL, .at = NULL) {
 sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
   x <- as_sas_chr(x)
   value <- as_sas_chr(value)
+  # values with bytes outside ASCII: not supported
+  if (any(chr_wide(x) | chr_wide(value), na.rm = TRUE)) {
+    abort_unsupported("SUBSTR on the left of = with a value that has bytes outside ASCII")
+  }
   m <- max(length(x), length(pos), length(value), if (is.null(len)) 1L else length(len))
   x <- rep_len(x, m)
   value <- rep_len(value, m)

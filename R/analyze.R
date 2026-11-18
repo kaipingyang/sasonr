@@ -34,6 +34,7 @@ fn_table <- list(
   right = fn_spec("char", 1, 1, "arg"), upcase = fn_spec("char", 1, 1, "arg"),
   lowcase = fn_spec("char", 1, 1, "arg"), propcase = fn_spec("char", 1, 1, "arg"),
   reverse = fn_spec("char", 1, 1, "arg"), substr = fn_spec("char", 2, 3, "arg"),
+  ksubstr = fn_spec("char", 2, 3, "arg"),
   scan = fn_spec("char", 2, 3, 200L), compress = fn_spec("char", 1, 2, "arg"),
   tranwrd = fn_spec("char", 3, 3, 200L), translate = fn_spec("char", 3, 3, "arg"),
   coalescec = fn_spec("char", 1, Inf, 200L)

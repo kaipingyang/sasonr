@@ -102,6 +102,7 @@ reference:
   - sas_f_indexc
   - sas_f_indexw
   - sas_f_klength
+  - sas_f_ksubstr
   - sas_f_left
   - sas_f_length
   - sas_f_lengthc

@@ -367,9 +367,14 @@ case_dom <- function(a) {
 for (nm in c("upcase", "lowcase", "propcase")) fn_policy[[nm]] <- fpol(dom = case_dom, nan = "none", math = FALSE)
 
 # Functions whose character arguments may have bytes outside ASCII: the case
-# functions above, and the lengths (counted in bytes; KLENGTH in characters).
-# Every other function with such an argument is outside its exact domain.
-chr_wide_ok_fns <- c("upcase", "lowcase", "propcase", "length", "lengthn", "lengthc", "klength")
+# functions above, the lengths (counted in bytes; KLENGTH in characters) and
+# SUBSTR (positions in bytes).  Every other function with such an argument is
+# outside its exact domain.  KSUBSTR stays outside: the length of a variable
+# that takes its length from KSUBSTR is not implemented.
+chr_wide_ok_fns <- c("upcase", "lowcase", "propcase", "length", "lengthn", "lengthc", "klength", "substr")
+# Of those, the functions available in a DATA step and in direct calls only
+# (%SYSFUNC and PROC SQL: outside the exact domain).
+chr_wide_data_fns <- "substr"
 
 #' Check a character argument of a SAS function for bytes outside ASCII
 #'

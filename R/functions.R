@@ -2049,7 +2049,7 @@ fn_table <- utils::modifyList(fn_table, list(
 # Argument types of functions that convert mismatched arguments (see
 # convert_fn_args()).
 fn_arg_types <- list(
-  substr = c("char", "num", "num"), scan = c("char", "num", "char", "char"),
+  substr = c("char", "num", "num"), ksubstr = c("char", "num", "num"), scan = c("char", "num", "char", "char"),
   compress = c("char", "char", "char"), index = c("char", "char"), round = c("num", "num"),
   intnx = c("char", "num", "num", "char"), intck = c("char", "num", "num", "char"), catx = "char"
 )
@@ -2078,7 +2078,7 @@ sas_f_cvt_c2n <- function(x, .at = NULL) {
 }
 
 # Functions whose arguments can be invalid (data error, _ERROR_ = 1).
-err_fns <- c("substr", "sqrt", "exp", "log", "log10", "log2", "mod", "modz", "mdy", "input", "inputn", "fact",
+err_fns <- c("substr", "ksubstr", "sqrt", "exp", "log", "log10", "log2", "mod", "modz", "mdy", "input", "inputn", "fact",
              "gamma", "arsin", "arcos", "intck", "intnx", "symget", "scan", "round", "rounde", "roundz", "catx", "cat", "cats", "catt", "cvt_c2n",
              "prxparse", "prxmatch", "prxchange", "band", "bor", "bxor", "bnot", "blshift", "brshift")
 

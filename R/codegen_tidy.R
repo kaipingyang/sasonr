@@ -305,7 +305,7 @@ gen_call <- function(e, cx) {
 # except the case and length functions.  Arguments known to be numeric are
 # not checked.
 chr_arg_gates <- function(e, args, cx) {
-  if (e$name %in% chr_wide_ok_fns) return(args)
+  if (e$name %in% chr_wide_ok_fns && !(e$name %in% chr_wide_data_fns && identical(cx$an$context, "sql"))) return(args)
   nodes <- unlist(lapply(e$args, function(a) {
     if (a$node == "of") lapply(a$vars, function(v) list(node = "var", name = v)) else list(a)
   }), recursive = FALSE)

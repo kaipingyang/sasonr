@@ -6,9 +6,9 @@
 \arguments{
 \item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 
-\item{pos}{Starting position, an integer from 1 to the length of \code{x}; an invalid position writes a note and sets the error flag.}
+\item{pos}{Starting position, an integer from 1 to the length of \code{x}; an invalid position writes a note and sets the error flag. In a UTF-8 session positions count bytes: a character outside ASCII takes two to four positions.}
 
-\item{len}{Optional number of characters; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log).}
+\item{len}{Optional number of bytes; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log). A start or end inside a multi-byte character is not supported (fails loud).}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -19,7 +19,7 @@ A vector with one result per element (arguments are recycled), as the SAS functi
 Extracts a substring. See the \href{https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm}{SAS documentation} (Functions and CALL Routines).
 }
 \section{Differences from R}{
- Invalid positions or lengths set \verb{_ERROR_} and write a NOTE; the result length is that of the source.
+ Invalid positions or lengths set \verb{_ERROR_} and write a NOTE; the result length is that of the source. \code{SUBSTR()} counts bytes, \code{substr()} counts characters (see \code{KSUBSTR()}). SUBSTR on the left of \code{=} with a value that has bytes outside ASCII, and \verb{\%SYSFUNC(SUBSTR())} or PROC SQL calls with such a value, are not supported.
 }
 
 \examples{
@@ -39,6 +39,14 @@ sas_f_substr("abcdef", 7)  # substr('abcdef',7) = ""
 # A length beyond the end: the rest of the string (with a NOTE and _ERROR_ = 1
 # in a DATA step).
 sas_f_substr("abcdef", 2, 10)  # substr('abcdef',2,10) = "bcdef"
+
+# In a UTF-8 session positions count bytes: the first three bytes of a value
+# with two-byte characters can be two characters.
+if (isTRUE(l10n_info()[["UTF-8"]])) {
+  x <- "\u00e9t\u00e9"
+  print(sas_f_substr(x, 1, 3))  # the first two characters of x
+  print(sas_f_length(sas_f_substr(x, 1, 3)))  # 3
+}
 }
 \seealso{
 Other character functions:
@@ -74,6 +82,7 @@ Other character functions:
 \code{\link[=sas_f_indexc]{sas_f_indexc()}},
 \code{\link[=sas_f_indexw]{sas_f_indexw()}},
 \code{\link[=sas_f_klength]{sas_f_klength()}},
+\code{\link[=sas_f_ksubstr]{sas_f_ksubstr()}},
 \code{\link[=sas_f_left]{sas_f_left()}},
 \code{\link[=sas_f_length]{sas_f_length()}},
 \code{\link[=sas_f_lengthc]{sas_f_lengthc()}},
