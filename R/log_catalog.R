@@ -53,6 +53,7 @@ log_catalog <- list(
                                            "there were <nobs> observations and <nvar> variables.")),
   ds.not_replaced_stopped = log_msg("warning", "WARNING: Data set WORK.<name> was not replaced because this step was stopped."),
   ds.not_replaced_incomplete = log_msg("warning", "WARNING: Data set WORK.<name> was not replaced because new file is incomplete."),
+  ds.merge_repeats = log_msg("note", "NOTE: MERGE statement has more than one data set with repeats of BY values."),
   ds.read = log_msg("note", "NOTE: There were <nobs> observations read from the data set WORK.<name>."),
   ds.read_where = log_msg("note", c("NOTE: There were <nobs> observations read from the data set WORK.<name>.",
                                     "      WHERE <where>;")),

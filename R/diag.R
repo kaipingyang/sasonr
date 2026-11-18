@@ -21,6 +21,8 @@ rt_reset <- function(rt = rt_diag()) {
   log_places_reset(rt)
   rt$mv_rerun <- FALSE
   rt$reads <- list()
+  # a MERGE with repeats of BY values in more than one data set (log NOTE)
+  rt$merge_repeats <- FALSE
   rt$proc_notes <- character()
   rt$flow_note <- FALSE
   # ODS OUTPUT requests of the step and the NOTEs of the data sets written (ods_output.R)

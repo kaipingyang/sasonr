@@ -531,9 +531,11 @@ log_step_close <- function(eng, kind, tr = NULL, env = NULL, stopped = FALSE, no
 
 # The observations read from each input data set.  PROC SORT reports no
 # observations read from an empty data set; PROC PRINT reports an empty one
-# as "No observations".
+# as "No observations".  A MERGE with repeats of BY values in more than one
+# data set says so first.
 log_emit_reads <- function(eng, tr) {
   rt <- rt_diag()
+  if (isTRUE(rt$merge_repeats)) log_emit(eng, id = "ds.merge_repeats", phase = "step_end")
   if (identical(tr$reasons, "PROC SORT")) rt$reads <- Filter(function(r) r$n > 0, rt$reads)
   print <- identical(tr$reasons, "PROC PRINT")
   for (r in rt$reads) {

@@ -100,9 +100,10 @@ data m; merge a b; by k; run;"
   expect_equal(res$work$m$y, 2)
 })
 
-test_that("MERGE fails loud when both inputs repeat a BY group", {
-  # the log NOTE about repeats of BY values is not implemented: a many-to-many
-  # MERGE is unsupported on the vectorised and the row-wise path
+test_that("MERGE walks observations when both inputs repeat a BY group", {
+  # A many-to-many MERGE pairs the two inputs
+  # observation by observation (the shorter input falls back to missing) and a
+  # common non-BY variable keeps the value from the last data set named.
   code <- "data a; input k x; datalines;
 1 10
 1 11
@@ -127,9 +128,15 @@ data d; input k v; datalines;
 ;
 run;
 data m2; merge c d; by k; run;"
-  msg <- "MERGE with repeats of BY values in more than one data set"
-  expect_error(sas_run(code), msg, class = "sasonr_unsupported")
-  expect_error(sas_run(code, level = "L3"), msg, class = "sasonr_unsupported")
+  withr::local_options(sasonr.step_notes = TRUE)
+  res <- sas_run(code)
+  expect_equal(res$work$m$k, c(1, 1, 2))
+  expect_equal(res$work$m$x, c(10, 11, 20))
+  expect_equal(res$work$m$y, c(100, 101, 200))
+  expect_equal(res$work$m2$k, c(1, 1))
+  expect_equal(res$work$m2$v, c(100, 101))
+  note <- "NOTE: MERGE statement has more than one data set with repeats of BY values."
+  expect_equal(sum(as.character(res$log) == note), 2L)
 })
 
 test_that("RENAME statement applies before output DROP=; data set WHERE= beats WHERE", {

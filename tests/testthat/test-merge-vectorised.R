@@ -1,5 +1,7 @@
 # Match-merge (MERGE + BY): the vectorised input table and the row-wise
-# (L3) PDV loop give the same data sets and the same log.
+# (L3) PDV loop give the same data sets and the same log (step NOTEs on).
+
+withr::local_options(sasonr.step_notes = TRUE)
 
 merge_levels <- function(res) vapply(res$translation$steps, `[[`, "", "level")
 
@@ -23,13 +25,10 @@ data a; length name $3; input id name $ v; label v = 'Value A'; format v 8.2; da
 data b; length name $5; input id name $ w v; datalines;
 1 alpha 100 20
 2 beta 200 21
-2 bet2 201 22
-2 bet3 202 23
 3 gamma 300 24
 ;
 data c; input id z; datalines;
 2 7
-3 8
 3 9
 5 10
 ;
@@ -52,10 +51,9 @@ data inner; merge a(in = ina) b(in = inb); by id; if ina and inb; run;
   res <- expect_merge_same(code, c("L1", "L1", "L1", "L2", "L2"))
   m <- res$work$m
   # a data set that has run out of rows in the group keeps its values
-  expect_equal(m$v[m$id %in% 2], c(21, 22, 23))
-  # NAME has the length of its first definition (A, $3)
-  expect_equal(trimws(m$name[m$id %in% 2]), c("bet", "bet", "bet"))
   expect_equal(m$w[m$id %in% 1], c(100, 100))
+  # NAME has the length of its first definition (A, $3)
+  expect_equal(trimws(m$name[m$id %in% 1]), c("alp", "ab"))
   expect_equal(m$v[m$id %in% 1], c(20, 11))
   # a group present in one data set only: the other data set's variables are missing
   expect_true(is.na(m$w[m$id %in% 4]))
@@ -70,24 +68,55 @@ data mm; merge b(keep = id w) c; by id; run;
   expect_merge_same(code, c("L1", "L1", "L1", "L2", "L2"))
 })
 
-test_that("repeats of BY values in more than one data set fail loud on both paths", {
-  many <- paste0(merge_inputs, "
+merge_note <- "NOTE: MERGE statement has more than one data set with repeats of BY values."
+
+test_that("many-to-many: the NOTE about repeats of BY values comes before the reads", {
+  code <- paste0(merge_inputs, "
+data b2; input id w; datalines;
+2 200
+2 201
+2 202
+;
 data c2; input id z; datalines;
 2 7
 2 8
 ;
-data mm; merge b c2; by id; run;
+data mm; merge b2 c2(in = inc); by id; put id= w= z=; run;
 ")
-  msg <- "MERGE with repeats of BY values in more than one data set"
-  expect_error(sas_run(many), msg, class = "sasonr_unsupported")
-  expect_error(sas_run(many, level = "L3"), msg, class = "sasonr_unsupported")
-  # three data sets: the repeats are in A and B (id 1), C has one row
-  three <- paste0(merge_inputs, "
+  res <- expect_merge_same(code, c("L1", "L1", "L1", "L1", "L1", "L2"))
+  # B has three rows for id 2, C2 two: the third row keeps C2's last value
+  expect_equal(res$work$mm$z[res$work$mm$id %in% 2], c(7, 8, 8))
+  lg <- as.character(res$log)
+  k <- which(lg == merge_note)
+  expect_length(k, 1L)
+  expect_identical(lg[k + 1:2], c("NOTE: There were 3 observations read from the data set WORK.B2.",
+                                  "NOTE: There were 2 observations read from the data set WORK.C2."))
+  expect_true(k > max(grep("^id=", lg)))
+})
+
+test_that("two many-to-many MERGE steps write one NOTE each; NONOTES drops it", {
+  code <- paste0(merge_inputs, "
 data b1; set b; output; if id = 1 then output; run;
 data m3; merge a b1 c; by id; run;
+data m4; merge a b1; by id; run;
 ")
-  expect_error(sas_run(three), msg, class = "sasonr_unsupported")
-  expect_error(sas_run(three, level = "L3"), msg, class = "sasonr_unsupported")
+  res <- expect_merge_same(code, c("L1", "L1", "L1", "L3", "L2", "L2"))
+  expect_equal(sum(as.character(res$log) == merge_note), 2L)
+  quiet <- sas_run(paste0("options nonotes;", code))
+  expect_equal(sum(as.character(quiet$log) == merge_note), 0L)
+})
+
+test_that("repeats of BY values in several data sets but different BY groups write no NOTE", {
+  code <- paste0(merge_inputs, "
+data d; input id u; datalines;
+2 1
+2 2
+;
+data m; merge a d; by id; run;
+")
+  res <- expect_merge_same(code, c("L1", "L1", "L1", "L1", "L2"))
+  expect_equal(sum(as.character(res$log) == merge_note), 0L)
+  expect_true("NOTE: There were 5 observations read from the data set WORK.A." %in% as.character(res$log))
 })
 
 test_that("missing BY values and DESCENDING", {

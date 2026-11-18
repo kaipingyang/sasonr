@@ -4,13 +4,7 @@
 \alias{sas_merge_input}
 \title{The input table of a match-merge (MERGE + BY): one row per row of the plan}
 \usage{
-sas_merge_input(
-  dfs,
-  by,
-  descending = rep(FALSE, length(by)),
-  in_vars = NULL,
-  .line = NULL
-)
+sas_merge_input(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL)
 }
 \description{
 One row per row of \code{\link[=sas_merge_plan]{sas_merge_plan()}}, with the values the program data
