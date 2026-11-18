@@ -61,7 +61,7 @@ sas_export_work <- function(res, dir, values = TRUE) {
     for (k in seq_along(vars)) {
       v <- vars[k]
       char <- is.character(d[[v]])
-      len <- m$len[[v]] %||% (if (char) max(1L, nchar(d[[v]])) else 8L)
+      len <- m$len[[v]] %||% (if (char) max(1L, chr_bytes(d[[v]])) else 8L)
       if (is.na(len)) len <- 8L
       attr_rows[[length(attr_rows) + 1L]] <- c(
         toupper(nm), k, disp[[k]], if (char) "char" else "num", len,

@@ -451,15 +451,10 @@ sas_f_propcase <- function(x, dlm = " /-(.\t") {
   }, as_sas_chr(x), dlm)
 }
 
-# a zero-length value (from TRIMN, STRIP, ...) has length 0; variables and literals are at least 1 long
+# a zero-length value (from TRIMN, STRIP, ...) has length 0; variables and literals are at least 1 long;
+# the length counts bytes (chr_bytes())
 #' @export
-sas_f_lengthc <- function(x) as.numeric(char_length(as_sas_chr(x)))
-
-# Number of characters: stringr for valid UTF-8 text, nchar() otherwise.
-char_length <- function(x) {
-  if (!is.character(x) || !all(validUTF8(x))) return(nchar(x))
-  stringr::str_length(x)
-}
+sas_f_lengthc <- function(x) as.numeric(chr_bytes(as_sas_chr(x)))
 #' @export
 sas_f_lengthm <- function(x) sas_f_lengthc(x)
 
@@ -2013,7 +2008,7 @@ fn_table <- utils::modifyList(fn_table, list(
   anyspace = fn_spec("num", 1, 2), anypunct = fn_spec("num", 1, 2), anyupper = fn_spec("num", 1, 2),
   anylower = fn_spec("num", 1, 2), notalpha = fn_spec("num", 1, 2), notdigit = fn_spec("num", 1, 2),
   notalnum = fn_spec("num", 1, 2), notspace = fn_spec("num", 1, 2), notupper = fn_spec("num", 1, 2),
-  notlower = fn_spec("num", 1, 2), notpunct = fn_spec("num", 1, 2),
+  notlower = fn_spec("num", 1, 2), notpunct = fn_spec("num", 1, 2), klength = fn_spec("num", 1),
   byte = fn_spec("char", 1, 1, 1L), rank = fn_spec("num", 1),
   ifc = fn_spec("char", 3, 4, 200L), ifn = fn_spec("num", 3, 4), choosec = fn_spec("char", 2, Inf, 200L),
   choosen = fn_spec("num", 2, Inf), whichc = fn_spec("num", 2, Inf), whichn = fn_spec("num", 2, Inf),
@@ -2096,6 +2091,7 @@ var_info_fns <- c("vname", "vlength", "vtype", "vlabel", "vformat", "vformatn", 
 #' @keywords internal
 sas_sort_values <- function(vals) {
   v <- unlist(vals)
+  if (is.character(v) && any(chr_wide(v))) chr_wide_gate("sortc")
   if (is.character(v)) return(as.list(v[order(sas_rtrim(v), method = "radix")]))
   codes <- sas_miss_code(v)
   as.list(v[order(ifelse(is.na(codes), 99L, codes), ifelse(is.na(v), 0, v), method = "radix")])

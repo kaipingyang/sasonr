@@ -276,6 +276,7 @@ gen_call <- function(e, cx) {
     if (e$lag$kind == "lag") return(rlang::call2("sas_lag_vec", x, n))
     return(rlang::expr((!!x - sas_lag_vec(!!x, !!n))))
   }
+  args <- chr_arg_gates(e, args, cx)
   if (e$name == "symget") args <- c(list(rlang::sym(".symtab")), args)
   in_sql <- identical(cx$an$context, "sql")
   if (e$name %in% names(fn_policy) && (!is.null(e$col) || in_sql)) {
@@ -298,6 +299,29 @@ gen_call <- function(e, cx) {
     out <- cg_call("sas_mv_res", c(list(out, rlang::call2("c", as.integer(e$line), as.integer(e$col))), inexact))
   }
   out
+}
+
+# Character arguments with bytes outside ASCII (sas_chr_arg()): every function
+# except the case and length functions.  Arguments known to be numeric are
+# not checked.
+chr_arg_gates <- function(e, args, cx) {
+  if (e$name %in% chr_wide_ok_fns) return(args)
+  nodes <- unlist(lapply(e$args, function(a) {
+    if (a$node == "of") lapply(a$vars, function(v) list(node = "var", name = v)) else list(a)
+  }), recursive = FALSE)
+  # no node per argument: every argument is checked
+  if (length(nodes) != length(args)) nodes <- vector("list", length(args))
+  line <- if (is.null(e$line)) NULL else as.integer(e$line)
+  exact <- if (isTRUE(cx$inexact)) list(.exact = FALSE)
+  for (k in seq_along(args)) {
+    a <- args[[k]]
+    if (is.null(a) || identical(a, quote(expr = )) || is.numeric(a) || (is.character(a) && !any(chr_wide(a)))) next
+    ty <- if (is.null(nodes[[k]])) NA_character_ else
+      tryCatch(expr_type(nodes[[k]], cx$an)$type, error = function(err) NA_character_)
+    if (identical(ty, "num")) next
+    args[k] <- list(cg_call("sas_chr_arg", c(list(a, e$name), if (length(line)) list(.line = line), exact)))
+  }
+  args
 }
 
 # Can evaluating this expression raise a SAS data error (sets _ERROR_)?
@@ -1078,7 +1102,7 @@ gen_row_stmt <- function(s, cx) {
     },
     put = list(assign_lang(rlang::sym(cx$sink), rlang::call2("c", rlang::sym(cx$sink), put_line_lang(s, cx)))),
     call = if (s$routine %in% c("missing", "sortn", "sortc")) gen_row_call_vars(s, cx) else {
-      args <- lapply(s$args, g)
+      args <- lapply(s$args, function(a) cg_call("sas_chr_arg", list(g(a), s$routine, .line = as.integer(s$line))))
       list(cg_call("sas_symput", c(list(rlang::sym(".symtab"), args[[1]], args[[2]], trim = s$routine == "symputx"),
                                    if (length(args) >= 3) list(scope = args[[3]]))))
     },

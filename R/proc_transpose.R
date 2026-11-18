@@ -193,12 +193,12 @@ sas_proc_transpose <- function(d, sp) {
     i <- info[[v]]
     list(name = v, disp = i$disp, char = i$char, len = i$len, fmt = i$fmt, informat = i$informat, label = i$label)
   }
-  name_len <- max(8L, nchar(vapply(vars, function(v) info[[v]]$disp, "")))
+  name_len <- max(8L, chr_bytes(vapply(vars, function(v) info[[v]]$disp, "")))
   cols <- c(lapply(sp$by, col_of), lapply(sp$copy, col_of))
   if (length(vars) > 0 || length(sp$copy) > 0) {
     cols <- c(cols, list(list(name = tolower(sp$name), disp = sp$name, char = TRUE, len = name_len, label = "NAME OF FORMER VARIABLE")))
     if (has_label) {
-      lab_len <- max(40L, nchar(vapply(vars, function(v) info[[v]]$label %||% "", "")))
+      lab_len <- max(40L, chr_bytes(vapply(vars, function(v) info[[v]]$label %||% "", "")))
       cols <- c(cols, list(list(name = tolower(sp$label), disp = sp$label, char = TRUE, len = lab_len, label = "LABEL OF FORMER VARIABLE")))
     }
   }

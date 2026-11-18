@@ -9,6 +9,7 @@
 #     class `sasonr_strict_warning`, once per function and R session);
 #   - the format registry for PUT() and INPUT() (a format given as text such as
 #     "8.2" is parsed first) and, as before, for PUTN/PUTC/INPUTN/INPUTC;
+#   - character arguments with bytes outside ASCII (sas_chr_arg());
 #   - the argument domain of the policy table (fn_policy.R) through
 #     sas_fcall(): arguments outside the exact domain go through the same
 #     strict gate, invalid arguments give SAS's missing result;
@@ -53,6 +54,9 @@ fn_layer_call <- function(name, impl, call, env) {
     if (!is.null(v)) vals[[i]] <- v
   }
   feature_check("function", name, context = "data")
+  # character arguments with bytes outside ASCII (sas_chr_arg(); PUT and INPUT
+  # check their values themselves)
+  if (!name %in% c(chr_wide_ok_fns, "put", "input")) for (v in vals) sas_chr_arg(v, name)
   if (name %in% names(fn_layer_fmt_arg)) {
     k <- match("fmt", nms)
     if (!is.na(k) && !empty[k]) vals[[k]] <- fn_layer_fmt(vals[[k]], fn_layer_fmt_arg[[name]])

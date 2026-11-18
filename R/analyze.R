@@ -163,7 +163,7 @@ expr_type <- function(e, st) {
   switch(e$node,
     num = ,
     missing = num,
-    str = list(type = "char", len = max(1L, nchar(e$value))),
+    str = list(type = "char", len = max(1L, chr_bytes(e$value))),
     var = {
       inf <- st$info[[e$name]]
       if (!is.null(inf) && identical(inf$type, "char")) list(type = "char", len = inf$len) else num
@@ -707,7 +707,7 @@ an_stmt <- function(s, st) {
             init <- if (k <= length(g$init)) g$init[[k]] else list(node = "missing", code = ".")
           }
           type <- if (is.null(init)) NA_character_ else if (init$node == "str") "char" else "num"
-          len <- if (identical(type, "char")) max(1L, nchar(init$value)) else NA_integer_
+          len <- if (identical(type, "char")) max(1L, chr_bytes(init$value)) else NA_integer_
           if (is.null(st$info[[vars[k]]]) && is.null(init)) st$retain_only <- c(st$retain_only, vars[k])
           reg_var(st, vars[k], type, len, retained = TRUE, disp = attr(vars, "disp")[vars[k]] %|NA|% vars[k])
           if (!is.null(init)) st$info[[vars[k]]]$init <- const_value(init)

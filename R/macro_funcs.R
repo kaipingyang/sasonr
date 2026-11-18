@@ -255,6 +255,10 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
       args[k]
     )
   })
+  # character arguments with bytes outside ASCII: as in a DATA step (sas_chr_arg())
+  if (!fname %in% chr_wide_ok_fns && any(vapply(vals, function(v) is.character(v) && any(chr_wide(v)), TRUE))) {
+    chr_wide_gate(fname, line, context = "sysfunc")
+  }
   f <- get(paste0("sas_f_", fname), envir = asNamespace("sasonr"))
   res <- switch(fname,
     putn = sas_format(vals[[1]], vals[[2]]),

@@ -27,6 +27,8 @@ sas_infile_open <- function(lines, line_no = seq_along(lines), opts = list(), in
   inf$instream <- instream
   lines <- lines[keep]
   line_no <- line_no[keep]
+  # column positions and widths count bytes: records with bytes outside ASCII are not supported
+  if (any(chr_wide(lines))) abort_unsupported("INPUT from records with bytes outside ASCII", line_no[which(chr_wide(lines))[1]])
   if (!is.null(opts$ls)) lines <- substr(lines, 1L, opts$ls)
   if (instream || isTRUE(opts$pad)) {
     w <- max(80L, if (instream) 80L * ceiling(max(c(1L, nchar(lines))) / 80L) else opts$lrecl %||% 256L)

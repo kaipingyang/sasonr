@@ -1214,13 +1214,25 @@ NULL
 #' @name sas_f_left
 NULL
 
+#' SAS `KLENGTH(string)`
+#'
+#' Number of characters up to the last non-blank character. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
+#'
+#' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks; a blank string is not supported (fails loud).
+#' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
+#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. `LENGTH()` counts bytes, `KLENGTH()` counts characters, as `nchar()` does.
+#' @example inst/examples/sas_f_klength.R
+#' @family character functions
+#' @name sas_f_klength
+NULL
+
 #' SAS `LENGTH(string)`
 #'
-#' Position of the last non-blank character (1 for a blank string). See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
+#' Number of bytes up to the last non-blank character (1 for a blank string). See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
 #'
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 1 for a blank string.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length. In a UTF-8 session the length counts bytes: a character outside ASCII takes two to four bytes, while `nchar()` counts it once.
 #' @example inst/examples/sas_f_length.R
 #' @family character functions
 #' @name sas_f_length
@@ -1228,11 +1240,11 @@ NULL
 
 #' SAS `LENGTHC(string)`
 #'
-#' Length including trailing blanks. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
+#' Number of bytes including trailing blanks. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
 #'
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result includes trailing blanks.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length. In a UTF-8 session the length counts bytes: a character outside ASCII takes two to four bytes, while `nchar()` counts it once.
 #' @example inst/examples/sas_f_lengthc.R
 #' @family character functions
 #' @name sas_f_lengthc
@@ -1252,11 +1264,11 @@ NULL
 
 #' SAS `LENGTHN(string)`
 #'
-#' Length without trailing blanks (0 for a blank string). See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
+#' Number of bytes without trailing blanks (0 for a blank string). See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
 #'
 #' @param x Character string. A numeric value is first converted to character with the BEST12. format. The result excludes trailing blanks and is 0 for a blank string.
 #' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
-#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length. In a UTF-8 session the length counts bytes: a character outside ASCII takes two to four bytes, while `nchar()` counts it once.
 #' @example inst/examples/sas_f_lengthn.R
 #' @family character functions
 #' @name sas_f_lengthn
