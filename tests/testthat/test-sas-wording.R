@@ -8,7 +8,12 @@ sas_wording_allowed <- data.frame(
     "as a SAS-supplied format",
     "Option value for SAS option LINESIZE",
     "the SAS 9.4 inventory",
-    "the edge of the SAS fuzz window"
+    "the edge of the SAS fuzz window",
+    "not a SAS name",
+    "of the SAS program",
+    "# SAS character values",
+    "The SAS text must be",
+    "the SAS position of the statement"
   ),
   reason = c(
     "the line of the user's SAS program (messages, generated-code headers)",
@@ -16,7 +21,12 @@ sas_wording_allowed <- data.frame(
     "the built-in formats of the SAS language, named in ERROR 48-59 of the program",
     "a system option of the SAS language, named in ERROR 18-12 of the program",
     "SAS 9.4 as the language version",
-    "describes the documented rounding fuzz of SAS (a fail-loud message)"
+    "describes the documented rounding fuzz of SAS (a fail-loud message)",
+    "the naming rules of the SAS language (a fail-loud message)",
+    "the user's SAS program (header of a script written by sas_script())",
+    "comment in a script: the data set keeps the attributes of character values in the program",
+    "the SAS program text given to sas_script() (an argument error)",
+    "the line and column of the statement in the user's SAS program"
   )
 )
 
