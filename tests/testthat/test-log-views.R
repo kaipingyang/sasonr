@@ -278,6 +278,9 @@ test_that("the syntax-check NOTE is one line when it fits LINESIZE, two lines ot
   expect_identical(one[1], paste("NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
                                  "This prevents execution of subsequent data modification statements."))
   expect_false(startsWith(one[2], "      This prevents"))
+  # the fit is judged on the 146 characters of the text that names SAS
+  expect_false(startsWith(sc("options linesize=146;\n")[2], "      This prevents"))
+  expect_identical(sc("options linesize=145;\n")[2], "      This prevents execution of subsequent data modification statements.")
 })
 
 test_that("a numbered ERROR is followed by a blank line, other ERRORs are not", {

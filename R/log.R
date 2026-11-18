@@ -413,7 +413,11 @@ log_render <- function(id, args = list(), ls = rt_linesize()) {
     linesize = log_wrap(paste(lines, collapse = " "), ls = ls),
     join = {
       one <- paste(trimws(lines, "left"), collapse = " ")
-      if (nchar(one) <= ls) one else lines
+      # the fit is judged on the documented text, which names the system
+      # with a word three characters shorter than "sasonr"
+      w <- nchar(one)
+      if (isTRUE(m$neutral)) w <- w - 3L * lengths(regmatches(one, gregexpr("\\bsasonr\\b", one)))
+      if (w <= ls) one else lines
     },
     rlang::abort(paste0("log message `", id, "`: unknown wrap rule `", m$wrap, "`."), .internal = TRUE)
   )
