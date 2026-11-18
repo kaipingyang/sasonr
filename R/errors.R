@@ -266,6 +266,7 @@ err_data_schema <- function(eng, step) {
   # the names in an invalid statement (ERROR 180-322) must be variables the
   # step compiles anyway: what a new name there adds is not supported
   invalid_names <- unlist(lapply(step$stmts, function(s) if (identical(s$stmt, "failed") && s$kind == "invalid") s$vars))
+  failed <- any(vapply(step$stmts, function(s) identical(s$stmt, "failed"), logical(1)))
   for (s in step$stmts) {
     if (identical(s$stmt, "failed")) {
       r <- err_failed_stmt(s$kind, s$vars, if (s$kind == "assign") s$vars[1] else NULL, s$line)
@@ -276,6 +277,10 @@ err_data_schema <- function(eng, step) {
     }
   }
   step$stmts <- stmts
+  # a call with too many arguments compiles with its declared arguments
+  # (an_extra_args())
+  step$extra_args <- TRUE
+  replaced <- FALSE
   for (attempt in seq_len(length(stmts) + 1L)) {
     tr <- tryCatch(translate_step(step, eng$session$meta, eng$level),
                    sasonr_syntax_error = function(e) e, sasonr_runtime_error = function(e) e, error = function(e) NULL)
@@ -283,6 +288,15 @@ err_data_schema <- function(eng, step) {
     if (!inherits(tr, "condition")) {
       meta <- tr$meta[vapply(step$outputs, `[[`, "", "name")]
       if (!all(vapply(meta, function(m) all(invalid_names %in% m$vars), logical(1)))) return(NULL)
+      # the type conversion NOTE of a step stopped by a call with too many
+      # arguments; unknown when a statement failed to parse or was replaced
+      # below (what it converts, and the type it gives its target)
+      if (isTRUE(ct_diag()$extra_args)) {
+        if (replaced || failed) {
+          abort_unsupported("the type conversion NOTE of a step with a call with too many arguments and another ERROR", step$line)
+        }
+        attr(meta, "conversion_notes") <- conversion_notes()
+      }
       return(meta)
     }
     # an ERROR of the analyzer at one statement: replace it by what it contributes at compile time
@@ -295,6 +309,7 @@ err_data_schema <- function(eng, step) {
     r <- err_failed_stmt(kind, vars, if (kind == "assign") s$target$name else NULL, s$line)
     if (is.null(r)) return(NULL)
     step$stmts <- append(step$stmts[-k], r, after = k - 1L)
+    replaced <- TRUE
   }
   NULL
 }
@@ -339,7 +354,7 @@ err_recover_step <- function(eng, text) {
   }
   meta <- err_data_schema(eng, step)
   if (is.null(meta) || any(vapply(meta, is.null, logical(1)))) return(NULL)
-  list(kind = "data", outputs = meta, syntax_check = TRUE)
+  list(kind = "data", outputs = meta, syntax_check = TRUE, conversion_notes = attr(meta, "conversion_notes"))
 }
 
 err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
@@ -414,6 +429,10 @@ engine_step_error <- function(eng, e, text, sql = FALSE) {
   # the rest of the step's lines, then what the stopped step writes
   log_source_read(eng, eng$chunk_end)
   log_boundary(eng)
+  # the type conversion NOTEs of the compiled step come before it stops
+  if (inherits(e, "sasonr_syntax_error") && isTRUE(eng$session$options$notes) && eng$step_notes) {
+    log_emit_lines(eng, rec$conversion_notes, phase = "compile")
+  }
   log_emit(eng, id = "step.stopped")
   # one NOTE per step, also when the step has several ERRORs
   if (isTRUE(rec$syntax_check) && !isTRUE(eng$syntax_check) && !isTRUE(eng$session$options$nosyntaxcheck)) {

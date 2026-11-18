@@ -111,3 +111,19 @@ test_that("an OF list that matches no variable is ERROR 71-185", {
   expect_equal(r$status, "error")
   expect_match(r$errors[1], "ERROR 71-185", fixed = TRUE)
 })
+
+test_that("an extra argument of a call with too many arguments takes the last argument's type", {
+  old <- options(sasonr.step_notes = TRUE)
+  on.exit(options(old))
+  r <- sas_run("data a;\n  r = scan('a b', 1, ' ', 'm', 2);\n  l = length(r);\nrun;", on_error = "sas")
+  expect_equal(r$status, "error")
+  m <- msgs(r)
+  k <- grep("Numeric values have been converted to character values", m, fixed = TRUE)
+  expect_length(k, 1L)
+  expect_match(m[k + 1L], "^ +2:32 *$")
+  expect_lt(k, grep("stopped processing this step", m, fixed = TRUE))
+  expect_gt(k, grep("too many arguments", m, fixed = TRUE)[1])
+  # a numeric extra argument after a numeric last argument is not converted
+  r <- sas_run("data a;\n  r = substr('abc', 1, 2, 3);\nrun;", on_error = "sas")
+  expect_false(any(grepl("have been converted", msgs(r), fixed = TRUE)))
+})

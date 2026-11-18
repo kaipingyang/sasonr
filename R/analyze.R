@@ -382,16 +382,12 @@ an_call <- function(e, st) {
     # the accepted argument counts (feature registry, from the SAS inventory): more or fewer is a compile-time ERROR
     sas_n <- registry_arg_counts(e$name)
     if (!is.null(sas_n)) {
-      if (!is.na(sas_n[2]) && length(e$args) > sas_n[2]) {
-        abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line, e$col, e$name)
-      }
+      if (!is.na(sas_n[2]) && length(e$args) > sas_n[2]) e <- an_extra_args(e, st, sas_n[2])
       if (length(e$args) < sas_n[1] && nargs < sas_n[1]) {
         abort_syntax(paste0("The ", toupper(e$name), " function call does not have enough arguments (ERROR 71-185)"), e$line, e$col, e$name)
       }
     }
-    if (length(e$args) > spec$max && e$name %in% fn_max_exact) {
-      abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line, e$col, e$name)
-    }
+    if (length(e$args) > spec$max && e$name %in% fn_max_exact) e <- an_extra_args(e, st, spec$max)
     if (length(e$args) > spec$max) {
       # optional arguments beyond those implemented here are not supported
       abort_unsupported(paste0("more than ", spec$max, " arguments to ", toupper(e$name)), e$line)
@@ -429,6 +425,31 @@ an_call <- function(e, st) {
     e$args[[1]] <- list(node = "call", name = "cvt_c2n", args = list(a),
                         line = a$line %||% e$line, col = a$col %||% e$col, construct = TRUE)
   }
+  e
+}
+
+# A call with more than `max` arguments is a compile-time ERROR.  When the
+# stopped step is compiled again for what it leaves in WORK (`st$extra_args`,
+# err_data_schema()), the call keeps its first `max` arguments and each extra
+# argument still takes the type of the last declared argument: a mismatch is
+# converted, with a place in the conversion NOTE.
+an_extra_args <- function(e, st, max) {
+  if (!isTRUE(st$extra_args)) {
+    abort_syntax(paste0("The ", toupper(e$name), " function call has too many arguments (ERROR 72-185)"), e$line, e$col, e$name)
+  }
+  types <- fn_arg_types[[e$name]] %||% registry_arg_types(e$name, max)
+  want <- if (length(types)) types[length(types)] else NA_character_
+  if (is.na(want)) abort_unsupported(paste0("the argument types of a ", toupper(e$name), " call with too many arguments"), e$line)
+  for (a in e$args[-seq_len(max)]) {
+    if (a$node %in% c("of", "omitted")) abort_unsupported(paste0("an extra OF list or omitted argument to ", toupper(e$name)), e$line)
+    a <- an_expr(a, st)
+    if (expr_type(a, st)$type != want) {
+      log_place(if (want == "char") "conv.n2c" else "conv.c2n", a$line %||% e$line, a$col %||% e$col)
+    }
+  }
+  e$args <- e$args[seq_len(max)]
+  ct <- ct_diag()
+  ct$extra_args <- TRUE
   e
 }
 
@@ -989,6 +1010,7 @@ resolve_ds_items <- function(items, vars, line) {
 #' @export
 sas_analyze <- function(step, meta = list(), level = "auto") {
   st <- new_state(meta)
+  st$extra_args <- isTRUE(step$extra_args)
   # BY first: FIRST./LAST. variables may be referenced anywhere in the step.
   by <- Filter(function(s) s$stmt == "by", step$stmts)
   if (length(by) > 1) abort_unsupported("more than one BY statement", by[[2]]$line)
