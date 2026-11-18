@@ -72,9 +72,11 @@ test_that("blank literals: QUOTE and TRANWRD", {
 test_that("STRIP and TRIM: blanks only, all-blank values, missing values, other characters kept", {
   x <- c("  ab  ", "", "   ", strrep(" ", 5000), NA, "\tx\t", "ab \n")
   expect_identical(sas_f_strip(x), c("ab", "", "", "", NA, "\tx\t", "ab \n"))
-  # bytes outside ASCII: not supported
-  expect_error(sas_f_strip("stra\u00dfe  "), class = "sasonr_strict_error")
-  expect_error(sas_f_trim("\u00e9t\u00e9 "), class = "sasonr_strict_error")
+  # bytes outside ASCII (UTF-8 session): blanks are removed by bytes
+  if (isTRUE(l10n_info()[["UTF-8"]])) {
+    expect_identical(sas_f_strip("stra\u00dfe  "), "stra\u00dfe")
+    expect_identical(sas_f_trim("\u00e9t\u00e9 "), "\u00e9t\u00e9")
+  }
   expect_identical(sas_f_trim(c("ab  ", "", "   ", strrep(" ", 5000), NA, " a\t ")),
                    c("ab", " ", " ", " ", NA, " a\t"))
   expect_identical(sas_f_strip(c(a = " x ")), c(a = "x"))
@@ -86,7 +88,8 @@ test_that("COUNT: non-overlapping matches, empty and missing substrings, T and I
   expect_identical(sas_f_count(c(NA, "x", "   "), ""), c(0, 0, 0)) # empty substring before missing x
   expect_identical(sas_f_count("AbA ", "a ", "it"), 2)
   expect_identical(sas_f_count(c("a a ", "a a "), "a ", c("", "t")), c(2, 2))
-  expect_error(sas_f_count("stra\u00dfe", "SS", "i"), class = "sasonr_strict_error")
+  # the I modifier folds ASCII letters only
+  if (isTRUE(l10n_info()[["UTF-8"]])) expect_identical(sas_f_count("stra\u00dfe", "SS", "i"), 0)
   expect_identical(sas_f_count(strrep(" ", 3000), "  "), 1500)
   expect_error(sas_f_count("abc", NA_character_), class = "sasonr_unsupported")
 })
@@ -94,8 +97,10 @@ test_that("COUNT: non-overlapping matches, empty and missing substrings, T and I
 test_that("COMPRESS with a character list and modifiers; LENGTHC counts bytes", {
   expect_identical(sas_f_compress(c("a b\tc", "", "   ")), c("ab\tc", "", ""))
   expect_identical(sas_f_compress(c("A1b2", "x"), "", "kd"), c("12", ""))
-  expect_error(sas_f_compress(c("Stra\u00dfe 1", "a"), "a"), class = "sasonr_strict_error")
-  expect_error(sas_f_compress("ab", "\u00df"), class = "sasonr_strict_error")
+  if (isTRUE(l10n_info()[["UTF-8"]])) {
+    expect_identical(sas_f_compress(c("Stra\u00dfe 1", "a"), "a"), c("Str\u00dfe 1", ""))
+    expect_identical(sas_f_compress("ab", "\u00df"), "ab")
+  }
   expect_identical(sas_f_compress(c("aAbB", "AA"), "a", "i"), c("bB", ""))
   expect_identical(sas_f_compress(c("a]b^c-d\\e", "x"), "]^-\\"), c("abcde", "x"))
   expect_identical(sas_f_compress(c("a\tb c", " "), "", "s"), c("abc", ""))
@@ -104,6 +109,6 @@ test_that("COMPRESS with a character list and modifiers; LENGTHC counts bytes", 
 
 test_that("TRANWRD with one target: blanks, empty and missing values", {
   expect_identical(sas_f_tranwrd(c("a b a", "", NA, "aa  "), "a", "xy"), c("xy b xy", "", NA, "xyxy  "))
-  expect_error(sas_f_tranwrd(c(n = "stra\u00dfe"), "\u00df", "ss"), class = "sasonr_strict_error")
+  if (isTRUE(l10n_info()[["UTF-8"]])) expect_identical(sas_f_tranwrd(c(n = "stra\u00dfe"), "\u00df", "ss"), "strasse")
   expect_identical(sas_f_tranwrd(c("ab", "b"), "b", ""), c("a", ""))
 })

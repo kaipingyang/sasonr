@@ -97,7 +97,7 @@ just_left <- function(s, w) {
   if (is.na(w)) return(s)
   # the width counts bytes: text with bytes outside ASCII (a user format
   # label, an aligned PUT result) is not supported
-  if (any(chr_wide(s), na.rm = TRUE)) chr_wide_gate("put")
+  if (!isTRUE(.active$chr_bytes) && any(chr_wide(s), na.rm = TRUE)) chr_wide_gate("put")
   s <- substr(s, 1L, w)
   paste0(s, strrep(" ", pmax(0L, w - nchar(s))))
 }
@@ -584,9 +584,13 @@ sas_format <- function(x, fmt = NULL) {
   if (is.null(uf) && is.character(x) && !fmt$char) uf <- user_fmt(fmt$name, TRUE)
   if (!is.null(uf)) return(apply_user_fmt(x, uf, fmt))
   if (is.character(x)) {
-    # the width of a format counts bytes: values with bytes outside ASCII are
-    # not supported, except with $HEXw. (which writes the bytes)
-    if (fmt$name != "hex" && any(chr_wide(x), na.rm = TRUE)) chr_wide_gate("put")
+    # the width of a format counts bytes: $w., $CHARw. and $QUOTEw. work on
+    # byte text (a cut inside a multi-byte character fails loud), $HEXw. writes
+    # the bytes; other formats with bytes outside ASCII are not supported
+    if (fmt$name != "hex" && chr_any_wide(x)) {
+      if (!fmt$name %in% c("", "char", "quote")) chr_wide_gate("put")
+      return(chr_bytes_call("put", sas_format, list(x, fmt), chr = TRUE))
+    }
     w <- fmt$w
     if (fmt$name == "quote" && is.na(w)) w <- max(nchar(x), 0L) + 2L
     if (!fmt$name %in% char_fmt_names) abort_unsupported(paste0("format ", fmt$text))
