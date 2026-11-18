@@ -204,8 +204,8 @@ classify_step <- function(an) {
       if (length(setdiff(ptr_reads, in_vars)) > 0) add3("INPUT pointer depends on non-INPUT variables")
     }
     if (rd$stmt == "merge") {
-      add3("MERGE (match-merge reads)")
       if (is.null(an$by)) abort_unsupported("MERGE without BY (one-to-one merge)", rd$line)
+      for (r in merge_row_reasons(an)) add3(r)
     }
     exec_idx <- which(!vapply(stmts, is_decl, logical(1)))
     rdr_idx <- which(vapply(stmts, function(s) s$stmt %in% c("set", "merge", "input"), logical(1)))
@@ -305,6 +305,22 @@ classify_step <- function(an) {
   reasons <- switch(level, L3 = sc$l3, L2 = sc$l2, L1 = "no cross-row state")
   list(level = level, reasons = reasons, sum_plan = sum_plan, skip_top = skip_top,
        output_pattern = output_pattern, carry_plan = carry_plan)
+}
+
+# Why a match-merge step has no vectorised form (character(0): it has one).
+# The vectorised input table holds the values the data sets write; a variable
+# read by MERGE that the step assigns or retains keeps the changed value on
+# the next row of its BY group where its data set has no row, which only the
+# row-wise path does.
+merge_row_reasons <- function(an) {
+  rd <- an$readers[[1]]
+  vars <- unique(vctrs::list_unchop(lapply(rd$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()))
+  assigned <- unique(vctrs::list_unchop(lapply(an$stmts, stmt_assigns_all), ptype = character(), name_spec = rlang::zap()))
+  hit <- intersect(vars, union(assigned, an$retain_stmt_vars))
+  if (length(hit)) {
+    return(paste0("MERGE with an assignment to or RETAIN of a variable read by MERGE (", paste(hit, collapse = ", "), ")"))
+  }
+  character()
 }
 
 has_lag_call <- function(e) {

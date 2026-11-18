@@ -291,9 +291,20 @@ test_that("the tidy form keeps body comments where a pipeline was merged", {
   expect_true("b <- a |>" %in% txt)
 })
 
-test_that("a MERGE step runs in a session block that says why", {
-  prog <- "data a; k = 1; x = 1; run;\ndata b; k = 1; y = 2; run;\ndata c; merge a b; by k; run;"
+test_that("a row-wise MERGE step runs in a session block that says why", {
+  prog <- "data a; k = 1; x = 1; run;\ndata b; k = 1; y = 2; run;\ndata c; merge a b; by k; x = 5; run;"
   txt <- as.character(sas_script(sas_translate(prog), tidy = TRUE))
   expect_true("# In a sasonr session: a MERGE step (MERGE runs row by row, L3)" %in% txt)
   expect_true(all(c("a <- tibble::tibble(.rows = 1L) |>", "b <- tibble::tibble(.rows = 1L) |>") %in% txt))
+})
+
+test_that("a vectorised MERGE step is a pipeline of the tidy form", {
+  prog <- "data a; k = 1; x = 1; run;\ndata b; k = 1; y = 2; run;\ndata c; merge a b; by k; run;"
+  ref <- sas_run(prog)
+  sc <- sas_script(sas_translate(prog), tidy = TRUE)
+  txt <- as.character(sc)
+  expect_false(any(grepl("In a sasonr session", txt, fixed = TRUE)))
+  expect_true("c <- sas_merge_input(" %in% txt)
+  env <- run_script(sc)
+  expect_identical(tibble::as_tibble(env$c), ref$work$c)
 })

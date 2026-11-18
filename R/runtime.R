@@ -1298,6 +1298,58 @@ sas_merge_read <- function(pdv, rows, plan, p, reset, in_vars, by) {
   pdv
 }
 
+#' The input table of a match-merge (MERGE + BY): one row per row of the plan
+#'
+#' One row per row of [sas_merge_plan()], with the values the program data
+#' vector holds after the MERGE read of that row: at the first row of a BY
+#' group every variable starts missing; each data set that has a row writes
+#' its variables in MERGE order (a later data set wins); a data set that has
+#' run out of rows in the group writes nothing, so its variables keep their
+#' value from the previous row of the group.  IN= variables and FIRST./LAST.
+#' flags come from the plan.  Only valid when the step does not change a
+#' variable read by MERGE (the row-wise path carries the changed value).
+#' @export
+#' @keywords internal
+sas_merge_input <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL) {
+  plan <- sas_merge_plan(dfs, by, descending)
+  vars <- unique(vctrs::list_unchop(lapply(dfs, names), ptype = character(), name_spec = rlang::zap()))
+  n <- nrow(plan)
+  pos <- seq_len(n)
+  # the plan row that starts the BY group of each row
+  gstart <- if (n) cummax(ifelse(plan$.new, pos, 0L)) else integer()
+  out <- list()
+  for (v in vars) {
+    js <- which(vapply(dfs, function(d) v %in% names(d), NA))
+    cols <- lapply(dfs[js], `[[`, v)
+    vals <- vctrs::vec_c(!!!lapply(cols, function(x) { attributes(x) <- NULL; x }))
+    offs <- cumsum(c(0L, lengths(cols)))[seq_along(js)]
+    # the row (in `vals`) a data set writes on each plan row; later data sets win
+    src <- rep(NA_integer_, n)
+    for (k in seq_along(js)) {
+      r <- plan[[paste0(".r", js[k])]]
+      hit <- !is.na(r)
+      src[hit] <- offs[k] + r[hit]
+    }
+    # the last row of the group so far on which some data set wrote `v`
+    w <- if (n) cummax(ifelse(is.na(src), 0L, pos)) else integer()
+    idx <- rep(NA_integer_, n)
+    take <- w > 0L & w >= gstart
+    idx[take] <- src[w[take]]
+    col <- vals[idx]
+    a <- attributes(cols[[1]])
+    if (length(a)) attributes(col) <- a[setdiff(names(a), "names")]
+    out[[v]] <- col
+  }
+  d <- tibble::as_tibble(out, .rows = n)
+  for (j in seq_along(in_vars)) {
+    if (!is.na(in_vars[j])) d[[in_vars[j]]] <- if (n) plan[[paste0(".in", j)]] else numeric()
+  }
+  for (v in by) {
+    for (f in paste0(c("first.", "last."), v)) d[[f]] <- if (n) plan[[f]] else numeric()
+  }
+  pad_char_columns(d)
+}
+
 #' Collect PDV rows written by OUTPUT into a tibble
 #' @export
 #' @keywords internal

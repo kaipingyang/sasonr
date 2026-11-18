@@ -449,6 +449,15 @@ source_item <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] els
   }
   srcs <- lapply(rd$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
   in_vars <- vapply(rd$datasets, function(d) d$options$in_var %||% NA_character_, "")
+  if (rd$stmt == "merge") {
+    # match-merge: the input table of the observation plan (FIRST./LAST. included)
+    args <- list(cg_call("list", lapply(srcs, `[[`, "lang")), by = cg_val(an$by$vars),
+                 descending = cg_val(an$by$descending), in_vars = cg_val(in_vars))
+    return(cgi(cg_call("sas_merge_input", args),
+               sprintf("sas_merge_input(\n  list(\n    %s\n  ),\n  %s\n)",
+                       paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n    "),
+                       paste0(names(args)[-1], " = ", vapply(args[-1], cg_text, ""), collapse = ", "))))
+  }
   if (length(srcs) == 1 && all(is.na(in_vars))) return(srcs[[1]])
   by <- if (!is.null(an$by) && length(srcs) > 1) list(by = cg_val(an$by$vars), descending = cg_val(an$by$descending))
   args <- c(list(cg_call("list", lapply(srcs, `[[`, "lang")), in_vars = cg_val(in_vars)), by)
@@ -470,7 +479,7 @@ add_input_stages <- function(cx, include_n = TRUE) {
   an <- cx$an
   rd <- if (length(an$readers) > 0) an$readers[[1]] else NULL
   if (include_n && "_n_" %in% an$order) add_stage(cx, "mutate", list(`_n_` = quote(as.numeric(dplyr::row_number()))))
-  if (!is.null(rd) && !is.null(rd$end) && rd$stmt == "set") {
+  if (!is.null(rd) && !is.null(rd$end) && rd$stmt %in% c("set", "merge")) {
     add_stage(cx, "mutate", stats::setNames(list(quote(as.numeric(dplyr::row_number() == dplyr::n()))), rd$end))
   }
   if (!is.null(an$by) && !is.null(rd) && rd$stmt == "set") {

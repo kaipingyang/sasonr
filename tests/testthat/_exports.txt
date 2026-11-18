@@ -265,6 +265,7 @@ internal sas_last
 internal sas_le
 internal sas_lt
 internal sas_max_op
+internal sas_merge_input
 internal sas_merge_plan
 internal sas_merge_read
 internal sas_min_op
