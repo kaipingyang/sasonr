@@ -1007,7 +1007,7 @@ gen_row_step <- function(an) {
     if (has_input) quote(sas_input_iter_end(.inf)),
     quote(if (.status == "stop") break),
     out_if,
-    if (!is.null(rd)) rlang::expr(if (!.read) {
+    unread_if <- if (!is.null(rd)) rlang::expr(if (!.read) {
       sas_loop_unread(!!loop_read_why(an$stmts))
       break
     }) else quote(break)
@@ -1015,6 +1015,10 @@ gen_row_step <- function(an) {
   loop <- Filter(Negate(is.null), loop)
   loop_text <- unlist(lapply(loop, function(x) {
     if (identical(x, status)) return(status_text)
+    # a block of two calls: one statement per line, so the script parses
+    if (!is.null(rd) && identical(x, unread_if)) {
+      return(c("  if (!.read) {", paste0("    ", cg_text(x[[3]][[2]])), "    break", "  }"))
+    }
     if (implicit_output && identical(x, out_if)) {
       return(c("  if (.status == \"ok\") {", indent_lines(vapply(outs, cg_text, ""), 2L), "  }"))
     }
