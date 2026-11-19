@@ -327,6 +327,16 @@ the development version provides.
   of `=`, `%SYSFUNC(SUBSTR())` and PROC SQL calls with a value that has bytes
   outside ASCII. New `KSUBSTR` counts characters; for ASCII values it is
   `SUBSTR`, a value with bytes outside ASCII fails loud.
+* `ANY*` and `NOT*` take the class of a character outside ASCII from a
+  table of measured classes: every code point from U+00A0 to U+00FF, plus
+  U+0100, U+0152, U+0391, U+4E2D and U+20AC. Among them, the multiplication
+  and division signs are neither letters nor punctuation, the micro sign is a
+  lower case letter, the ordinal indicators and U+4E2D are letters that are
+  neither upper nor lower case, the no-break space is a space and the soft
+  hyphen is not printable. U+1D11E is known to be neither a letter nor
+  punctuation; its other classes and all other characters outside ASCII fail
+  loud. New `ANYPRINT` and `NOTPRINT` find the first printable character
+  (blank to tilde in ASCII) or the first character that is not printable.
 * In a UTF-8 session more character functions accept values with bytes
   outside ASCII and count in bytes: `INDEX`, `INDEXW`, `INDEXC`, `FIND`,
   `FINDW`, `FINDC`, `VERIFY`, `COUNT`, `COUNTC`, `COUNTW`, the `ANY*` and
@@ -334,9 +344,8 @@ the development version provides.
   `COMPBL`, the `CAT` functions, `SCAN`, `SUBSTRN`, `COMPRESS`, `TRANSLATE`,
   `REVERSE` and `REPEAT`. Character lists and delimiters are sets of bytes;
   the `I` modifier and the class modifiers recognise ASCII characters only;
-  `ANY*` and `NOT*` classify the characters whose class is documented (e acute, E acute,
-  U diaeresis, the euro sign; other characters outside ASCII fail loud) and
-  return the position of the first byte. A result that would leave part of a
+  `ANY*` and `NOT*` classify the characters of a table of measured classes
+  (see above) and return the position of the first byte. A result that would leave part of a
   multi-byte character fails loud. A `CAT` result cut inside a character by a
   shorter target variable is blank, with the buffer WARNING and `_ERROR_`.
   The colon comparison (`=:`) truncates in bytes, and `$w.`, `$CHARw.` and

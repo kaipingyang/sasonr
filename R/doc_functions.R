@@ -64,6 +64,19 @@ NULL
 #' @name sas_f_anylower
 NULL
 
+#' SAS `ANYPRINT(string <, start>)`
+#'
+#' Position of the first printable character. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
+#'
+#' @param x Character string to search. A numeric value is first converted to character with the BEST12. format.
+#' @param start Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+#' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
+#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @example inst/examples/sas_f_anyprint.R
+#' @family character functions
+#' @name sas_f_anyprint
+NULL
+
 #' SAS `ANYPUNCT(string <, start>)`
 #'
 #' Position of the first punctuation character. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
@@ -1609,6 +1622,19 @@ NULL
 #' @example inst/examples/sas_f_notlower.R
 #' @family character functions
 #' @name sas_f_notlower
+NULL
+
+#' SAS `NOTPRINT(string <, start>)`
+#'
+#' Position of the first character that is not printable. See the [SAS documentation](https://documentation.sas.com/doc/en/lefunctionsref/9.4/titlepage.htm) (Functions and CALL Routines).
+#'
+#' @param x Character string to search. A numeric value is first converted to character with the BEST12. format.
+#' @param start Optional numeric start position, default 1. A positive value searches rightwards from that position; a negative value searches leftwards (towards the beginning) from position |start|, starting at the end of the string if |start| exceeds the length. 0, or a positive start beyond the end of the string, gives 0.
+#' @return A vector with one result per element (arguments are recycled), as the SAS function returns per observation.
+#' @section Differences from R: SAS character values have a fixed length and are padded with blanks; trailing blanks do not count in comparisons. R strings have no fixed length.
+#' @example inst/examples/sas_f_notprint.R
+#' @family character functions
+#' @name sas_f_notprint
 NULL
 
 #' SAS `NOTPUNCT(string <, start>)`

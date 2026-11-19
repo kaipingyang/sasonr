@@ -375,8 +375,8 @@ for (nm in c("upcase", "lowcase", "propcase")) fn_policy[[nm]] <- fpol(dom = cas
 # length of a variable that takes its length from KSUBSTR is not implemented.
 chr_byte_fns <- c(
   "index", "indexw", "indexc", "find", "findw", "findc", "verify", "count", "countc", "countw",
-  paste0("any", c("alnum", "alpha", "digit", "lower", "punct", "space", "upper")),
-  paste0("not", c("alnum", "alpha", "digit", "lower", "punct", "space", "upper")),
+  paste0("any", c("alnum", "alpha", "digit", "lower", "print", "punct", "space", "upper")),
+  paste0("not", c("alnum", "alpha", "digit", "lower", "print", "punct", "space", "upper")),
   "tranwrd", "transtrn", "left", "right", "trim", "strip", "compbl", "cat", "cats", "catt", "catx",
   "scan", "substrn", "compress", "translate", "reverse", "repeat"
 )
@@ -436,8 +436,8 @@ for (nm in c("find", "findc")) {
   }, nan = "none")
 }
 
-for (nm in c(paste0("any", c("alnum", "alpha", "digit", "lower", "punct", "space", "upper")),
-              paste0("not", c("alnum", "alpha", "digit", "lower", "punct", "space", "upper")))) {
+for (nm in c(paste0("any", c("alnum", "alpha", "digit", "lower", "print", "punct", "space", "upper")),
+              paste0("not", c("alnum", "alpha", "digit", "lower", "print", "punct", "space", "upper")))) {
   fn_policy[[nm]] <- fpol(dom = function(a) dom_huge(dom_n(a, 2), 2^31 - 1), nan = "none")
 }
 
