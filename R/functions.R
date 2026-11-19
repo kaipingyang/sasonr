@@ -558,11 +558,13 @@ class_pos <- function(x, mods, negate, start) {
 }
 
 # ANY* and NOT* for values with bytes outside ASCII: each character has a
-# class (the letters of Latin-1 are letters, upper or lower case) and the
-# result is the position of its first byte.  The start position counts bytes;
-# a start on a later byte of a character starts at the next character
-# (backward: at the character that holds that byte).  Characters outside ASCII
-# other than the Latin-1 letters, the euro sign and U+1D11E: not supported.
+# class and the result is the position of its first byte.  The start position
+# counts bytes; a start on a later byte of a character starts at the next
+# character (backward: at the character that holds that byte).  Only the
+# characters whose class is documented are supported: e acute (lower case
+# letter), E acute and U diaeresis (upper case letters), the euro sign and
+# U+1D11E (neither letters nor punctuation); any other character outside ASCII
+# is not supported.
 class_pos_wide <- function(x, mods, negate, start) {
   set <- class_chars(mods)
   rowwise(function(s, st) {
@@ -573,9 +575,9 @@ class_pos_wide <- function(x, mods, negate, start) {
     lead <- cumsum(c(1L, nb[-length(nb)]))
     cp <- vapply(ch, utf8ToInt, 0L, USE.NAMES = FALSE)
     wide <- cp >= 0x80
-    letter <- cp >= 0xC0 & cp <= 0xFE & !cp %in% c(0xD7, 0xDF, 0xF7)
+    letter <- cp %in% c(0xE9, 0xC9, 0xDC)
     if (any(wide & !letter & !cp %in% c(0x20AC, 0x1D11E))) {
-      abort_unsupported("a character class function with a character outside ASCII other than a Latin-1 letter")
+      abort_unsupported("a character class function with a character outside ASCII whose class is not documented")
     }
     cls <- ifelse(rep_len(grepl("a", mods, fixed = TRUE), length(cp)), letter,
                   ifelse(rep_len(mods == "u", length(cp)), letter & cp <= 0xDE,

@@ -322,7 +322,8 @@ the development version provides.
   `COMPBL`, the `CAT` functions, `SCAN`, `SUBSTRN`, `COMPRESS`, `TRANSLATE`,
   `REVERSE` and `REPEAT`. Character lists and delimiters are sets of bytes;
   the `I` modifier and the class modifiers recognise ASCII characters only;
-  `ANY*` and `NOT*` classify characters (Latin-1 letters are letters) and
+  `ANY*` and `NOT*` classify the characters whose class is documented (e acute, E acute,
+  U diaeresis, the euro sign; other characters outside ASCII fail loud) and
   return the position of the first byte. A result that would leave part of a
   multi-byte character fails loud. A `CAT` result cut inside a character by a
   shorter target variable is blank, with the buffer WARNING and `_ERROR_`.
