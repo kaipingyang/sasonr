@@ -692,6 +692,15 @@ engine_program <- function(eng, code) {
 #' (PROC SQL, PROC DATASETS) have no R translation: their code is a call of
 #' `sas_untranslated()`, which stops with a condition of class
 #' `sasonr_unsupported`.
+#'
+#' Option `sasonr.passes` selects the readability passes applied to the code
+#' of vectorised DATA steps: `"by_first_value"` (a retained numeric variable
+#' set only at `FIRST.` of a BY group from a column becomes one grouped value
+#' per BY group) and `"unused_first_last"` (`FIRST.`/`LAST.` columns that no
+#' later expression reads are not created). All are on by default;
+#' `options(sasonr.passes = character())` turns them off. A pass rewrites
+#' code only where the result is the same: the same WORK data sets and the
+#' same log. [sas_run()] runs the code with the same passes.
 #' @examples
 #' tr <- sas_translate("data b; set a; y = round(x, 0.1); run;",
 #'                     work = list(a = data.frame(x = c(1.25, 2.35))))

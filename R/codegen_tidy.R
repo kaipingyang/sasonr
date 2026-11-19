@@ -593,8 +593,19 @@ gen_vec_step <- function(an) {
   }
   gen_vec_block(an$stmts, NULL, cx, top = TRUE)
   if (!is.na(k0)) cx$stages <- drop_dead_inits(cx$stages, k0)
+  cx$stages <- apply_codegen_passes(cx$stages, list(an = an, reads_after = vec_reads_after(cx)))
 
   c(list(render_pipeline(".d", source_item(an), cx$stages)), vec_put_item(cx), vec_output_item(an))
+}
+
+# The names that the code after the pipeline of a vectorised step reads from
+# `.d`: the PUT lines and their guards, the output condition, the output
+# columns (see vec_put_item() and vec_output_item()).
+vec_reads_after <- function(cx) {
+  an <- cx$an
+  puts <- unlist(lapply(cx$puts, function(p) c(pass_used_names(p$line), pass_used_names(p$guard))))
+  outs <- unlist(lapply(an$dsir$slots$outputs, `[[`, "vars"))
+  unique(c(puts, an$output_pattern$cond, outs))
 }
 
 # Drop the initial (missing) value of a variable that the mutate stages right
