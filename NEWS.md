@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* Readability passes for the code of vectorised DATA steps (option
+  `sasonr.passes`, see `?sas_translate`): a retained numeric variable set only
+  at `FIRST.` of a BY group from a column is written as one grouped value per
+  BY group (`group_by()`, `dplyr::first()`, `ungroup()`) instead of the
+  carry-forward helper, and `FIRST.`/`LAST.` columns that nothing reads are no
+  longer created. `sas_run()` and `sas_script()` use the same code; with
+  `options(sasonr.passes = character())` the code is unchanged.
 * The `level`, `on_error` and `scope` arguments of `sas_run()`,
   `sas_translate()` and `sas_macro_vars()` take their exact values only
   (`rlang::arg_match()`); an abbreviation such as `level = "L"` is an error.

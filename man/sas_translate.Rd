@@ -27,6 +27,15 @@ run bound for the log NOTEs and \verb{_ERROR_}. Steps that sasonr runs itself
 (PROC SQL, PROC DATASETS) have no R translation: their code is a call of
 \code{sas_untranslated()}, which stops with a condition of class
 \code{sasonr_unsupported}.
+
+Option \code{sasonr.passes} selects the readability passes applied to the code
+of vectorised DATA steps: \code{"by_first_value"} (a retained numeric variable
+set only at \code{FIRST.} of a BY group from a column becomes one grouped value
+per BY group) and \code{"unused_first_last"} (\code{FIRST.}/\code{LAST.} columns that no
+later expression reads are not created). All are on by default;
+\code{options(sasonr.passes = character())} turns them off. A pass rewrites
+code only where the result is the same: the same WORK data sets and the
+same log. \code{\link[=sas_run]{sas_run()}} runs the code with the same passes.
 }
 \description{
 The macro processor runs first; steps are translated in order. Nothing is
