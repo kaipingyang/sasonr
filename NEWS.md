@@ -315,6 +315,23 @@ the development version provides.
   of `=`, `%SYSFUNC(SUBSTR())` and PROC SQL calls with a value that has bytes
   outside ASCII. New `KSUBSTR` counts characters; for ASCII values it is
   `SUBSTR`, a value with bytes outside ASCII fails loud.
+* In a UTF-8 session more character functions accept values with bytes
+  outside ASCII and count in bytes: `INDEX`, `INDEXW`, `INDEXC`, `FIND`,
+  `FINDW`, `FINDC`, `VERIFY`, `COUNT`, `COUNTC`, `COUNTW`, the `ANY*` and
+  `NOT*` functions, `TRANWRD`, `TRANSTRN`, `LEFT`, `RIGHT`, `TRIM`, `STRIP`,
+  `COMPBL`, the `CAT` functions, `SCAN`, `SUBSTRN`, `COMPRESS`, `TRANSLATE`,
+  `REVERSE` and `REPEAT`. Character lists and delimiters are sets of bytes;
+  the `I` modifier and the class modifiers recognise ASCII characters only;
+  `ANY*` and `NOT*` classify the characters whose class is documented (e acute, E acute,
+  U diaeresis, the euro sign; other characters outside ASCII fail loud) and
+  return the position of the first byte. A result that would leave part of a
+  multi-byte character fails loud. A `CAT` result cut inside a character by a
+  shorter target variable is blank, with the buffer WARNING and `_ERROR_`.
+  The colon comparison (`=:`) truncates in bytes, and `$w.`, `$CHARw.` and
+  `$QUOTEw.` count bytes (a cut inside a character fails loud). `%SYSFUNC`
+  and PROC SQL calls of these functions, `$UPCASEw.` and the modifiers of
+  `SCAN`, `COUNTW` and `FINDW` (other than `E`) with such values still fail
+  loud.
 * About 190 SAS functions as `sas_f_<name>()`, about 100 formats and
   informats, `PUT()` / `INPUT()` and user formats from PROC FORMAT. Missing
   and invalid arguments write the log NOTEs, set `_ERROR_` and give missing

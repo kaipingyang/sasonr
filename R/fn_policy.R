@@ -367,14 +367,23 @@ case_dom <- function(a) {
 for (nm in c("upcase", "lowcase", "propcase")) fn_policy[[nm]] <- fpol(dom = case_dom, nan = "none", math = FALSE)
 
 # Functions whose character arguments may have bytes outside ASCII: the case
-# functions above, the lengths (counted in bytes; KLENGTH in characters) and
-# SUBSTR (positions in bytes).  Every other function with such an argument is
-# outside its exact domain.  KSUBSTR stays outside: the length of a variable
-# that takes its length from KSUBSTR is not implemented.
-chr_wide_ok_fns <- c("upcase", "lowcase", "propcase", "length", "lengthn", "lengthc", "klength", "substr")
+# functions above, the lengths (counted in bytes; KLENGTH in characters),
+# SUBSTR and the character functions with byte semantics (positions, lengths,
+# counts and character lists in bytes; runtime.R chr_bytes_call(); a result
+# that cuts a multi-byte character fails loud).  Every other function with
+# such an argument is outside its exact domain.  KSUBSTR stays outside: the
+# length of a variable that takes its length from KSUBSTR is not implemented.
+chr_byte_fns <- c(
+  "index", "indexw", "indexc", "find", "findw", "findc", "verify", "count", "countc", "countw",
+  paste0("any", c("alnum", "alpha", "digit", "lower", "punct", "space", "upper")),
+  paste0("not", c("alnum", "alpha", "digit", "lower", "punct", "space", "upper")),
+  "tranwrd", "transtrn", "left", "right", "trim", "strip", "compbl", "cat", "cats", "catt", "catx",
+  "scan", "substrn", "compress", "translate", "reverse", "repeat"
+)
+chr_wide_ok_fns <- c("upcase", "lowcase", "propcase", "length", "lengthn", "lengthc", "klength", "substr", chr_byte_fns)
 # Of those, the functions available in a DATA step and in direct calls only
 # (%SYSFUNC and PROC SQL: outside the exact domain).
-chr_wide_data_fns <- "substr"
+chr_wide_data_fns <- c("substr", chr_byte_fns)
 
 #' Check a character argument of a SAS function for bytes outside ASCII
 #'

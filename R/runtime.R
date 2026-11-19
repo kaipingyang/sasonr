@@ -109,6 +109,66 @@ chr_bytes <- function(x) {
   n
 }
 
+# Byte semantics of the character functions (UTF-8 session) -----------------
+#
+# Positions, lengths, counts and character lists count bytes.  A value with
+# bytes outside ASCII is mapped to "byte text" (one character U+0000 to U+00FF
+# per byte), so that the character-level code of a function works on bytes;
+# a character result is mapped back and must be valid UTF-8 (a result that
+# leaves part of a multi-byte character fails loud).  Case folding (the I
+# modifier) and the class modifiers recognise ASCII letters only.
+
+# Does a call need byte text?  Not inside a call that already uses it.
+chr_any_wide <- function(...) {
+  if (isTRUE(.active$chr_bytes)) return(FALSE)
+  for (a in list(...)) if (is.character(a) && any(chr_wide(a), na.rm = TRUE)) return(TRUE)
+  FALSE
+}
+
+chr_to_bytes <- function(x) {
+  if (!is.character(x)) return(x)
+  w <- chr_wide(x) & !is.na(x)
+  if (!any(w)) return(x)
+  y <- chr_utf8(x[w])
+  # one code point per byte (raw values: no code page mapping of 0x80-0x9F)
+  x[w] <- vapply(y, function(v) intToUtf8(as.integer(charToRaw(v))), "", USE.NAMES = FALSE)
+  x
+}
+
+chr_from_bytes <- function(x, name) {
+  if (!is.character(x)) return(x)
+  w <- chr_wide(x) & !is.na(x)
+  if (!any(w)) return(x)
+  y <- vapply(x[w], function(v) {
+    cp <- utf8ToInt(v)
+    if (anyNA(cp) || any(cp > 255L)) return(NA_character_)
+    r <- rawToChar(as.raw(cp))
+    Encoding(r) <- "UTF-8"
+    r
+  }, "", USE.NAMES = FALSE)
+  if (anyNA(y) || !all(validUTF8(y))) {
+    abort_unsupported(sprintf("%s with a result that cuts a multi-byte character", toupper(name)))
+  }
+  x[w] <- y
+  x
+}
+
+# Call `f` with its character arguments as byte text; `chr` maps a character
+# result back.
+chr_bytes_call <- function(name, f, args, chr = FALSE) {
+  args <- lapply(args, chr_to_bytes)
+  old <- .active$chr_bytes
+  .active$chr_bytes <- TRUE
+  on.exit(.active$chr_bytes <- old, add = TRUE)
+  out <- do.call(f, args)
+  .active$chr_bytes <- old
+  if (chr) chr_from_bytes(out, name) else out
+}
+
+# Case folding of ASCII letters only (the I modifier).
+ascii_lower <- function(x) chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", x)
+ascii_upper <- function(x) chartr("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", x)
+
 # sas_char() for values with bytes outside ASCII: the stored value is the
 # first `len` bytes, padded with blanks to `len` bytes.  A cut inside a
 # multi-byte character leaves bytes that are not a character: not supported.
@@ -212,9 +272,9 @@ cmp_fun <- function(op) {
 #' @keywords internal
 sas_cmp_trunc <- function(op, a, b) {
   ab <- recycle2(a, b)
-  # the prefix length counts bytes; not implemented for values outside ASCII
-  if (any(chr_wide(ab[[1]]) | chr_wide(ab[[2]]), na.rm = TRUE)) {
-    abort_unsupported("colon comparison (=: and the like) of character values outside ASCII")
+  # the prefix length counts bytes (byte text; the prefix may cut a character)
+  if (is.character(ab[[1]]) && is.character(ab[[2]]) && any(chr_wide(ab[[1]]) | chr_wide(ab[[2]]), na.rm = TRUE)) {
+    ab <- lapply(ab, chr_to_bytes)
   }
   len <- pmin(nchar(ab[[1]]), nchar(ab[[2]]))
   cmp_fun(op)(substr(ab[[1]], 1L, len), substr(ab[[2]], 1L, len))
@@ -520,6 +580,7 @@ remove_blanks <- function(x, pattern, base) {
 
 #' @export
 sas_f_trim <- function(x) {
+  if (chr_any_wide(x)) return(chr_bytes_call("trim", sys.function(), list(x), chr = TRUE))
   out <- sas_rtrim(as_sas_chr(x))
   out[!nzchar(out)] <- " "
   out
@@ -527,15 +588,20 @@ sas_f_trim <- function(x) {
 #' @export
 sas_f_trimn <- function(x) sas_rtrim(as_sas_chr(x))
 #' @export
-sas_f_strip <- function(x) remove_blanks(as_sas_chr(x), "\\A +| +\\z", strip_both)
+sas_f_strip <- function(x) {
+  if (chr_any_wide(x)) return(chr_bytes_call("strip", sys.function(), list(x), chr = TRUE))
+  remove_blanks(as_sas_chr(x), "\\A +| +\\z", strip_both)
+}
 #' @export
 sas_f_left <- function(x) {
+  if (chr_any_wide(x)) return(chr_bytes_call("left", sys.function(), list(x), chr = TRUE))
   x <- as_sas_chr(x)
   s <- sub("^ +", "", x)
   paste0(s, strrep(" ", nchar(x) - nchar(s)))
 }
 #' @export
 sas_f_right <- function(x) {
+  if (chr_any_wide(x)) return(chr_bytes_call("right", sys.function(), list(x), chr = TRUE))
   x <- as_sas_chr(x)
   s <- sas_rtrim(x)
   paste0(strrep(" ", nchar(x) - nchar(s)), s)
@@ -555,7 +621,7 @@ cat_item <- function(a, trim) if (is.numeric(a)) cat_num_text(a) else trim(a)
 
 # A result longer than the target variable (`.len`, 200 for a new variable):
 # blank result and _ERROR_ = 1, no NOTE (CATX also writes a NOTE).
-cat_fit <- function(out, .len) {
+cat_fit <- function(out, .len, fname = NULL, args = NULL, .at = NULL, trim = identity) {
   if (is.null(.len)) return(out)
   # the CAT functions build their value in a 200-byte buffer: a longer value is
   # blank (a shorter target variable just truncates, as in t = cats(t, c))
@@ -565,16 +631,58 @@ cat_fit <- function(out, .len) {
     rt_error()
     out[long] <- ""
   }
+  if (isTRUE(.active$chr_bytes) && !is.null(fname)) out <- cat_fit_bytes(out, .len, fname, args, .at, trim)
+  out
+}
+
+# A target variable shorter than the result of CAT, CATS or CATT, for values
+# with bytes outside ASCII (byte text, `out`): when the cut falls inside a
+# multi-byte character the result is blank, with the buffer WARNING, the NOTE
+# on the left-most argument that does not fit and _ERROR_ = 1.  A cut between
+# characters is not supported.
+cat_fit_bytes <- function(out, .len, fname, args, .at, trim) {
+  short <- nchar(out) > .len
+  if (!any(short)) return(out)
+  n <- max(lengths(args))
+  for (i in which(short)) {
+    nxt <- utf8ToInt(substr(out[i], .len + 1L, .len + 1L))
+    # (vectorised code has no call position for the NOTE: not supported)
+    if (!(nxt >= 0x80 && nxt < 0xC0) || is.null(.at)) {
+      abort_unsupported(sprintf("%s with a result longer than its target variable (bytes outside ASCII)", toupper(fname)))
+    }
+    v <- vapply(args, function(a) cat_item(a[min(i, length(a))], trim), "")
+    argn <- which(cumsum(nchar(v)) > .len)[1]
+    rt <- rt_diag()
+    rt$notes <- c(rt$notes, paste0(
+      "WARNING: In a call to the ", toupper(fname), " function, the buffer allocated for the result was not long enough to contain ",
+      "the concatenation of all the arguments. The correct result would contain ", nchar(out[i]),
+      " characters, but the actual result might either be truncated to ", .len,
+      " character(s) or be completely blank, depending on the calling environment. ",
+      "The following note indicates the left-most argument that caused truncation."))
+    note_invalid_arg(fname, argn, .at, lapply(args, function(a) chr_from_bytes(a[min(i, length(a))], fname)), NULL,
+                     numbered = TRUE, math = FALSE)
+    out[i] <- ""
+  }
   out
 }
 #' @export
-sas_f_cats <- function(..., .at = NULL, .len = NULL) cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = strip_both)), .len)
+sas_f_cats <- function(..., .at = NULL, .len = NULL) {
+  if (chr_any_wide(...)) return(chr_bytes_call("cats", sys.function(), c(list(...), list(.at = .at, .len = .len)), chr = TRUE))
+  cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = strip_both)), .len, "cats", list(...), .at, strip_both)
+}
 #' @export
-sas_f_catt <- function(..., .at = NULL, .len = NULL) cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = sas_rtrim)), .len)
+sas_f_catt <- function(..., .at = NULL, .len = NULL) {
+  if (chr_any_wide(...)) return(chr_bytes_call("catt", sys.function(), c(list(...), list(.at = .at, .len = .len)), chr = TRUE))
+  cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = sas_rtrim)), .len, "catt", list(...), .at, sas_rtrim)
+}
 #' @export
-sas_f_cat <- function(..., .at = NULL, .len = NULL) cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = identity)), .len)
+sas_f_cat <- function(..., .at = NULL, .len = NULL) {
+  if (chr_any_wide(...)) return(chr_bytes_call("cat", sys.function(), c(list(...), list(.at = .at, .len = .len)), chr = TRUE))
+  cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = identity)), .len, "cat", list(...), .at, identity)
+}
 #' @export
 sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
+  if (chr_any_wide(sep, ...)) return(chr_bytes_call("catx", sys.function(), c(list(sep), list(...), list(.at = .at, .len = .len)), chr = TRUE))
   rt <- rt_diag()
   args <- list(...)
   # numeric items: BEST32. without blanks (missing values are written, not
@@ -597,7 +705,7 @@ sas_f_catx <- function(sep, ..., .at = NULL, .len = 200L) {
         " characters, but the actual result might either be truncated to ", .len,
         " character(s) or be completely blank, depending on the calling environment. ",
         "The following note indicates the left-most argument that caused truncation."))
-      note_invalid_arg("catx", argn, .at, c(list(sep[i]), lapply(args, `[`, min(i, max(lengths(args))))), NULL,
+      note_invalid_arg("catx", argn, .at, lapply(c(list(sep[i]), lapply(args, `[`, min(i, max(lengths(args))))), chr_from_bytes, "catx"), NULL,
                        numbered = TRUE, math = FALSE)
       return("")
     }
@@ -792,12 +900,14 @@ sas_exist_one <- function(nm, type, .work, .at) {
 
 #' @export
 sas_f_index <- function(x, s) {
+  if (chr_any_wide(x, s)) return(chr_bytes_call("index", sys.function(), list(x, s)))
   ab <- recycle2(as_sas_chr(x), s)
   out <- mapply(function(a, b) regexpr(b, a, fixed = TRUE)[1], ab[[1]], ab[[2]], USE.NAMES = FALSE)
   as.numeric(pmax(out, 0L))
 }
 #' @export
 sas_f_indexc <- function(x, ...) {
+  if (chr_any_wide(x, ...)) return(chr_bytes_call("indexc", sys.function(), list(x, ...)))
   # the characters of all excerpts form one set (INDEXC(source, excerpt-1, ..., excerpt-n))
   ab <- rlang::exec(recycle_n, as_sas_chr(x), !!!lapply(list(...), as_sas_chr))
   vapply(seq_along(ab[[1]]), function(i) {
@@ -823,6 +933,7 @@ sas_f_klength <- function(x) {
 }
 #' @export
 sas_f_tranwrd <- function(x, from, to) {
+  if (chr_any_wide(x, from, to)) return(chr_bytes_call("tranwrd", sys.function(), list(x, from, to), chr = TRUE))
   x <- as_sas_chr(x)
   # one target and one replacement: a single vectorised gsub(); its result
   # carries no attributes, like the element-wise path
@@ -846,6 +957,7 @@ sas_f_coalescec <- function(...) {
 }
 #' @export
 sas_f_reverse <- function(x) {
+  if (chr_any_wide(x)) return(chr_bytes_call("reverse", sys.function(), list(x), chr = TRUE))
   vapply(as_sas_chr(x), function(s) intToUtf8(rev(utf8ToInt(s))), character(1), USE.NAMES = FALSE)
 }
 

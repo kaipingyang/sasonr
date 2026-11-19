@@ -85,6 +85,7 @@ class_chars <- function(mods) {
 
 #' @export
 sas_f_substrn <- function(x, pos, len = NULL) {
+  if (chr_any_wide(x)) return(chr_bytes_call("substrn", sys.function(), list(x, pos, len), chr = TRUE))
   x <- if (is.numeric(x)) strip_both(sas_fmt_best(x, 12L)) else x
   rowwise(function(s, p, l) {
     n <- nchar(s)
@@ -115,10 +116,14 @@ sas_f_first <- function(x) {
 }
 
 #' @export
-sas_f_compbl <- function(x) gsub(" {2,}", " ", as_sas_chr(x))
+sas_f_compbl <- function(x) {
+  if (chr_any_wide(x)) return(chr_bytes_call("compbl", sys.function(), list(x), chr = TRUE))
+  gsub(" {2,}", " ", as_sas_chr(x))
+}
 
 #' @export
 sas_f_compress <- function(x, chars = NULL, mods = NULL) {
+  if (chr_any_wide(x, chars, mods)) return(chr_bytes_call("compress", sys.function(), list(x, chars, mods), chr = TRUE))
   x <- as_sas_chr(x)
   if (is.null(chars) && is.null(mods)) return(gsub(" ", "", x, fixed = TRUE))
   one <- function(a) is.null(a) || (is.character(a) && length(a) == 1L && !is.na(a))
@@ -133,9 +138,9 @@ sas_f_compress <- function(x, chars = NULL, mods = NULL) {
 # set is built once (as in compress_rowwise()) and removed, or kept (K), with
 # one stringr call.  Missing values go through compress_rowwise().
 compress_vec <- function(x, cs, md) {
-  md <- tolower(md)
+  md <- ascii_lower(md)
   set <- c(chars_of(cs), class_chars(md))
-  if (grepl("i", md, fixed = TRUE)) set <- unique(c(set, toupper(set), tolower(set)))
+  if (grepl("i", md, fixed = TRUE)) set <- unique(c(set, ascii_upper(set), ascii_lower(set)))
   set <- unique(set)
   keep <- grepl("k", md, fixed = TRUE)
   s <- x
@@ -155,9 +160,9 @@ compress_vec <- function(x, cs, md) {
 
 compress_rowwise <- function(x, chars, mods) {
   rowwise(function(s, cs, md) {
-    md <- tolower(md)
+    md <- ascii_lower(md)
     set <- c(chars_of(cs), class_chars(md))
-    if (grepl("i", md, fixed = TRUE)) set <- unique(c(set, toupper(set), tolower(set)))
+    if (grepl("i", md, fixed = TRUE)) set <- unique(c(set, ascii_upper(set), ascii_lower(set)))
     if (grepl("t", md, fixed = TRUE)) s <- sas_rtrim(s)
     ch <- chars_of(s)
     keep <- if (grepl("k", md, fixed = TRUE)) ch %in% set else !ch %in% set
@@ -166,14 +171,14 @@ compress_rowwise <- function(x, chars, mods) {
 }
 
 find_pos <- function(s, sub, mods, start) {
-  mods <- tolower(mods)
+  mods <- ascii_lower(mods)
   if (grepl("t", mods, fixed = TRUE)) {
     s <- sas_rtrim(s)
     sub <- sas_rtrim(sub)
   }
   if (grepl("i", mods, fixed = TRUE)) {
-    s <- tolower(s)
-    sub <- tolower(sub)
+    s <- ascii_lower(s)
+    sub <- ascii_lower(sub)
   }
   if (!nzchar(sub)) return(0)
   n <- nchar(s)
@@ -194,6 +199,7 @@ find_pos <- function(s, sub, mods, start) {
 
 #' @export
 sas_f_find <- function(x, sub, a3 = NULL, a4 = NULL) {
+  if (chr_any_wide(x, sub, a3, a4)) return(chr_bytes_call("find", sys.function(), list(x, sub, a3, a4)))
   mods <- if (is.character(a3)) a3 else if (is.character(a4)) a4 else ""
   start <- if (is.numeric(a3)) a3 else if (is.numeric(a4)) a4 else 1
   rowwise(find_pos, as_sas_chr(x), as_sas_chr(sub), mods, start, type = numeric(1))
@@ -201,17 +207,18 @@ sas_f_find <- function(x, sub, a3 = NULL, a4 = NULL) {
 
 #' @export
 sas_f_findc <- function(x, chars = "", a3 = NULL, a4 = NULL) {
+  if (chr_any_wide(x, chars, a3, a4)) return(chr_bytes_call("findc", sys.function(), list(x, chars, a3, a4)))
   mods <- if (is.character(a3)) a3 else if (is.character(a4)) a4 else ""
   start <- if (is.numeric(a3)) a3 else if (is.numeric(a4)) a4 else NA_real_
   rowwise(function(s, cs, md, st) {
-    md <- tolower(md)
+    md <- ascii_lower(md)
     if (grepl("t", md, fixed = TRUE)) {
       s <- sas_rtrim(s)
       cs <- sas_rtrim(cs)
     }
     set <- c(chars_of(cs), class_chars(md))
     if (grepl("i", md, fixed = TRUE)) {
-      set <- unique(c(toupper(set), tolower(set)))
+      set <- unique(c(ascii_upper(set), ascii_lower(set)))
     }
     ch <- chars_of(s)
     hit <- ch %in% set
@@ -246,18 +253,26 @@ word_starts <- function(s, word, dlm) {
 
 #' @export
 sas_f_indexw <- function(x, word, dlm = " ") {
+  # delimiters with bytes outside ASCII: not supported
+  if (chr_any_wide(dlm)) chr_wide_gate("indexw")
+  if (chr_any_wide(x, word)) return(chr_bytes_call("indexw", sys.function(), list(x, word, dlm)))
   rowwise(function(s, w, d) as.numeric(word_starts(s, strip_both(w), chars_of(d))), as_sas_chr(x), word, dlm, type = numeric(1))
 }
 
 #' @export
 sas_f_findw <- function(x, word, dlm = " !$%&()*+,-./;<^|", a4 = "", a5 = 1) {
+  # delimiters with bytes outside ASCII: not supported
+  if (chr_any_wide(dlm)) chr_wide_gate("findw")
+  # modifiers other than E with values outside ASCII: not supported
+  if (chr_any_wide(x, word) && is.character(a4) && any(grepl("[^eE ]", a4))) chr_wide_gate("findw")
+  if (chr_any_wide(x, word)) return(chr_bytes_call("findw", sys.function(), list(x, word, dlm, a4, a5)))
   mods <- if (is.character(a4)) a4 else ""
   start <- if (is.numeric(a4)) a4 else a5
   rowwise(function(s, w, d, md, st) {
-    md <- tolower(md)
+    md <- ascii_lower(md)
     if (grepl("i", md, fixed = TRUE)) {
-      s <- tolower(s)
-      w <- tolower(w)
+      s <- ascii_lower(s)
+      w <- ascii_lower(w)
     }
     w <- strip_both(w)
     dl <- c(chars_of(d), class_chars(gsub("[eiktrb]", "", md)))
@@ -285,6 +300,7 @@ sas_f_findw <- function(x, word, dlm = " !$%&()*+,-./;<^|", a4 = "", a5 = 1) {
 
 #' @export
 sas_f_verify <- function(x, ...) {
+  if (chr_any_wide(x, ...)) return(chr_bytes_call("verify", sys.function(), list(x, ...)))
   set <- unique(unlist(lapply(list(...), function(a) chars_of(paste(a, collapse = "")))))
   rowwise(function(s) {
     w <- which(!chars_of(s) %in% set)
@@ -294,6 +310,7 @@ sas_f_verify <- function(x, ...) {
 
 #' @export
 sas_f_count <- function(x, sub, mods = "") {
+  if (chr_any_wide(x, sub)) return(chr_bytes_call("count", sys.function(), list(x, sub, mods)))
   a <- recycle_n(as_sas_chr(x), sub, mods)
   s <- a[[1]]
   b <- a[[2]]
@@ -302,7 +319,7 @@ sas_f_count <- function(x, sub, mods = "") {
       !all(validUTF8(s)) || !all(validUTF8(b))) {
     return(count_rowwise(s, b, a[[3]]))
   }
-  md <- tolower(a[[3]])
+  md <- ascii_lower(a[[3]])
   tm <- grepl("t", md, fixed = TRUE)
   if (any(tm)) {
     s[tm] <- sas_rtrim(s[tm])
@@ -310,8 +327,8 @@ sas_f_count <- function(x, sub, mods = "") {
   }
   im <- grepl("i", md, fixed = TRUE)
   if (any(im)) {
-    s[im] <- tolower(s[im])
-    b[im] <- tolower(b[im])
+    s[im] <- ascii_lower(s[im])
+    b[im] <- ascii_lower(b[im])
   }
   # an empty substring counts 0, also for a missing value
   out <- numeric(length(s))
@@ -324,14 +341,14 @@ sas_f_count <- function(x, sub, mods = "") {
 # arguments that are not character).
 count_rowwise <- function(x, sub, mods) {
   rowwise(function(s, b, md) {
-    md <- tolower(md)
+    md <- ascii_lower(md)
     if (grepl("t", md, fixed = TRUE)) {
       s <- sas_rtrim(s)
       b <- sas_rtrim(b)
     }
     if (grepl("i", md, fixed = TRUE)) {
-      s <- tolower(s)
-      b <- tolower(b)
+      s <- ascii_lower(s)
+      b <- ascii_lower(b)
     }
     if (!nzchar(b)) return(0)
     m <- gregexpr(b, s, fixed = TRUE)[[1]]
@@ -341,29 +358,30 @@ count_rowwise <- function(x, sub, mods) {
 
 #' @export
 sas_f_countc <- function(x, chars = "", mods = "") {
+  if (chr_any_wide(x, chars)) return(chr_bytes_call("countc", sys.function(), list(x, chars, mods)))
   rowwise(function(s, cs, md) {
-    md <- tolower(md)
+    md <- ascii_lower(md)
     if (grepl("t", md, fixed = TRUE)) {
       s <- sas_rtrim(s)
       cs <- sas_rtrim(cs)
     }
     set <- c(chars_of(cs), class_chars(md))
-    if (grepl("i", md, fixed = TRUE)) set <- unique(c(toupper(set), tolower(set)))
+    if (grepl("i", md, fixed = TRUE)) set <- unique(c(ascii_upper(set), ascii_lower(set)))
     hit <- chars_of(s) %in% set
     # K and V count the characters that are not in the list
     if (grepl("[kv]", md)) hit <- !hit
     as.numeric(sum(hit))
-  }, as_sas_chr(x), chars, mods, type = numeric(1))
+  }, as_sas_chr(x), chars %||% "", mods, type = numeric(1))
 }
 
 scan_default_dlm <- " !$%&()*+,-./;<^|"
 
 scan_words <- function(s, dlm, mods = "") {
-  md <- tolower(mods)
+  md <- ascii_lower(mods)
   ch <- chars_of(if (grepl("m", md, fixed = TRUE)) sas_rtrim(s) else s)
   if (length(ch) == 0) return(if (grepl("m", md, fixed = TRUE)) "" else character())
   set <- c(chars_of(dlm), class_chars(gsub("[kmbqrot]", "", md)))
-  if (grepl("i", md, fixed = TRUE)) set <- unique(c(toupper(set), tolower(set)))
+  if (grepl("i", md, fixed = TRUE)) set <- unique(c(ascii_upper(set), ascii_lower(set)))
   is_d <- ch %in% set
   if (grepl("k", md, fixed = TRUE)) is_d <- !is_d
   if (grepl("q", md, fixed = TRUE)) {
@@ -393,6 +411,9 @@ scan_words <- function(s, dlm, mods = "") {
 #' @export
 sas_f_countw <- function(x, dlm = scan_default_dlm, mods = "") {
   dlm <- dlm %||% scan_default_dlm
+  # modifiers with values outside ASCII: not supported
+  if (chr_any_wide(x, dlm) && any(nzchar(gsub(" ", "", mods)))) chr_wide_gate("countw")
+  if (chr_any_wide(x, dlm)) return(chr_bytes_call("countw", sys.function(), list(x, dlm, mods)))
   rowwise(function(s, d, md) as.numeric(length(scan_words(s, d, md))), as_sas_chr(x), dlm, mods, type = numeric(1))
 }
 
@@ -403,6 +424,13 @@ sas_f_scan <- function(x, n, dlm = scan_default_dlm, mods = "", .at = NULL) {
   # n = 0, missing or not an integer: invalid argument (blank result, _ERROR_)
   bad <- is.na(n) | n == 0 | n != trunc(n)
   if (any(bad)) note_invalid_arg("scan", 2L, .at, list(as_sas_chr(x), n), rep_len(bad, max(length(x), length(n))), numbered = TRUE, math = FALSE)
+  # modifiers with values outside ASCII: not supported
+  if (chr_any_wide(x, dlm) && any(nzchar(gsub(" ", "", mods)))) chr_wide_gate("scan")
+  if (chr_any_wide(x, dlm)) return(chr_bytes_call("scan", function(x, n, dlm, mods) scan_rows(x, n, dlm, mods), list(x, n, dlm, mods), chr = TRUE))
+  scan_rows(x, n, dlm, mods)
+}
+
+scan_rows <- function(x, n, dlm, mods) {
   rowwise(function(s, k, d, md) {
     if (is.na(k) || k == 0 || k != trunc(k)) return("")
     w <- scan_words(s, d, md)
@@ -415,11 +443,13 @@ sas_f_scan <- function(x, n, dlm = scan_default_dlm, mods = "", .at = NULL) {
 
 #' @export
 sas_f_transtrn <- function(x, from, to) {
+  if (chr_any_wide(x, from, to)) return(chr_bytes_call("transtrn", sys.function(), list(x, from, to), chr = TRUE))
   rowwise(function(s, f, t) if (!nzchar(f)) s else gsub(f, t, s, fixed = TRUE), as_sas_chr(x), as_sas_chr(from), as_sas_chr(to))
 }
 
 #' @export
 sas_f_translate <- function(x, ...) {
+  if (chr_any_wide(x, ...)) return(chr_bytes_call("translate", sys.function(), list(x, ...), chr = TRUE))
   pairs <- list(...)
   x <- as_sas_chr(x)
   # an unpaired last to-argument is ignored
@@ -460,6 +490,7 @@ sas_f_lengthm <- function(x) sas_f_lengthc(x)
 
 #' @export
 sas_f_repeat <- function(x, n) {
+  if (chr_any_wide(x)) return(chr_bytes_call("repeat", sys.function(), list(x, n), chr = TRUE))
   rowwise(function(s, k) {
     if (is.na(k) || k < 0) return("")
     if (!nzchar(s)) return("")
@@ -504,6 +535,7 @@ sas_f_dequote <- function(x) {
 }
 
 class_pos <- function(x, mods, negate, start) {
+  if (chr_any_wide(x)) return(class_pos_wide(as_sas_chr(x), mods, negate, start))
   set <- class_chars(mods)
   rowwise(function(s, st) {
     if (!is.na(st) && abs(st) >= 2^31) return(NA_real_)
@@ -523,6 +555,46 @@ class_pos <- function(x, mods, negate, start) {
       if (length(w) == 0) 0 else as.numeric(max(w))
     }
   }, as_sas_chr(x), start, type = numeric(1))
+}
+
+# ANY* and NOT* for values with bytes outside ASCII: each character has a
+# class and the result is the position of its first byte.  The start position
+# counts bytes; a start on a later byte of a character starts at the next
+# character (backward: at the character that holds that byte).  Only the
+# characters whose class is documented are supported: e acute (lower case
+# letter), E acute and U diaeresis (upper case letters), the euro sign and
+# U+1D11E (neither letters nor punctuation); any other character outside ASCII
+# is not supported.
+class_pos_wide <- function(x, mods, negate, start) {
+  set <- class_chars(mods)
+  rowwise(function(s, st) {
+    if (!is.na(st) && abs(st) >= 2^31) return(NA_real_)
+    ch <- chars_of(chr_utf8(s))
+    if (length(ch) == 0) return(0)
+    nb <- nchar(ch, type = "bytes")
+    lead <- cumsum(c(1L, nb[-length(nb)]))
+    cp <- vapply(ch, utf8ToInt, 0L, USE.NAMES = FALSE)
+    wide <- cp >= 0x80
+    letter <- cp %in% c(0xE9, 0xC9, 0xDC)
+    if (any(wide & !letter & !cp %in% c(0x20AC, 0x1D11E))) {
+      abort_unsupported("a character class function with a character outside ASCII whose class is not documented")
+    }
+    cls <- ifelse(rep_len(grepl("a", mods, fixed = TRUE), length(cp)), letter,
+                  ifelse(rep_len(mods == "u", length(cp)), letter & cp <= 0xDE,
+                         ifelse(rep_len(mods == "l", length(cp)), letter & cp >= 0xE0, FALSE)))
+    hit <- ifelse(wide, cls, ch %in% set)
+    if (negate) hit <- !hit
+    if (is.na(st)) st <- 1
+    st <- trunc(st)
+    if (st == 0) return(0)
+    if (st > 0) {
+      w <- which(hit & lead >= st)
+      if (length(w) == 0) 0 else as.numeric(lead[w[1]])
+    } else {
+      w <- which(hit & lead <= -st)
+      if (length(w) == 0) 0 else as.numeric(lead[max(w)])
+    }
+  }, x, start, type = numeric(1))
 }
 
 #' @export
