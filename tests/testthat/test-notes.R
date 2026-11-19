@@ -196,3 +196,31 @@ test_that("WHERE NOTEs: constant BETWEEN bounds in ascending order, colon compar
   expect_identical(where_line("a not between 3 and 1"), "WHERE not (a>=1 and a<=3);")
   expect_identical(where_line("(s =: t < u) = v"), "WHERE v=s=:t and t<u;")
 })
+
+test_that("an iteration that reads nothing writes its observation, then the step stops", {
+  dl <- function(...) c("  datalines;", ..., ";", "run;")
+  loop_note <- "NOTE: DATA STEP stopped due to looping."
+  r <- run_notes(c("data a;", "  if _n_ = 1 then input x;", dl("7", "8")))
+  expect_identical(msgs(r), c(loop_note, "NOTE: The data set WORK.A has 2 observations and 1 variables."))
+  expect_identical(r$work$a$x, c(7, NA))
+  r <- run_notes(c("data a;", "  if _n_ <= 2 then do; input x; end;", dl("1", "2", "3")))
+  expect_identical(msgs(r), c(loop_note, "NOTE: The data set WORK.A has 3 observations and 1 variables."))
+  r <- run_notes(c("data a;", "  x = 1; if 0 then input y;", dl("1")))
+  expect_identical(msgs(r), c(loop_note, "NOTE: The data set WORK.A has 1 observations and 2 variables."))
+  r <- run_notes(c("data b; x = 1; output; x = 2; output; run;", "data a; if _n_ = 1 then do; set b; end; run;"))
+  expect_identical(msgs(r)[-1], c(loop_note, "NOTE: There were 1 observations read from the data set WORK.B.",
+                                  "NOTE: The data set WORK.A has 2 observations and 1 variables."))
+  # a read on every iteration, or no reading statement: no NOTE
+  r <- run_notes(c("data a;", "  do i = 1 to 2; input x; end;", dl("1", "2")))
+  expect_identical(msgs(r), "NOTE: The data set WORK.A has 1 observations and 2 variables.")
+  r <- run_notes("data a; x = 1; run;")
+  expect_identical(msgs(r), "NOTE: The data set WORK.A has 1 observations and 1 variables.")
+})
+
+test_that("an iteration that reads nothing fails loud for the shapes not known", {
+  dl <- function(...) c("  datalines;", ..., ";", "run;")
+  for (body in c("  if _n_ ne 3 then input x;", "  if _n_ = 1 then input x; output;",
+                 "  if _n_ = 1 then input x; if _n_ = 2 then stop;", "  if _n_ = 1 then input x; if _n_ = 2 then delete;")) {
+    expect_error(run_notes(c("data a;", body, dl("1", "2", "3"))), class = "sasonr_unsupported")
+  }
+})

@@ -12,6 +12,7 @@
 \alias{sas_in}
 \alias{sas_last}
 \alias{sas_le}
+\alias{sas_loop_unread}
 \alias{sas_lt}
 \alias{sas_max_op}
 \alias{sas_ne}

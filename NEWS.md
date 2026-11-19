@@ -87,6 +87,13 @@ the development version provides.
   "Numeric values have been converted to character values" with the place of
   the variable. A numeric constant or expression as an operand of `||` fails
   loud (unsupported).
+* A DATA step with a SET, MERGE or INPUT statement now stops when an
+  iteration ends without executing one: the observation of that iteration is
+  written, then the log shows "NOTE: DATA STEP stopped due to looping."
+  (before the observations-read NOTEs). The reading statement must run at the
+  top level or under a top-level IF on a constant or on `_n_ = k`,
+  `_n_ < k`, `_n_ <= k`; other shapes, an OUTPUT or RETURN statement in the
+  step, and STOP or DELETE in such an iteration fail loud.
 
 ## Errors and fail-loud behaviour
 

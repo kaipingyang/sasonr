@@ -25,6 +25,8 @@ rt_reset <- function(rt = rt_diag()) {
   rt$merge_repeats <- FALSE
   # a STOP statement ran in the step (the MERGE NOTE above is then not written)
   rt$stop_stmt <- FALSE
+  # an iteration read nothing and the step stopped (looping NOTE)
+  rt$looping <- FALSE
   rt$proc_notes <- character()
   rt$flow_note <- FALSE
   # ODS OUTPUT requests of the step and the NOTEs of the data sets written (ods_output.R)

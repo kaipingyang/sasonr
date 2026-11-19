@@ -1737,6 +1737,25 @@ sas_return <- function() {
   rlang::signal(message = "return", class = "sasonr_return")
   abort_runtime("RETURN signalled outside a DATA step loop")
 }
+# An iteration of a step with a reading statement ended without executing
+# one (`status`: how it ended).  After its observation is written the step
+# stops with the looping NOTE.  `why`: the step has a shape whose behaviour
+# here is not known (it fails loud).  An iteration ended by a STOP statement
+# or by DELETE before any read is not known either; one ended by the end of
+# the input stops as usual.
+#' @export
+sas_loop_unread <- function(status, why = NULL) {
+  rt <- rt_diag()
+  if (identical(status, "stop")) {
+    if (isTRUE(rt$stop_stmt)) abort_unsupported("a STOP statement in a DATA step iteration that executed no SET, MERGE or INPUT statement")
+    return(invisible())
+  }
+  if (identical(status, "delete")) abort_unsupported("DELETE (or a subsetting IF) in a DATA step iteration that executed no SET, MERGE or INPUT statement")
+  if (!is.null(why)) abort_unsupported(why)
+  rt$looping <- TRUE
+  invisible()
+}
+
 #' @export
 sas_stop_step <- function(stmt = FALSE) {
   # `stmt`: a STOP statement of the program (not the end of the input)

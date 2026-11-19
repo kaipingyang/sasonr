@@ -528,6 +528,7 @@ log_step_close <- function(eng, kind, tr = NULL, env = NULL, stopped = FALSE, no
       math.failed = log_emit_places(eng, part, log_places_get(rt, part), phase = "step_end"),
       ods = for (o in rt$ods_notes) log_emit(eng, id = "ds.created", name = o$name, nobs = o$nobs, nvar = o$nvar, phase = "step_end"),
       ods.warn = for (nm in rt$ods_missing) log_emit_lines(eng, ods_not_created_lines(nm), phase = "step_end"),
+      looping = if (isTRUE(rt$looping)) log_emit(eng, id = "ds.looping", phase = "step_end"),
       reads = log_emit_reads(eng, tr),
       proc = log_emit_lines(eng, rt$proc_notes, phase = "step_end"),
       datasets = log_emit_datasets(eng, tr$outputs, stopped),

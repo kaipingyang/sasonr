@@ -54,6 +54,7 @@ log_catalog <- list(
                                            "there were <nobs> observations and <nvar> variables.")),
   ds.not_replaced_stopped = log_msg("warning", "WARNING: Data set WORK.<name> was not replaced because this step was stopped."),
   ds.not_replaced_incomplete = log_msg("warning", "WARNING: Data set WORK.<name> was not replaced because new file is incomplete."),
+  ds.looping = log_msg("note", "NOTE: DATA STEP stopped due to looping."),
   ds.merge_repeats = log_msg("note", "NOTE: MERGE statement has more than one data set with repeats of BY values."),
   ds.read = log_msg("note", "NOTE: There were <nobs> observations read from the data set WORK.<name>."),
   ds.read_where = log_msg("note", c("NOTE: There were <nobs> observations read from the data set WORK.<name>.",
@@ -117,8 +118,8 @@ log_catalog <- list(
 # under NOTES (and sasonr.step_notes).  PROC SQL writes no "Missing values
 # were generated" NOTE.
 log_close_order <- list(
-  data = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "reads", "proc", "datasets"),
-                    notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)),
+  data = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "looping", "reads", "proc", "datasets"),
+                    notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)),
   proc = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "ods", "ods.warn", "reads", "proc", "datasets"),
                     notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE)),
   sql = data.frame(part = c("input.new_line", "math.failed"), notes = c(TRUE, TRUE))

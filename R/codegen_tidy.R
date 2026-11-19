@@ -882,6 +882,36 @@ has_stmt <- function(stmts, kind) {
   any(vapply(stmts, function(s) s$stmt %in% kind || has_stmt(stmt_children(s), kind), logical(1)))
 }
 
+# An iteration that executes no SET, MERGE or INPUT statement stops the step
+# (sas_loop_unread()).  Known shapes: every reading statement either runs at
+# the top level of the step or is the THEN branch (alone or in a DO; END;
+# block) of a top-level IF whose condition is a constant or `_n_ = k`,
+# `_n_ < k`, `_n_ <= k`, so that no later iteration reads again; no RETURN
+# and no OUTPUT statement.  Returns NULL for a known shape, otherwise what is
+# not supported (failed loud only when such an iteration happens).
+loop_read_why <- function(stmts) {
+  readers <- c("set", "merge", "input")
+  if (has_stmt(stmts, "output")) return("an OUTPUT statement in a DATA step iteration that executed no SET, MERGE or INPUT statement")
+  if (has_stmt(stmts, "return")) return("a RETURN statement in a DATA step with an iteration that executed no SET, MERGE or INPUT statement")
+  n_guard <- function(c) {
+    identical(c$node, "num") ||
+      (identical(c$node, "compare") && c$op %in% c("=", "<", "<=") && identical(c$lhs$node, "var") &&
+         identical(c$lhs$name, "_n_") && identical(c$rhs$node, "num"))
+  }
+  then_reads <- function(s) {
+    s$stmt %in% readers ||
+      (identical(s$stmt, "do") && identical(s$kind, "block") &&
+         all(vapply(s$body, function(b) b$stmt %in% readers || !has_stmt(list(b), readers), logical(1))))
+  }
+  for (s in stmts) {
+    if (s$stmt %in% readers || !has_stmt(list(s), readers)) next
+    ok <- identical(s$stmt, "if") && n_guard(s$cond) && then_reads(s$then) &&
+      (is.null(s[["else"]]) || !has_stmt(list(s[["else"]]), readers))
+    if (!ok) return("a DATA step iteration that executed no SET, MERGE or INPUT statement when a later iteration may execute one")
+  }
+  NULL
+}
+
 # The L3 step: a list of [cgi()] items.
 gen_row_step <- function(an) {
   cx <- new_cx("row", an)
@@ -981,9 +1011,15 @@ gen_row_step <- function(an) {
     err_sync(),
     rlang::expr(.log <- c(.log, !!dump)),
     if (has_input) quote(sas_input_iter_end(.inf)),
-    quote(if (.status == "stop") break),
+    if (!is.null(rd)) quote(if (.status == "stop") {
+      if (!.read) sas_loop_unread(.status)
+      break
+    }) else quote(if (.status == "stop") break),
     out_if,
-    if (!is.null(rd)) quote(if (!.read) break) else quote(break)
+    if (!is.null(rd)) rlang::expr(if (!.read) {
+      sas_loop_unread(.status, !!loop_read_why(an$stmts))
+      break
+    }) else quote(break)
   )
   loop <- Filter(Negate(is.null), loop)
   loop_text <- unlist(lapply(loop, function(x) {
