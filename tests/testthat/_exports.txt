@@ -10,6 +10,7 @@ public sas_f_anyalnum
 public sas_f_anyalpha
 public sas_f_anydigit
 public sas_f_anylower
+public sas_f_anyprint
 public sas_f_anypunct
 public sas_f_anyspace
 public sas_f_anyupper
@@ -128,6 +129,7 @@ public sas_f_notalnum
 public sas_f_notalpha
 public sas_f_notdigit
 public sas_f_notlower
+public sas_f_notprint
 public sas_f_notpunct
 public sas_f_notspace
 public sas_f_notupper

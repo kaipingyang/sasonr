@@ -328,7 +328,34 @@ test_that("the start of ANY* and NOT* counts bytes", {
   expect_identical(sas_f_anyalpha(paste0("a1", e1, e1), -4), 3)
   expect_identical(sas_f_anyalpha(paste0("12345", e1), -6), 6)
   # characters whose class is not known fail loud
-  expect_error(sas_f_anyalpha("中"), class = "sasonr_unsupported")
+  expect_error(sas_f_anyalpha(intToUtf8(0x101)), class = "sasonr_unsupported")
+  expect_error(sas_f_anyspace(paste0("a", intToUtf8(0x1D11E))), class = "sasonr_unsupported")
+})
+
+test_that("ANY* and NOT* follow the measured class of every tabulated character", {
+  skip_utf8()
+  tab <- utils::read.csv(test_path("fixtures", "any_classes.csv"))
+  fns <- c(alpha = "alpha", upper = "upper", lower = "lower", punct = "punct",
+           space = "space", alnum = "alnum", digit = "digit", print = "print")
+  for (i in seq_len(nrow(tab))) {
+    ch <- intToUtf8(tab$cp[i])
+    for (col in names(fns)) {
+      any_f <- getExportedValue("sasonr", paste0("sas_f_any", fns[[col]]))
+      not_f <- getExportedValue("sasonr", paste0("sas_f_not", fns[[col]]))
+      info <- sprintf("U+%04X %s", tab$cp[i], col)
+      expect_identical(lenient(any_f(ch)), as.numeric(tab[[col]][i]), info = info)
+      expect_identical(lenient(not_f(ch)), as.numeric(1 - tab[[col]][i]), info = info)
+    }
+  }
+  expect_identical(nrow(tab), 101L)
+  # the multiplication sign is neither a letter nor punctuation; the micro sign is a lower case letter
+  expect_identical(sas_f_anyalpha(paste0("1", intToUtf8(0xD7))), 0)
+  expect_identical(sas_f_anypunct(paste0("1", intToUtf8(0xD7))), 0)
+  expect_identical(sas_f_anylower(paste0("1", intToUtf8(0xB5))), 2)
+  # positions count bytes: the no-break space is a space and starts at byte 4
+  expect_identical(sas_f_anyspace(paste0("a", e1, intToUtf8(0xA0))), 4)
+  expect_identical(lenient(sas_f_notprint(paste0("ab", intToUtf8(0xAD)))), 3)
+  expect_identical(sas_f_anyalpha(paste0("12", intToUtf8(0x4E2D))), 3)
 })
 
 test_that("COUNT, COUNTC and COUNTW count bytes", {
@@ -455,4 +482,35 @@ test_that("the byte functions stay outside the exact domain in %SYSFUNC and PROC
   expect_error(sas_run(paste0("%put %sysfunc(index(", e1, "t, t));")), class = "sasonr_strict_error")
   expect_error(sas_run(paste0("data a; s = '", e1, "t'; run; proc sql; create table b as select index(s, 't') as n from a; quit;")),
                class = "sasonr_error")
+})
+
+test_that("ANYPRINT and NOTPRINT on ASCII values", {
+  byte_chr <- function(k) intToUtf8(k)
+  p <- function(...) lenient(sas_f_anyprint(...))
+  q <- function(...) lenient(sas_f_notprint(...))
+  expect_identical(p("a"), 1)
+  expect_identical(p(" "), 1)
+  expect_identical(p(byte_chr(9)), 0)
+  expect_identical(p(byte_chr(10)), 0)
+  expect_identical(p(byte_chr(13)), 0)
+  expect_identical(p(paste0(byte_chr(9), "a")), 2)
+  expect_identical(p("abc123"), 1)
+  expect_identical(p("abc123", 0), 0)
+  expect_identical(p("abc123", 4), 4)
+  expect_identical(p("abc123", 7), 0)
+  expect_identical(p("abc123", -3), 3)
+  expect_identical(p("abc123", -7), 6)
+  expect_identical(p(paste0("ab", byte_chr(10), "c"), -3), 2)
+  expect_identical(p("ab  ", 3), 3)
+  expect_identical(p("abc", -2.5), 2)
+  expect_identical(q("abc"), 0)
+  expect_identical(q(" "), 0)
+  expect_identical(q(byte_chr(9)), 1)
+  expect_identical(q(paste0("a", byte_chr(9))), 2)
+  expect_identical(q(paste0("ab", byte_chr(10), "c"), 2), 3)
+  expect_identical(q(paste0("ab", byte_chr(10), "c"), -3), 3)
+  expect_identical(q("abc123", 7), 0)
+  # a zero-length value and a blank variable hold one blank
+  r <- lenient(sas_run("data _null_; length s $20; s = ' '; a = anyprint(''); b = anyprint(s); c = notprint(s); put a= b= c=; run;"))
+  expect_true(any(grepl("a=1 b=1 c=0", msgs(r), fixed = TRUE)))
 })

@@ -534,9 +534,15 @@ sas_f_dequote <- function(x) {
   }, as_sas_chr(x))
 }
 
+# the characters of an ANY*/NOT* class; "w" is the printable class (blank to tilde)
+any_class_chars <- function(mods) {
+  if (identical(mods, "w")) return(intToUtf8(32:126, multiple = TRUE))
+  class_chars(mods)
+}
+
 class_pos <- function(x, mods, negate, start) {
   if (chr_any_wide(x)) return(class_pos_wide(as_sas_chr(x), mods, negate, start))
-  set <- class_chars(mods)
+  set <- any_class_chars(mods)
   rowwise(function(s, st) {
     if (!is.na(st) && abs(st) >= 2^31) return(NA_real_)
     ch <- chars_of(s)
@@ -557,16 +563,28 @@ class_pos <- function(x, mods, negate, start) {
   }, as_sas_chr(x), start, type = numeric(1))
 }
 
+# column of class_table_wide (R/any_classes.R) for each ANY*/NOT* class
+class_wide_col <- c(a = "alpha", u = "upper", l = "lower", p = "punct", s = "space",
+                    ad = "alnum", d = "digit", w = "print")
+
+# class of a character outside ASCII: TRUE/FALSE, or NA when not documented.
+# The measured table covers U+00A0..U+00FF and a few other code points; for
+# U+1D11E only the alpha and punctuation classes are documented (neither).
+class_of_wide <- function(cp, mods) {
+  col <- class_wide_col[[mods]]
+  out <- class_table_wide[[col]][match(cp, class_table_wide$cp)]
+  if (col %in% c("alpha", "punct")) out[cp == 0x1D11E] <- FALSE
+  out
+}
+
 # ANY* and NOT* for values with bytes outside ASCII: each character has a
 # class and the result is the position of its first byte.  The start position
 # counts bytes; a start on a later byte of a character starts at the next
-# character (backward: at the character that holds that byte).  Only the
-# characters whose class is documented are supported: e acute (lower case
-# letter), E acute and U diaeresis (upper case letters), the euro sign and
-# U+1D11E (neither letters nor punctuation); any other character outside ASCII
-# is not supported.
+# character (backward: at the character that holds that byte).  The class of a
+# character outside ASCII comes from class_table_wide; a character whose class
+# is not documented is not supported.
 class_pos_wide <- function(x, mods, negate, start) {
-  set <- class_chars(mods)
+  set <- any_class_chars(mods)
   rowwise(function(s, st) {
     if (!is.na(st) && abs(st) >= 2^31) return(NA_real_)
     ch <- chars_of(chr_utf8(s))
@@ -575,14 +593,14 @@ class_pos_wide <- function(x, mods, negate, start) {
     lead <- cumsum(c(1L, nb[-length(nb)]))
     cp <- vapply(ch, utf8ToInt, 0L, USE.NAMES = FALSE)
     wide <- cp >= 0x80
-    letter <- cp %in% c(0xE9, 0xC9, 0xDC)
-    if (any(wide & !letter & !cp %in% c(0x20AC, 0x1D11E))) {
-      abort_unsupported("a character class function with a character outside ASCII whose class is not documented")
+    hit <- ch %in% set
+    if (any(wide)) {
+      cls <- class_of_wide(cp[wide], mods)
+      if (anyNA(cls)) {
+        abort_unsupported("a character class function with a character outside ASCII whose class is not documented")
+      }
+      hit[wide] <- cls
     }
-    cls <- ifelse(rep_len(grepl("a", mods, fixed = TRUE), length(cp)), letter,
-                  ifelse(rep_len(mods == "u", length(cp)), letter & cp <= 0xDE,
-                         ifelse(rep_len(mods == "l", length(cp)), letter & cp >= 0xE0, FALSE)))
-    hit <- ifelse(wide, cls, ch %in% set)
     if (negate) hit <- !hit
     if (is.na(st)) st <- 1
     st <- trunc(st)
@@ -606,6 +624,8 @@ sas_f_anyalnum <- function(x, start = 1) class_pos(x, "ad", FALSE, start)
 #' @export
 sas_f_anyspace <- function(x, start = 1) class_pos(x, "s", FALSE, start)
 #' @export
+sas_f_anyprint <- function(x, start = 1) class_pos(x, "w", FALSE, start)
+#' @export
 sas_f_anypunct <- function(x, start = 1) class_pos(x, "p", FALSE, start)
 #' @export
 sas_f_anyupper <- function(x, start = 1) class_pos(x, "u", FALSE, start)
@@ -623,6 +643,8 @@ sas_f_notspace <- function(x, start = 1) class_pos(x, "s", TRUE, start)
 sas_f_notupper <- function(x, start = 1) class_pos(x, "u", TRUE, start)
 #' @export
 sas_f_notlower <- function(x, start = 1) class_pos(x, "l", TRUE, start)
+#' @export
+sas_f_notprint <- function(x, start = 1) class_pos(x, "w", TRUE, start)
 #' @export
 sas_f_notpunct <- function(x, start = 1) class_pos(x, "p", TRUE, start)
 
@@ -2080,7 +2102,8 @@ fn_table <- utils::modifyList(fn_table, list(
   anyspace = fn_spec("num", 1, 2), anypunct = fn_spec("num", 1, 2), anyupper = fn_spec("num", 1, 2),
   anylower = fn_spec("num", 1, 2), notalpha = fn_spec("num", 1, 2), notdigit = fn_spec("num", 1, 2),
   notalnum = fn_spec("num", 1, 2), notspace = fn_spec("num", 1, 2), notupper = fn_spec("num", 1, 2),
-  notlower = fn_spec("num", 1, 2), notpunct = fn_spec("num", 1, 2), klength = fn_spec("num", 1),
+  notlower = fn_spec("num", 1, 2), notpunct = fn_spec("num", 1, 2),
+  anyprint = fn_spec("num", 1, 2), notprint = fn_spec("num", 1, 2), klength = fn_spec("num", 1),
   byte = fn_spec("char", 1, 1, 1L), rank = fn_spec("num", 1),
   ifc = fn_spec("char", 3, 4, 200L), ifn = fn_spec("num", 3, 4), choosec = fn_spec("char", 2, Inf, 200L),
   choosen = fn_spec("num", 2, Inf), whichc = fn_spec("num", 2, Inf), whichn = fn_spec("num", 2, Inf),
