@@ -217,10 +217,36 @@ test_that("an iteration that reads nothing writes its observation, then the step
   expect_identical(msgs(r), "NOTE: The data set WORK.A has 1 observations and 1 variables.")
 })
 
+test_that("an iteration that reads nothing: any read condition, OUTPUT, DELETE, STOP", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  dl <- function(...) c("  datalines;", ..., ";", "run;")
+  loop_note <- "NOTE: DATA STEP stopped due to looping."
+  # the first iteration without a read stops the step (lines 4 and 5 unread)
+  r <- run_notes(c("data a;", "  if _n_ ne 3 then input x;", dl("1", "2", "3", "4", "5")))
+  expect_identical(msgs(r), c(loop_note, "NOTE: The data set WORK.A has 3 observations and 1 variables."))
+  expect_identical(r$work$a$x, c(1, 2, NA))
+  # the explicit OUTPUT statements of that iteration run
+  r <- run_notes(c("data a;", "  if _n_ = 1 then input x; output; output;", dl("1", "2")))
+  expect_identical(msgs(r), c(loop_note, "NOTE: The data set WORK.A has 4 observations and 1 variables."))
+  # STOP ends the step first: no NOTE
+  r <- run_notes(c("data a;", "  if _n_ = 1 then input x; if _n_ > 1 then stop;", dl("1", "2")))
+  expect_identical(msgs(r), "NOTE: The data set WORK.A has 1 observations and 1 variables.")
+  # DELETE (or a subsetting IF) drops the observation; the NOTE is written
+  for (del in c("if _n_ > 1 then delete;", "if _n_ = 1;")) {
+    r <- run_notes(c("data a;", paste("  if _n_ = 1 then input x;", del), dl("1", "2")))
+    expect_identical(msgs(r), c(loop_note, "NOTE: The data set WORK.A has 1 observations and 1 variables."))
+  }
+  # a read that hits the end of the data stops as usual
+  r <- run_notes(c("data a;", "  input x; if _n_ = 2 then input y;", dl("1", "2")))
+  expect_identical(msgs(r), "NOTE: The data set WORK.A has 1 observations and 2 variables.")
+  expect_identical(r$work$a$x, 1)
+})
+
 test_that("an iteration that reads nothing fails loud for the shapes not known", {
   dl <- function(...) c("  datalines;", ..., ";", "run;")
-  for (body in c("  if _n_ ne 3 then input x;", "  if _n_ = 1 then input x; output;",
-                 "  if _n_ = 1 then input x; if _n_ = 2 then stop;", "  if _n_ = 1 then input x; if _n_ = 2 then delete;")) {
+  for (body in c("  if _n_ = 1 then do i = 1 to 1; input x; end;",
+                 "  select; when (_n_ = 1) input x; otherwise; end;",
+                 "  if _n_ = 1 then input x; if _n_ = 2 then return;")) {
     expect_error(run_notes(c("data a;", body, dl("1", "2", "3"))), class = "sasonr_unsupported")
   }
 })
