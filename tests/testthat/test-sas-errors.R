@@ -127,3 +127,20 @@ test_that("an extra argument of a call with too many arguments takes the last ar
   r <- sas_run("data a;\n  r = substr('abc', 1, 2, 3);\nrun;", on_error = "sas")
   expect_false(any(grepl("have been converted", msgs(r), fixed = TRUE)))
 })
+
+test_that("a numeric variable operand of || gives a conversion NOTE at its place", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  code <- c("data out;", "  num = 12;", "  length c $20;", "  c = 'x' || num;", "  d = num || 'y' || num;", "run;")
+  for (lv in c("auto", "L3")) {
+    r <- sas_run(code, level = lv)
+    m <- msgs(r)
+    expect_identical(m[1], "NOTE: Numeric values have been converted to character values at the places given by: (Line):(Column).")
+    expect_match(m[2], "^ +4:14 +5:21 +5:7 *$")
+    expect_identical(r$work$out$c, "x          12")
+  }
+})
+
+test_that("a numeric constant or expression operand of || fails loud", {
+  expect_error(sas_run("data out; c = 'x' || 12; run;"), class = "sasonr_unsupported")
+  expect_error(sas_run("data out; n = 1; c = 'x' || (n + 1); run;"), class = "sasonr_unsupported")
+})

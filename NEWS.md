@@ -83,6 +83,10 @@ the development version provides.
   `options(sasonr.log_style = "plain")` turns it off.
 * `$log_events` of a result is a tibble of the log events (kind, message id,
   step, place, text, program line) behind every view.
+* A numeric variable as an operand of `||` in a DATA step now gives the NOTE
+  "Numeric values have been converted to character values" with the place of
+  the variable. A numeric constant or expression as an operand of `||` fails
+  loud (unsupported).
 
 ## Errors and fail-loud behaviour
 

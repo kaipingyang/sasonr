@@ -258,6 +258,7 @@ an_expr <- function(e, st) {
       if (e$op == "||" && identical(st$context, "where") && expr_type(e, st)$len > 32767L) {
         abort_unsupported("a WHERE concatenation of more than 32767 characters (not supported)", e$line)
       }
+      if (e$op == "||" && identical(st$context, "data")) an_concat_n2c(e, st)
       if (e$op %in% c("+", "-", "*", "/", "**", "min", "max", "and", "or")) {
         if (expr_type(e$lhs, st)$type == "char" || expr_type(e$rhs, st)$type == "char") {
           abort_unsupported("automatic character-to-numeric conversion", e$line)
@@ -426,6 +427,20 @@ an_call <- function(e, st) {
                         line = a$line %||% e$line, col = a$col %||% e$col, construct = TRUE)
   }
   e
+}
+
+# A numeric operand of || in a DATA step is converted to character text: the
+# conversion NOTE gives the place of the operand.  Only a variable operand has
+# a known place; a numeric constant or expression operand fails loud.
+an_concat_n2c <- function(e, st) {
+  for (a in list(e$lhs, e$rhs)) {
+    if (expr_type(a, st)$type == "char") next
+    if (!identical(a$node, "var") || is.null(a$line) || is.null(a$col)) {
+      abort_unsupported("a numeric constant or expression as an operand of || (only a numeric variable)", a$line %||% e$line)
+    }
+    log_place("conv.n2c", a$line, a$col)
+  }
+  invisible()
 }
 
 # A call with more than `max` arguments is a compile-time ERROR.  When the
