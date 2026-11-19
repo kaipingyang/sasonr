@@ -329,7 +329,7 @@ test_that("LAG in a DO value list is evaluated in the pre-header, not in the bod
 })
 
 test_that("a read and an INPUT end their block with the end-of-input stop", {
-  x <- cfg_of("data c; w = 1; set a; u = v; run;")
+  x <- cfg_of("data c; w = v; set a; u = v; run;")
   expect_equal(ops_of(x, "B1"), c("assign", "read"))
   t <- x$blocks$B1$term
   expect_equal(x$blocks[[t$true]]$term$term, "stop")
@@ -388,7 +388,7 @@ test_that("facts: explicit output, the dominating read, conditional sites", {
   expect_equal(r$f$conditional$lag, 2L)
   expect_false(r$f$conditional$read)
   expect_false(r$f$needs_state_machine)
-  r <- facts_of("data c; w = 1; set a; output; run;")
+  r <- facts_of("data c; w = v; set a; output; run;")
   expect_true(r$f$explicit_output)
   expect_false(r$f$read_dominates)
   r <- facts_of("data c; do until (e); set a end = e; end; stop; run;")

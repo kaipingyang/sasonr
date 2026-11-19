@@ -212,7 +212,8 @@ classify_step <- function(an) {
     if (length(rdr_idx) == 0) {
       add3("SET/INPUT inside a block")
     } else if (rdr_idx[1] != exec_idx[1]) {
-      add3("executable statements before SET/INPUT")
+      why <- before_read_move(an)$why
+      add3(paste0("executable statements before SET/INPUT", if (!is.null(why)) paste0(" (", why, ")")))
     }
     if (!is.null(rd$end)) add2("END= variable")
     if (!is.null(rd$nobs)) add3("NOBS= variable")
@@ -321,6 +322,51 @@ merge_row_reasons <- function(an) {
     return(paste0("MERGE with an assignment to or RETAIN of a variable read by MERGE (", paste(hit, collapse = ", "), ")"))
   }
   character()
+}
+
+# Executable statements before the top-level read (SET, MERGE, INPUT). They
+# run at the top of every iteration, also on the one where the read meets the
+# end of the input and the step stops, and they see the previous row's input
+# variables. A leading run of `v = <literal>;` gives the same result when it
+# runs right after the read: it reads nothing, the literal has the type of v
+# (no conversion, nothing logged on the extra run), and v is a variable the
+# step creates that the read neither reads nor writes and that is not
+# retained. Returns `list(stmts, why)`: `stmts` the statements with that run
+# moved to just after the read (NULL when nothing is to be moved or it cannot
+# be), `why` what blocks the move (NULL when nothing does).
+before_read_move <- function(an) {
+  stmts <- an$stmts
+  rdr <- which(vapply(stmts, function(s) s$stmt %in% c("set", "merge", "input"), logical(1)))
+  if (length(rdr) == 0) return(list(stmts = NULL, why = NULL))
+  r <- rdr[1]
+  pre <- which(!vapply(stmts[seq_len(r - 1L)], is_decl, logical(1)))
+  if (length(pre) == 0) return(list(stmts = NULL, why = NULL))
+  used_by_read <- unique(c(unlist(stmts[[r]], use.names = FALSE), unlist(an$infile, use.names = FALSE)))
+  for (i in pre) {
+    s <- stmts[[i]]
+    if (s$stmt != "assign") {
+      what <- switch(s$stmt, sum = "sum statement", subset_if = "subsetting IF", paste0(toupper(s$stmt), " statement"))
+      return(list(stmts = NULL, why = what))
+    }
+    if (s$target$node != "var") return(list(stmts = NULL, why = "assignment to an array element"))
+    v <- s$target$name
+    inf <- an$info[[v]]
+    if (is.null(inf) || v %in% c("_n_", "_error_") || inf$kind != "data") {
+      return(list(stmts = NULL, why = "assignment to an automatic variable"))
+    }
+    if (isTRUE(inf$retained) || v %in% an$retain_stmt_vars) {
+      return(list(stmts = NULL, why = paste0("assignment to retained variable ", v)))
+    }
+    if (v %in% used_by_read) {
+      return(list(stmts = NULL, why = paste0("assignment to variable ", v, " used by the read")))
+    }
+    lit <- switch(s$value$node, num = "num", missing = "num", str = "char", NA_character_)
+    if (is.na(lit)) return(list(stmts = NULL, why = "assignment of an expression that is not a literal"))
+    if (!identical(lit, inf$type)) return(list(stmts = NULL, why = paste0("type conversion in the assignment to ", v)))
+  }
+  rest <- setdiff(seq_along(stmts), pre)
+  at <- match(r, rest)
+  list(stmts = stmts[c(rest[seq_len(at)], pre, rest[-seq_len(at)])], why = NULL)
 }
 
 has_lag_call <- function(e) {

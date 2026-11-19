@@ -1062,6 +1062,24 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
     an$reasons <- "forced L3"
     return(an)
   }
+  # literal assignments before the read run right after it in the vectorised
+  # form (see before_read_move()); kept only when that makes the step L1/L2
+  mv <- before_read_move(an)$stmts
+  if (!is.null(mv)) {
+    an2 <- an
+    an2$stmts <- mv
+    an2$dsir <- dsir_slots(an2)
+    cls2 <- classify_step(an2)
+    lv2 <- dsir_level(dsir_facts(dsir_lower(an2), an2), an2)
+    if (!identical(cls2$level, "L3") && !identical(lv2$level, "L3")) {
+      an <- an2
+      cls <- cls2
+      an$sum_plan <- cls$sum_plan
+      an$skip_top <- cls$skip_top
+      an$output_pattern <- cls$output_pattern
+      an$carry_plan <- cls$carry_plan
+    }
+  }
   lv <- dsir_level(dsir_facts(dsir_lower(an), an), an)
   # where both give the same level the reasons of classify_step() stay (the
   # header of the generated code does not change)
