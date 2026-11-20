@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC TABULATE tables reach the HTML document of `sas_html()` while the
+  HTML destination is open: heading rows and the corner cell in `<thead>`,
+  row titles spanning their sub-rows, N and NMISS without decimals, one table
+  per page of the page dimension under its page text. A heading or MISSTEXT
+  longer than its column, a `BOX=` text in the corner and `F=` on an N or
+  NMISS cell are an Unsupported error of `sas_html()`; the listing is still
+  written.
 * PROC TABULATE prints its tables to the listing: one, two and three
   dimensions with crossing, concatenation, `ALL`, labels, `F=`, `BOX=` and
   `MISSTEXT=`, the row-title area of LINESIZE/4, wrapped headings, column

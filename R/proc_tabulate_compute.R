@@ -26,6 +26,11 @@
 #                 class variable, printed on its own line above `row`)
 #     formats     list (one element per stat column) of the cell formats of
 #                 each body row
+#     cell_stats  list (one element per stat column) of the statistic of
+#                 each body row (n, sum, pctn ...)
+#     format_source  list (likewise) of where each cell format comes from:
+#                 "f" (F= in the TABLE statement), "proc" (FORMAT= on the
+#                 PROC statement) or "default" (12.2)
 #     page        NULL, or list(text, role) of the page-dimension elements
 #     box, misstext, table   BOX= (NULL or list(kind, value)), the MISSTEXT
 #                 text (default "."), the number of the TABLE statement
@@ -277,19 +282,27 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
       data[[v]] <- col
     }
     fmts <- vector("list", length(cpaths))
+    stats <- fsrc <- vector("list", length(cpaths))
     for (j in seq_along(cpaths)) {
       cp <- cpaths[[j]]
       vals <- rep(NA_real_, nr)
       fj <- vector("list", nr)
+      st <- character(nr)
+      src <- character(nr)
       for (i in seq_len(nr)) {
         rp <- rpaths[[i]]
         elems <- c(pg$elems, rp$elems, cp$elems)
         rows <- intersect(intersect(pg$rows, rp$rows), cp$rows)
         fj[i] <- list(tab_path_format(cp$elems) %||% tab_path_format(rp$elems) %||% sp$format %||% tab_default_format)
+        src[i] <- if (!is.null(tab_path_format(cp$elems)) || !is.null(tab_path_format(rp$elems))) "f"
+                  else if (!is.null(sp$format)) "proc" else "default"
+        st[i] <- tab_cell_stat(elems)
         vals[i] <- tab_cell_value(elems, rows, stats_of, pct_denom, line)
       }
       data[[stat_names[j]]] <- vals
       fmts[[j]] <- fj
+      stats[[j]] <- st
+      fsrc[[j]] <- src
     }
     tb <- tibble::new_tibble(data, nrow = nr)
     uniform <- lapply(fmts, function(fj) if (length(fj) && all(vapply(fj, identical, logical(1), fj[[1]]))) fj[[1]])
@@ -306,6 +319,8 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
                            proc = "Tabulate", template = "base.tabulate", cols = cols, header = header$cells)
     attr(t, "row_header") <- rh
     attr(t, "formats") <- fmts
+    attr(t, "cell_stats") <- stats
+    attr(t, "format_source") <- fsrc
     attr(t, "page") <- if (is.null(dims$page)) NULL else tab_page_text(pg$elems, sp, lv, line)
     attr(t, "box") <- ir$box
     attr(t, "misstext") <- ir$misstext %||% "."
@@ -321,6 +336,14 @@ tab_path_format <- function(elems) {
   f
 }
 
+# The statistic of a cell: the last statistic element of its paths, else N
+# without an analysis variable and SUM with one.
+tab_cell_stat <- function(elems) {
+  stat <- NULL
+  for (e in elems) if (identical(e$node$kind, "stat")) stat <- e$node$name
+  stat %||% (if (is.null(tab_path_var(elems))) "n" else "sum")
+}
+
 tab_path_var <- function(elems) {
   for (e in elems) if (identical(e$node$kind, "var")) return(e$node$name)
   NULL
@@ -330,9 +353,7 @@ tab_path_var <- function(elems) {
 # paths, `rows` the matching rows.  NA is an empty cell.
 tab_cell_value <- function(elems, rows, stats_of, pct_denom, line) {
   v <- tab_path_var(elems)
-  stat <- NULL
-  for (e in elems) if (identical(e$node$kind, "stat")) stat <- e$node$name
-  stat <- stat %||% (if (is.null(v)) "n" else "sum")
+  stat <- tab_cell_stat(elems)
   if (!length(rows)) return(NA_real_)
   if (is.null(v)) {
     if (stat != "n") abort_unsupported(paste0("PROC TABULATE ", toupper(stat), " without an analysis variable"), line)

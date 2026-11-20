@@ -12,6 +12,7 @@ proc_registry <- list(
                ods_output = function(tables, spec, line) means_ods_output(tables, spec, line)),
   # no procedure title line; the tables of a step are written page by page
   tabulate = list(compute = function(d, spec) tabulate_compute(d, spec), templates = c(Table = "base.tabulate"),
+                  proctitle = FALSE,
                   listing = function(tables, ls) tab_listing_tables(tables, ls))
 )
 proc_registry_alias <- c(summary = "means")

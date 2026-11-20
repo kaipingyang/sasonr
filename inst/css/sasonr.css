@@ -33,3 +33,4 @@
 .sasonr-output table.sas-table td.sas-data { background-color: #ffffff; font-weight: normal; vertical-align: top; }
 .sasonr-output table.sas-table .sas-num { text-align: right; }
 .sasonr-output .sas-stack { white-space: nowrap; }
+.sasonr-output .sas-pagetext { margin: 0.5em 0 0 0; }

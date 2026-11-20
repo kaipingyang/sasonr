@@ -33,9 +33,46 @@ html_cell <- function(values, tag = "td", cls = character(), attrs = "") {
   paste0("<", tag, if (length(cls)) paste0(' class="', paste(cls, collapse = " "), '"'), attrs, ">", body, "</", tag, ">")
 }
 
+# HTML templates of the tables that are not drawn from their columns (the
+# MEANS layout below): the template name of a table picks its renderer.
+html_templates <- list(
+  base.tabulate = function(tb) html_base_tabulate(tb)
+)
+
+# A table laid out on a grid: `cells` is a list of rectangles list(r0, r1,
+# c0, c1, text, kind) over logical rows 1..nrow, `kind` "header" (in
+# <thead>, rows 1..nhead), "rowheader" or "data".  Each cell is written in
+# the row where it starts, in column order, with rowspan/colspan.
+render_html_grid <- function(cells, nrow, nhead, summary) {
+  r0 <- vapply(cells, `[[`, 1L, "r0")
+  c0 <- vapply(cells, `[[`, 1L, "c0")
+  rows <- vapply(seq_len(nrow), function(r) {
+    own <- cells[which(r0 == r)[order(c0[r0 == r])]]
+    tds <- vapply(own, function(cl) {
+      rs <- cl$r1 - cl$r0 + 1L
+      cs <- cl$c1 - cl$c0 + 1L
+      head <- identical(cl$kind, "header")
+      scope <- if (head) (if (cs > 1L) "colgroup" else "col") else if (rs > 1L) "rowgroup" else "row"
+      attrs <- paste0(if (!identical(cl$kind, "data")) paste0(' scope="', scope, '"'),
+                      if (rs > 1L) paste0(' rowspan="', rs, '"'), if (cs > 1L) paste0(' colspan="', cs, '"'))
+      switch(cl$kind,
+        header = html_cell(cl$text, "th", "sas-header", attrs),
+        rowheader = html_cell(cl$text, "th", "sas-rowheader", attrs),
+        data = html_cell(cl$text, "td", c("sas-data", "sas-num"), attrs)
+      )
+    }, "")
+    paste0("<tr>", paste(tds, collapse = ""), "</tr>")
+  }, "")
+  c(paste0('<table class="sas-table" summary="', html_escape(summary), '">'),
+    "<thead>", rows[seq_len(nhead)], "</thead>", "<tbody>", rows[setdiff(seq_len(nrow), seq_len(nhead))], "</tbody>",
+    "</table>")
+}
+
 #' @noRd
 render_html <- function(table) {
   validate_sas_ods_table(table)
+  tpl <- html_templates[[attr(table, "template", exact = TRUE) %||% ""]]
+  if (!is.null(tpl)) return(tpl(table))
   cols <- attr(table, "cols", exact = TRUE)
   header <- attr(table, "header", exact = TRUE)
   col_of <- function(nm) cols[match(nm, cols$name), ]
@@ -88,12 +125,20 @@ render_html <- function(table) {
     if (length(notes)) paste0('<p class="sas-note-text">', html_escape(notes), "</p>"))
 }
 
+# Whether a procedure writes its title line ("The MEANS Procedure"): not
+# when its PROC registry entry says so (PROC TABULATE).
+html_proctitle <- function(proc) {
+  key <- tolower(proc)
+  if (key %in% names(proc_registry_alias)) key <- proc_registry_alias[[key]]
+  !identical(proc_registry[[key]]$proctitle, FALSE)
+}
+
 # One procedure output: the titles and the procedure title once, per BY group
 # its byline and tables, then the footnotes.
 render_html_output <- function(o) {
   out <- c('<div class="sas-proc">',
            if (length(o$titles)) paste0('<div class="sas-title">', html_escape(o$titles), "</div>"),
-           paste0('<div class="sas-proctitle">The ', html_escape(toupper(o$proc)), " Procedure</div>"))
+           if (html_proctitle(o$proc)) paste0('<div class="sas-proctitle">The ', html_escape(toupper(o$proc)), " Procedure</div>"))
   group <- NULL
   for (tb in o$tables) {
     by <- attr(tb, "by", exact = TRUE)
