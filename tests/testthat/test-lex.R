@@ -105,10 +105,35 @@ test_that("DATALINES and CARDS4 data round-trip", {
   expect_equal(tok$text[tok$kind == "datalines_end"], ";;;;")
   tok <- expect_lossless("data a; input s $; cards4;\nx;y\n\n;;;;\nrun;")
   expect_equal(tok$text[tok$kind == "datalines"], c("x;y", ""))
-  tok <- expect_lossless("data a; input s $; cards; ignored\nx\n  ;\nrun;")
-  expect_equal(tok$text[tok$kind == "comment"], " ignored")
+  tok <- expect_lossless("data a; input s $; cards; /* note */\nx\n  ;\nrun;")
+  expect_equal(tok$text[tok$kind == "comment"], " /* note */")
   expect_equal(tok$text[tok$kind == "datalines_end"], "  ;")
   expect_lossless("data a; input s $; datalines;\nx\ny")
+})
+
+test_that("in-stream data starts on the line after DATALINES", {
+  # text after the statement on its line is statements, not data: fail loud
+  for (code in c("data a; input x; datalines; 3 1 2 ; run; proc rank data=a out=b; run;",
+                 "data a; input x; cards; 3 1 2 ;\nrun;",
+                 "data a; input x; datalines4; 3 1 2 ;\n;;;;\nrun;",
+                 "data a; input x; lines; run;\n3\n;\n",
+                 "data a; input x;\ndatalines; /* open\n3\n*/\n;\nrun;")) {
+    e <- tryCatch(sas_lex(code), error = function(e) e)
+    expect_s3_class(e, "sasonr_unsupported")
+    expect_match(conditionMessage(e), "text after DATALINES on the same line", fixed = TRUE)
+    tok <- sas_lex(code, lossless = TRUE)
+    expect_identical(paste0(tok$text, collapse = ""), code)
+    e2 <- tryCatch(tokens_semantic(tok), error = function(e) e)
+    expect_identical(conditionMessage(e2), conditionMessage(e))
+  }
+  tok <- sas_lex("data a; input x; datalines; 3 1 2 ;", lossless = TRUE)
+  expect_false(any(tok$kind == "datalines"))
+  expect_equal(tok$text[tok$kind == "num"], c("3", "1", "2"))
+  # blanks and closed comments on the DATALINES line; the data follow
+  t <- sas_lex("data a; input x;\ndatalines; /* a */ /* b */  \n3\n1\n;\nrun;")
+  expect_equal(t$value[t$type == "datalines"], c("3", "1"))
+  t <- sas_lex("data a; input x;\ndatalines;\n3\n1\n;\nrun;")
+  expect_equal(t$value[t$type == "datalines"], c("3", "1"))
 })
 
 test_that("quoted strings, hex and date literals keep their source text", {

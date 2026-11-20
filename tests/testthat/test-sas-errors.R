@@ -144,3 +144,16 @@ test_that("a numeric constant or expression operand of || fails loud", {
   expect_error(sas_run("data out; c = 'x' || 12; run;"), class = "sasonr_unsupported")
   expect_error(sas_run("data out; n = 1; c = 'x' || (n + 1); run;"), class = "sasonr_unsupported")
 })
+
+test_that("text after DATALINES on its line fails loud instead of swallowing the program", {
+  for (oe in c("abort", "sas")) {
+    expect_error(sas_run("data a; input x; datalines; 3 1 2 ; run; proc rank data=a out=b; run;", on_error = oe),
+                 "text after DATALINES on the same line", class = "sasonr_unsupported")
+    expect_error(sas_run("data a; input x; cards; 3 1 2 ;\nrun;", on_error = oe), class = "sasonr_unsupported")
+    expect_error(sas_run("data a; input x; datalines4; 3 1 2 ;\n;;;;\nrun;", on_error = oe), class = "sasonr_unsupported")
+  }
+  r <- sas_run("data a; input x;\ndatalines; /* the data */\n3\n1\n2\n;\nrun;")
+  expect_identical(r$work$a$x, c(3, 1, 2))
+  r <- sas_run("data a; input x;\ndatalines;\n3\n1\n2\n;\nrun;")
+  expect_identical(r$work$a$x, c(3, 1, 2))
+})

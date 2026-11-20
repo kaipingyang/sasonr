@@ -6,6 +6,27 @@
 
 datalines_words <- c("datalines", "cards", "lines", "datalines4", "cards4", "lines4")
 
+# The rest of the DATALINES statement line (code points, no line feed) holds
+# only blanks and closed `/* */` comments. The data lines start on the next
+# line; other text there is read as statements, which is not supported.
+datalines_rest_blank <- function(x) {
+  n <- length(x)
+  j <- 1L
+  while (j <= n) {
+    if (x[j] %in% c(32L, 9L, 11L, 12L, 160L)) {
+      j <- j + 1L
+    } else if (j < n && x[j] == 47L && x[j + 1L] == 42L) {
+      k <- j + 2L
+      while (k < n && !(x[k] == 42L && x[k + 1L] == 47L)) k <- k + 1L
+      if (k >= n) return(FALSE)
+      j <- k + 2L
+    } else {
+      return(FALSE)
+    }
+  }
+  TRUE
+}
+
 # After these keywords a value is expected, so `.a` is a special missing value.
 value_expecting_kw <- c(
   "if", "then", "else", "and", "or", "not", "until", "while", "to", "by",
@@ -131,7 +152,11 @@ sas_lex <- function(text, lossless = FALSE) {
 
   lex_datalines <- function(j, four) {
     # j: position just after the `;` of the DATALINES statement.
-    while (j <= n && cp[j] != 10L) j <- j + 1L # rest of the statement line is ignored
+    s <- j
+    while (j <= n && cp[j] != 10L) j <- j + 1L
+    if (j > s && !datalines_rest_blank(cp[s:(j - 1L)])) {
+      abort_unsupported("text after DATALINES on the same line", line_of[s])
+    }
     j <- j + 1L
     repeat {
       if (j > n) {

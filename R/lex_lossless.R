@@ -24,8 +24,10 @@
 # - an unexpected character, a hexadecimal constant with too many digits: an
 #   `error` row for those characters;
 # - a semicolon inside DATALINES data: the line stays a `datalines` row.
-# The text after `DATALINES;` on the statement line, which sas_lex() ignores, is
-# a `ws` row when blank and a `comment` row otherwise.
+# The text after `DATALINES;` on the statement line is a `ws` row when blank and
+# a `comment` row when it holds only blanks and closed `/* */` comments. Other
+# text there (sas_lex() fails loud on it) is lexed as ordinary tokens and the
+# lines that follow are not read as data.
 
 trivia_kinds <- c("ws", "newline", "comment")
 
@@ -294,7 +296,14 @@ sas_tokens <- function(code) {
         if (at(k) == 59L) {
           if (k > i) emit_space(i, k - 1L)
           emit("semi", ";", k, k, k)
-          i <- lex_datalines(k + 1L, four = endsWith(low, "4"))
+          e <- k + 1L
+          while (e <= n && cp[e] != 10L) e <- e + 1L
+          if (e > k + 1L && !datalines_rest_blank(cp[(k + 1L):(e - 1L)])) {
+            record(abort_unsupported("text after DATALINES on the same line", line_of[k + 1L]))
+            i <- k + 1L
+          } else {
+            i <- lex_datalines(k + 1L, four = endsWith(low, "4"))
+          }
         }
       }
       next

@@ -5,6 +5,11 @@ the development version provides.
 
 ## Running SAS programs
 
+* In-stream data start on the line after the `DATALINES` (`CARDS`, `LINES`,
+  `DATALINES4`, ...) statement. Blanks and `/* */` comments may follow the
+  statement on its line; any other text there is now an Unsupported error.
+  Before, that text and the rest of the program were taken as data and the
+  steps after it were silently skipped.
 * Readability passes for the code of vectorised DATA steps (option
   `sasonr.passes`, see `?sas_translate`): a retained numeric variable set only
   at `FIRST.` of a BY group from a column is written as one grouped value per
