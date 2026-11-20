@@ -680,8 +680,26 @@ translate_proc_tabulate <- function(step, meta, last) {
     if (any(nchar(c(warn, errs)) > ls)) unexact("an ERROR or WARNING longer than the line size")
     tab_abort_error(errs, warn, err_line)
   }
-  # the computation (proc_tabulate_compute.R) is specified; the listing is not
-  # implemented yet
-  tab_spec(step, decl, irs, inp)
-  abort_unsupported("PROC TABULATE output is not implemented yet", step$line)
+  # WARNING of a class variable crossed with itself (one per TABLE statement)
+  self_warn <- vapply(Filter(tab_crosses_self, irs), function(ir) {
+    paste0("WARNING: A class variable is crossed with itself in the table statement at line ", ir$line,
+           ".  This may cause unpredictable results.")
+  }, "")
+  if (length(warn) && length(self_warn)) unexact("a keyword WARNING and a self-crossing WARNING in one step")
+  if (any(nchar(c(warn, self_warn)) > rt_linesize())) unexact("a WARNING longer than the line size")
+  spec <- tab_spec(step, decl, irs, inp)
+  header <- sprintf("# ---- PROC TABULATE (SAS line %d)", as.integer(step$line))
+  # the WARNINGs are written when the step runs, before its NOTEs
+  warns <- c(warn, self_warn)
+  warn_code <- if (length(warns)) paste0(".log <- c(.log, ", r_lit(stats::setNames(warns, rep("msg", length(warns)))), ")")
+  code <- c(
+    header,
+    warn_code,
+    paste0(".d <- ", proc_source_code(inp)),
+    paste0(".r <- sas_rt_proc(\"tabulate\", .d, ", r_lit(spec), ")"),
+    ".lst <- c(.lst, sas_tab_titles(.titles, .r))",
+    ".ods <- c(.ods, .r$tables)"
+  )
+  list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TABULATE", line = step$line,
+       outputs = character(), meta = list())
 }

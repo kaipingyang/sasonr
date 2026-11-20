@@ -159,14 +159,18 @@ test_that("a character analysis variable is an ERROR without a nesting path", {
     "ERROR: Variable sub in list does not match type prescribed for this list.")
 })
 
-test_that("a step that passes the checks fails loud: no output yet", {
+test_that("a step that passes the checks prints its table; its WARNINGs go to the log", {
+  withr::local_options(sasonr.strict = TRUE, sasonr.step_notes = TRUE)
+  # a statistic keyword is gated by the PROC statistics registry
   expect_error(sas_run(paste0(have, "proc tabulate data=have; class grp; var v; table grp, v*mean; run;")),
-               "PROC TABULATE output is not implemented yet", class = "sasonr_unsupported")
-  # grp*grp is a WARNING in the step that runs; still no output
-  expect_error(sas_run(paste0(have, "proc tabulate data=have; class grp; table grp*grp; run;"), on_error = "sas"),
-               "not implemented yet", class = "sasonr_unsupported")
-  expect_error(sas_run(paste0(kw, "proc tabulate data=kw; class all n; var mean; table all, mean; run;"), on_error = "sas"),
-               "not implemented yet", class = "sasonr_unsupported")
+               class = "sasonr_strict_error")
+  r <- sas_run(paste0(have, "proc tabulate data=have; class grp; table grp*grp; run;"))
+  expect_identical(grep("^WARNING", as.character(sas_log(r)), value = TRUE),
+                   "WARNING: A class variable is crossed with itself in the table statement at line 11.  This may cause unpredictable results.")
+  expect_true(length(r$listing) > 0L)
+  r <- sas_run(paste0(kw, "proc tabulate data=kw; class all n; var mean; table all, mean; run;"))
+  expect_identical(sum(grepl("conflicts with the keyword of the same name", as.character(sas_log(r)))), 3L)
+  expect_true(length(r$listing) > 0L)
 })
 
 test_that("a log that cannot be written exactly fails loud", {
@@ -201,9 +205,9 @@ run;
   expect_identical(chk$step, c(rep(2L, 10), 3L, 3L))
 })
 
-test_that("sas_check() reports only the missing output for a TABULATE step inside the checked scope", {
+test_that("sas_check() has no finding for a TABULATE step inside the checked scope", {
   chk <- sas_check(paste0(have, "proc tabulate data=have format=8.2 order=data missing;
     class grp sub / descending; var v; keylabel n='Count' all='Total'; label v='Value';
     table grp all, sub*v*(n mean) / box='B' misstext='-'; run;"))
-  expect_identical(chk$feature, "PROC TABULATE output is not implemented yet")
+  expect_identical(nrow(chk), 0L)
 })

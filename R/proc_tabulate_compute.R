@@ -53,11 +53,7 @@ tab_spec <- function(step, decl, irs, inp) {
   tryCatch(proc_apply_attr_stmts(step$stmts, st), sasonr_runtime_error = function(e) {
     abort_unsupported("the ERROR of a FORMAT or LABEL statement of PROC TABULATE", line)
   })
-  class_stmts <- Filter(function(s) identical(s$stmt, "class"), step$stmts)
   if (length(decl$dup)) abort_unsupported("a CLASS variable declared in two CLASS statements of PROC TABULATE", line)
-  if (length(class_stmts) > 1L && any(vapply(class_stmts[-1], function(s) isTRUE(s$opts$missing), logical(1)))) {
-    abort_unsupported("CLASS / MISSING on a CLASS statement after the first one of PROC TABULATE", line)
-  }
   cls <- lapply(decl$class, function(v) {
     co <- decl$class_opts[[v]]
     list(name = v, missing = isTRUE(co$missing) || isTRUE(o$missing), order = co$order %||% o$order %||% "internal",
@@ -216,9 +212,12 @@ tab_node_heading <- function(n, sp, line) {
   )
 }
 
-tab_level_text <- function(v, level, lv, sp, line) {
+# The heading of a class level.  A missing numeric level prints its formatted
+# text (`.`, `A` for .A) in the row dimension; in the column and page
+# dimensions it is not measured.
+tab_level_text <- function(v, level, lv, sp, line, row = FALSE) {
   val <- lv[[v]]$values[level]
-  if (!is.character(val) && sas_is_missing(val)) {
+  if (!row && !is.character(val) && sas_is_missing(val)) {
     abort_unsupported(paste0("the heading of a missing level of the numeric CLASS variable ", toupper(v)), line)
   }
   if (is.character(val) && !nzchar(sas_rtrim(val))) return("")
@@ -374,28 +373,40 @@ tab_col_header <- function(cpaths, other_stat_var, sp, lv, line) {
         key <- here
         h <- tab_node_heading(n, sp, line)
         if (!is.na(h) && !(n$kind %in% c("var", "stat") && !is.na(n$label) && !nzchar(n$label))) {
-          add(key, h, if (n$kind == "all") "class" else n$kind, if (n$kind == "all") 2L else 1L)
+          add(key, h, if (n$kind == "all") "class" else n$kind, 1L)
         }
       }
     }
-    # the default statistic N of a column without a statistic prints its
-    # heading at the bottom; the default SUM, and a statistic or an analysis
-    # variable in another dimension, are not measured
+    # the default statistic of a column without a statistic (N, or SUM with an
+    # analysis variable) prints its heading at the bottom; a statistic or an
+    # analysis variable in another dimension is not measured
     if (!any(vapply(p$elems, function(e) identical(e$node$kind, "stat"), logical(1)))) {
       if (other_stat_var) {
         abort_unsupported("a PROC TABULATE column without a statistic when the rows give a statistic or an analysis variable", line)
       }
-      if (!is.null(tab_path_var(p$elems))) {
-        abort_unsupported("the heading of the default statistic SUM of a PROC TABULATE column", line)
-      }
-      add(paste0(key, "/default"), tab_node_heading(list(kind = "stat", name = "n", label = NA_character_), sp, line),
+      dflt <- if (is.null(tab_path_var(p$elems))) "n" else "sum"
+      add(paste0(key, "/default"), tab_node_heading(list(kind = "stat", name = dflt, label = NA_character_), sp, line),
           "stat", 1L)
     }
     list(cells = out, depth = row - 1L)
   })
+  # a column with fewer heading rows than the deepest one: its top heading
+  # cell reaches down over the missing rows (text at the bottom), the cells
+  # below it move down; a top cell shared with a deeper column is not measured
   depth <- vapply(slots, `[[`, 1L, "depth")
-  if (length(unique(depth)) > 1L) {
-    abort_unsupported("column headings of PROC TABULATE with a different number of heading rows in different columns", line)
+  big <- max(c(0L, depth))
+  for (j in which(depth < big)) {
+    s <- slots[[j]]$cells
+    if (!length(s)) abort_unsupported("a PROC TABULATE column without headings next to columns with headings", line)
+    top <- s[[1]]$key
+    shared <- vapply(slots[depth != depth[j]], function(o) length(o$cells) > 0L && identical(o$cells[[1]]$key, top), NA)
+    if (any(shared)) {
+      abort_unsupported("column headings of PROC TABULATE with a different number of heading rows below a shared heading", line)
+    }
+    extra <- big - depth[j]
+    s[[1]]$rowspan <- s[[1]]$rowspan + extra
+    for (q in seq_along(s)[-1]) s[[q]]$level <- s[[q]]$level + extra
+    slots[[j]]$cells <- s
   }
   cells <- list()
   for (j in seq_along(slots)) for (c in slots[[j]]$cells) {
@@ -442,8 +453,8 @@ tab_row_header <- function(rpaths, sp, lv, line) {
         if (!is.na(h)) out[[length(out) + 1L]] <- list(key = paste0("h", idkey), text = h, role = "title", col = col,
                                                          heading = TRUE)
         key <- paste0(key, "/", n$id, ":", e$level)
-        out[[length(out) + 1L]] <- list(key = key, text = tab_level_text(n$name, e$level, lv, sp, line), role = "class",
-                                        col = col, heading = FALSE)
+        out[[length(out) + 1L]] <- list(key = key, text = tab_level_text(n$name, e$level, lv, sp, line, row = TRUE),
+                                        role = "class", col = col, heading = FALSE)
       } else {
         key <- paste0(key, "/", n$id)
         h <- tab_node_heading(n, sp, line)

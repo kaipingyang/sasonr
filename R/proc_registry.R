@@ -9,7 +9,10 @@
 
 proc_registry <- list(
   means = list(compute = function(d, spec) means_compute(d, spec), templates = c(Summary = "base.summary"),
-               ods_output = function(tables, spec, line) means_ods_output(tables, spec, line))
+               ods_output = function(tables, spec, line) means_ods_output(tables, spec, line)),
+  # no procedure title line; the tables of a step are written page by page
+  tabulate = list(compute = function(d, spec) tabulate_compute(d, spec), templates = c(Table = "base.tabulate"),
+                  listing = function(tables, ls) tab_listing_tables(tables, ls))
 )
 proc_registry_alias <- c(summary = "means")
 
@@ -50,14 +53,19 @@ sas_rt_proc <- function(name, d, spec) {
     if (length(clash) > 0) abort_unsupported(paste0("an ODS OUTPUT data set that is also an OUTPUT data set (WORK.", toupper(clash[1]), ")"), spec$line)
     res$data <- c(ods, res$data)
   }
-  listing <- render_listing_tables(res$tables, paste0("The ", toupper(name), " Procedure"), rt_linesize())
-  list(listing = listing, out = res$data, tables = res$tables)
+  listing <- if (is.null(e$listing)) {
+    render_listing_tables(res$tables, paste0("The ", toupper(name), " Procedure"), rt_linesize())
+  } else {
+    e$listing(res$tables, rt_linesize())
+  }
+  list(listing = as.character(listing), out = res$data, tables = res$tables, pages = attr(listing, "pages", exact = TRUE))
 }
 
 # Listing renderers ---------------------------------------------------------------
 
 listing_templates <- list(
-  base.summary = function(tb, ls, ps) listing_base_summary(tb, ls)
+  base.summary = function(tb, ls, ps) listing_base_summary(tb, ls),
+  base.tabulate = function(tb, ls, ps) as.character(tab_listing_tables(list(tb), ls))
 )
 
 #' @noRd

@@ -1,4 +1,4 @@
-# PROC TABULATE: cell computation and the table object (no listing yet).
+# PROC TABULATE: cell computation and the table object.
 
 have <- "
 proc format;
@@ -22,8 +22,8 @@ run;
 "
 
 # Run the data steps of `data_code`, then compute every TABLE of the PROC
-# TABULATE step `proc_code` (no output: the step itself stops before the
-# listing).  `rows` selects input rows (a WHERE stand-in).
+# TABULATE step `proc_code` directly (without the listing).  `rows` selects
+# input rows (a WHERE stand-in).
 tab_compute <- function(data_code, proc_code, rows = NULL) {
   s <- sasonr:::SasSession$new()
   on.exit(s$close())
@@ -250,13 +250,13 @@ run;"
 test_that("shapes outside the measured rules fail loud", {
   expect_error(tab_compute(have, "proc tabulate data=have; class grp; var v; table grp, v*stddev; run;"),
                "STDDEV", class = "sasonr_unsupported")
-  expect_error(tab_compute(have, "proc tabulate data=have; class grp; class sub / missing; var v; table grp, v*sum; run;"),
-               "MISSING", class = "sasonr_unsupported")
+  expect_error(tab_compute(have, "proc tabulate data=have; class grp; class grp / missing; var v; table grp, v*sum; run;"),
+               "two CLASS statements", class = "sasonr_unsupported")
   expect_error(tab_compute(have, "proc tabulate data=have; class grp; var v; table grp, v*n v=''*sum=''; run;"),
-               "heading rows", class = "sasonr_unsupported")
+               "without headings", class = "sasonr_unsupported")
 })
 
-test_that("a step that passes the checks still stops before the output", {
+test_that("sas_check() has no finding for a step inside the checked scope", {
   chk <- sas_check(paste(have, "proc tabulate data=have; class grp sub; var v; table sub, grp all, v*(n pctn); run;"))
-  expect_identical(chk$feature, "PROC TABULATE output is not implemented yet")
+  expect_identical(nrow(chk), 0L)
 })

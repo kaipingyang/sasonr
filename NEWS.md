@@ -5,6 +5,14 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC TABULATE prints its tables to the listing: one, two and three
+  dimensions with crossing, concatenation, `ALL`, labels, `F=`, `BOX=` and
+  `MISSTEXT=`, the row-title area of LINESIZE/4, wrapped headings, column
+  panels with `(Continued)` and one table per page of the page dimension.
+  The table objects are kept in the result's `ods` list. `CLASS / MISSING`
+  applies to the variables of its own CLASS statement. Layouts outside these
+  rules (and, in strict mode, the statistics not yet in the PROC statistics
+  registry) are an Unsupported error.
 * In-stream data start on the line after the `DATALINES` (`CARDS`, `LINES`,
   `DATALINES4`, ...) statement. Blanks and `/* */` comments may follow the
   statement on its line; any other text there is now an Unsupported error.
