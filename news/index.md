@@ -1,0 +1,465 @@
+# Changelog
+
+## sasonr 0.0.0.9000
+
+sasonr is in early development and not on CRAN yet. This section lists
+what the development version provides.
+
+### Running SAS programs
+
+  - `ODS OUTPUT Table=` (or the path `Tabulate.Report.Table=`) before a
+    PROC TABULATE step writes the table as a data set: the CLASS
+    variables, then `_TYPE_`, `_PAGE_` and `_TABLE_`, then one column
+    per analysis variable and statistic (`v_N`, `v_Mean`, `v_Sum`,
+    `v_PctN_00_v`; `N` without an analysis variable), one observation
+    per class-level combination. N, MEAN, SUM and PCTN with one TABLE
+    statement are supported; other statistics, `F=`, labels in the TABLE
+    statement, KEYLABEL, a LABEL statement, CLASS options and an ODS
+    OUTPUT statement inside the step are an Unsupported error.
+  - PROC TABULATE tables reach the HTML document of `sas_html()` while
+    the HTML destination is open: heading rows and the corner cell in
+    `<thead>`, row titles spanning their sub-rows, N and NMISS without
+    decimals, one table per page of the page dimension under its page
+    text. A heading or MISSTEXT longer than its column, a `BOX=` text in
+    the corner and `F=` on an N or NMISS cell are an Unsupported error
+    of `sas_html()`; the listing is still written.
+  - PROC TABULATE prints its tables to the listing: one, two and three
+    dimensions with crossing, concatenation, `ALL`, labels, `F=`, `BOX=`
+    and `MISSTEXT=`, the row-title area of LINESIZE/4, wrapped headings,
+    column panels with `(Continued)` and one table per page of the page
+    dimension. The table objects are kept in the result’s `ods` list.
+    `CLASS / MISSING` applies to the variables of its own CLASS
+    statement. Layouts outside these rules (and, in strict mode, the
+    statistics not yet in the PROC statistics registry) are an
+    Unsupported error.
+  - In-stream data start on the line after the `DATALINES` (`CARDS`,
+    `LINES`, `DATALINES4`, …) statement. Blanks and `/* */` comments may
+    follow the statement on its line; any other text there is now an
+    Unsupported error. Before, that text and the rest of the program
+    were taken as data and the steps after it were silently skipped.
+  - Readability passes for the code of vectorised DATA steps (option
+    `sasonr.passes`, see `?sas_translate`): a retained numeric variable
+    set only at `FIRST.` of a BY group from a column is written as one
+    grouped value per BY group (`group_by()`, `dplyr::first()`,
+    `ungroup()`) instead of the carry-forward helper, and
+    `FIRST.`/`LAST.` columns that nothing reads are no longer created.
+    `sas_run()` and `sas_script()` use the same code; with
+    `options(sasonr.passes = character())` the code is unchanged.
+  - The `level`, `on_error` and `scope` arguments of `sas_run()`,
+    `sas_translate()` and `sas_macro_vars()` take their exact values
+    only (`rlang::arg_match()`); an abbreviation such as `level = "L"`
+    is an error.
+  - Internals: the code generator builds its R calls with rlang
+    (`call2()`, `expr()`, `sym()`, `exec()`), package-held numbers and
+    lists go through vctrs (`vec_cast()`, `list_unchop()`,
+    `vec_rbind()`), and row-wise function calls use purrr, a new
+    dependency.
+  - `sas_run()` runs a SAS program given as text and returns the log,
+    the listing and the WORK data sets; `sas_translate()` shows the R
+    code that is generated for each step. `sas_lex()`, `sas_parse()`,
+    `sas_parse_expr()` and `sas_analyze()` expose the lexer, the parser
+    and the static analysis.
+  - `sas_script()` writes the translation of a program
+    (`sas_translate()`) or the trace of a run (`sas_run()`) as an R
+    script: one step verb per SAS step (`sas_data_step()` with the
+    generated code of the step, `sas_proc_sort()` and `sas_proc_means()`
+    with the options the program gave, `sas_proc_sql()`, `sas_proc()`,
+    `sas_options()`, `sas_title()`, `sas_global()`), each running its
+    step in a session; macro code whose result is known only at run time
+    is kept as SAS text in `sas_deferred()`. `tidy = TRUE` writes
+    vectorised DATA steps as dplyr pipes on R variables (with
+    `library(tidylog)`; see `sasonr_tidy_log()`) and keeps a session
+    only for the other steps. `sas_work(trim = FALSE)` and
+    `sas_session_add()` move data sets between R and a session. The
+    internal PROC MEANS helper is now `sas_rt_proc_means()`.
+  - `sas_check()` lists every unsupported feature of a program before
+    anything runs (step, line, feature), where `sas_run()` stops at the
+    first one. A step that uses a macro variable set only at run time
+    (CALL SYMPUT, `INTO :`) is reported as checked when the program
+    runs.
+  - `sas_session()` creates a persistent session. Successive
+    `sas_run(code, session = s)` calls are submissions to that session:
+    WORK data sets, macro variables and macro definitions, user formats,
+    `OPTIONS`, titles and filerefs carry over. `sas_work()`,
+    `sas_meta()`, `sas_macro_vars()`, `sas_log()` and `sas_listing()`
+    read a session; `sas_session_close()` closes its PROC SQL
+    connection. A submission to a session that is already running one is
+    refused. The Architecture article lists the state that does not
+    carry over between submissions (syntax-check mode, PRXPARSE
+    numbering, log line numbers, PROC SQL left open).
+  - There is no default session: function-layer calls outside
+    `sas_run()` keep no hidden state. PRXPARSE ids need `session =`
+    (`sas_f_prxparse(re, session = s)`); pattern texts work without one.
+  - `sas_export_work()` writes the WORK data sets of a result as CSV
+    files together with a table of variable attributes.
+  - The exports are explicit: the user API plus the run-time helpers
+    that translated code calls (documented as internal). `sas_format()`
+    and `sas_fmt_best()` are internal; use `sas_f_putn()` and
+    `sas_f_putc()`, which take the format as text and check it. The PROC
+    SQL helpers `sas_f_cvt_*()` and `sas_f_sql*()` are internal exports
+    as well, and `sas_titles_once()` and `sas_untranslated()` are new
+    internal exports.
+  - Translated code calls only base R, package-prefixed functions and
+    the exported helpers. The code of PROC SQL and PROC DATASETS steps,
+    which sasonr runs itself, is a call of `sas_untranslated()` that
+    stops with `sasonr_unsupported`; the `sas_translate()` page
+    describes the environment in which the code of a step is evaluated.
+  - SASHELP members are read from the directory given by
+    `options(sasonr.sashelp_dir)` or the environment variable
+    `SASONR_SASHELP_DIR` (`<member>.sas7bdat` with its column attributes
+    in `<member>_meta.csv`, or a built `.rds`). sasonr ships no SASHELP
+    members; without a directory every SASHELP member is missing and
+    fails loud.
+
+### The log
+
+  - `$log` of a result shows the program lines with their numbers (long
+    lines continued on `!` lines at `LINESIZE`), each step’s messages
+    after its lines, compile-time ERRORs after their line with an
+    underscore marker and the error number. `OPTIONS SOURCE` and
+    `NOSOURCE` turn the echo on and off.
+  - `$log` of a result and `sas_log()` now carry the source echo
+    (before: the messages and PUT output only, which `sas_log(x, echo =
+    FALSE)` gives). The first argument of `sas_log()` is now `x` (a
+    result or a session); `sas_log(session = s)` still works.
+  - `sas_log(x, format = c("plain", "ansi", "html"), echo = TRUE)` gives
+    the log of a result or a session as plain text, as text coloured for
+    the terminal (ERROR red, WARNING green, NOTE blue, with a summary
+    line), or as HTML with CSS classes (`sas-note`, `sas-warning`,
+    `sas-error`, `sas-put`, `sas-src`; style sheet in
+    `system.file("css", "sasonr.css", package = "sasonr")`). `echo =
+    FALSE` gives the messages and PUT output only.
+  - `print()` of a result shows the coloured view in a terminal with
+    colours; `options(sasonr.log_style = "plain")` turns it off.
+  - `$log_events` of a result is a tibble of the log events (kind,
+    message id, step, place, text, program line) behind every view.
+  - A numeric variable as an operand of `||` in a DATA step now gives
+    the NOTE “Numeric values have been converted to character values”
+    with the place of the variable. A numeric constant or expression as
+    an operand of `||` fails loud (unsupported).
+  - A DATA step with a SET, MERGE or INPUT statement now stops at the
+    first iteration that ends without executing one, whatever the
+    condition that skipped the read: that iteration completes (its
+    OUTPUT statements run, and DELETE or a subsetting IF drops its
+    observation), then the log shows “NOTE: DATA STEP stopped due to
+    looping.” (before the observations-read NOTEs). A STOP statement in
+    that iteration ends the step without the NOTE. A reading statement
+    in a DO loop or a SELECT group, or a RETURN statement in the step,
+    fails loud when such an iteration happens.
+
+### Errors and fail-loud behaviour
+
+  - Features that sasonr does not support raise a condition of class
+    `sasonr_unsupported` with the SAS line instead of being
+    approximated.
+  - Error model: `sas_run(on_error = c("sas", "abort"))`, default
+    `"sas"` (option `sasonr.on_error`). After an ERROR in the program
+    the step is not run and syntax-check mode (OBS=0), the documented
+    behaviour of batch jobs, applies to the rest of the program: DATA
+    steps create empty data sets, global statements and macro code still
+    run, PROC SQL errors set NOEXEC for that PROC SQL only, and `SYSERR`
+    and `SYSCC` are set. The result has `status = "error"`, `errors` and
+    `error_line`. `sasonr_unsupported` always aborts. Calls of names
+    that are not SAS functions give ERROR 68-185; unknown SET options
+    are syntax errors.
+  - In syntax-check mode the TITLE statements of a PROC step and the
+    OPTIONS statements of PROC DATASETS are executed; PROC CONTENTS runs
+    (listing, OUT= with 0 observations); PROC SORT OUT=, PROC FREQ
+    TABLES OUT= and PROC APPEND create a new output data set with 0
+    observations and 0 variables and keep an existing one; PROC MEANS
+    stops with SYSERR 1012; PROC SQL writes the NOEXEC NOTEs, sets
+    SQLOBS and SQLRC to 0 and ends with SYSERR 1012; the other steps set
+    SYSERR to 3; a DATA step does not replace an existing data set. PROC
+    TRANSPOSE with DATA=, a new OUT= data set and a VAR statement runs
+    on its input with 0 observations. Other forms of PROC TRANSPOSE,
+    PROC FORMAT, PROC SUMMARY and other combinations fail loud.
+  - An ERROR in a global statement is not handled like a step ERROR: for
+    `LINESIZE=` set to a name other than MAX outside a step, sasonr
+    writes `ERROR 18-12`, sets SYSCC to 1012 and enters syntax-check
+    mode at the next DATA step unless `OPTIONS NOSYNTAXCHECK` comes
+    first. Other ERRORs in global statements fail loud.
+  - The empty data sets left by a failing step are derived from the
+    parsed step (types, lengths, LENGTH, RETAIN, ARRAY); when they
+    cannot be derived, sasonr fails loud.
+  - **Strict mode** (`options(sasonr.strict = TRUE)`, the default): a
+    program that uses a function, format, informat or procedure
+    statistic whose status is `approximate` (the last bits of numeric
+    results may not be exact) or `unsupported`, or a function in a
+    context in which it is not supported (DATA step, WHERE, PROC SQL,
+    `%SYSFUNC`), stops with a condition of class `sasonr_strict_error`
+    (a subclass of `sasonr_unsupported`). With `options(sasonr.strict =
+    FALSE)` such features run: the log of the submission ends with one
+    NOTE that lists the approximate features used, and each feature
+    signals one warning of class `sasonr_strict_warning` per submission.
+    Arguments outside the domain in which a function’s results are exact
+    go through the same gate. `PUTN`, `PUTC`, `INPUTN` and `INPUTC`
+    check the format they name at run time. See `?sasonr_strict`.
+  - Feature statuses (`supported`, `partial`, `approximate`,
+    `unsupported`, `not_comparable`) are available through
+    `sas_feature_registry()` and `sas_proc_stat_registry()`.
+  - sasonr targets SAS 9.4 and has one behaviour.
+
+### DATA step
+
+  - Lengths and other integer tokens: ATTRIB LENGTH= no longer reads
+    `$8.5` as 85 (a fractional length is truncated, `$8.5` is 8); a
+    numeric length is range-checked on the value as written (`8.5` is an
+    error, `3.5` is 3), also in LENGTH. A fractional ARRAY dimension or
+    initial-value repetition, INPUT end column, INPUT `#n` pointer and
+    FILE LRECL= is a syntax error. A PUT item wider than the FILE LRECL
+    fails loud.
+  - `VLENGTH()` of a numeric variable returns its declared length (3 to
+    8).
+  - Hand-written lexer (strings, comments, name, date and hex literals,
+    special missing values, DATALINES blocks, macro tokens),
+    recursive-descent statement parser and Pratt expression parser with
+    the SAS operator precedence. The AST keeps the program as written.
+  - DATA steps are compiled to R code at three levels: vectorised
+    `dplyr` code (L1), grouped vectorised code for recognised patterns
+    such as BY groups with `FIRST.`/`LAST.`, `RETAIN` accumulators,
+    baseline carry-forward and unconditional `LAG` (L2), and an explicit
+    row loop that follows the DATA step execution rules otherwise (L3).
+    A vectorised step that needs row-by-row diagnostics is re-run row by
+    row.
+  - `_ERROR_` and the data error diagnostics (PDV dump in the log),
+    SAS-style log NOTEs for missing values and mathematical operations,
+    and the variable attribute model (length, format, informat, label,
+    name case).
+  - INPUT statement pointers and modifiers, INFILE options, the FILE
+    statement and `LINESIZE`.
+  - The declarative statements of a DATA step (WHERE, KEEP, DROP,
+    RENAME, BY, the attribute statements and the output list) are
+    collected into slots of an intermediate representation, and the
+    executable statements are lowered to a control-flow graph. Data-flow
+    facts on that graph decide the step level. The generated R code is
+    built as R calls and evaluated directly; `sas_translate()` shows the
+    deparsed text.
+  - Data set options (KEEP=, DROP=, RENAME=, WHERE=, IN=, FIRSTOBS=,
+    OBS=) of DATA step input and output data sets, PROC DATA=, PROC OUT=
+    and PROC SQL tables go through one component. An invalid option on
+    an input data set is an ERROR and stops the step; an unknown
+    variable in KEEP=, DROP= or RENAME= of an output data set gives a
+    WARNING and the step completes (an unknown KEEP= variable leaves a
+    data set without variables, an unknown RENAME= pair is ignored). IN=
+    on PROC PRINT DATA= is ERROR 22-7. WHERE= on an output data set is
+    not implemented yet and fails loud.
+  - A BY statement inside a DO, IF or SELECT block was ignored; it now
+    fails loud.
+  - LEAVE inside a SELECT group leaves the SELECT, not the enclosing DO
+    loop. An iterative DO evaluates its start, TO and BY values before
+    it assigns the start to the index, so `do i = 1 to i;` uses the
+    value of `i` before the loop.
+  - An assignment to `SUBSTR()` on the left of `=` is checked as its own
+    context of `SUBSTR`; `CONSTANT('EXACTINT', 1E300)` stops the step
+    with the step exception in a step that runs once and fails loud
+    elsewhere.
+  - Dates have no 29 February in years divisible by 4000.
+  - Log messages that describe sasonr’s own handling name sasonr as the
+    subject: “NOTE: sasonr stopped processing this step because of
+    errors.”, “NOTE: Due to ERROR(s) above, sasonr set option OBS=0,
+    enabling syntax check mode.” and “NOTE: sasonr went to a new line
+    when INPUT statement reached past the end of a line.”
+  - Expressions of the DATA step, WHERE and PROC SQL are parsed with one
+    operator table. sasonr treats the following as described here: `IN`,
+    `NOT IN` and `IN:` bind tighter than the other comparison operators
+    in the DATA step (`a <= b in (0, 5)` is `a <= (b in (0, 5))`); in
+    WHERE, `-a ** b` is `(-a) ** b`, `**` binds tighter than `MIN` and
+    `MAX`, and `NOT` takes a `MIN`/`MAX` operand; in PROC SQL, `^` (NOT)
+    takes a comparison as its operand; colon comparisons (`=:`, `<:` …)
+    take part in comparison chains; `BETWEEN` accepts constant numeric
+    bounds in either order; `||`, `LIKE` and `CONTAINS` in WHERE and
+    PROC SQL take character operands only (a numeric operand is an
+    error); `**` with invalid arguments (`0 ** 0`, a negative base with
+    a fractional exponent) gives a missing value with the
+    invalid-argument NOTE, and with constant operands it is folded at
+    compile time; WHERE conditions are evaluated without data-error
+    NOTEs. These shapes now fail loud: `NOT` as an operand of \`+ - \*
+    /`in WHERE, a PROC SQL comparison chain that starts with a colon
+    comparison, a chain of three or more links with a colon
+    comparison,`BETWEEN`with mixed or descending character bounds, a
+    function ERROR or a division by zero in a WHERE
+    condition,`%’`and`%"`outside`%STR`,`%NRSTR`,`%QUOTE`and`%NRQUOTE\`,
+    and the remainders of a statement with a missing semicolon other
+    than the supported ones.
+
+### Macro language
+
+  - The macro processor interleaves with step execution: a step runs as
+    soon as it is complete, so values created with `CALL SYMPUT(X)` and
+    PROC SQL `INTO:` are available to the macro code that follows.
+  - Global statements outside a step take effect as soon as they are
+    complete, before the macro code after them runs. `OPTIONS
+    LINESIZE=MAX` and `NONOTES` inside PROC DATASETS or PROC SQL apply
+    to the macro code after them; other in-step settings followed by a
+    `%SYSFUNC` NOTE fail loud. The positive and negative forms of an
+    option in one OPTIONS statement apply in the order written.
+  - Text generated by a macro call has the line of the call (NOTE
+    places, ERROR lines and fail-loud messages).
+  - Automatic macro variables: `SYSLAST` and `SYSDSN` follow `_LAST_`,
+    `SYSFILRC` is set by FILENAME, and `SYSCC`, `SYSRC` and `SYSFILRC`
+    can be assigned with `%let`. Other automatic macro variables fail
+    loud.
+  - `_LAST_`: PROC SQL CREATE VIEW sets it, INSERT, UPDATE and DELETE do
+    not, APPEND sets it to BASE=, and a DATA step stopped by an ERROR
+    sets it to its new output data set.
+  - `%SYSFUNC` NOTEs are wrapped at LINESIZE; single quotes inside
+    `%LET` values hide macro triggers.
+
+### PROC SQL
+
+  - OUTOBS=, INOBS= and LOOPS= (also in RESET) take an integer constant:
+    `2.5`, `-1` or a name give ERROR 22-322 and the rest of the step is
+    not executed. A GROUP BY or ORDER BY column number that is not a
+    positive integer gives “ERROR: GROUP BY clause requires a positive
+    column number.” (ORDER BY alike); `ORDER BY -1` no longer leaves the
+    rows unordered.
+  - INSERT … SET: a column missing from a SET clause is missing in that
+    row (`.` or blank), and a value of the wrong type in any SET clause
+    gives “ERROR: It is invalid to assign a numeric expression to a
+    character value using the SET clause.” (and the character-to-numeric
+    message) with no row inserted. A PROC SQL step stopped by an ERROR
+    sets SYSERR to 1012.
+  - PROC SQL expressions are evaluated as R calls, without a text round
+    trip.
+  - Own recursive-descent SQL parser; DuckDB runs joins and grouping,
+    and SAS semantics are applied in R: missing values, remerging of
+    summary statistics with the remerge NOTE, `CALCULATED`, `INTO
+    :macro-variable` and `SQLOBS`.
+  - Computed character columns get fixed lengths (CAT functions of
+    column arguments 200, of constant arguments the length of the
+    value).
+  - The NOTE for an out-of-range function argument (`Invalid argument to
+    function MDY. Missing values may be generated.`) is written; other
+    function data-error NOTEs in PROC SQL fail loud.
+  - The summary functions MEAN, CSS, USS, VAR and STD are computed from
+    sequential sums in row order; order-dependent statistics on rows
+    whose order is not fixed fail loud unless the result does not depend
+    on the order.
+
+### Procedures
+
+  - PROC MEANS builds its output as ODS tables (the `Summary` table,
+    with the BY groups, the titles and the column headers); the listing
+    and the HTML destination render the same table. `sas_html(x, file,
+    log = FALSE)` writes the procedure output of a result as an HTML
+    document (style sheet `system.file("css", "sasonr.css", package =
+    "sasonr")`). The HTML destination is open when a program starts;
+    `ODS HTML CLOSE;` and `ODS HTML;` close and reopen it. `ODS HTML
+    FILE=` and the other ODS HTML options fail loud.
+  - `ODS OUTPUT Summary=<data set>;` (or `Means.Summary=`) writes the
+    MEANS Summary table to WORK, with its data set NOTEs. MATCH\_ALL,
+    PERSIST=, BY groups and the ODS actions (CLOSE, SELECT, EXCLUDE, …)
+    fail loud.
+  - Options that take an integer constant fail with ERROR 22-322 for a
+    fractional value instead of truncating it: PROC MEANS MAXDEC=, FW=,
+    QNTLDEF= / PCTLDEF=; PROC FREQ BINOMIAL LEVEL=, RELRISK COLUMN=.
+    PROC FREQ BINOMIAL(ALPHA=) is an ERROR (ALPHA= is not a BINOMIAL
+    suboption), TABLES ALPHA= and BINOMIAL P= need a number, and PROC
+    FORMAT DEFAULT= needs a number. BINOMIAL P= above 1 is a percentage
+    (`P=1.5` tests 0.015). PROC MEANS MAXDEC=-1, an ALPHA= outside (0,
+    1) and a negative WAYS value give their WARNING and the procedure
+    runs.
+  - PROC SORT, PRINT, MEANS / SUMMARY, FREQ, TRANSPOSE, CONTENTS,
+    DATASETS, APPEND, DELETE and FORMAT (VALUE / INVALUE).
+  - PROC MEANS / SUMMARY: sums in observation order and the moment
+    statistics (CSS, USS, VAR, STD, STDERR, CV, T, KURTOSIS), computed
+    with and without FREQ and WEIGHT and for the VARDEF= values DF, N,
+    WDF and WEIGHT; T is capped at +-99999.99; STD and CV are reported
+    as 0 when the variance is negligible against the squared mean; a
+    negative CSS is missing. SKEWNESS, PRT and the confidence limits are
+    `approximate`. MAXDEC= uses the `w.d` display engine; the printed
+    table chooses its default decimals and splits wide tables into
+    panels.
+  - PROC FREQ: tables and OUT=, the chi-square family, FISHER and EXACT
+    FISHER, the 2x2 EXACT CHISQ, BINOMIAL, Cochran-Mantel-Haenszel
+    statistics (SCORES=TABLE / RANK), the common odds ratio and relative
+    risks, the Breslow-Day test, RISKDIFF and RELRISK (Wald,
+    Agresti-Caffo, Hauck-Anderson, Newcombe and exact unconditional
+    limits), TESTP= / TESTF=, MISSPRINT and BY groups. Requests outside
+    the supported layouts fail loud.
+
+### Functions, formats and rounding
+
+  - `UPCASE`, `LOWCASE` and `PROPCASE` map letters outside ASCII with
+    the case mapping of a UTF-8 session (before: they failed loud). They
+    still fail loud in an R session that is not UTF-8, for invalid UTF-8
+    bytes and for a letter whose other case has a different number of
+    bytes. The `PROPCASE` page lists which characters start a word.
+  - In a UTF-8 session the length of a character variable counts bytes:
+    a value is cut to its first `n` bytes and padded with blanks to `n`
+    bytes, and `LENGTH`, `LENGTHN` and `LENGTHC` count bytes. A cut
+    inside a multi-byte character fails loud. New `KLENGTH` counts
+    characters (0 for a blank argument). Lengths taken from values
+    (literals, R data frames, PROC SQL, PROC TRANSPOSE) count bytes too.
+    Every other function, `PUT` and `INPUT` with a character argument
+    that has a byte outside ASCII fail loud (`sasonr_strict_error`), as
+    do CALL SYMPUT, SYMPUTX and SORTC; an INPUT statement reading such
+    records is not supported.
+  - In a UTF-8 session `SUBSTR` counts positions and lengths in bytes; a
+    start or end inside a multi-byte character fails loud, as do SUBSTR
+    on the left of `=`, `%SYSFUNC(SUBSTR())` and PROC SQL calls with a
+    value that has bytes outside ASCII. New `KSUBSTR` counts characters;
+    for ASCII values it is `SUBSTR`, a value with bytes outside ASCII
+    fails loud.
+  - `ANY*` and `NOT*` take the class of a character outside ASCII from a
+    table of measured classes: every code point from U+00A0 to U+00FF,
+    plus U+0100, U+0152, U+0391, U+4E2D and U+20AC. Among them, the
+    multiplication and division signs are neither letters nor
+    punctuation, the micro sign is a lower case letter, the ordinal
+    indicators and U+4E2D are letters that are neither upper nor lower
+    case, the no-break space is a space and the soft hyphen is not
+    printable. U+1D11E is known to be neither a letter nor punctuation;
+    its other classes and all other characters outside ASCII fail loud.
+    New `ANYPRINT` and `NOTPRINT` find the first printable character
+    (blank to tilde in ASCII) or the first character that is not
+    printable.
+  - In a UTF-8 session more character functions accept values with bytes
+    outside ASCII and count in bytes: `INDEX`, `INDEXW`, `INDEXC`,
+    `FIND`, `FINDW`, `FINDC`, `VERIFY`, `COUNT`, `COUNTC`, `COUNTW`, the
+    `ANY*` and `NOT*` functions, `TRANWRD`, `TRANSTRN`, `LEFT`, `RIGHT`,
+    `TRIM`, `STRIP`, `COMPBL`, the `CAT` functions, `SCAN`, `SUBSTRN`,
+    `COMPRESS`, `TRANSLATE`, `REVERSE` and `REPEAT`. Character lists and
+    delimiters are sets of bytes; the `I` modifier and the class
+    modifiers recognise ASCII characters only; `ANY*` and `NOT*`
+    classify the characters of a table of measured classes (see above)
+    and return the position of the first byte. A result that would leave
+    part of a multi-byte character fails loud. A `CAT` result cut inside
+    a character by a shorter target variable is blank, with the buffer
+    WARNING and `_ERROR_`. The colon comparison (`=:`) truncates in
+    bytes, and `$w.`, `$CHARw.` and `$QUOTEw.` count bytes (a cut inside
+    a character fails loud). `%SYSFUNC` and PROC SQL calls of these
+    functions, `$UPCASEw.` and the modifiers of `SCAN`, `COUNTW` and
+    `FINDW` (other than `E`) with such values still fail loud.
+  - About 190 SAS functions as `sas_f_<name>()`, about 100 formats and
+    informats, `PUT()` / `INPUT()` and user formats from PROC FORMAT.
+    Missing and invalid arguments write the log NOTEs, set `_ERROR_` and
+    give missing results; arguments are converted between numeric and
+    character, and the number of arguments is checked.
+  - A direct call of a `sas_f_*` function from R code is checked as in a
+    DATA step: approximate and unsupported functions follow
+    `sasonr.strict` (`sasonr_strict_error`, or with `sasonr.strict =
+    FALSE` a `sasonr_strict_warning` once per function and R session),
+    arguments outside the exact input domain follow the same gate, and a
+    data error (an invalid argument, invalid data) gives the documented
+    result with a warning of class `sasonr_data_error` that carries the
+    NOTE text. `sas_f_put()` and `sas_f_input()` take the format or
+    informat as text (`"8.2"`) and check it against the registry.
+  - Every `sas_f_*` function has a reference page with the SAS syntax,
+    parameter descriptions, the differences from base R and examples.
+  - `ROUND` rounds half away from zero with a small relative fuzz and
+    returns the double nearest to the decimal multiple; `ROUNDE` and
+    `ROUNDZ` follow their documented definitions. Values at the edge of
+    the fuzz window fail loud.
+  - One display engine writes every number that becomes text: `w.d`,
+    `Z`, `COMMA`, `DOLLAR`, `NEGPAREN`, `PVALUE`, `PERCENT`, the `BEST`
+    formats, E notation, PROC listings and macro values. Values whose
+    formatted text sasonr cannot determine exactly (some very wide
+    decimals, long integers with decimals, narrow `BEST` widths, some E
+    forms) fail loud.
+  - `MOD` and `MODZ` compute exact remainders; `YRDIF` supports the
+    30/360, ACT/365 and ACT/360 bases and the AGE and ACT/ACT bases
+    where the result is exact; `INTCK` and `INTNX` support the
+    `WEEKDAY`, `TENDAY` and `SEMIMONTH` intervals in their plain form;
+    `EXIST()` reports WORK and SASHELP members, also in PROC SQL; the
+    `$HEX` informat writes the INPUT NOTE and sets `_ERROR_` for invalid
+    data.

@@ -1,0 +1,15 @@
+pandoc: 2.9.2.1
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  articles/architecture: architecture.html
+  articles/dev-base-vs-tidyverse: dev-base-vs-tidyverse.html
+  articles/getting-started: getting-started.html
+  articles/guide-datastep: guide-datastep.html
+  articles/guide-functions: guide-functions.html
+  articles/guide-procs: guide-procs.html
+  articles/guide-sql: guide-sql.html
+last_built: 2026-11-20T15:25Z
+urls:
+  reference: https://kaipingyang.github.io/sasonr/reference
+  article: https://kaipingyang.github.io/sasonr/articles
