@@ -248,17 +248,17 @@ run;
                    c("", dup("grp"), dup("grp"), note))
   expect_identical(after_run("proc tabulate data=have;\n  class all;\n  class grp;\n  class grp;\n  var v;\n  table all grp, v*sum;\nrun;"),
                    c("", "WARNING: The variable all conflicts with the keyword of the same name.", dup("grp"), note))
+  # the WARNINGs follow the order of the repeats, not that of the first declarations
+  expect_identical(after_run("proc tabulate data=have;\n  class grp;\n  class sub;\n  class sub;\n  class grp;\n  var v;\n  table grp, sub*v*sum;\nrun;"),
+                   c("", dup("sub"), dup("grp"), note))
+  expect_identical(after_run("proc tabulate data=have;\n  class sub;\n  class grp;\n  class grp;\n  class sub;\n  var v;\n  table grp, sub*v*sum;\nrun;"),
+                   c("", dup("grp"), dup("sub"), note))
 })
 
 test_that("repeated CLASS declarations outside the measured rules fail loud", {
   fails <- function(code, what) {
     expect_error(sas_run(code, on_error = "sas"), what, class = "sasonr_unsupported")
   }
-  # repeats in an order other than that of the first declarations
-  fails(paste0(have, "proc tabulate data=have; class grp; class sub; class sub; class grp; table grp; run;"),
-        "order of their first declarations")
-  fails(paste0(have, "proc tabulate data=have; class grp; class sub; class grp; class sub; class grp; table grp; run;"),
-        "order of their first declarations")
   fails(paste0(have, "proc tabulate data=have; class grp grp; table grp; run;"), "inside one CLASS statement")
   fails(paste0(have, "proc tabulate data=have; class grp; class grp grp; table grp; run;"), "inside one CLASS statement")
   fails(paste0(have, "proc tabulate data=have; class grp; class GRP; table grp; run;"), "lower case")

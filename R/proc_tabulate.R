@@ -631,16 +631,12 @@ translate_proc_tabulate <- function(step, meta, last) {
   warn <- if (length(conflict)) paste0("WARNING: The variable ", conflict, " conflicts with the keyword of the same name.") else character()
   # WARNING of a CLASS variable declared again (the second declaration is ignored)
   dup_warn <- character()
-  # (one per repeat, after the keyword WARNINGs)
+  # (one per repeat, in the order of the repeats, after the keyword WARNINGs)
   if (length(decl$dup)) {
     if (decl$dup_same) unexact("a variable repeated inside one CLASS statement")
     v <- tolower(decl$dup)
     if (!identical(decl$dup, v) || !identical(unname(decl$class_text[unique(v)]), unique(v))) {
       unexact("a repeated CLASS variable not written in lower case")
-    }
-    # the order of the repeats and the order of the first declarations must agree
-    if (!identical(v, v[order(match(v, decl$class))])) {
-      unexact("repeated CLASS variables whose repeats are not in the order of their first declarations")
     }
     if (any(v %in% conflict)) unexact("a keyword-named CLASS variable declared again")
     dup_warn <- paste0("WARNING: Class variable ", v, " was defined in a previous statement, duplicate definition will be ignored.")
