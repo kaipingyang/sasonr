@@ -150,6 +150,7 @@ parse_proc_step <- function(p) {
   name <- tk_low(p)
   if (name == "format") return(parse_proc_format(p, line))
   if (name %in% c("means", "summary")) return(parse_proc_means(p, line, name))
+  if (name == "tabulate") return(parse_proc_tabulate(p, line))
   if (name == "freq") return(parse_proc_freq(p, line))
   if (name == "transpose") return(parse_proc_transpose(p, line))
   if (name == "contents") return(parse_proc_contents(p, line))
@@ -278,6 +279,7 @@ proc_source_code <- function(inp, obs_col = FALSE) {
 translate_proc <- function(step, meta, last = NULL) {
   if (step$name == "format") return(translate_proc_format(step))
   if (step$name %in% c("means", "summary")) return(translate_proc_means(step, meta, last))
+  if (step$name == "tabulate") return(translate_proc_tabulate(step, meta, last))
   if (step$name == "freq") return(translate_proc_freq(step, meta, last))
   if (step$name == "transpose") return(translate_proc_transpose(step, meta, last))
   if (step$name == "contents") return(translate_proc_contents(step, meta, last))

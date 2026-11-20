@@ -321,10 +321,16 @@ err_data_schema <- function(eng, step) {
 # data set and PROC SORT (with or without OUT=) do; DATA _NULL_ and PROC
 # PRINT, MEANS, SUMMARY and FREQ do not.  Another PROC that stops with an ERROR
 # is not supported: NULL.
-err_recover_step <- function(eng, text) {
+err_recover_step <- function(eng, text, e = NULL) {
   step <- eng$cur_step %||% err_parse_recover(text)
   if (is.null(step)) return(NULL)
   if (step$type == "proc") {
+    # PROC TABULATE: only the ERRORs of its own checks (proc_tabulate.R) are
+    # known; they leave nothing in WORK and do not start syntax-check mode
+    if (step$name == "tabulate") {
+      if (!isTRUE(e$tab_error)) return(NULL)
+      return(list(kind = "proc", outputs = list(), syntax_check = FALSE, step = step))
+    }
     outs <- list()
     if (step$name == "sort") {
       if (!is.null(step$options$out)) {
@@ -396,7 +402,7 @@ engine_step_error <- function(eng, e, text, sql = FALSE) {
                       e$sas_line %||% NULL)
   }
   in_sql <- sql || isTRUE(eng$sql_open) || identical(eng$phase, "sql")
-  rec <- if (in_sql) NULL else err_recover_step(eng, text)
+  rec <- if (in_sql) NULL else err_recover_step(eng, text, e)
   if (!in_sql && is.null(rec)) {
     abort_unsupported(paste0("the data sets that this ERROR leaves in WORK, or whether it starts syntax-check mode, ",
                              "could not be derived from the parsed step (", conditionMessage(e), ")"), e$sas_line %||% NULL)
@@ -462,8 +468,8 @@ engine_step_error <- function(eng, e, text, sql = FALSE) {
                                                                          e$sas_line %||% "?", ")"))
     }
   }
-  if (identical(rec$kind, "proc") && rec$step$name %in% c("means", "summary", "freq") && is.null(e$sas_syserr)) {
-    # the SYSERR and SYSCC values after a stopped PROC MEANS, SUMMARY or FREQ
+  if (identical(rec$kind, "proc") && rec$step$name %in% c("means", "summary", "freq", "tabulate") && is.null(e$sas_syserr)) {
+    # the SYSERR and SYSCC values after a stopped PROC MEANS, SUMMARY, FREQ or TABULATE
     # are not implemented: a reference fails loud
     mac_auto_unknown(eng$session$macro, c("syserr", "syscc"),
                      paste0("a PROC ", toupper(rec$step$name), " step that stopped with an ERROR (SAS line ", e$sas_line %||% "?", ")"))
@@ -511,7 +517,8 @@ engine_empty_dataset <- function(eng, nm, m) {
 # marker).
 err_emit_error <- function(eng, e) {
   line <- e$sas_line
-  exact <- identical(eng$phase, "compile") && length(line) == 1L && !is.na(line)
+  # (`sas_step_end`: the ERROR follows the source of the whole step)
+  exact <- identical(eng$phase, "compile") && length(line) == 1L && !is.na(line) && !isTRUE(e$sas_step_end)
   at <- if (exact && length(e$sas_col) == 1L && !is.na(e$sas_col)) c(line, e$sas_col)
   text <- err_message_lines(e)
   # a numbered syntax ERROR longer than LINESIZE continues on lines indented
@@ -528,12 +535,23 @@ err_emit_error <- function(eng, e) {
   if (!is.null(at) && !log_source_on_all(eng$program$source, line)) {
     log_echo_omit(eng, "an ERROR on a line that OPTIONS NOSOURCE hides")
   }
+  # an ERROR found when the whole step has been read follows its source and
+  # the blank line after it, after the WARNINGs the step writes first
+  # (`sas_before`)
+  end_phase <- NULL
+  if (isTRUE(e$sas_step_end)) {
+    log_source_read(eng, eng$chunk_end)
+    log_boundary(eng)
+    end_phase <- "step_end"
+  }
+  if (length(e$sas_before)) log_emit_lines(eng, e$sas_before, phase = end_phase)
   log_emit(eng, "error", text = text, at = at, token = e$sas_token,
-           src = if (exact) line, phase = if (exact) "compile")
+           src = if (exact) line, phase = if (exact) "compile" else end_phase)
   # further numbered ERRORs at the same token, their numbers stacked under the
   # marker (22-322 followed by 76-322 or 202-322)
   for (t in e$sas_also) {
-    log_emit(eng, "error", text = t, at = at, token = e$sas_token, src = if (exact) line, phase = if (exact) "compile")
+    log_emit(eng, "error", text = t, at = at, token = e$sas_token, src = if (exact) line,
+             phase = if (exact) "compile" else end_phase)
   }
   # a second numbered ERROR at the same token (PROC SQL statement options)
   if (!is.null(e$sql_also)) log_emit(eng, "error", text = e$sql_also, src = if (exact) line, phase = if (exact) "compile")

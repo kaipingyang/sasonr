@@ -148,7 +148,7 @@ check_step_error <- function(eng, e, text, step) {
   if (!identical(getOption("sasonr.on_error", "sas")[1], "sas") || !inherits(e, "sasonr_syntax_error")) return(invisible())
   if (inherits(e, "sasonr_global_error") || isTRUE(eng$sql_open)) return(invisible())
   if (!is.null(eng$cur_step) && eng$cur_step$type %in% c("sql_begin", "sql", "sql_end")) return(invisible())
-  if (!is.null(err_recover_step(eng, text))) return(invisible())
+  if (!is.null(err_recover_step(eng, text, e))) return(invisible())
   cnd <- tryCatch(abort_unsupported(paste0("the data sets that this ERROR leaves in WORK, or whether it starts syntax-check mode, ",
                                            "could not be derived from the parsed step (", conditionMessage(e), ")"),
                                     e$sas_line %||% NULL),
@@ -194,6 +194,8 @@ check_add_condition <- function(eng, step, e, line) {
   col <- e$sas_col
   if (is.null(col) || length(col) != 1L) col <- NA_integer_
   check_add(eng, step, ln, col, "error", feature, msg)
+  # further findings of the same step raised together (`sas_more`)
+  for (m in e$sas_more) check_add_condition(eng, step, m, line)
 }
 
 check_add <- function(eng, step, line, col, severity, feature, message) {
