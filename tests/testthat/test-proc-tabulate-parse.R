@@ -173,6 +173,58 @@ test_that("a step that passes the checks prints its table; its WARNINGs go to th
   expect_true(length(r$listing) > 0L)
 })
 
+test_that("a CLASS variable declared again gives a WARNING and the first declaration applies", {
+  withr::local_options(sasonr.strict = TRUE, sasonr.step_notes = TRUE)
+  step_log <- function(code) {
+    r <- sas_run(paste0(have, code))
+    lines <- as.character(sas_log(r))
+    list(log = lines[grep("proc tabulate", lines):length(lines)], listing = r$listing)
+  }
+  warn <- "WARNING: Class variable grp was defined in a previous statement, duplicate definition will be ignored."
+  r <- step_log("proc tabulate data=have;\n  class grp / missing;\n  class grp;\n  table grp;\nrun;")
+  expect_identical(r$log, c(
+    "11         proc tabulate data=have;",
+    "12           class grp / missing;",
+    "13           class grp;",
+    "14           table grp;",
+    "15         run;",
+    "",
+    warn,
+    "NOTE: There were 3 observations read from the data set WORK.HAVE."))
+  # MISSING of the first statement: the missing level is a column
+  expect_identical(sum(grepl("^\\|\\s+N\\s+\\|", r$listing)), 1L)
+  expect_true(any(grepl("|            |     a      |     b      |", r$listing, fixed = TRUE)))
+  r <- step_log("proc tabulate data=have;\n  class grp;\n  class grp / missing;\n  table grp;\nrun;")
+  expect_identical(r$log, c(
+    "11         proc tabulate data=have;",
+    "12           class grp;",
+    "13           class grp / missing;",
+    "14           table grp;",
+    "15         run;",
+    "",
+    warn,
+    "NOTE: There were 3 observations read from the data set WORK.HAVE."))
+  # MISSING of the second statement is ignored
+  expect_true(any(grepl("|     a      |     b      |", r$listing, fixed = TRUE)))
+  expect_false(any(grepl("|            |     a      |", r$listing, fixed = TRUE)))
+  # also without options on either statement
+  expect_identical(run_log(paste0(have, "proc tabulate data=have; class grp; class grp; table grp; run;")), warn)
+})
+
+test_that("repeated CLASS declarations outside the measured rules fail loud", {
+  fails <- function(code, what) {
+    expect_error(sas_run(code, on_error = "sas"), what, class = "sasonr_unsupported")
+  }
+  fails(paste0(have, "proc tabulate data=have; class grp; class grp; class grp; table grp; run;"), "more than one repeated")
+  fails(paste0(have, "proc tabulate data=have; class grp sub; class grp sub; table grp; run;"), "more than one repeated")
+  fails(paste0(have, "proc tabulate data=have; class grp grp; table grp; run;"), "inside one CLASS statement")
+  fails(paste0(have, "proc tabulate data=have; class grp; class GRP; table grp; run;"), "lower case")
+  fails(paste0(kw, "proc tabulate data=kw; class all; class all; var mean; table all, mean; run;"), "keyword WARNING")
+  fails(paste0(have, "proc tabulate data=have; class grp; class grp; table grp*grp; run;"), "self-crossing")
+  # an ERROR after the WARNING
+  fails(paste0(have, "proc tabulate data=have; class grp; class grp; table grp, v*sum; run;"), "WARNING")
+})
+
 test_that("a log that cannot be written exactly fails loud", {
   # the nesting path with ALL, and a statistic spelling not measured
   expect_error(sas_run(paste0(have, "proc tabulate data=have; class grp; var v trt; table grp all, v*trt; run;"), on_error = "sas"),

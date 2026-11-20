@@ -53,7 +53,6 @@ tab_spec <- function(step, decl, irs, inp) {
   tryCatch(proc_apply_attr_stmts(step$stmts, st), sasonr_runtime_error = function(e) {
     abort_unsupported("the ERROR of a FORMAT or LABEL statement of PROC TABULATE", line)
   })
-  if (length(decl$dup)) abort_unsupported("a CLASS variable declared in two CLASS statements of PROC TABULATE", line)
   cls <- lapply(decl$class, function(v) {
     co <- decl$class_opts[[v]]
     list(name = v, missing = isTRUE(co$missing) || isTRUE(o$missing), order = co$order %||% o$order %||% "internal",

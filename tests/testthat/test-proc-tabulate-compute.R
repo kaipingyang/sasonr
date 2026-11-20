@@ -247,11 +247,18 @@ run;"
                            rows = integer()), class = "sasonr_unsupported")
 })
 
+test_that("a CLASS variable declared again keeps the options of its first declaration", {
+  r <- tab_compute(have, "proc tabulate data=have; class grp / missing; class grp; var v; table grp, v*sum; run;")
+  expect_identical(r$tables[[1]]$grp, c(" ", "a", "b", "c"))
+  expect_equal(unname(cells(r$tables[[1]])[, 1]), c(90, 60, 150, 80))
+  r <- tab_compute(have, "proc tabulate data=have; class grp; class grp / missing; var v; table grp, v*sum; run;")
+  expect_identical(r$tables[[1]]$grp, c("a", "b", "c"))
+  expect_equal(unname(cells(r$tables[[1]])[, 1]), c(60, 150, 80))
+})
+
 test_that("shapes outside the measured rules fail loud", {
   expect_error(tab_compute(have, "proc tabulate data=have; class grp; var v; table grp, v*stddev; run;"),
                "STDDEV", class = "sasonr_unsupported")
-  expect_error(tab_compute(have, "proc tabulate data=have; class grp; class grp / missing; var v; table grp, v*sum; run;"),
-               "two CLASS statements", class = "sasonr_unsupported")
   expect_error(tab_compute(have, "proc tabulate data=have; class grp; var v; table grp, v*n v=''*sum=''; run;"),
                "without headings", class = "sasonr_unsupported")
 })

@@ -353,12 +353,16 @@ tab_parse_factor <- function(p, uns) {
 # IR --------------------------------------------------------------------------------
 
 # Declared CLASS and VAR variables of a step: names (lower case) and their
-# spelling; a second CLASS declaration of a variable is ignored (WARNING).
+# spelling; a second CLASS declaration of a variable is ignored (WARNING), so
+# the options of its first CLASS statement apply.  `dup` the spellings of the
+# repeats, `dup_same` a repeat inside one CLASS statement.
 tab_declared <- function(step) {
   class <- character()
   class_text <- character()
   class_opts <- list()
+  class_stmt <- integer()
   dup <- character()
+  dup_same <- FALSE
   vars <- character()
   var_text <- character()
   var_line <- NA_integer_
@@ -368,7 +372,8 @@ tab_declared <- function(step) {
          text = vapply(items[ok], function(it) it$text %||% it$name, ""))
   }
   lists <- FALSE
-  for (s in step$stmts) {
+  for (j in seq_along(step$stmts)) {
+    s <- step$stmts[[j]]
     if (identical(s$stmt, "class")) {
       it <- item_names(s$items)
       if (!it$ok) lists <- TRUE
@@ -376,11 +381,13 @@ tab_declared <- function(step) {
         v <- it$names[k]
         if (v %in% class) {
           dup <- c(dup, it$text[k])
+          if (identical(class_stmt[[v]], j)) dup_same <- TRUE
           next
         }
         class <- c(class, v)
         class_text[v] <- it$text[k]
         class_opts[[v]] <- s$opts
+        class_stmt[v] <- j
       }
     } else if (identical(s$stmt, "var")) {
       it <- item_names(s$items)
@@ -394,7 +401,7 @@ tab_declared <- function(step) {
       }
     }
   }
-  list(class = class, class_text = class_text, class_opts = class_opts, dup = dup, vars = vars,
+  list(class = class, class_text = class_text, class_opts = class_opts, dup = dup, dup_same = dup_same, vars = vars,
        var_text = var_text, var_line = var_line, lists = lists)
 }
 
@@ -620,6 +627,16 @@ translate_proc_tabulate <- function(step, meta, last) {
   conflict_text <- c(decl$class_text, decl$var_text)[conflict]
   if (length(conflict) && !identical(unname(conflict_text), conflict)) unexact("a keyword-named variable not written in lower case")
   warn <- if (length(conflict)) paste0("WARNING: The variable ", conflict, " conflicts with the keyword of the same name.") else character()
+  # WARNING of a CLASS variable declared again (the second declaration is ignored)
+  dup_warn <- character()
+  if (length(decl$dup)) {
+    if (length(decl$dup) > 1L) unexact("more than one repeated CLASS declaration")
+    if (decl$dup_same) unexact("a variable repeated inside one CLASS statement")
+    v <- tolower(decl$dup)
+    if (!identical(decl$dup, v) || !identical(decl$class_text[[v]], v)) unexact("a repeated CLASS variable not written in lower case")
+    if (length(warn)) unexact("a keyword WARNING and a repeated CLASS WARNING in one step")
+    dup_warn <- paste0("WARNING: Class variable ", v, " was defined in a previous statement, duplicate definition will be ignored.")
+  }
   other_warn <- length(decl$dup) > 0L || any(vapply(irs, tab_crosses_self, logical(1)))
 
   # ERROR: a character analysis variable
@@ -686,11 +703,12 @@ translate_proc_tabulate <- function(step, meta, last) {
            ".  This may cause unpredictable results.")
   }, "")
   if (length(warn) && length(self_warn)) unexact("a keyword WARNING and a self-crossing WARNING in one step")
-  if (any(nchar(c(warn, self_warn)) > rt_linesize())) unexact("a WARNING longer than the line size")
+  if (length(dup_warn) && length(self_warn)) unexact("a repeated CLASS WARNING and a self-crossing WARNING in one step")
+  if (any(nchar(c(warn, dup_warn, self_warn)) > rt_linesize())) unexact("a WARNING longer than the line size")
   spec <- tab_spec(step, decl, irs, inp)
   header <- sprintf("# ---- PROC TABULATE (SAS line %d)", as.integer(step$line))
   # the WARNINGs are written when the step runs, before its NOTEs
-  warns <- c(warn, self_warn)
+  warns <- c(warn, dup_warn, self_warn)
   warn_code <- if (length(warns)) paste0(".log <- c(.log, ", r_lit(stats::setNames(warns, rep("msg", length(warns)))), ")")
   code <- c(
     header,
