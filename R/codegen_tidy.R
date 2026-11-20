@@ -1018,10 +1018,9 @@ gen_row_step <- function(an) {
     if (has_input) quote(sas_input_iter_end(.inf)),
     quote(if (.status == "stop") break),
     out_if,
-    unread_if <- if (!is.null(rd)) rlang::expr(if (!.read) {
-      sas_loop_unread(!!loop_read_why(an$stmts))
-      break
-    }) else quote(break)
+    unread_if <- if (!is.null(rd)) {
+      rlang::call2("if", quote(!.read), rlang::call2("{", rlang::call2("sas_loop_unread", loop_read_why(an$stmts)), quote(break)))
+    } else quote(break)
   )
   loop <- Filter(Negate(is.null), loop)
   loop_text <- unlist(lapply(loop, function(x) {
