@@ -13,7 +13,8 @@ proc_registry <- list(
   # no procedure title line; the tables of a step are written page by page
   tabulate = list(compute = function(d, spec) tabulate_compute(d, spec), templates = c(Table = "base.tabulate"),
                   proctitle = FALSE,
-                  listing = function(tables, ls) tab_listing_tables(tables, ls))
+                  listing = function(tables, ls) tab_listing_tables(tables, ls),
+                  ods_output = function(tables, spec, line) tab_output_data(tables, spec, line))
 )
 proc_registry_alias <- c(summary = "means")
 
@@ -45,8 +46,8 @@ sas_rt_proc <- function(name, d, spec) {
   }
   reqs <- rt_diag()$ods_output
   if (length(reqs) > 0) {
-    # ODS OUTPUT data sets (ods_output.R); only PROC MEANS writes them
-    if (is.null(e$ods_output) || tolower(name) != "means") {
+    # ODS OUTPUT data sets (ods_output.R): PROC MEANS and PROC TABULATE
+    if (is.null(e$ods_output) || !tolower(name) %in% c("means", "tabulate")) {
       abort_unsupported(paste0("ODS OUTPUT in a PROC ", toupper(name), " step"), spec$line)
     }
     ods <- ods_output_write(res$tables, spec, reqs, e$ods_output, name)

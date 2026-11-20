@@ -4,16 +4,18 @@
 # (`SasSession$ods_output`).  The requests apply to the next PROC step: a DATA
 # step leaves them pending; PROC PRINT produces no requested table, so it
 # writes the WARNING "Output ... was not created" and the requests end; a
-# PROC MEANS step writes each requested table to WORK (sas_rt_proc()); any
+# PROC MEANS or PROC TABULATE step writes each requested table to WORK (sas_rt_proc()); any
 # other step with requests pending fails loud.  The log writes the data set
 # NOTEs, then the WARNING, before the observations read (log_close_order,
 # parts "ods" and "ods.warn").  Without PERSIST= the requests end with the
-# PROC step.  A MEANS step that writes only ODS OUTPUT data sets makes the
+# PROC step.  A MEANS or TABULATE step that writes only ODS OUTPUT data sets makes the
 # data set `_LAST_` (with OUT= data sets the last OUT= data set stays
 # `_LAST_`).
 #
 # Supported: the table name `Summary` or the path `Means.Summary` (without
-# BY), several requests in one statement, a one-level or WORK. data set name.
+# BY) of PROC MEANS, the table name `Table` or the path
+# `Tabulate.Report.Table` of PROC TABULATE (proc_tabulate_output.R), several
+# requests in one statement, a one-level or WORK. data set name.
 # MATCH_ALL, PERSIST=, quoted labels, `name#n`, data set options, the default
 # DATAn name and the actions (CLOSE, CLEAR, SHOW, SELECT, EXCLUDE, ALL, NONE)
 # fail loud.
@@ -65,8 +67,8 @@ ods_output_write <- function(tables, spec, reqs, writer, proc) {
   rt <- rt_diag()
   out <- list()
   for (rq in reqs) {
-    if (length(rq$object) > 2L) {
-      abort_unsupported(paste0("ODS OUTPUT path ", paste(rq$object, collapse = "."), " (supported: <table> or <proc>.<table>)"), rq$line)
+    if (length(rq$object) > 3L) {
+      abort_unsupported(paste0("ODS OUTPUT path ", paste(rq$object, collapse = "."), " (supported: <table> or the full path)"), rq$line)
     }
     if (length(rq$object) > 1L && !identical(tolower(rq$object[1]), tolower(proc))) {
       abort_unsupported(paste0("ODS OUTPUT ", paste(rq$object, collapse = "."), " in a PROC ", toupper(proc),

@@ -724,7 +724,9 @@ translate_proc_tabulate <- function(step, meta, last) {
     paste0(".d <- ", proc_source_code(inp)),
     paste0(".r <- sas_rt_proc(\"tabulate\", .d, ", r_lit(spec), ")"),
     ".lst <- c(.lst, sas_tab_titles(.titles, .r))",
-    ".ods <- c(.ods, .r$tables)"
+    ".ods <- c(.ods, .r$tables)",
+    # the ODS OUTPUT data sets (ods_output.R)
+    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TABULATE", line = step$line,
        outputs = character(), meta = list())

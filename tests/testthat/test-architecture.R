@@ -105,3 +105,21 @@ test_that("the log store check finds writes", {
   expect_true(grepl(log_files_re, "log_render.R"))
   expect_false(grepl(log_files_re, "logistic.R"))
 })
+
+test_that("one function builds the columns of the TABULATE output data set", {
+  files <- list.files(pkg_r_dir(), pattern = "[.][Rr]$", full.names = TRUE)
+  env <- asNamespace("sasonr")
+  hits <- character()
+  for (f in files) {
+    exprs <- parse(f, keep.source = FALSE)
+    for (e in exprs) {
+      if (is.call(e) && identical(e[[1]], as.name("<-")) && is.name(e[[2]]) && is.call(e[[3]]) &&
+          identical(e[[3]][[1]], as.name("function")) &&
+          any(grepl("Table for Observation", deparse(e[[3]]), fixed = TRUE))) {
+        hits <- c(hits, as.character(e[[2]]))
+      }
+    }
+  }
+  expect_identical(hits, "tab_output_data")
+  expect_true(is.function(get("tab_output_data", envir = env)))
+})

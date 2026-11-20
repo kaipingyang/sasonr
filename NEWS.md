@@ -5,6 +5,15 @@ the development version provides.
 
 ## Running SAS programs
 
+* `ODS OUTPUT Table=` (or the path `Tabulate.Report.Table=`) before a PROC
+  TABULATE step writes the table as a data set: the CLASS variables, then
+  `_TYPE_`, `_PAGE_` and `_TABLE_`, then one column per analysis variable
+  and statistic (`v_N`, `v_Mean`, `v_Sum`, `v_PctN_00_v`; `N` without an
+  analysis variable), one observation per class-level combination. N, MEAN,
+  SUM and PCTN with one TABLE statement are supported; other statistics,
+  `F=`, labels in the TABLE statement, KEYLABEL, a LABEL statement, CLASS
+  options and an ODS OUTPUT statement inside the step are an Unsupported
+  error.
 * PROC TABULATE tables reach the HTML document of `sas_html()` while the
   HTML destination is open: heading rows and the corner cell in `<thead>`,
   row titles spanning their sub-rows, N and NMISS without decimals, one table

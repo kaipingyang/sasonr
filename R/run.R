@@ -135,16 +135,16 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (length(eng$session$ods_output) > 0 && step$type %in% c("data", "proc", "sql_begin")) {
       # ODS OUTPUT requests apply to the next PROC step (a DATA step leaves them
-      # pending): PROC MEANS, or PROC PRINT of an existing data set with one
+      # pending): PROC MEANS, PROC TABULATE, or PROC PRINT of an existing data set with one
       # request (the WARNING "not created", ods_output.R)
       ok_print <- step$type == "proc" && step$name == "print" && length(eng$session$ods_output) == 1L &&
         length(eng$session$ods_output[[1]]$object) == 1L && length(step$options$data$options) == 0L && !is.null(step$options$data$name %||% eng$session$last) &&
         exists(tolower(step$options$data$name %||% eng$session$last), envir = eng$session$work, inherits = FALSE)
-      ok <- step$type == "data" || (step$type == "proc" && step$name == "means") || ok_print
+      ok <- step$type == "data" || (step$type == "proc" && step$name %in% c("means", "tabulate")) || ok_print
       if (!ok || isTRUE(eng$syntax_check)) {
         abort_unsupported(paste0("ODS OUTPUT requests at ", if (step$type == "data") "a DATA step" else
           paste("PROC", toupper(if (step$type == "sql_begin") "sql" else step$name)),
-          if (isTRUE(eng$syntax_check)) " in syntax-check mode", " (supported: PROC MEANS, PROC PRINT with one request, a DATA step in between)"), step$line)
+          if (isTRUE(eng$syntax_check)) " in syntax-check mode", " (supported: PROC MEANS, PROC TABULATE, PROC PRINT with one request, a DATA step in between)"), step$line)
       }
     }
     if (step$type %in% c("global", "sql_begin", "sql", "sql_end")) script_record(eng, step, text, line)

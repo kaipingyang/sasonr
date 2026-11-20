@@ -32,6 +32,11 @@
 #                 "f" (F= in the TABLE statement), "proc" (FORMAT= on the
 #                 PROC statement) or "default" (12.2)
 #     page        NULL, or list(text, role) of the page-dimension elements
+#     cells       one list(row, col, key, var, stat, n, value) per cell: `key`
+#                 the level index of each class variable of its paths (named,
+#                 page then row then column), `n` the number of matching rows
+#     page_number, levels   the number of the page in its table and the class
+#                 level values (for the output data set, proc_tabulate_output.R)
 #     box, misstext, table   BOX= (NULL or list(kind, value)), the MISSTEXT
 #                 text (default "."), the number of the TABLE statement
 #
@@ -78,7 +83,8 @@ tab_spec <- function(step, decl, irs, inp) {
   }
   if (!is.null(o$format) && isTRUE(o$format$char)) abort_unsupported("PROC TABULATE FORMAT= with a character format", line)
   list(line = line, data = inp$ds$name, class = cls, vars = decl$vars, info = info, irs = irs, format = o$format,
-       keylabel = keylabel)
+       keylabel = keylabel, ds_order = intersect(st$order, decl$class),
+       label_stmt = any(vapply(step$stmts, function(s) identical(s$stmt, "label"), logical(1))))
 }
 
 # Computation -------------------------------------------------------------------
@@ -283,6 +289,7 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
     }
     fmts <- vector("list", length(cpaths))
     stats <- fsrc <- vector("list", length(cpaths))
+    cells <- list()
     for (j in seq_along(cpaths)) {
       cp <- cpaths[[j]]
       vals <- rep(NA_real_, nr)
@@ -298,6 +305,8 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
                   else if (!is.null(sp$format)) "proc" else "default"
         st[i] <- tab_cell_stat(elems)
         vals[i] <- tab_cell_value(elems, rows, stats_of, pct_denom, line)
+        cells[[length(cells) + 1L]] <- list(row = i, col = j, key = tab_cell_key(elems), var = tab_path_var(elems),
+                                            stat = st[i], n = length(rows), value = vals[i])
       }
       data[[stat_names[j]]] <- vals
       fmts[[j]] <- fj
@@ -325,9 +334,20 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
     attr(t, "box") <- ir$box
     attr(t, "misstext") <- ir$misstext %||% "."
     attr(t, "table") <- k
+    attr(t, "cells") <- cells
+    attr(t, "page_number") <- length(out) + 1L
+    attr(t, "levels") <- lapply(lv, `[[`, "values")
     out <- c(out, list(t))
   }
   out
+}
+
+# The class levels of a cell: the level index of every class element, named by
+# variable, in the order of the elements (page, row, column).
+tab_cell_key <- function(elems) {
+  key <- integer()
+  for (e in elems) if (identical(e$node$kind, "class")) key <- c(key, stats::setNames(e$level, e$node$name))
+  key
 }
 
 tab_path_format <- function(elems) {
