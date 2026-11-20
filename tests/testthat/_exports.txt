@@ -267,6 +267,7 @@ internal sas_iter_dump
 internal sas_lag
 internal sas_lag_vec
 internal sas_last
+internal sas_loop_unread
 internal sas_le
 internal sas_lt
 internal sas_max_op
@@ -311,6 +312,7 @@ internal sas_sort_values
 internal sas_stop_step
 internal sas_substr_assign
 internal sas_symput
+internal sas_tab_titles
 internal sas_true
 internal sas_trunc_chars
 internal sas_where_cond

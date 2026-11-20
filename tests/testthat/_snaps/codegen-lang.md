@@ -25,7 +25,6 @@
         sas_check_sorted("g", FALSE) |>
         dplyr::mutate(
           first.g = sas_first(g),
-          last.g = sas_last(g),
           p = NA_real_
         ) |>
         dplyr::group_by(.grp = cumsum(first.g)) |>
