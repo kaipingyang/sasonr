@@ -1028,10 +1028,11 @@ run;
   ))
 })
 
-test_that("the statistics gate fails loud in strict mode until the registry has TABULATE rows", {
+test_that("the statistics in the registry run in strict mode", {
   prog <- "data a; input g $ v; datalines;\nx 1\ny 2\n;\nrun;\nproc tabulate data=a; class g; var v; table g, v*mean; run;"
   withr::local_options(sasonr.strict = TRUE)
-  expect_error(sas_run(prog), class = "sasonr_strict_error")
+  r <- sas_run(prog)
+  expect_true(length(r$listing) > 0L)
 })
 
 test_that("a table without a statistic keyword runs in strict mode", {

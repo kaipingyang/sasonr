@@ -161,9 +161,8 @@ test_that("a character analysis variable is an ERROR without a nesting path", {
 
 test_that("a step that passes the checks prints its table; its WARNINGs go to the log", {
   withr::local_options(sasonr.strict = TRUE, sasonr.step_notes = TRUE)
-  # a statistic keyword is gated by the PROC statistics registry
-  expect_error(sas_run(paste0(have, "proc tabulate data=have; class grp; var v; table grp, v*mean; run;")),
-               class = "sasonr_strict_error")
+  # a statistic keyword in the PROC statistics registry passes the strict gate
+  expect_true(length(sas_run(paste0(have, "proc tabulate data=have; class grp; var v; table grp, v*mean; run;"))$listing) > 0L)
   r <- sas_run(paste0(have, "proc tabulate data=have; class grp; table grp*grp; run;"))
   expect_identical(grep("^WARNING", as.character(sas_log(r)), value = TRUE),
                    "WARNING: A class variable is crossed with itself in the table statement at line 11.  This may cause unpredictable results.")
