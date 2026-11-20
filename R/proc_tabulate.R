@@ -19,8 +19,8 @@
 # crossing.  A root-to-leaf path of a tree is a term; a cell is one term of
 # each present dimension.
 #
-# Computation and output are not implemented: a step that passes every check
-# fails loud.
+# The computation is in proc_tabulate_compute.R; the output is not
+# implemented: a step that passes every check fails loud.
 
 # T1 statistics (the table cells): N NMISS SUM MEAN STD/STDDEV MIN MAX RANGE
 # MEDIAN P50 PCTN PCTSUM.
@@ -680,5 +680,8 @@ translate_proc_tabulate <- function(step, meta, last) {
     if (any(nchar(c(warn, errs)) > ls)) unexact("an ERROR or WARNING longer than the line size")
     tab_abort_error(errs, warn, err_line)
   }
+  # the computation (proc_tabulate_compute.R) is specified; the listing is not
+  # implemented yet
+  tab_spec(step, decl, irs, inp)
   abort_unsupported("PROC TABULATE output is not implemented yet", step$line)
 }
