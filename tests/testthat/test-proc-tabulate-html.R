@@ -98,7 +98,8 @@ test_that("HTML shapes that are not supported fail loud while the listing is wri
     "label v='A very long label for the analysis variable'; table grp, v*mean*f=6.2;",
     "table grp, sub*v*sum / misstext='a much longer missing text than fits';",
     "table grp, v*mean / box='Corner';",
-    "table grp, v*n*f=8.1;"
+    "table grp, v*n*f=8.1;",
+    "table grp sub, v*sum;"
   )
   for (p in progs) {
     r <- tab_html_run(paste0(tab_html_data, "proc tabulate data=have; class grp sub; var v; ", p, " run;"))

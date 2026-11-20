@@ -355,12 +355,13 @@ tab_parse_factor <- function(p, uns) {
 # Declared CLASS and VAR variables of a step: names (lower case) and their
 # spelling; a second CLASS declaration of a variable is ignored (WARNING), so
 # the options of its first CLASS statement apply.  `dup` the spellings of the
-# repeats, `dup_same` a repeat inside one CLASS statement.
+# repeats in statement order, `dup_same` a repeat inside a CLASS statement that
+# already declares the variable.
 tab_declared <- function(step) {
   class <- character()
   class_text <- character()
   class_opts <- list()
-  class_stmt <- integer()
+  class_stmt <- list()
   dup <- character()
   dup_same <- FALSE
   vars <- character()
@@ -381,13 +382,14 @@ tab_declared <- function(step) {
         v <- it$names[k]
         if (v %in% class) {
           dup <- c(dup, it$text[k])
-          if (identical(class_stmt[[v]], j)) dup_same <- TRUE
+          if (j %in% class_stmt[[v]]) dup_same <- TRUE
+          class_stmt[[v]] <- c(class_stmt[[v]], j)
           next
         }
         class <- c(class, v)
         class_text[v] <- it$text[k]
         class_opts[[v]] <- s$opts
-        class_stmt[v] <- j
+        class_stmt[[v]] <- j
       }
     } else if (identical(s$stmt, "var")) {
       it <- item_names(s$items)
@@ -629,12 +631,18 @@ translate_proc_tabulate <- function(step, meta, last) {
   warn <- if (length(conflict)) paste0("WARNING: The variable ", conflict, " conflicts with the keyword of the same name.") else character()
   # WARNING of a CLASS variable declared again (the second declaration is ignored)
   dup_warn <- character()
+  # (one per repeat, after the keyword WARNINGs)
   if (length(decl$dup)) {
-    if (length(decl$dup) > 1L) unexact("more than one repeated CLASS declaration")
     if (decl$dup_same) unexact("a variable repeated inside one CLASS statement")
     v <- tolower(decl$dup)
-    if (!identical(decl$dup, v) || !identical(decl$class_text[[v]], v)) unexact("a repeated CLASS variable not written in lower case")
-    if (length(warn)) unexact("a keyword WARNING and a repeated CLASS WARNING in one step")
+    if (!identical(decl$dup, v) || !identical(unname(decl$class_text[unique(v)]), unique(v))) {
+      unexact("a repeated CLASS variable not written in lower case")
+    }
+    # the order of the repeats and the order of the first declarations must agree
+    if (!identical(v, v[order(match(v, decl$class))])) {
+      unexact("repeated CLASS variables whose repeats are not in the order of their first declarations")
+    }
+    if (any(v %in% conflict)) unexact("a keyword-named CLASS variable declared again")
     dup_warn <- paste0("WARNING: Class variable ", v, " was defined in a previous statement, duplicate definition will be ignored.")
   }
   other_warn <- length(decl$dup) > 0L || any(vapply(irs, tab_crosses_self, logical(1)))

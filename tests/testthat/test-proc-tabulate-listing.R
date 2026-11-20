@@ -1081,3 +1081,50 @@ test_that("shapes outside the measured layout fail loud", {
                               strrep("w", 40), "'; run;")),
                class = "sasonr_unsupported")
 })
+
+test_that("a class-variable heading row goes before each concatenated class variable of the rows", {
+  prog <- r"---(
+options nocenter nodate nonumber formdlim=' ' pagesize=max linesize=132;
+data have;
+  length grp $1 sub $1 all $1;
+  input grp $ sub $ all $ v;
+  datalines;
+a x p 10
+a y q 20
+b x p 30
+c y q 40
+. x p 50
+. y q 60
+a . p 70
+b . q 80
+;
+run;
+
+proc tabulate data=have;
+  class all;
+  class grp;
+  var v;
+  table all grp, v*sum;
+run;
+)---"
+  expect_identical(tab_listing(prog), c(
+    "----------------------------------------------",
+    "|                               |     v      |",
+    "|                               |------------|",
+    "|                               |    Sum     |",
+    "|-------------------------------+------------|",
+    "|all                            |            |",
+    "|-------------------------------|            |",
+    "|p                              |      110.00|",
+    "|-------------------------------+------------|",
+    "|q                              |      140.00|",
+    "|-------------------------------+------------|",
+    "|grp                            |            |",
+    "|-------------------------------|            |",
+    "|a                              |      100.00|",
+    "|-------------------------------+------------|",
+    "|b                              |      110.00|",
+    "|-------------------------------+------------|",
+    "|c                              |       40.00|",
+    "----------------------------------------------"))
+})

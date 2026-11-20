@@ -211,15 +211,58 @@ test_that("a CLASS variable declared again gives a WARNING and the first declara
   expect_identical(run_log(paste0(have, "proc tabulate data=have; class grp; class grp; table grp; run;")), warn)
 })
 
+test_that("several repeated CLASS declarations give one WARNING each, after the keyword WARNINGs", {
+  # SUM is outside the strict feature registry
+  withr::local_options(sasonr.strict = FALSE, sasonr.step_notes = TRUE)
+  have8 <- "
+data have;
+  length grp $1 sub $1 all $1;
+  input grp $ sub $ all $ v;
+  datalines;
+a x p 10
+a y q 20
+b x p 30
+c y q 40
+. x p 50
+. y q 60
+a . p 70
+b . q 80
+;
+run;
+"
+  # the lines between the end of the step and its first NOTE, and that NOTE
+  after_run <- function(code) {
+    r <- withCallingHandlers(sas_run(paste0(have8, code)), sasonr_strict_warning = function(w) invokeRestart("muffleWarning"))
+    lines <- as.character(sas_log(r))
+    from <- grep("^[0-9]+ +run;$", lines)
+    from <- from[length(from)] + 1L
+    to <- grep("^NOTE: There were", lines)
+    to <- to[to > from][1]
+    lines[from:to]
+  }
+  dup <- function(v) paste0("WARNING: Class variable ", v, " was defined in a previous statement, duplicate definition will be ignored.")
+  note <- "NOTE: There were 8 observations read from the data set WORK.HAVE."
+  expect_identical(after_run("proc tabulate data=have;\n  class grp;\n  class sub;\n  class grp;\n  class sub;\n  var v;\n  table grp, sub*v*sum;\nrun;"),
+                   c("", dup("grp"), dup("sub"), note))
+  expect_identical(after_run("proc tabulate data=have;\n  class grp;\n  class grp;\n  class grp;\n  var v;\n  table grp, v*sum;\nrun;"),
+                   c("", dup("grp"), dup("grp"), note))
+  expect_identical(after_run("proc tabulate data=have;\n  class all;\n  class grp;\n  class grp;\n  var v;\n  table all grp, v*sum;\nrun;"),
+                   c("", "WARNING: The variable all conflicts with the keyword of the same name.", dup("grp"), note))
+})
+
 test_that("repeated CLASS declarations outside the measured rules fail loud", {
   fails <- function(code, what) {
     expect_error(sas_run(code, on_error = "sas"), what, class = "sasonr_unsupported")
   }
-  fails(paste0(have, "proc tabulate data=have; class grp; class grp; class grp; table grp; run;"), "more than one repeated")
-  fails(paste0(have, "proc tabulate data=have; class grp sub; class grp sub; table grp; run;"), "more than one repeated")
+  # repeats in an order other than that of the first declarations
+  fails(paste0(have, "proc tabulate data=have; class grp; class sub; class sub; class grp; table grp; run;"),
+        "order of their first declarations")
+  fails(paste0(have, "proc tabulate data=have; class grp; class sub; class grp; class sub; class grp; table grp; run;"),
+        "order of their first declarations")
   fails(paste0(have, "proc tabulate data=have; class grp grp; table grp; run;"), "inside one CLASS statement")
+  fails(paste0(have, "proc tabulate data=have; class grp; class grp grp; table grp; run;"), "inside one CLASS statement")
   fails(paste0(have, "proc tabulate data=have; class grp; class GRP; table grp; run;"), "lower case")
-  fails(paste0(kw, "proc tabulate data=kw; class all; class all; var mean; table all, mean; run;"), "keyword WARNING")
+  fails(paste0(kw, "proc tabulate data=kw; class all; class all; var mean; table all, mean; run;"), "keyword-named CLASS variable declared again")
   fails(paste0(have, "proc tabulate data=have; class grp; class grp; table grp*grp; run;"), "self-crossing")
   # an ERROR after the WARNING
   fails(paste0(have, "proc tabulate data=have; class grp; class grp; table grp, v*sum; run;"), "WARNING")

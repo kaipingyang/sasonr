@@ -162,24 +162,25 @@ tab_grid_parts <- function(tb, fail) {
   if (nr == 0L) fail("a table without body rows")
   has_rows <- nrow(rh) > 0L
   k <- if (has_rows) max(rh$col + rh$ncol - 1L) else 0L
-  # body logical rows: the class-variable heading row goes before body row 1
+  # body logical rows: a class-variable heading row goes before the body row
+  # it heads (`head_at`, the body rows that have one)
   heads <- rh[rh$heading, ]
   levels <- rh[!rh$heading, ]
-  if (nrow(heads) > 0L) {
-    if (any(heads$row != 1L)) fail("a class-variable heading row inside the row dimension")
-    if (!setequal(heads$col, seq_len(k)) || anyDuplicated(heads$col)) {
+  head_at <- sort(unique(heads$row))
+  for (r in head_at) {
+    hc <- heads$col[heads$row == r]
+    if (!setequal(hc, seq_len(k)) || anyDuplicated(hc)) {
       fail("a class-variable heading row that does not cover every row-title column")
     }
   }
-  head_row <- nrow(heads) > 0L
   hlev <- header$level
   hspan <- header$rowspan %||% rep(1L, nrow(header))
   hleaf <- lapply(header$columns, function(cc) match(cc, scols))
   for (l in hleaf) if (anyNA(l) || !identical(l, seq(min(l), max(l)))) fail("a heading over columns that are not adjacent")
   nh <- if (nrow(header)) max(hlev + hspan - 1L) else 0L
   list(header = header, hlev = hlev, hspan = hspan, hleaf = hleaf, nh = nh, scols = scols, nr = nr,
-       has_rows = has_rows, k = k, heads = heads, levels = levels, head_row = head_row,
-       box = attr(tb, "box", exact = TRUE), nrow = nh + head_row + nr)
+       has_rows = has_rows, k = k, heads = heads, levels = levels, head_at = head_at,
+       box = attr(tb, "box", exact = TRUE), nrow = nh + length(head_at) + nr)
 }
 
 # The cells of the leaves `pj` of grid `g`: rectangles on the logical rows
@@ -205,19 +206,19 @@ tab_grid <- function(g, pj, data_text, box_text) {
   }
   if (nh > 0L && g$has_rows) add(1L, nh, 1L, k, box_text, "box")
   # body rows
-  off <- nh + g$head_row
-  body <- function(i) off + i
+  body <- function(i) nh + i + vapply(i, function(r) sum(g$head_at <= r), 1L)
   heads <- g$heads
   levels <- g$levels
-  if (g$head_row) {
-    for (z in seq_len(nrow(heads))) add(nh + 1L, nh + 1L, heads$col[z], heads$col[z], heads$text[[z]], "left")
+  for (z in seq_len(nrow(heads))) {
+    at <- body(heads$row[z]) - 1L
+    add(at, at, heads$col[z], heads$col[z], heads$text[[z]], "left")
   }
   for (z in seq_len(nrow(levels))) {
     add(body(levels$row[z]), body(levels$row[z] + levels$nrow[z] - 1L), levels$col[z],
         levels$col[z] + levels$ncol[z] - 1L, levels$text[[z]], "left")
   }
   for (i in seq_len(g$nr)) {
-    top <- if (i == 1L && g$head_row) nh + 1L else body(i)
+    top <- if (i %in% g$head_at) body(i) - 1L else body(i)
     for (q in seq_len(np)) add(top, body(i), k + q, k + q, data_text(pj[q], i), "raw", "bottom")
   }
   cells
@@ -352,11 +353,13 @@ tab_draw <- function(cells, nrow, cw, fail, page_line = NULL) {
 # text is not wrapped; numbers are the formatted values without the padding,
 # an empty cell is the MISSTEXT.  Not supported (fail loud): a heading longer
 # than its column, a MISSTEXT longer than its column (the text would be
-# broken into lines) and a BOX= text in the corner cell.  Row titles always
+# broken into lines), a BOX= text in the corner cell and a class-variable
+# heading row below the first body row.  Row titles always
 # fit: the listing of the same table fails loud otherwise.
 html_base_tabulate <- function(tb) {
   fail <- function(what) abort_unsupported(paste0("the PROC TABULATE HTML output of ", what))
   g <- tab_grid_parts(tb, fail)
+  if (any(g$head_at != 1L)) fail("a class-variable heading row inside the row dimension")
   fmts <- attr(tb, "formats", exact = TRUE)
   cstat <- attr(tb, "cell_stats", exact = TRUE)
   fsrc <- attr(tb, "format_source", exact = TRUE)
