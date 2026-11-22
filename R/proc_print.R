@@ -61,7 +61,8 @@ print_compute <- function(d, spec) {
                lapply(names(text), function(nm) list(values = text[[nm]]$values[g], sub = text[[nm]]$sub[k],
                                                      grand = if (k == ng) text[[nm]]$grand))),
       sums = sums, sub_label = if (sub_rows) spec$by_info[[spec$by]]$disp else NULL,
-      last = k == ng, n = if (isTRUE(spec$n)) length(g) else NULL, split = spec$split, first = k == 1L
+      last = k == ng, n = if (isTRUE(spec$n)) length(g) else NULL, split = spec$split, first = k == 1L,
+      row_header = obs || !is.null(spec$id)
     )
     tb
   })

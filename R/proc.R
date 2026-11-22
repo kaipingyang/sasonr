@@ -53,6 +53,17 @@ parse_global_stmt <- function(p, open_code = FALSE) {
       return(list(type = "global", kind = "ods_html", open = FALSE, line = line))
     }
     if (is_kw(p, "output", 1L)) return(parse_ods_output(p, line))
+    # `ODS RTF FILE="path";` and `ODS RTF CLOSE;` (default style only)
+    if (is_kw(p, "rtf", 1L) && is_kw(p, "close", 2L) && tk_type(p, 3L) == "semi") {
+      advance(p, 4L)
+      return(list(type = "global", kind = "ods_rtf", open = FALSE, line = line))
+    }
+    if (is_kw(p, "rtf", 1L) && is_kw(p, "file", 2L) && is_op(p, "=", 3L) && tk_type(p, 4L) %in% c("str", "str_macro") &&
+        tk_type(p, 5L) == "semi") {
+      file <- tk_val(p, 4L)
+      advance(p, 6L)
+      return(list(type = "global", kind = "ods_rtf", open = TRUE, file = file, line = line))
+    }
     if (is_kw(p, "html", 1L)) {
       abort_unsupported("ODS HTML options (FILE= and the other options are not supported; use sas_html(file =))", line)
     }
@@ -409,7 +420,8 @@ translate_proc <- function(step, meta, last = NULL) {
     paste0(".d <- ", proc_source_code(inp, obs_col = TRUE)),
     if (length(vars) > 0) c(
       paste0(".r <- sas_rt_proc(\"print\", .d, ", r_lit(spec), ")"),
-      ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))"
+      ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+      ".ods <- c(.ods, .r$tables)"
     )
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC PRINT",

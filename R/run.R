@@ -313,9 +313,15 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "proc") eng$session$ods_output <- NULL
     eng$ods <- c(eng$ods, env$.ods)
-    if (length(env$.ods) > 0 && isTRUE(eng$session$ods_html)) {
+    html_tables <- Filter(function(tb) !identical(attr(tb, "template", exact = TRUE), "base.print"), env$.ods)
+    if (length(html_tables) > 0 && isTRUE(eng$session$ods_html)) {
       eng$html <- c(eng$html, list(list(proc = step$name, titles = env$.titles, footnotes = eng$session$footnotes,
-                                          tables = env$.ods)))
+                                          tables = html_tables)))
+    }
+    if (length(env$.ods) > 0 && !is.null(eng$session$ods_rtf)) {
+      eng$session$ods_rtf$outputs <- c(eng$session$ods_rtf$outputs,
+                                       list(list(proc = step$name, titles = env$.titles, footnotes = eng$session$footnotes,
+                                                 tables = env$.ods)))
     }
     if (identical(eng$on_error, "sas")) err_set_macro(eng, syserr = if (isTRUE(eng$syntax_check)) 3 else 0)
     # output data sets whose layout is only known at run time (PROC TRANSPOSE...)
@@ -581,6 +587,16 @@ engine_global <- function(eng, g) {
     if (!is.null(g$formdlim)) o$formdlim <- g$formdlim
   }
   if (g$kind == "ods_html") eng$session$ods_html <- g$open
+  if (g$kind == "ods_rtf") {
+    if (isTRUE(g$open)) {
+      if (!is.null(eng$session$ods_rtf)) abort_unsupported("ODS RTF FILE= while the RTF destination is open", g$line)
+      eng$session$ods_rtf <- list(file = g$file, outputs = list())
+      log_emit(eng, id = "ods.rtf_body", file = g$file)
+    } else if (!is.null(eng$session$ods_rtf)) {
+      rtf_write_document(eng$session$ods_rtf$outputs, eng$session$ods_rtf$file)
+      eng$session$ods_rtf <- NULL
+    }
+  }
   if (g$kind == "ods_output") eng$session$ods_output <- c(eng$session$ods_output, g$requests)
   if (g$kind == "title") {
     keep <- eng$session$titles[seq_len(min(length(eng$session$titles), g$level - 1L))]
@@ -666,6 +682,11 @@ engine_program <- function(eng, code) {
   if (!isTRUE(eng$deferred)) script_open_code(eng, "", length(eng$program$lines) + 1L, end = TRUE)
   if (isTRUE(eng$sc_pending)) {
     abort_unsupported("the end of a program after an ERROR in a global statement (supported: a DATA step follows)")
+  }
+  # the RTF file is written when the destination closes; a program that
+  # leaves it open would write no file here
+  if (!isTRUE(eng$deferred) && !is.null(eng$session$ods_rtf)) {
+    abort_unsupported("an ODS RTF destination that the program does not close (ODS RTF CLOSE;)")
   }
   invisible(eng)
 }
