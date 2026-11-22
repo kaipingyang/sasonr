@@ -21,6 +21,13 @@ the development version provides.
   title) and the percentages COLPCTN, ROWPCTN, REPPCTN, PAGEPCTN, COLPCTSUM,
   ROWPCTSUM and `PCTN<var>` / `PCTSUM<var>` with class variables as the
   denominator. A table of several panels can now have a page dimension.
+* PROC TABULATE `CLASSDATA=` (with or without `EXCLUSIVE`), the CLASS option
+  `PRELOADFMT` with the TABLE option `PRINTMISS`, and `PRINTMISS` when every
+  combination of levels occurs: the levels of the CLASSDATA= data set and of
+  the format ranges join the levels of the data in internal order; a level
+  without observations has N 0. These options with more than one CLASS
+  variable, with BY or OUT=, with ORDER=, DESCENDING or MISSING, or with a
+  format range that is not one value are an Unsupported error.
 * PROC TABULATE `OUT=` writes the same data set as `ODS OUTPUT Table=` (one
   column builder for both); OUT= with BY, with data set options or with an
   ODS OUTPUT request in the same step is an Unsupported error.

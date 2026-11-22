@@ -293,10 +293,10 @@ run;
 "))
   expect_identical(chk$feature, c(
     "PROC TABULATE option NOSEPS",
-    "CLASS option MLF", "VAR statement options", "TABLE option PRINTMISS", "TABLE option RTS=",
+    "CLASS option MLF", "VAR statement options", "TABLE option RTS=",
     "PROC TABULATE statistic CV",
     "PROC TABULATE option STYLE=", "STYLE= on a TABLE element"))
-  expect_identical(chk$step, c(rep(2L, 6), 3L, 3L))
+  expect_identical(chk$step, c(rep(2L, 5), 3L, 3L))
 })
 
 test_that("sas_check() has no finding for a TABULATE step inside the checked scope", {

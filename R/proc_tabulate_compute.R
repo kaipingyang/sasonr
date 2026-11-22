@@ -70,7 +70,7 @@ tab_spec <- function(step, decl, irs, inp) {
   cls <- lapply(decl$class, function(v) {
     co <- decl$class_opts[[v]]
     list(name = v, missing = isTRUE(co$missing) || isTRUE(o$missing), order = co$order %||% o$order %||% "internal",
-         descending = isTRUE(co$descending))
+         descending = isTRUE(co$descending), preloadfmt = isTRUE(co$preloadfmt))
   })
   names(cls) <- decl$class
   keylabel <- character()
@@ -94,7 +94,25 @@ tab_spec <- function(step, decl, irs, inp) {
   if (length(intersect(by, c(decl$class, decl$vars)))) abort_unsupported("a PROC TABULATE BY variable that is also a CLASS or VAR variable", line)
   by_info <- proc_var_info(st, by)
   if (!is.null(o$out) && length(by)) abort_unsupported("PROC TABULATE OUT= with BY", line)
-  list(line = line, data = inp$ds$name, class = cls, by = by, by_info = by_info, out = o$out, vars = decl$vars, info = info, irs = irs, format = o$format,
+  # CLASSDATA=, EXCLUSIVE, PRELOADFMT (+ PRINTMISS): the measured scope of
+  # cases tabulate_t2/p2b, p2c (one CLASS variable, internal order)
+  pre <- names(Filter(function(cl) cl$preloadfmt, cls))
+  extended <- !is.null(o$classdata) || length(pre) > 0L
+  if (isTRUE(o$exclusive) && is.null(o$classdata)) abort_unsupported("PROC TABULATE EXCLUSIVE without CLASSDATA=", line)
+  if (extended) {
+    fail <- function(what) abort_unsupported(paste0("PROC TABULATE CLASSDATA= or PRELOADFMT ", what), line)
+    if (length(cls) != 1L) fail("with more than one CLASS variable")
+    if (length(by) || !is.null(o$out)) fail("with BY or OUT=")
+    if (!identical(cls[[1]]$order, "internal") || cls[[1]]$descending || cls[[1]]$missing) fail("with ORDER=, DESCENDING or MISSING")
+    if (length(pre) && isTRUE(o$exclusive)) fail("together with EXCLUSIVE")
+    if (length(pre) && !all(vapply(irs, function(ir) isTRUE(ir$printmiss), TRUE))) fail("without PRINTMISS")
+    for (v in pre) {
+      f <- info[[v]]$fmt
+      if (is.null(f) || !nzchar(f$name %||% "")) fail("on a variable without a user format")
+    }
+  }
+  list(line = line, data = inp$ds$name, class = cls, by = by, by_info = by_info, out = o$out,
+       classdata = o$classdata, exclusive = isTRUE(o$exclusive), vars = decl$vars, info = info, irs = irs, format = o$format,
        keylabel = keylabel, ds_order = intersect(st$order, decl$class),
        label_stmt = any(vapply(step$stmts, function(s) identical(s$stmt, "label"), logical(1))))
 }
@@ -136,8 +154,26 @@ tab_compute_rows <- function(d, sp) {
   used <- unique(unlist(lapply(sp$irs, function(ir) {
     lapply(ir$dims, function(t) vapply(Filter(function(n) identical(n$kind, "class"), tab_nodes(t)), `[[`, "", "name"))
   }), use.names = FALSE))
+  # CLASSDATA= with EXCLUSIVE: only the rows whose class value is a CLASSDATA value
+  if (!is.null(sp$classdata)) {
+    v <- names(sp$class)[1]
+    cd <- sp$classdata_rows
+    if (is.null(cd[[v]])) abort_unsupported(paste0("a CLASSDATA= data set without the CLASS variable ", toupper(v)), line)
+    if (sp$exclusive) d <- d[proc_group_key(d[[v]], sp$info[[v]]) %in% proc_group_key(cd[[v]], sp$info[[v]]), , drop = FALSE]
+  }
   lv <- list()
-  for (v in used) lv[[v]] <- tab_levels(d[[v]], sp$class[[v]], sp$info[[v]], line)
+  for (v in used) {
+    lv[[v]] <- tab_levels(d[[v]], sp$class[[v]], sp$info[[v]], line)
+    extra <- NULL
+    if (!is.null(sp$classdata)) extra <- sp$classdata_rows[[v]]
+    if (isTRUE(sp$class[[v]]$preloadfmt)) {
+      extra <- vctrs::vec_c(extra, proc_preload_values(sp$info[[v]]$fmt, is.character(d[[v]]), line))
+    }
+    if (!is.null(extra)) {
+      if (is.character(extra)) extra <- sas_rtrim(extra)
+      lv[[v]] <- proc_levels_extend(lv[[v]], extra, sp$info[[v]])
+    }
+  }
   used_stats <- unique(unlist(lapply(sp$irs, function(ir) {
     lapply(ir$dims, function(t) vapply(Filter(function(n) identical(n$kind, "stat"), tab_nodes(t)), `[[`, "", "name"))
   }), use.names = FALSE))
@@ -200,7 +236,15 @@ tab_expand <- function(tree, rows, lv) {
     n$children <- NULL
     if (identical(n$kind, "class")) {
       li <- lv[[n$name]]$idx[rows]
-      for (k in sort(unique(li))) out <- c(out, tab_expand_below(list(node = n, level = k), ch, rows[li == k], lv))
+      ks <- sort(unique(li))
+      ex <- lv[[n$name]]$extra
+      if (any(ex)) {
+        if (any(vapply(tab_nodes(ch), function(m) identical(m$kind, "class"), logical(1)))) {
+          abort_unsupported("CLASSDATA= or PRELOADFMT levels of a class variable crossed with another class variable")
+        }
+        ks <- sort(unique(c(ks, which(ex))))
+      }
+      for (k in ks) out <- c(out, tab_expand_below(list(node = n, level = k, extra = isTRUE(ex[k])), ch, rows[li == k], lv))
     } else {
       out <- c(out, tab_expand_below(list(node = n, level = NA_integer_), ch, rows, lv))
     }
@@ -221,6 +265,16 @@ tab_expand_below <- function(el, ch, rows, lv) {
 tab_paths <- function(tree, rows, lv) {
   if (is.null(tree)) return(list(list(elems = list(), rows = rows)))
   tab_expand(tree, rows, lv)
+}
+
+# The number of paths of a dimension when every level of every class node is
+# taken (PRINTMISS: a dimension whose data paths are fewer is not measured).
+tab_count_full <- function(tree, lv) {
+  if (!length(tree)) return(1L)
+  sum(vapply(tree, function(n) {
+    below <- tab_count_full(n$children, lv)
+    if (identical(n$kind, "class")) length(lv[[n$name]]$keys) * below else below
+  }, 1))
 }
 
 # Heading texts --------------------------------------------------------------------
@@ -275,6 +329,15 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
   pages <- tab_paths(dims$page, all_rows, lv)
   rpaths <- tab_paths(dims$row, all_rows, lv)
   cpaths <- tab_paths(dims$col, all_rows, lv)
+  if (isTRUE(ir$printmiss)) {
+    for (dn in c("page", "row", "col")) {
+      t <- dims[[dn]]
+      np <- length(switch(dn, page = pages, row = rpaths, col = cpaths))
+      if (!is.null(t) && np != tab_count_full(t, lv)) {
+        abort_unsupported("PRINTMISS with a combination of class levels that does not occur in the data", line)
+      }
+    }
+  }
   if (nrow(d) == 0L) {
     col_class <- any(vapply(tab_nodes(dims$col), function(n) identical(n$kind, "class"), logical(1)))
     if (!is.null(dims$page) || is.null(dims$row) || length(rpaths) || col_class) {
@@ -444,7 +507,10 @@ tab_denom_vars <- function(denom, line) {
 tab_cell_value <- function(elems, rows, stats_of, pct_denom, line, den_rows = NULL) {
   v <- tab_path_var(elems)
   stat <- tab_cell_stat(elems)
-  if (!length(rows)) return(NA_real_)
+  if (!length(rows)) {
+    if (stat %in% c("n", "nmiss") && any(vapply(elems, function(e) isTRUE(e$extra), logical(1)))) return(0)
+    return(NA_real_)
+  }
   denom <- tab_cell_denom(elems)
   if (!is.null(denom) || stat %in% tab_stats_pct_denom) {
     if (is.null(v)) abort_unsupported(paste0("PROC TABULATE ", toupper(stat), " without an analysis variable"), line)

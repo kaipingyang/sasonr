@@ -301,3 +301,31 @@ run;"
   r <- tab_compute(d, "proc tabulate data=t; class g s; var v; table s*g, v*pctn<g>; run;")
   expect_equal(unname(cells(r$tables[[1]])[, 1]), c(50, 50, 100))
 })
+
+test_that("CLASSDATA= adds levels; EXCLUSIVE keeps only them; PRELOADFMT adds the format values", {
+  d <- "data t; length g $1; input g $ v; datalines;
+a 1
+b 2
+;
+run;
+data lv; length g $1; input g $; datalines;
+a
+c
+;
+run;
+proc format; value $gf 'a' = 'Alpha' 'z' = 'Zulu'; run;"
+  run_cd <- function(code) {
+    withr::local_options(sasonr.strict = FALSE)
+    r <- suppressWarnings(sas_run(paste0(d, code)))
+    r$ods[[1]]
+  }
+  t <- run_cd("proc tabulate data=t classdata=lv; class g; var v; table g, v*(n sum); run;")
+  expect_identical(t$g, c("a", "b", "c"))
+  expect_equal(cells(t)[3, ], c(0, NA))
+  t <- run_cd("proc tabulate data=t classdata=lv exclusive; class g; var v; table g, v*(n sum); run;")
+  expect_identical(t$g, c("a", "c"))
+  t <- run_cd("proc tabulate data=t; class g / preloadfmt; format g $gf.; var v; table g, v*n / printmiss; run;")
+  expect_identical(t$g, c("a", "b", "z"))
+  expect_error(run_cd("proc tabulate data=t; class g / preloadfmt; format g $gf.; var v; table g, v*n; run;"),
+               class = "sasonr_unsupported")
+})

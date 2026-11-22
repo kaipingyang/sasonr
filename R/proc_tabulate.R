@@ -51,6 +51,10 @@ parse_proc_tabulate <- function(p, line) {
       advance(p, 2L)
       if (o == "data") {
         opts$data <- parse_ds_ref(p, "input")
+      } else if (o == "classdata") {
+        ref <- parse_ds_ref(p, "input")
+        if (length(ref$options)) tab_note(uns, "data set options on PROC TABULATE CLASSDATA=", oline)
+        opts$classdata <- ref$name
       } else if (o == "out") {
         ref <- parse_ds_ref(p, "output")
         if (length(ref$options)) tab_note(uns, "data set options on PROC TABULATE OUT=", oline)
@@ -72,8 +76,8 @@ parse_proc_tabulate <- function(p, line) {
       }
       next
     }
-    if (o == "missing") {
-      opts$missing <- TRUE
+    if (o %in% c("missing", "exclusive")) {
+      opts[[o]] <- TRUE
     } else {
       tab_note(uns, paste0("PROC TABULATE option ", toupper(o)), oline)
     }
@@ -188,7 +192,7 @@ parse_tabulate_class <- function(p, uns) {
         }
         next
       }
-      if (k %in% c("missing", "descending", "ascending")) {
+      if (k %in% c("missing", "descending", "ascending", "preloadfmt")) {
         o[[k]] <- TRUE
       } else {
         tab_note(uns, paste0("CLASS option ", toupper(k)), line)
@@ -248,13 +252,14 @@ parse_tabulate_table <- function(p, uns) {
   }
   box <- NULL
   misstext <- NULL
+  printmiss <- FALSE
   if (is_op(p, "/")) {
     advance(p)
     while (tk_type(p) == "name") {
       k <- tk_low(p)
       oline <- tk_line(p)
       if (!is_op(p, "=", 1L)) {
-        tab_note(uns, paste0("TABLE option ", toupper(k)), oline)
+        if (k == "printmiss") printmiss <- TRUE else tab_note(uns, paste0("TABLE option ", toupper(k)), oline)
         advance(p)
         next
       }
@@ -277,7 +282,7 @@ parse_tabulate_table <- function(p, uns) {
   }
   if (tk_type(p) != "semi") return(bad())
   advance(p)
-  list(stmt = "table", dims = res, box = box, misstext = misstext, line = line)
+  list(stmt = "table", dims = res, box = box, misstext = misstext, printmiss = printmiss, line = line)
 }
 
 tab_parse_fail <- function() {
@@ -430,7 +435,7 @@ tab_table_ir <- function(stmt, decl) {
   k <- length(dims)
   get <- function(i) if (i >= 1L && i <= k) dims[[i]] else NULL
   list(dims = list(page = if (k == 3L) get(1L), row = if (k >= 2L) get(k - 1L), col = get(k)),
-       box = stmt$box, misstext = stmt$misstext, line = stmt$line)
+       box = stmt$box, misstext = stmt$misstext, printmiss = isTRUE(stmt$printmiss), line = stmt$line)
 }
 
 tab_tree_concat <- function(concat, decl) {
@@ -728,7 +733,12 @@ translate_proc_tabulate <- function(step, meta, last) {
     header,
     warn_code,
     paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_rt_proc(\"tabulate\", .d, ", r_lit(spec), ")"),
+    if (is.null(spec$classdata)) {
+      paste0(".r <- sas_rt_proc(\"tabulate\", .d, ", r_lit(spec), ")")
+    } else c(
+      paste0(".cd <- sas_ds(work, ", r_str(spec$classdata), ") |> sas_note_read(", r_str(spec$classdata), ")"),
+      paste0(".r <- sas_rt_proc(\"tabulate\", .d, c(", r_lit(spec), ", list(classdata_rows = .cd)))")
+    ),
     ".lst <- c(.lst, sas_tab_titles(.titles, .r))",
     ".ods <- c(.ods, .r$tables)",
     # the ODS OUTPUT data sets (ods_output.R)

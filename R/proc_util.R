@@ -165,6 +165,40 @@ proc_internal_order <- function(x) {
   sas_order(tibble::as_tibble(d), "v")
 }
 
+# Class levels outside the data (CLASSDATA= values, PRELOADFMT ranges), shared
+# by PROC TABULATE and (later) PROC MEANS COMPLETETYPES (spec 10 D4): added to
+# the level set in internal order; `extra` marks them (no row has them).
+proc_levels_extend <- function(l, extra_values, info) {
+  if (!length(extra_values)) return(l)
+  k <- proc_group_key(extra_values, info)
+  new <- !k %in% l$keys & !duplicated(k)
+  if (!any(new)) return(l)
+  vals <- vctrs::vec_c(l$values, extra_values[new])
+  keys <- c(l$keys, k[new])
+  ord <- proc_internal_order(vals)
+  l$values <- vals[ord]
+  l$keys <- keys[ord]
+  l$extra <- keys[ord] %in% k[new]
+  l$idx <- match(l$key, l$keys)
+  l
+}
+
+# The values a user format's ranges give (PRELOADFMT): discrete values only.
+proc_preload_values <- function(fmt, char, line) {
+  s <- sas_rt_active()
+  def <- s$formats[[paste0("value:", if (char) "$", fmt$name)]]
+  if (is.null(def)) abort_unsupported(paste0("PRELOADFMT with the format ", toupper(fmt$name), " that is not a user format"), line)
+  vapply(def$entries, function(e) {
+    lo <- e[["lo"]]
+    hi <- e[["hi"]]
+    if (isTRUE(e[["other"]]) || isTRUE(e[["lo_low"]]) || isTRUE(e[["hi_high"]]) || (!is.null(hi) && !identical(hi, lo)) ||
+        isTRUE(e[["lo_excl"]]) || isTRUE(e[["hi_excl"]]) || is.null(lo)) {
+      abort_unsupported("PRELOADFMT with a format range that is not one value", line)
+    }
+    if (char) as.character(lo) else as.numeric(lo)
+  }, if (char) "" else 0)
+}
+
 # BY groups ---------------------------------------------------------------------
 
 # Row index vectors of the BY groups of `d` (data order); stops with SAS's
