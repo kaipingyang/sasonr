@@ -398,7 +398,7 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
                   else if (!is.null(sp$format)) "proc" else "default"
         st[i] <- tab_cell_stat(elems)
         den_rows <- function(stat, denom) tab_denom_rows(stat, denom, pg, rp, cp, elems, all_rows, lv, line)
-        vals[i] <- tab_cell_value(elems, rows, stats_of, pct_denom, line, den_rows)
+        vals[i] <- tab_cell_value(elems, rows, stats_of, pct_denom, line, den_rows, length(all_rows))
         cells[[length(cells) + 1L]] <- list(row = i, col = j, key = tab_cell_key(elems), var = tab_path_var(elems),
                                             stat = st[i], n = length(rows), value = vals[i])
       }
@@ -504,7 +504,7 @@ tab_denom_vars <- function(denom, line) {
   }, "")
 }
 
-tab_cell_value <- function(elems, rows, stats_of, pct_denom, line, den_rows = NULL) {
+tab_cell_value <- function(elems, rows, stats_of, pct_denom, line, den_rows = NULL, n_all = NULL) {
   v <- tab_path_var(elems)
   stat <- tab_cell_stat(elems)
   if (!length(rows)) {
@@ -512,6 +512,12 @@ tab_cell_value <- function(elems, rows, stats_of, pct_denom, line, den_rows = NU
     return(NA_real_)
   }
   denom <- tab_cell_denom(elems)
+  # N and PCTN without an analysis variable count the observations
+  if (is.null(v) && stat %in% c("pctn", "colpctn", "rowpctn", "reppctn", "pagepctn")) {
+    dr <- if (stat == "pctn" && is.null(denom)) seq_len(n_all %||% 0L) else den_rows(stat, denom)
+    if (!length(dr)) return(NA_real_)
+    return(length(rows) / length(dr) * 100)
+  }
   if (!is.null(denom) || stat %in% tab_stats_pct_denom) {
     if (is.null(v)) abort_unsupported(paste0("PROC TABULATE ", toupper(stat), " without an analysis variable"), line)
     what <- tab_stat_canon[[stat]]
