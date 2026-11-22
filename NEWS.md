@@ -6,13 +6,18 @@ the development version provides.
 ## Running SAS programs
 
 * `ODS RTF FILE="path";` and `ODS RTF CLOSE;` write the RTF document of
-  the PROC PRINT tables (default style) when the destination closes: the
+  the PROC PRINT and PROC TABULATE tables (default style) when the
+  destination closes. PROC TABULATE: merged row titles and headings, the
+  page text of a page dimension (one section per page), the same width rule
+  as PROC PRINT; a column heading over several columns and characters whose
+  advance is not measured yet (such as `.`) are an Unsupported error. PROC
+  PRINT: the
   table rows, borders, heading and row-header styles, BY lines, SPLIT= line
   breaks and the column widths (from the measured character advances of the
   default fonts). Other procedures, options of
-  the ODS RTF statement, titles in the document, PROC PRINT with N, a column
-  whose width a bold number sets, and a destination left open at the end of
-  the program are an Unsupported error.
+  the ODS RTF statement, titles in the document, PROC PRINT with N and BY,
+  and a destination left open at the end of the program are an Unsupported
+  error.
 * PROC PRINT supports `OBS=`, `N`, `LABEL`, `SPLIT=` and the ID, BY, SUM and
   SUMBY statements: one page per BY group with its byline, observation
   numbers that continue across pages, subtotals per BY group and the grand

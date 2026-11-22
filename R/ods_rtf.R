@@ -122,8 +122,10 @@ rtf_print_table <- function(tb) {
     }
   }
   nr <- length(a$text[[1]]$values)
-  # outside the measured rule: the N line (it widens a column)
-  if (!is.null(a$n)) abort_unsupported("the ODS RTF output of PROC PRINT with the option N")
+  # N with BY widens a column (one measured point), not implemented
+  if (!is.null(a$n) && !is.null(attr(tb, "by", exact = TRUE))) {
+    abort_unsupported("the ODS RTF output of PROC PRINT with the option N and BY")
+  }
   widths <- vapply(seq_len(nc), function(j) {
     data_bold <- role[j]
     hw <- rtf_heading_width(heads[[j]])
@@ -137,6 +139,10 @@ rtf_print_table <- function(tb) {
   xs <- cumsum(widths)
   align <- vapply(a$cols, function(c) if (isTRUE(c$char)) "l" else "r", "")
   n_row <- if (!is.null(a$n)) paste0("N = ", a$n)
+  # an N line wider than the table makes a column grow (not measured)
+  if (!is.null(n_row) && 125 + rtf_text_width(n_row, bold = FALSE) > sum(widths)) {
+    abort_unsupported("an ODS RTF table narrower than its N line")
+  }
   total <- 1L + nr + length(sum_rows) + if (!is.null(n_row)) 1L else 0L
   out <- character()
   row_k <- 0L
@@ -241,7 +247,7 @@ rtf_tabulate_table <- function(tb, widths = NULL) {
   cells <- tab_grid(g, seq_along(g$scols), data_text, "")
   ncol <- g$k + length(g$scols)
   nrow <- g$nrow
-  if (is.null(widths)) fail("the data columns (their width rule is not measured yet)")
+  if (is.null(widths)) widths <- rtf_tabulate_widths(cells, ncol, fail)
   xs <- cumsum(widths)
   cover <- function(r, c) {
     for (cl in cells) if (cl$r0 <= r && r <= cl$r1 && cl$c0 <= c && c <= cl$c1) return(cl)
@@ -291,6 +297,35 @@ rtf_tabulate_table <- function(tb, widths = NULL) {
     out <- c(out, paste0("\\trowd\\trkeep", if (header) "\\trhdr", "\\trql"), defs, pars, "{\\row}")
   }
   out
+}
+
+# Column widths of a TABULATE table [measured, cases tabulate_rtf]: the
+# same rule as PROC PRINT -- 125 + the widest cell of the column (data text
+# regular, headings and row titles bold, a heading by its widest word), +10
+# on the first column.  A cell over several columns that is wider than them
+# is not measured (fails loud).
+rtf_tabulate_widths <- function(cells, ncol, fail) {
+  cell_w <- function(cl) {
+    text <- paste(cl$text, collapse = " ")
+    switch(cl$align,
+      raw = rtf_text_width(text, bold = FALSE),
+      center = , box = rtf_heading_width(text),
+      rtf_text_width(text, bold = TRUE)
+    )
+  }
+  w <- rep(0, ncol)
+  wide <- list()
+  for (cl in cells) {
+    if (cl$c0 == cl$c1) w[cl$c0] <- max(w[cl$c0], cell_w(cl)) else wide <- c(wide, list(cl))
+  }
+  widths <- 125 + w + c(10, rep(0, ncol - 1L))
+  # a column heading over several data columns changes their widths in a way
+  # not measured yet (tabulate_rtf/p03: x and y 6 twips wider than the rule)
+  for (cl in wide) {
+    if (identical(cl$align, "center")) fail("a column heading over several columns")
+    if (cell_w(cl) + 125 > sum(widths[cl$c0:cl$c1])) fail("a row title over several columns that is wider than them")
+  }
+  widths
 }
 
 # Test hook: column widths given from outside (options(sasonr.rtf_widths =
