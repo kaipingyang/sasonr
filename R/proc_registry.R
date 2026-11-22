@@ -14,7 +14,10 @@ proc_registry <- list(
   tabulate = list(compute = function(d, spec) tabulate_compute(d, spec), templates = c(Table = "base.tabulate"),
                   proctitle = FALSE,
                   listing = function(tables, ls) tab_listing_tables(tables, ls),
-                  ods_output = function(tables, spec, line) tab_output_data(tables, spec, line))
+                  ods_output = function(tables, spec, line) tab_output_data(tables, spec, line)),
+  # one table per page (BY group); no procedure title
+  print = list(compute = function(d, spec) print_compute(d, spec), templates = c(Print = "base.print"),
+               proctitle = FALSE, listing = function(tables, ls) print_listing_tables(tables))
 )
 proc_registry_alias <- c(summary = "means")
 
@@ -45,7 +48,8 @@ sas_rt_proc <- function(name, d, spec) {
     rt$proc_notes <- c(rt$proc_notes, res$events)
   }
   reqs <- rt_diag()$ods_output
-  if (length(reqs) > 0) {
+  # PROC PRINT: the engine writes the WARNING of a pending request (run.R)
+  if (length(reqs) > 0 && !identical(tolower(name), "print")) {
     # ODS OUTPUT data sets (ods_output.R): PROC MEANS and PROC TABULATE
     if (is.null(e$ods_output) || !tolower(name) %in% c("means", "tabulate")) {
       abort_unsupported(paste0("ODS OUTPUT in a PROC ", toupper(name), " step"), spec$line)
@@ -67,7 +71,8 @@ sas_rt_proc <- function(name, d, spec) {
 
 listing_templates <- list(
   base.summary = function(tb, ls, ps) listing_base_summary(tb, ls),
-  base.tabulate = function(tb, ls, ps) as.character(tab_listing_tables(list(tb), ls))
+  base.tabulate = function(tb, ls, ps) as.character(tab_listing_tables(list(tb), ls)),
+  base.print = function(tb, ls, ps) listing_base_print(tb)
 )
 
 #' @noRd

@@ -171,6 +171,10 @@ parse_proc_step <- function(p) {
         opts$data <- parse_ds_ref(p, "input")
       } else if (opt == "out" && name == "sort") {
         opts$out <- parse_ds_ref(p, "output")
+      } else if (name == "print" && opt %in% c("obs", "split")) {
+        if (!tk_type(p) %in% c("str", "str_macro")) abort_unsupported(paste0("PROC PRINT option ", toupper(opt), "= without a quoted string"), oline)
+        opts[[opt]] <- tk_val(p)
+        advance(p)
       } else if (name == "print" && opt %in% c("width", "contents") ||
                  name == "sort" && opt %in% c("sortsize")) {
         advance(p)
@@ -181,7 +185,7 @@ parse_proc_step <- function(p) {
     }
     ok <- switch(name,
       sort = opt %in% c("nodupkey", "nodupkeys", "noduprecs", "noduprec", "nodup", "force", "tagsort", "threads", "nothreads", "equals", "overwrite"),
-      print = opt %in% c("noobs", "double", "uniform")
+      print = opt %in% c("noobs", "uniform", "n", "label")
     )
     if (!ok) {
       proc_option_error(name, p)
@@ -214,8 +218,19 @@ parse_proc_step <- function(p) {
       "sort by" = ,
       "print by" = {
         b <- parse_by(p)
-        if (name == "print") abort_unsupported("BY statement in PROC PRINT", sline)
+        if (name == "print" && any(b$descending)) abort_unsupported("BY DESCENDING in PROC PRINT", sline)
         b
+      },
+      "print id" = ,
+      "print sum" = ,
+      "print sumby" = {
+        kw <- low
+        advance(p)
+        items <- list()
+        while (tk_type(p) == "name") items <- c(items, list(parse_varlist_item(p)))
+        expect_semi(p, toupper(kw))
+        if (length(items) == 0) abort_syntax(paste(toupper(kw), "statement without variables"), sline)
+        list(stmt = kw, items = items, line = sline)
       },
       "sort where" = ,
       "print where" = parse_where(p),
@@ -224,6 +239,7 @@ parse_proc_step <- function(p) {
         advance(p)
         items <- list()
         while (tk_type(p) == "name") items <- c(items, list(parse_varlist_item(p)))
+        if (is_op(p, "/")) abort_unsupported("VAR statement options in PROC PRINT", sline)
         expect_semi(p, "VAR")
         list(stmt = "var", items = items, line = sline)
       },
@@ -329,35 +345,72 @@ translate_proc <- function(step, meta, last = NULL) {
     if (t == "num" && isTRUE(f$char)) abort_syntax(paste0("The character format ", f$text, " cannot be used with numeric variable ", toupper(v)), step$line)
     if (t == "char" && !isTRUE(f$char)) abort_syntax(paste0("The format $", toupper(f$name), " was not found or could not be loaded"), step$line)
   }
-  var_stmts <- Filter(function(s) s$stmt == "var", step$stmts)
-  pvars <- vars
-  if (length(var_stmts) > 0) {
-    pvars <- vctrs::list_unchop(lapply(var_stmts, function(s) {
+  resolve_stmts <- function(kw) {
+    ss <- Filter(function(s) s$stmt == kw, step$stmts)
+    if (length(ss) == 0) return(NULL)
+    out <- vctrs::list_unchop(lapply(ss, function(s) {
       tmp <- new_state(list())
       tmp$order <- vars
       tmp$info <- inp$st$info[vars]
       resolve_items(s$items, tmp, s$line, register = FALSE)
     }), ptype = character(), name_spec = rlang::zap())
-    miss <- setdiff(pvars, vars)
-    if (length(miss) > 0) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found"), var_stmts[[1]]$line)
+    miss <- setdiff(out, vars)
+    if (length(miss) > 0) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found"), ss[[1]]$line)
+    unique(out)
   }
-  if (length(var_stmts) > 0 && length(pvars) == 0) {
+  by_stmts <- Filter(function(s) s$stmt == "by", step$stmts)
+  if (length(by_stmts) > 1) abort_unsupported("more than one BY statement in PROC PRINT", by_stmts[[2]]$line)
+  by <- if (length(by_stmts) == 1) by_stmts[[1]]$vars else character()
+  miss <- setdiff(by, vars)
+  if (length(miss) > 0) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found"), by_stmts[[1]]$line)
+  ids <- resolve_stmts("id") %||% character()
+  sums <- resolve_stmts("sum") %||% character()
+  sumby <- resolve_stmts("sumby") %||% character()
+  pvars <- resolve_stmts("var")
+  has_var <- !is.null(pvars)
+  if (!has_var) pvars <- setdiff(vars, c(by, ids))
+  if (has_var && length(pvars) == 0) {
     return(list(code = paste(c(header, "# no variables to print"), collapse = "\n"), level = "PROC",
                 reasons = "PROC PRINT", line = step$line, outputs = character(), meta = list()))
   }
-  spec <- lapply(pvars, function(v) {
+  o <- step$options
+  # outside the measured rules: fail loud
+  if (length(intersect(ids, pvars)) > 0) abort_unsupported("a PROC PRINT ID variable that is also in the VAR list", step$line)
+  if (length(ids) > 1) abort_unsupported("more than one PROC PRINT ID variable", step$line)
+  if (length(intersect(ids, by)) > 0) abort_unsupported("a PROC PRINT ID variable that is also a BY variable", step$line)
+  if (length(sums) > 0) {
+    bad <- setdiff(sums, pvars)
+    if (length(bad) > 0) abort_unsupported(paste0("a PROC PRINT SUM variable that is not printed (", toupper(bad[1]), ")"), step$line)
+    if (any(vapply(sums, function(v) identical(inp$st$info[[v]]$type, "char"), TRUE))) abort_unsupported("SUM of a character variable in PROC PRINT", step$line)
+    if (length(by) > 1) abort_unsupported("PROC PRINT SUM with more than one BY variable", step$line)
+    if (isTRUE(o[["n"]])) abort_unsupported("PROC PRINT option N together with SUM", step$line)
+  }
+  if (length(sumby) > 0 && !(length(by) == 1 && identical(sumby, by) && length(sums) > 0)) {
+    abort_unsupported("PROC PRINT SUMBY other than the BY variable with SUM", step$line)
+  }
+  if (isTRUE(o[["uniform"]]) && length(by) > 0) abort_unsupported("PROC PRINT option UNIFORM with BY", step$line)
+  use_label <- isTRUE(o[["label"]]) || !is.null(o[["split"]])
+  col_spec <- function(v) {
     inf <- inp$st$info[[v]]
-    list(name = v, disp = inf$disp %||% v, char = identical(inf$type, "char"),
+    lab <- if (use_label && v %in% names(inp$st$labels)) inp$st$labels[[v]] else NULL
+    list(name = v, disp = inf$disp %||% v, label = lab, char = identical(inf$type, "char"),
          fmt = if (is.null(inp$st$formats[[v]])) NULL else inp$st$formats[[v]][c("name", "w", "d", "char", "text")])
-  })
+  }
+  info <- lapply(by, function(v) list(disp = inp$st$info[[v]]$disp %||% v, fmt = inp$st$formats[[v]]))
+  names(info) <- by
+  spec <- list(
+    line = step$line, data = inp$ds$name, cols = lapply(pvars, col_spec), id = if (length(ids)) col_spec(ids) else NULL,
+    noobs = isTRUE(o[["noobs"]]), obs_label = o[["obs"]] %||% "Obs", n = isTRUE(o[["n"]]), split = o[["split"]],
+    by = by, by_info = info, sums = sums
+  )
   # a data set without variables: "No variables in data set" (log_emit_reads()), no listing
   code <- c(
     header,
     paste0(".d <- ", proc_source_code(inp, obs_col = TRUE)),
-    if (length(vars) > 0) {
-      sprintf(".lst <- c(.lst, sas_print_listing(.d, %s, noobs = %s, titles = .titles))",
-              r_lit(spec), isTRUE(step$options[["noobs"]]))
-    }
+    if (length(vars) > 0) c(
+      paste0(".r <- sas_rt_proc(\"print\", .d, ", r_lit(spec), ")"),
+      ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))"
+    )
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC PRINT",
        line = step$line, outputs = character(), meta = list())
@@ -446,50 +499,6 @@ print_header_lines <- function(h, dw) {
     return(list(lines = c(substr(h, 1L, i), substr(h, i + 1L, n)), width = max(dw, min(m))))
   }
   sql_header_lines(h, max(dw, 8L))
-}
-
-#' Render a PROC PRINT listing
-#' @param d Data with an `.obs` column (physical observation numbers).
-#' @param spec List of columns: `name`, `disp`, `char`, `fmt`.
-#' @export
-#' @keywords internal
-sas_print_listing <- function(d, spec, noobs = FALSE, titles = character()) {
-  if (nrow(d) == 0) return(character())
-  cols <- list()
-  heads <- character()
-  right <- logical()
-  if (!noobs) {
-    cols <- list(as.character(d$.obs))
-    heads <- "Obs"
-    right <- TRUE
-  }
-  for (s in spec) {
-    x <- d[[s$name]]
-    txt <- if (s$char) {
-      if (is.null(s$fmt)) sas_rtrim(x) else sas_rtrim(sas_format(x, s$fmt))
-    } else if (is.null(s$fmt)) {
-      print_num_column(x)
-    } else {
-      trimws(sas_format(x, s$fmt))
-    }
-    cols <- c(cols, list(txt))
-    heads <- c(heads, s$disp)
-    right <- c(right, !s$char)
-  }
-  # headers wider than the data are split (see sql_header_lines())
-  hl <- lapply(seq_along(cols), function(k) {
-    dw <- max(nchar(cols[[k]]))
-    x <- print_header_lines(heads[k], dw)
-    x$width <- max(dw, nchar(x$lines))
-    x
-  })
-  widths <- vapply(hl, `[[`, 1L, "width")
-  nl <- max(vapply(hl, function(x) length(x$lines), 1L))
-  hrows <- lapply(seq_len(nl), function(j) vapply(hl, function(x) c(rep("", nl - length(x$lines)), x$lines)[j], ""))
-  pad <- function(x, w, r) formatC(x, width = if (r) w else -w)
-  row_text <- function(vals) sas_rtrim(paste(mapply(pad, vals, widths, right), collapse = "    "))
-  body <- vapply(seq_len(nrow(d)), function(i) row_text(vapply(cols, `[`, "", i)), "")
-  c(titles, "", vapply(hrows, row_text, ""), "", body)
 }
 
 # PROC FORMAT ------------------------------------------------------------------------

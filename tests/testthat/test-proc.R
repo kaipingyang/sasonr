@@ -123,8 +123,8 @@ proc print data=e; run;
 test_that("unsupported PROCs, options and statements fail loud", {
   d <- "data a; x = 1; run;"
   expect_error(sas_run(paste(d, "proc univariate data=a; run;")), class = "sasonr_unsupported")
-  expect_error(sas_run(paste(d, "proc print data=a; by x; run;")), class = "sasonr_unsupported")
-  expect_error(sas_run(paste(d, "proc print data=a label; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(d, "proc print data=a; by descending x; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(d, "proc print data=a double; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc sort data=a dupout=b; by x; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc sort data=a; by y; run;")), class = "sasonr_runtime_error")
   expect_error(sas_run(paste(d, "proc print data=a; where y > 1; run;")), class = "sasonr_runtime_error")

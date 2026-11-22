@@ -285,7 +285,6 @@ internal sas_num
 internal sas_obs_window
 internal sas_or
 internal sas_pow
-internal sas_print_listing
 internal sas_proc_contents
 internal sas_proc_freq
 internal sas_proc_store
