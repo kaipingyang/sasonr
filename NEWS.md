@@ -21,6 +21,9 @@ the development version provides.
   title) and the percentages COLPCTN, ROWPCTN, REPPCTN, PAGEPCTN, COLPCTSUM,
   ROWPCTSUM and `PCTN<var>` / `PCTSUM<var>` with class variables as the
   denominator. A table of several panels can now have a page dimension.
+* PROC TABULATE `OUT=` writes the same data set as `ODS OUTPUT Table=` (one
+  column builder for both); OUT= with BY, with data set options or with an
+  ODS OUTPUT request in the same step is an Unsupported error.
 * PROC TABULATE `ORDER=FREQ` puts tied levels in data order (the order of
   their first observation); ties under `ORDER=FREQ` with `DESCENDING` are an
   Unsupported error.

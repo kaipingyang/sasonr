@@ -108,3 +108,21 @@ test_that("layouts outside the measured scope fail loud", {
                  class = "sasonr_unsupported", info = b)
   }
 })
+
+test_that("OUT= writes the data set of ODS OUTPUT Table=", {
+  prog <- "data h; length g $1; input g $ v; datalines;
+a 1
+a 2
+b 3
+;
+run;
+proc tabulate data=h out=o; class g; var v; table g, v*(n sum); run;
+ods output table=t;
+proc tabulate data=h; class g; var v; table g, v*(n sum); run;"
+  withr::local_options(sasonr.step_notes = TRUE)
+  r <- sas_run(prog)
+  expect_identical(r$work$o, r$work$t)
+  notes <- grep("^NOTE", as.character(sas_log(r)), value = TRUE)
+  expect_identical(notes[2:3], c("NOTE: There were 3 observations read from the data set WORK.H.",
+                                 "NOTE: The data set WORK.O has 2 observations and 6 variables."))
+})

@@ -51,6 +51,10 @@ parse_proc_tabulate <- function(p, line) {
       advance(p, 2L)
       if (o == "data") {
         opts$data <- parse_ds_ref(p, "input")
+      } else if (o == "out") {
+        ref <- parse_ds_ref(p, "output")
+        if (length(ref$options)) tab_note(uns, "data set options on PROC TABULATE OUT=", oline)
+        opts$out <- ref$name
       } else if (o == "format") {
         if (!is_format_ahead(p)) tab_skip_value(p) else opts$format <- parse_format(p)
         if (is.null(opts$format)) tab_note(uns, "PROC TABULATE FORMAT= without a format", oline)

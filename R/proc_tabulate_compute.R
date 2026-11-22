@@ -93,7 +93,8 @@ tab_spec <- function(step, decl, irs, inp) {
   if (length(miss)) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found."), by_stmts[[1]]$line)
   if (length(intersect(by, c(decl$class, decl$vars)))) abort_unsupported("a PROC TABULATE BY variable that is also a CLASS or VAR variable", line)
   by_info <- proc_var_info(st, by)
-  list(line = line, data = inp$ds$name, class = cls, by = by, by_info = by_info, vars = decl$vars, info = info, irs = irs, format = o$format,
+  if (!is.null(o$out) && length(by)) abort_unsupported("PROC TABULATE OUT= with BY", line)
+  list(line = line, data = inp$ds$name, class = cls, by = by, by_info = by_info, out = o$out, vars = decl$vars, info = info, irs = irs, format = o$format,
        keylabel = keylabel, ds_order = intersect(st$order, decl$class),
        label_stmt = any(vapply(step$stmts, function(s) identical(s$stmt, "label"), logical(1))))
 }

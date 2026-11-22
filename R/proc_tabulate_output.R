@@ -21,6 +21,21 @@
 
 tab_output_stats <- c(n = "N", mean = "Mean", sum = "Sum", pctn = "PctN")
 
+# OUT= (D3): the data set of the same column builder as ODS OUTPUT Table
+# [measured: identical data sets, case tabulate_t2/p4_out].
+tab_compute_out <- function(d, sp) {
+  r <- tabulate_compute(d, sp)
+  if (!is.null(sp$out)) {
+    if (length(rt_diag()$ods_output)) abort_unsupported("PROC TABULATE OUT= with an ODS OUTPUT request pending", sp$line)
+    res <- tab_output_data(r$tables, sp, sp$line)
+    r$data[[sp$out]] <- res
+    # after the observations-read NOTE (an ODS OUTPUT data set comes before it)
+    r$events <- c(r$events, sprintf("NOTE: The data set WORK.%s has %d observations and %d variables.",
+                                    toupper(sp$out), nrow(res$data), ncol(res$data)))
+  }
+  r
+}
+
 tab_output_data <- function(tables, sp, line) {
   no <- function(what) abort_unsupported(paste("ODS OUTPUT of the TABULATE Table with", what), line)
   if (length(sp$irs) != 1L) no("more than one TABLE statement")
