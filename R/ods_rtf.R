@@ -16,8 +16,8 @@
 #   10 pt (\fs20); numbers and Obs right-aligned, character values left;
 #   SPLIT= line breaks as {\line};
 # - column width (twips): 125 plus the widest cell of the column, a cell's
-#   text width being the sum of its character advances (regular 10 pt:
-#   num / 2048; bold 11 pt: k / 2048 * 220, rounded once); a heading wraps at
+#   text width being the sum of its character advances in 1/2048 twips
+#   (regular 10 pt and bold 11 pt tables, rounded once); a heading wraps at
 #   blanks, so its widest word counts; the first column adds 10.
 # Characters without a measured advance fail loud.
 
@@ -37,13 +37,13 @@ rtf_text_width <- function(s, bold) {
   if (!nzchar(s)) return(0)
   w <- rtf_char_widths()
   ch <- strsplit(s, "", fixed = TRUE)[[1]]
-  v <- if (bold) w$bold_k[match(ch, w$char)] else w$regular_num[match(ch, w$char)]
+  v <- if (bold) w$bold_num[match(ch, w$char)] else w$regular_num[match(ch, w$char)]
   if (anyNA(v)) {
     bad <- unique(ch[is.na(v)])
     abort_unsupported(paste0("the ODS RTF width of the character", if (length(bad) > 1) "s", " '",
                              paste(bad, collapse = "', '"), "' in ", if (bold) "bold" else "regular", " text"))
   }
-  if (bold) round(sum(v) / 2048 * 220) else round(sum(v) / 2048)
+  round(sum(v) / 2048)
 }
 
 rtf_heading_width <- function(lines) {
@@ -122,8 +122,7 @@ rtf_print_table <- function(tb) {
     }
   }
   nr <- length(a$text[[1]]$values)
-  # outside the measured rule: a column whose width a bold digit sets (the
-  # bold advances of digits are not exact yet), and the N line
+  # outside the measured rule: the N line (it widens a column)
   if (!is.null(a$n)) abort_unsupported("the ODS RTF output of PROC PRINT with the option N")
   widths <- vapply(seq_len(nc), function(j) {
     data_bold <- role[j]
@@ -133,10 +132,6 @@ rtf_print_table <- function(tb) {
     sums_j <- vapply(sum_rows, function(r) r[j], "")
     sw <- vapply(sums_j, rtf_text_width, 0, bold = TRUE)
     w <- max(hw, vw, sw, 0)
-    bold_digits <- c(if (data_bold) vals[vw == w], sums_j[sw == w])
-    if (w > hw && any(grepl("[0-9]", bold_digits))) {
-      abort_unsupported("an ODS RTF column whose width a bold number sets")
-    }
     125 + w + if (j == 1L) 10 else 0
   }, 0)
   xs <- cumsum(widths)
