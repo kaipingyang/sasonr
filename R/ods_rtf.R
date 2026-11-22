@@ -181,14 +181,14 @@ rtf_write_document <- function(outputs, file) {
     if (length(o$titles) || length(o$footnotes)) abort_unsupported("TITLE or FOOTNOTE lines in an ODS RTF document")
     for (tb in o$tables) {
       tpl <- attr(tb, "template", exact = TRUE)
-      if (!identical(tpl, "base.print")) abort_unsupported(paste0("the ODS RTF output of PROC ", toupper(o$proc)))
+      if (!tpl %in% c("base.print", "base.tabulate")) abort_unsupported(paste0("the ODS RTF output of PROC ", toupper(o$proc)))
       by <- attr(tb, "by", exact = TRUE)
       if (k > 0L) body <- c(body, "\\pard\\par\\par")
       if (!is.null(by)) {
         body <- c(body, paste0("\\plain\\pard\\keepn\\chcbpat8\\i0\\b\\sb0\\sa0\\ql\\f1\\fs22\\cf1{", rtf_escape(by$text), "}"),
                   "{\\par}", "\\par")
       }
-      body <- c(body, rtf_print_table(tb))
+      body <- c(body, if (identical(tpl, "base.tabulate")) rtf_tabulate_table(tb, rtf_widths_override(tb)) else rtf_print_table(tb))
       k <- k + 1L
     }
   }
@@ -198,4 +198,87 @@ rtf_write_document <- function(outputs, file) {
   on.exit(close(con))
   writeLines(doc, con, useBytes = TRUE)
   invisible(file)
+}
+
+# The rows of one PROC TABULATE table (template base.tabulate), from the
+# logical grid the listing and the HTML view share (tab_grid()): a cell over
+# several leaf columns is one RTF cell whose \cellx is the right edge of its
+# last column; a cell over several grid rows is \clvmgf on its first row and
+# \clvmrg on the others [measured, cases tabulate_rtf].  Heading cells are
+# centred (the corner cell vertically centred), row titles left and top,
+# data right and bottom; a row has \keepn when it is a heading row, starts a
+# vertical merge that goes on in the next row, or is the second-to-last row.
+# The width of the data columns is not measured yet (fails loud).
+rtf_tabulate_table <- function(tb, widths = NULL) {
+  fail <- function(what) abort_unsupported(paste0("the PROC TABULATE ODS RTF output of ", what))
+  g <- tab_grid_parts(tb, fail)
+  if (any(g$head_at != 1L)) fail("a class-variable heading row inside the row dimension")
+  if (!is.null(attr(tb, "page", exact = TRUE))) fail("a page dimension")
+  if (!is.null(attr(tb, "by", exact = TRUE))) fail("BY groups")
+  if (!is.null(g$box)) fail("a BOX= text")
+  fmts <- attr(tb, "formats", exact = TRUE)
+  cstat <- attr(tb, "cell_stats", exact = TRUE)
+  fsrc <- attr(tb, "format_source", exact = TRUE)
+  misstext <- attr(tb, "misstext", exact = TRUE) %||% "."
+  data_text <- function(j, i) {
+    v <- tb[[g$scols[j]]][i]
+    if (is.na(v)) return(misstext)
+    trimws(sas_format(v, tab_html_format(fmts[[j]][[i]], cstat[[j]][i], fsrc[[j]][i], fail)))
+  }
+  cells <- tab_grid(g, seq_along(g$scols), data_text, "")
+  ncol <- g$k + length(g$scols)
+  nrow <- g$nrow
+  if (is.null(widths)) fail("the data columns (their width rule is not measured yet)")
+  xs <- cumsum(widths)
+  cover <- function(r, c) {
+    for (cl in cells) if (cl$r0 <= r && r <= cl$r1 && cl$c0 <= c && c <= cl$c1) return(cl)
+    NULL
+  }
+  keepn_row <- vapply(seq_len(nrow), function(r) {
+    r <= g$nh || r == nrow - 1L || any(vapply(cells, function(cl) cl$r0 == r && cl$r1 > r && cl$r0 > g$nh, logical(1)))
+  }, TRUE)
+  out <- character()
+  for (r in seq_len(nrow)) {
+    header <- r <= g$nh
+    defs <- character()
+    pars <- character()
+    c <- 1L
+    while (c <= ncol) {
+      cl <- cover(r, c)
+      if (is.null(cl)) fail("a grid position without a cell")
+      kind <- cl$align
+      start <- cl$r0 == r
+      merge <- if (cl$r1 > cl$r0) (if (start) "\\clvmgf" else "\\clvmrg") else ""
+      is_head <- kind %in% c("center", "box")
+      valign <- if (identical(kind, "box")) "c" else if (identical(kind, "left")) "t" else "b"
+      bg <- if (identical(kind, "raw")) 8 else 17
+      defs <- c(defs, paste0(
+        if (cl$r0 == 1L) "\\clbrdrt\\brdrs\\brdrw15\\brdrcf1",
+        "\\clbrdrb\\brdrs\\brdrw", if (cl$r1 == nrow) 15 else 5, "\\brdrcf1",
+        "\\clbrdrl\\brdrs\\brdrw", if (cl$c0 == 1L) 15 else 5, "\\brdrcf1",
+        if (cl$c1 == ncol) "\\clbrdrr\\brdrs\\brdrw15\\brdrcf1",
+        merge, "\\cltxlrtb\\clvertal", valign, "\\clcbpat", bg, "\\clpadt60\\clpadft3\\clpadr60\\clpadfr3\\cellx", xs[cl$c1]))
+      if (!start) {
+        pars <- c(pars, paste0("\\pard\\plain\\intbl", if (keepn_row[r]) "\\keepn", "{\\cell}"))
+      } else {
+        text <- rtf_escape(paste(cl$text, collapse = " "))
+        bold <- !identical(kind, "raw")
+        align <- if (is_head) "c" else if (identical(kind, "left")) "l" else "r"
+        pars <- c(pars, rtf_cell_par(text, keepn_row[r], bold, align))
+      }
+      c <- cl$c1 + 1L
+    }
+    out <- c(out, paste0("\\trowd\\trkeep", if (header) "\\trhdr", "\\trql"), defs, pars, "{\\row}")
+  }
+  out
+}
+
+# Test hook: column widths given from outside (options(sasonr.rtf_widths =
+# list(<widths>, ...)), one vector per table in order); NULL otherwise.
+rtf_widths_override <- function(tb) {
+  w <- getOption("sasonr.rtf_widths")
+  if (is.null(w)) return(NULL)
+  k <- getOption("sasonr.rtf_widths_k", 0L) + 1L
+  options(sasonr.rtf_widths_k = k)
+  w[[k]]
 }
