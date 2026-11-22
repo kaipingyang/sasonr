@@ -179,6 +179,46 @@ sas_log(res_out, echo = FALSE)
 res_out$work$stats
 ```
 
+## Procedures on data frames
+
+`sas_means_df()`, `sas_tabulate_df()` and `sas_transpose_df()` run one
+procedure on a data frame without a program. They read their arguments
+with the same parser and specification builder as the PROC step of a
+program and call the same computation, so the table is the one the program
+gives. `as.data.frame()` drops the table attributes; `sas_log()` gives the
+WARNINGs and NOTEs of the computation and `sas_html()` the HTML document.
+
+```{r}
+d <- data.frame(arm = c("A", "A", "B", "B"), aval = c(10.2, 11.8, 10.9, 10.4))
+m <- sas_means_df(d, var = "aval", class = "arm", stats = c("n", "mean"))
+as.data.frame(m)
+as.data.frame(sas_tabulate_df(d, "arm all, aval*(n mean)", class = "arm", var = "aval"))
+```
+
+## The RTF document
+
+`ODS RTF FILE="path";` opens the RTF destination; the PROC PRINT and PROC
+TABULATE tables of the steps that follow go into the document, which is
+written at `ODS RTF CLOSE;`. The document follows the default RTF style: a
+heading row repeated on every page, row titles and headings in bold, merged
+row titles, BY lines, and the column widths of that style.
+
+```{r, eval = FALSE}
+sas_run("
+data trial;
+  input arm $ aval;
+  datalines;
+A 10
+B 11
+;
+run;
+ods rtf file=\"trial.rtf\";
+proc print data=trial;
+run;
+ods rtf close;
+")
+```
+
 ## What fails loud
 
 sasonr stops with a `sasonr_unsupported` condition, naming the SAS line,
