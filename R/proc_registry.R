@@ -64,7 +64,8 @@ sas_rt_proc <- function(name, d, spec) {
   } else {
     e$listing(res$tables, rt_linesize())
   }
-  list(listing = as.character(listing), out = res$data, tables = res$tables, pages = attr(listing, "pages", exact = TRUE))
+  list(listing = as.character(listing), out = res$data, tables = res$tables, pages = attr(listing, "pages", exact = TRUE),
+       groups = attr(listing, "groups", exact = TRUE))
 }
 
 # Listing renderers ---------------------------------------------------------------

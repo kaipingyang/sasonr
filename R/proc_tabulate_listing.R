@@ -38,15 +38,40 @@ tab_page_break <- c("", "", "")
 tab_listing_tables <- function(tables, ls) {
   out <- character()
   pages <- 0L
+  # BY groups: the BY line and a blank line above the first page of a group;
+  # `groups` gives the line of each BY line, its values and the number of
+  # pages of the group (sas_tab_titles() puts the titles above it)
+  groups <- list()
+  group <- NULL
   for (tb in tables) {
+    by <- attr(tb, "by", exact = TRUE)
     panels <- listing_base_tabulate(tb, ls)
     for (k in seq_along(panels)) {
       if (pages > 0L) out <- c(out, tab_page_break)
+      if (k == 1L && !is.null(by) && !identical(by$group, group)) {
+        groups[[length(groups) + 1L]] <- list(at = length(out) + 1L, values = by$values, info = by$info, pages = 0L)
+        out <- c(out, by$text, "")
+        group <- by$group
+      }
+      if (length(groups)) groups[[length(groups)]]$pages <- groups[[length(groups)]]$pages + 1L
       out <- c(out, panels[[k]], if (k < length(panels)) c("", "(Continued)"))
       pages <- pages + 1L
     }
   }
-  structure(out, pages = pages)
+  structure(out, pages = pages, groups = if (length(groups)) groups)
+}
+
+# #BYVAL(var) in a title: the formatted BY value of the group; other #BY
+# references are not measured.
+tab_byval_title <- function(titles, values, info) {
+  vapply(titles, function(t) {
+    for (v in names(values)) {
+      pat <- paste0("#byval\\(", v, "\\)")
+      t <- gsub(pat, proc_value_text(values[[v]], info[[v]] %||% list()), t, ignore.case = TRUE)
+    }
+    if (grepl("#by", t, ignore.case = TRUE)) abort_unsupported("a #BY reference other than #BYVAL(variable) in a title")
+    t
+  }, "", USE.NAMES = FALSE)
 }
 
 #' TITLE lines above the listing of a PROC TABULATE step
@@ -58,6 +83,22 @@ tab_listing_tables <- function(tables, ls) {
 #' @export
 #' @keywords internal
 sas_tab_titles <- function(titles, r) {
+  groups <- r$groups
+  if (!is.null(groups)) {
+    if (length(titles) == 0L) return(as.character(r$listing))
+
+    if (any(vapply(groups, `[[`, 1L, "pages") > 1L)) {
+      abort_unsupported("TITLE lines above a PROC TABULATE BY group of more than one page")
+    }
+    lst <- as.character(r$listing)
+    out <- character()
+    from <- 1L
+    for (g in groups) {
+      out <- c(out, lst[seq_len(g$at - 1L)[seq_len(g$at - 1L) >= from]], tab_byval_title(titles, g$values, g$info), "")
+      from <- g$at
+    }
+    return(c(out, lst[from:length(lst)]))
+  }
   if (length(titles) > 0L && isTRUE(r$pages > 1L)) {
     abort_unsupported("TITLE lines above a PROC TABULATE output of more than one page")
   }
@@ -127,7 +168,6 @@ listing_base_tabulate <- function(tb, ls, ps = NULL) {
   if (length(panels) > 1L) {
     if (!has_rows) fail("several panels of a table without a row dimension")
     if (!is.null(box)) fail("several panels with a BOX= text")
-    if (!is.null(page)) fail("several panels with a page dimension")
   }
 
   lapply(panels, function(pj) {

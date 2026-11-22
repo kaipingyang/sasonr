@@ -48,9 +48,13 @@
 # row matches both.
 
 tab_stat_canon <- c(n = "n", nmiss = "nmiss", sum = "sum", mean = "mean", std = "std", stddev = "std", min = "min",
-                    max = "max", range = "range", median = "median", p50 = "p50", pctn = "n", pctsum = "sum")
+                    max = "max", range = "range", median = "median", p50 = "p50", pctn = "n", pctsum = "sum",
+                    colpctn = "n", rowpctn = "n", reppctn = "n", pagepctn = "n",
+                    colpctsum = "sum", rowpctsum = "sum", reppctsum = "sum", pagepctsum = "sum")
 tab_stat_heading <- c(n = "N", nmiss = "NMiss", sum = "Sum", mean = "Mean", std = "Std", min = "Min", max = "Max",
-                      range = "Range", median = "Median", p50 = "P50", pctn = "PctN", pctsum = "PctSum")
+                      range = "Range", median = "Median", p50 = "P50", pctn = "PctN", pctsum = "PctSum",
+                      colpctn = "ColPctN", rowpctn = "RowPctN", reppctn = "RepPctN", pagepctn = "PagePctN",
+                      colpctsum = "ColPctSum", rowpctsum = "RowPctSum", reppctsum = "RepPctSum", pagepctsum = "PagePctSum")
 tab_default_format <- list(name = "", w = 12L, d = 2L, char = FALSE, text = "12.2")
 
 # Specification ---------------------------------------------------------------
@@ -82,14 +86,43 @@ tab_spec <- function(step, decl, irs, inp) {
     }
   }
   if (!is.null(o$format) && isTRUE(o$format$char)) abort_unsupported("PROC TABULATE FORMAT= with a character format", line)
-  list(line = line, data = inp$ds$name, class = cls, vars = decl$vars, info = info, irs = irs, format = o$format,
+  by_stmts <- Filter(function(s) identical(s$stmt, "by"), step$stmts)
+  if (length(by_stmts) > 1L) abort_unsupported("more than one BY statement in PROC TABULATE", line)
+  by <- if (length(by_stmts)) by_stmts[[1]]$vars else character()
+  miss <- setdiff(by, st$order)
+  if (length(miss)) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found."), by_stmts[[1]]$line)
+  if (length(intersect(by, c(decl$class, decl$vars)))) abort_unsupported("a PROC TABULATE BY variable that is also a CLASS or VAR variable", line)
+  by_info <- proc_var_info(st, by)
+  list(line = line, data = inp$ds$name, class = cls, by = by, by_info = by_info, vars = decl$vars, info = info, irs = irs, format = o$format,
        keylabel = keylabel, ds_order = intersect(st$order, decl$class),
        label_stmt = any(vapply(step$stmts, function(s) identical(s$stmt, "label"), logical(1))))
 }
 
 # Computation -------------------------------------------------------------------
 
+# BY groups (sorted data, proc_by_groups()): each group is computed on its
+# own rows (PCTN/PCTSUM per group) and its tables carry the BY line; each BY
+# group starts a page under the titles [measured, case tabulate_t2/p1_by].
 tabulate_compute <- function(d, sp) {
+  if (!length(sp$by)) return(tab_compute_rows(d, sp))
+  groups <- proc_by_groups(d, sp$by, rep(FALSE, length(sp$by)), sp$data, sp$by_info)
+  tables <- list()
+  events <- character()
+  for (k in seq_along(groups)) {
+    g <- groups[[k]]
+    r <- tab_compute_rows(d[g, , drop = FALSE], sp)
+    by <- list(values = lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
+               text = proc_by_line(d, g[1], sp$by, sp$by_info), group = k, info = sp$by_info)
+    tables <- c(tables, lapply(r$tables, function(t) {
+      attr(t, "by") <- by
+      t
+    }))
+    if (length(r$events)) abort_unsupported("a PROC TABULATE WARNING inside a BY group", sp$line)
+  }
+  list(tables = tables, data = list(), events = events)
+}
+
+tab_compute_rows <- function(d, sp) {
   line <- sp$line
   events <- character()
   n0 <- nrow(d)
@@ -300,7 +333,8 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
         src[i] <- if (!is.null(tab_path_format(cp$elems)) || !is.null(tab_path_format(rp$elems))) "f"
                   else if (!is.null(sp$format)) "proc" else "default"
         st[i] <- tab_cell_stat(elems)
-        vals[i] <- tab_cell_value(elems, rows, stats_of, pct_denom, line)
+        den_rows <- function(stat, denom) tab_denom_rows(stat, denom, pg, rp, cp, elems, all_rows, lv, line)
+        vals[i] <- tab_cell_value(elems, rows, stats_of, pct_denom, line, den_rows)
         cells[[length(cells) + 1L]] <- list(row = i, col = j, key = tab_cell_key(elems), var = tab_path_var(elems),
                                             stat = st[i], n = length(rows), value = vals[i])
       }
@@ -360,6 +394,12 @@ tab_cell_stat <- function(elems) {
   stat %||% (if (is.null(tab_path_var(elems))) "n" else "sum")
 }
 
+tab_cell_denom <- function(elems) {
+  den <- NULL
+  for (e in elems) if (identical(e$node$kind, "stat")) den <- e$node$denom
+  den
+}
+
 tab_path_var <- function(elems) {
   for (e in elems) if (identical(e$node$kind, "var")) return(e$node$name)
   NULL
@@ -367,10 +407,54 @@ tab_path_var <- function(elems) {
 
 # The value of one cell: `elems` the elements of its page, row and column
 # paths, `rows` the matching rows.  NA is an empty cell.
-tab_cell_value <- function(elems, rows, stats_of, pct_denom, line) {
+# The rows of the denominator of a percentage [measured, case tabulate_t2/p3]:
+# COLPCTN/COLPCTSUM the page and column classes of the cell, ROWPCTN/ROWPCTSUM
+# the page and row classes, PAGEPCTN/PAGEPCTSUM the page, REPPCTN/REPPCTSUM
+# every row of the table (all pages); PCTN<vars>/PCTSUM<vars> the class levels
+# of the cell without those variables.
+tab_denom_rows <- function(stat, denom, pg, rp, cp, elems, all_rows, lv, line) {
+  if (!is.null(denom)) {
+    vars <- tab_denom_vars(denom, line)
+    keep <- Filter(function(e) identical(e$node$kind, "class") && !e$node$name %in% vars, elems)
+    rows <- all_rows
+    for (e in keep) rows <- intersect(rows, which(lv[[e$node$name]]$idx == e$level))
+    return(rows)
+  }
+  switch(sub("(pctn|pctsum)$", "", stat),
+    col = intersect(pg$rows, cp$rows),
+    row = intersect(pg$rows, rp$rows),
+    page = pg$rows,
+    rep = all_rows
+  )
+}
+
+# The variables of a <denominator>: one or more class variable names.
+tab_denom_vars <- function(denom, line) {
+  bad <- function() abort_unsupported("a PCTN or PCTSUM denominator other than a list of class variables", line)
+  if (!identical(denom$node, "concat")) bad()
+  vapply(denom$items, function(it) {
+    if (!identical(it$node, "cross") || length(it$items) != 1L) bad()
+    el <- it$items[[1]]
+    if (!identical(el$node, "elem") || length(el$denom)) bad()
+    el$name
+  }, "")
+}
+
+tab_cell_value <- function(elems, rows, stats_of, pct_denom, line, den_rows = NULL) {
   v <- tab_path_var(elems)
   stat <- tab_cell_stat(elems)
   if (!length(rows)) return(NA_real_)
+  denom <- tab_cell_denom(elems)
+  if (!is.null(denom) || stat %in% tab_stats_pct_denom) {
+    if (is.null(v)) abort_unsupported(paste0("PROC TABULATE ", toupper(stat), " without an analysis variable"), line)
+    what <- tab_stat_canon[[stat]]
+    s <- stats_of(v, rows, unique(c("n", what)))
+    if (what == "sum" && s[["n"]] == 0) return(NA_real_)
+    dr <- den_rows(stat, denom)
+    t <- if (length(dr)) stats_of(v, dr, unique(c("n", what)))[[what]] else NA_real_
+    if (is.na(t) || t == 0) return(NA_real_)
+    return(s[[what]] / t * 100)
+  }
   if (is.null(v)) {
     if (stat != "n") abort_unsupported(paste0("PROC TABULATE ", toupper(stat), " without an analysis variable"), line)
     return(as.numeric(length(rows)))

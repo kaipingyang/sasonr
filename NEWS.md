@@ -16,6 +16,11 @@ the development version provides.
   (`DOUBLE` was accepted and ignored before).
 * The ODS table class is now `sasonr_ods_table`, like the other classes of
   the package.
+* PROC TABULATE supports the BY statement (each BY group on its own page
+  under the titles and its BY line, percentages per group, `#BYVAL(var)` in a
+  title) and the percentages COLPCTN, ROWPCTN, REPPCTN, PAGEPCTN, COLPCTSUM,
+  ROWPCTSUM and `PCTN<var>` / `PCTSUM<var>` with class variables as the
+  denominator. A table of several panels can now have a page dimension.
 * PROC TABULATE `ORDER=FREQ` puts tied levels in data order (the order of
   their first observation); ties under `ORDER=FREQ` with `DESCENDING` are an
   Unsupported error.

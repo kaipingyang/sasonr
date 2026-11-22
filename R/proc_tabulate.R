@@ -87,6 +87,11 @@ parse_proc_tabulate <- function(p, line) {
       tables = parse_tabulate_table(p, uns),
       keylabel = parse_tabulate_keylabel(p, uns),
       where = parse_where(p),
+      by = {
+        b <- parse_by(p)
+        if (any(b$descending)) tab_note(uns, "BY DESCENDING in PROC TABULATE", sline)
+        b
+      },
       format = parse_format_stmt(p),
       label = parse_label(p),
       {
@@ -504,11 +509,12 @@ tab_ir_unsupported <- function(ir) {
       if (!is.null(n$denom)) out <- c(out, list(list(msg = "a denominator after a TABLE element that is not PCTN or PCTSUM", line = n$line)))
       next
     }
-    if (!is.null(n$denom)) {
+    if (!is.null(n$denom) && !n$name %in% c("pctn", "pctsum")) {
       out <- c(out, list(list(msg = paste0("a ", toupper(n$name), " denominator in a TABLE statement"), line = n$line)))
-    } else if (n$name %in% tab_stats_pct_denom) {
+    } else if (n$name %in% c("reppctsum", "pagepctsum")) {
+      # not in the measured cases
       out <- c(out, list(list(msg = paste0("PROC TABULATE statistic ", toupper(n$name)), line = n$line)))
-    } else if (!n$name %in% tab_stats_supported) {
+    } else if (!n$name %in% c(tab_stats_supported, tab_stats_pct_denom)) {
       out <- c(out, list(list(msg = paste0("PROC TABULATE statistic ", toupper(n$name)), line = n$line)))
     }
   }

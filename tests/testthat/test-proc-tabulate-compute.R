@@ -269,3 +269,35 @@ test_that("sas_check() has no finding for a step inside the checked scope", {
   chk <- sas_check(paste(have, "proc tabulate data=have; class grp sub; var v; table sub, grp all, v*(n pctn); run;"))
   expect_identical(nrow(chk), 0L)
 })
+
+test_that("BY groups are computed on their own rows", {
+  d <- "data t; length g $1 s $1; input s $ g $ v; datalines;
+x a 1
+x a 2
+x b 3
+y a 4
+;
+run;"
+  r <- tab_compute(d, "proc tabulate data=t; by s; class g; var v; table g, v*(n pctn); run;")
+  expect_length(r$tables, 2L)
+  expect_identical(attr(r$tables[[1]], "by")$text, "s=x")
+  expect_equal(unname(cells(r$tables[[1]])[, 2]), c(200 / 3, 100 / 3))
+  expect_equal(unname(cells(r$tables[[2]])[, 2]), 100)
+})
+
+test_that("COLPCTN, ROWPCTN, PAGEPCTN, REPPCTN and PCTN<var> take their own denominators", {
+  d <- "data t; length g $1 s $1; input s $ g $ v; datalines;
+x a 1
+x b 2
+y a 3
+y a 4
+;
+run;"
+  r <- tab_compute(d, "proc tabulate data=t; class g s; var v; table g, s*v*(colpctn rowpctn reppctn); run;")
+  m <- cells(r$tables[[1]])
+  # rows a, b; columns x: ColPctN RowPctN RepPctN, y: the same
+  expect_equal(unname(m[1, ]), c(50, 100 / 3, 25, 100, 200 / 3, 50))
+  expect_equal(unname(m[2, ]), c(50, 100, 25, NA, NA, NA))
+  r <- tab_compute(d, "proc tabulate data=t; class g s; var v; table s*g, v*pctn<g>; run;")
+  expect_equal(unname(cells(r$tables[[1]])[, 1]), c(50, 50, 100))
+})
