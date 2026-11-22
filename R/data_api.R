@@ -7,7 +7,7 @@
 data_api_names <- function(x, what) {
   if (is.null(x)) return(character())
   if (!is.character(x) || anyNA(x) || !all(grepl("^[A-Za-z_][A-Za-z0-9_]{0,31}$", x))) {
-    rlang::abort(paste0("`", what, "` must be SAS variable names."), class = "sasonr_error")
+    rlang::abort(paste0("`", what, "` must be variable names."), class = "sasonr_error")
   }
   x
 }
@@ -78,7 +78,7 @@ sas_means_df <- function(data, var = NULL, class = NULL, by = NULL, stats = NULL
 #' @rdname sas_data_procs
 #' @export
 sas_tabulate_df <- function(data, table, class = NULL, var = NULL, by = NULL, options = "") {
-  if (!rlang::is_string(table)) rlang::abort("`table` must be one TABLE statement as SAS text.", class = "sasonr_error")
+  if (!rlang::is_string(table)) rlang::abort("`table` must be the text of one TABLE statement.", class = "sasonr_error")
   body <- paste0(data_api_stmt("class", data_api_names(class, "class")), data_api_stmt("by", data_api_names(by, "by")),
                  data_api_stmt("var", data_api_names(var, "var")), "  table ", table, ";\n")
   data_api_tables(data_api_run(data, "tabulate", options, body))

@@ -28,10 +28,11 @@ tab_compute_out <- function(d, sp) {
   if (!is.null(sp$out)) {
     if (length(rt_diag()$ods_output)) abort_unsupported("PROC TABULATE OUT= with an ODS OUTPUT request pending", sp$line)
     res <- tab_output_data(r$tables, sp, sp$line)
-    r$data[[sp$out]] <- res
-    # after the observations-read NOTE (an ODS OUTPUT data set comes before it)
-    r$events <- c(r$events, sprintf("NOTE: The data set WORK.%s has %d observations and %d variables.",
-                                    toupper(sp$out), nrow(res$data), ncol(res$data)))
+    # the data set NOTE goes after the observations-read NOTE (an ODS OUTPUT
+    # data set comes before it)
+    return(list(tables = r$tables, data = c(r$data, stats::setNames(list(res), sp$out)),
+                events = c(r$events, sprintf("NOTE: The data set WORK.%s has %d observations and %d variables.",
+                                             toupper(sp$out), nrow(res$data), ncol(res$data)))))
   }
   r
 }
