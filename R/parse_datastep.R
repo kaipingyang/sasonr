@@ -932,8 +932,10 @@ parse_put <- function(p) {
         kind <- "named"
         advance(p)
       }
+      fmt_col <- tk_col(p)
+      fmt_text <- if (is_format_ahead(p)) tk_val(p) else NULL
       fmt <- if (is_format_ahead(p)) parse_format(p) else NULL
-      items <- c(items, list(list(kind = kind, name = name, text = text, fmt = fmt)))
+      items <- c(items, list(list(kind = kind, name = name, text = text, fmt = fmt, fmt_col = fmt_col)))
       next
     }
     if (is_op(p, "/")) {

@@ -853,6 +853,24 @@ an_stmt <- function(s, st) {
             !is.null(user_fmt(f$name, TRUE)) && is.null(user_fmt(f$name, FALSE))) {
           abort_syntax(sprintf("The format %s was not found or could not be loaded. (ERROR 48-59)", toupper(f$name)), line)
         }
+        # a SAS character format on a numeric variable: the WARNING, then
+        # ERROR 48-59 under the format when no numeric format has that name
+        # ($QUOTE., $CHAR.); $w. writes the value with w. [measured, cases
+        # syntax_ignored/c1-c3]
+        if (isTRUE(f$char) && identical(st$info[[it$name]]$type, "num") && is.null(user_fmt(f$name %||% "", TRUE))) {
+          warn <- sprintf("WARNING: Variable %s has already been defined as numeric.", st$info[[it$name]]$disp %||% it$name)
+          if (nzchar(f$name %||% "") && !isTRUE(st$extra_args)) {
+            if (!f$name %in% c("quote", "char")) abort_unsupported(paste0("the character format ", f$text, " on a numeric variable"), line)
+            rlang::abort(sprintf("Syntax error: The format %s was not found or could not be loaded. (ERROR 48-59) (SAS line %d)", toupper(f$name), line),
+                         class = c("sasonr_syntax_error", "sasonr_error"), sas_line = line, sas_col = it$fmt_col,
+                         sas_token = f$text, sas_before = warn, sas_wrap = TRUE)
+          }
+          if (!nzchar(f$name %||% "")) {
+            ct <- ct_diag()
+            ct$notes <- c(ct$notes, warn)
+            it$fmt <- list(name = "", w = f$w, d = NA_integer_, char = FALSE, text = paste0(f$w, "."))
+          }
+        }
         check_format(it$fmt, line)
         it
       })
