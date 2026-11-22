@@ -548,7 +548,7 @@ translate_proc_freq <- function(step, meta, last) {
   code <- c(
     header,
     paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_proc_freq(.d, ", r_lit(spec), ")"),
+    paste0(".r <- sas_rt_freq(.d, ", r_lit(spec), ")"),
     ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
@@ -626,7 +626,7 @@ freq_stat_num <- function(v) {
 #' @param sp Specification built by the translator.
 #' @export
 #' @keywords internal
-sas_proc_freq <- function(d, sp) {
+sas_rt_freq <- function(d, sp) {
   info <- sp$info
   groups <- if (!is.null(sp$by)) proc_by_groups(d, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(d)))
   lst <- character()

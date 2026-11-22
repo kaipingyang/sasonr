@@ -79,8 +79,8 @@ characters wrap by characters; the timing NOTEs of SAS are not written.
 When the echo cannot be shown exactly, the echo of that submission is left
 out and the log starts with a NOTE that says why; the run itself goes on:
 a numbered ERROR on a line with a macro reference (a macro variable, call,
-statement or comment), a compile-time ERROR on a line that \verb{OPTIONS NOSOURCE} hides, \verb{OPTIONS SOURCE} / \verb{NOSOURCE} with more text on its line,
-a numbered WARNING. For now a NOTE place (\verb{(Line):(Column)}, \verb{at line N column M}) on a line with a macro reference fails loud.
+statement or comment), a compile-time ERROR on a line that \verb{OPTIONS NOSOURCE} hides, \verb{OPTIONS SOURCE} / \code{NOSOURCE} with more text on its line,
+a numbered WARNING. For now a NOTE place (\code{(Line):(Column)}, \verb{at line N column M}) on a line with a macro reference fails loud.
 
 \code{compact = TRUE} is a narrower layout of the echo for display: the line
 number takes as many columns as the largest line number of the view needs,

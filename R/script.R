@@ -278,7 +278,7 @@ script_node <- function(nd, mode) {
     return(node)
   }
   name <- nd$name %||% ""
-  if (identical(nd$type, "proc") && name %in% c("sort", "means")) {
+  if (identical(nd$type, "proc") && name %in% c("sort", "means", "freq", "transpose")) {
     st <- script_stmts(stext)
     head <- st[[1]]
     opts <- sub("^[[:alnum:]_]+[[:space:]]*", "", head$rest)
@@ -628,7 +628,8 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #'   gives the variable attributes of the output data sets and the log. When
 #'   vectorised code meets a data error the step is run again row by row from
 #'   its SAS text, as in [sas_run()].
-#' * `sas_proc_sort()`, `sas_proc_means()`: the options of the PROC statement
+#' * `sas_proc_sort()`, `sas_proc_means()`, `sas_proc_freq()`,
+#'   `sas_proc_transpose()`: the options of the PROC statement
 #'   and one argument per statement (`by = "usubjid"`, `output = "out=m
 #'   mean="`), as the program wrote them.
 #' * `sas_proc_sql()`: the SQL statements of a PROC SQL step.
@@ -688,6 +689,18 @@ sas_proc_sort <- function(session, options = "", ..., line = 1L) {
 #' @export
 sas_proc_means <- function(session, options = "", ..., line = 1L) {
   script_submit(session, script_proc_text("means", options, list(...)), line)
+}
+
+#' @rdname sas_step_verbs
+#' @export
+sas_proc_freq <- function(session, options = "", ..., line = 1L) {
+  script_submit(session, script_proc_text("freq", options, list(...)), line)
+}
+
+#' @rdname sas_step_verbs
+#' @export
+sas_proc_transpose <- function(session, options = "", ..., line = 1L) {
+  script_submit(session, script_proc_text("transpose", options, list(...)), line)
 }
 
 #' @rdname sas_step_verbs

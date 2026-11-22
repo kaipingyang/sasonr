@@ -80,7 +80,7 @@ translate_proc_transpose <- function(step, meta, last) {
   code <- c(
     sprintf("# ---- PROC TRANSPOSE (SAS line %d)", as.integer(step$line)),
     paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_proc_transpose(.d, ", r_lit(spec), ")"),
+    paste0(".r <- sas_rt_transpose(.d, ", r_lit(spec), ")"),
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TRANSPOSE", line = step$line,
@@ -104,7 +104,7 @@ transpose_valid_name <- function(s) {
 #' @param sp Specification built by the translator.
 #' @export
 #' @keywords internal
-sas_proc_transpose <- function(d, sp) {
+sas_rt_transpose <- function(d, sp) {
   rt <- rt_diag()
   info <- sp$info
   vars <- sp$vars

@@ -225,6 +225,8 @@ public sas_script
 public sas_data_step
 public sas_proc_sort
 public sas_proc_means
+public sas_proc_freq
+public sas_proc_transpose
 public sas_proc_sql
 public sas_proc
 public sas_options
@@ -286,10 +288,10 @@ internal sas_obs_window
 internal sas_or
 internal sas_pow
 internal sas_proc_contents
-internal sas_proc_freq
+internal sas_rt_freq
 internal sas_proc_store
 internal sas_rt_proc
-internal sas_proc_transpose
+internal sas_rt_transpose
 internal sas_put_fvalue
 internal sas_put_layout
 internal sas_put_line

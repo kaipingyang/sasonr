@@ -6,9 +6,9 @@
 \arguments{
 \item{x}{Character string. A numeric value is first converted to character with the BEST12. format.}
 
-\item{pos}{Starting position, an integer from 1 to the length of \code{x}; an invalid position writes a note and sets the error flag. In a UTF-8 session positions count bytes: a character outside ASCII takes two to four positions.}
+\item{pos}{Starting position, an integer from 1 to the length of \code{x}; a missing, smaller or larger position writes a note and sets the error flag. In a UTF-8 session positions count bytes: a character outside ASCII takes two to four positions.}
 
-\item{len}{Optional number of bytes; when omitted the rest of the string is returned. A length running past the end is invalid (note in the log). A start or end inside a multi-byte character is not supported (fails loud).}
+\item{len}{Optional number of bytes; when omitted the rest of the string is returned. A length running past the end returns the rest of the string; a missing or nonpositive length is invalid (blank result). A start or end inside a multi-byte character is not supported (fails loud).}
 
 \item{.at}{Internal: source position \code{c(line, column)} used in log NOTEs.}
 }
@@ -54,6 +54,7 @@ Other character functions:
 \code{\link[=sas_f_anyalpha]{sas_f_anyalpha()}},
 \code{\link[=sas_f_anydigit]{sas_f_anydigit()}},
 \code{\link[=sas_f_anylower]{sas_f_anylower()}},
+\code{\link[=sas_f_anyprint]{sas_f_anyprint()}},
 \code{\link[=sas_f_anypunct]{sas_f_anypunct()}},
 \code{\link[=sas_f_anyspace]{sas_f_anyspace()}},
 \code{\link[=sas_f_anyupper]{sas_f_anyupper()}},
@@ -93,6 +94,7 @@ Other character functions:
 \code{\link[=sas_f_notalpha]{sas_f_notalpha()}},
 \code{\link[=sas_f_notdigit]{sas_f_notdigit()}},
 \code{\link[=sas_f_notlower]{sas_f_notlower()}},
+\code{\link[=sas_f_notprint]{sas_f_notprint()}},
 \code{\link[=sas_f_notpunct]{sas_f_notpunct()}},
 \code{\link[=sas_f_notspace]{sas_f_notspace()}},
 \code{\link[=sas_f_notupper]{sas_f_notupper()}},

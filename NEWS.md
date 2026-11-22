@@ -16,6 +16,11 @@ the development version provides.
   (`DOUBLE` was accepted and ignored before).
 * The ODS table class is now `sasonr_ods_table`, like the other classes of
   the package.
+* `sas_proc_freq()` and `sas_proc_transpose()` are step verbs like
+  `sas_proc_sort()` and `sas_proc_means()`: they take a session, the options
+  of the PROC statement and one argument per statement, and `sas_script()`
+  writes PROC FREQ and PROC TRANSPOSE steps with them. The run-time helpers
+  that had these names until now are internal.
 * `ODS OUTPUT Table=` (or the path `Tabulate.Report.Table=`) before a PROC
   TABULATE step writes the table as a data set: the CLASS variables, then
   `_TYPE_`, `_PAGE_` and `_TABLE_`, then one column per analysis variable

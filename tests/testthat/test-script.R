@@ -308,3 +308,17 @@ test_that("a vectorised MERGE step is a pipeline of the tidy form", {
   env <- run_script(sc)
   expect_identical(tibble::as_tibble(env$c), ref$work$c)
 })
+
+test_that("PROC FREQ and PROC TRANSPOSE become session verbs in the script", {
+  code <- "data a; input g $ x; datalines;\na 1\nb 2\na 3\n;\nrun;
+proc freq data=a; tables g; run;
+proc transpose data=a out=t; var x; run;"
+  sc <- sas_script(sas_translate(code))
+  verbs <- vapply(sc, `[[`, "", "verb")
+  expect_true(all(c("sas_proc_freq", "sas_proc_transpose") %in% verbs))
+  s <- sas_session()
+  for (nd in sc) s <- eval(nd$lang, list(s = s), asNamespace("sasonr"))
+  r <- sas_run(code)
+  expect_identical(sas_listing(s), r$listing)
+  expect_identical(sas_work(s)$t, r$work$t)
+})
