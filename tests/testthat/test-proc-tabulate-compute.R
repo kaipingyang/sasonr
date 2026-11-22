@@ -217,7 +217,7 @@ test_that("ORDER=FORMATTED sorts by the formatted text", {
   expect_equal(unname(cells(t)[, 1]), c(200, 180))
 })
 
-test_that("ORDER=FREQ ties are taken only when every candidate order agrees", {
+test_that("ORDER=FREQ ties follow the data order; ties with DESCENDING fail loud", {
   r <- tab_compute(have, "proc tabulate data=have order=freq; class grp; var v; table grp, v*sum; run;")
   expect_identical(r$tables[[1]]$grp, c("a", "b", "c"))
   tie <- "data t; length g $1; input g $ v; datalines;
@@ -225,7 +225,9 @@ b 1
 a 2
 ;
 run;"
-  expect_error(tab_compute(tie, "proc tabulate data=t order=freq; class g; var v; table g, v*sum; run;"),
+  r <- tab_compute(tie, "proc tabulate data=t order=freq; class g; var v; table g, v*sum; run;")
+  expect_identical(r$tables[[1]]$g, c("b", "a"))
+  expect_error(tab_compute(tie, "proc tabulate data=t; class g / order=freq descending; var v; table g, v*sum; run;"),
                class = "sasonr_unsupported")
 })
 
