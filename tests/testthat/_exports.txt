@@ -227,6 +227,9 @@ public sas_proc_sort
 public sas_proc_means
 public sas_proc_freq
 public sas_proc_transpose
+public sas_means_df
+public sas_tabulate_df
+public sas_transpose_df
 public sas_proc_sql
 public sas_proc
 public sas_options

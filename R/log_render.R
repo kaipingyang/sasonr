@@ -562,6 +562,7 @@ sas_log <- function(x, format = c("plain", "ansi", "html"), echo = log_echo_defa
     x <- session
   }
   format <- rlang::arg_match(format, c("plain", "ansi", "html"))
+  x <- data_api_result(x) %||% x
   ev <- if (inherits(x, "sasonr_result")) {
     x$log_events %||% rlang::abort("`x` has no log events (a result of an older version of sasonr).", class = "sasonr_error")
   } else if (R6::is.R6(x) && inherits(x, "SasSession")) {

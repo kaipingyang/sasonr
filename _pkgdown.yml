@@ -61,6 +61,10 @@ reference:
   - sas_script
   - sas_step_verbs
   - sasonr_tidy_log
+- title: Procedures on data frames
+  desc: Run one procedure on a data frame without writing a SAS program.
+  contents:
+  - sas_data_procs
 - title: Front end (lexer, parser, analysis)
   contents:
   - sas_lex

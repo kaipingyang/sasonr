@@ -162,7 +162,8 @@ render_html_output <- function(o) {
 #'
 #' The style sheet is `system.file("css", "sasonr.css", package = "sasonr")`;
 #' the document embeds it.
-#' @param x A result of [sas_run()].
+#' @param x A result of [sas_run()], or of a data-level PROC function
+#'   ([sas_means_df()], [sas_tabulate_df()]).
 #' @param file `NULL`, or a path: the document is written there.
 #' @param log `TRUE` adds the log after the tables (`sas_log(x, "html")`).
 #' @return The document as one string (invisibly when `file` is given).
@@ -185,6 +186,7 @@ render_html_output <- function(o) {
 #' substr(doc, 1, 60)
 #' @export
 sas_html <- function(x, file = NULL, log = FALSE) {
+  x <- data_api_result(x) %||% x
   if (!inherits(x, "sasonr_result")) rlang::abort("`x` must be a result of sas_run().")
   if (!is.null(file) && !(is.character(file) && length(file) == 1L && !is.na(file))) {
     rlang::abort("`file` must be NULL or one path.")

@@ -7,7 +7,8 @@
 sas_html(x, file = NULL, log = FALSE)
 }
 \arguments{
-\item{x}{A result of \code{\link[=sas_run]{sas_run()}}.}
+\item{x}{A result of \code{\link[=sas_run]{sas_run()}}, or of a data-level PROC function
+(\code{\link[=sas_means_df]{sas_means_df()}}, \code{\link[=sas_tabulate_df]{sas_tabulate_df()}}).}
 
 \item{file}{\code{NULL}, or a path: the document is written there.}
 
