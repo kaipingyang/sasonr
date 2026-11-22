@@ -136,6 +136,7 @@ rtf_print_table <- function(tb) {
     w <- max(hw, vw, sw, 0)
     125 + w + if (j == 1L) 10 else 0
   }, 0)
+  if (sum(widths) > 11520) abort_unsupported("an ODS RTF PROC PRINT table wider than the page")
   xs <- cumsum(widths)
   align <- vapply(a$cols, function(c) if (isTRUE(c$char)) "l" else "r", "")
   n_row <- if (!is.null(a$n)) paste0("N = ", a$n)
@@ -248,6 +249,9 @@ rtf_tabulate_table <- function(tb, widths = NULL) {
   ncol <- g$k + length(g$scols)
   nrow <- g$nrow
   if (is.null(widths)) widths <- rtf_tabulate_widths(cells, ncol, fail)
+  # wider than the page (12240 - 2 * 360 twips): SAS splits the columns into
+  # groups, each with the row titles and its headings (not implemented)
+  if (sum(widths) > 11520) fail("a table wider than the page")
   xs <- cumsum(widths)
   cover <- function(r, c) {
     for (cl in cells) if (cl$r0 <= r && r <= cl$r1 && cl$c0 <= c && c <= cl$c1) return(cl)
@@ -319,11 +323,18 @@ rtf_tabulate_widths <- function(cells, ncol, fail) {
     if (cl$c0 == cl$c1) w[cl$c0] <- max(w[cl$c0], cell_w(cl)) else wide <- c(wide, list(cl))
   }
   widths <- 125 + w + c(10, rep(0, ncol - 1L))
-  # a column heading over several data columns changes their widths in a way
-  # not measured yet (tabulate_rtf/p03: x and y 6 twips wider than the rule)
+  # a column heading over k columns: each of them is at least
+  # 125 + floor(heading width / k) [measured, probe rtf_span: sub over x and
+  # y gives 125 + floor(337 / 2) = 293 each; a longer label widens both
+  # evenly]
   for (cl in wide) {
-    if (identical(cl$align, "center")) fail("a column heading over several columns")
-    if (cell_w(cl) + 125 > sum(widths[cl$c0:cl$c1])) fail("a row title over several columns that is wider than them")
+    cols <- cl$c0:cl$c1
+    if (identical(cl$align, "center")) {
+      need <- 125 + floor(cell_w(cl) / length(cols)) + ifelse(cols == 1L, 10, 0)
+      widths[cols] <- pmax(widths[cols], need)
+    } else if (cell_w(cl) + 125 > sum(widths[cols])) {
+      fail("a row title over several columns that is wider than them")
+    }
   }
   widths
 }

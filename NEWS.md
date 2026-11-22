@@ -9,9 +9,9 @@ the development version provides.
   the PROC PRINT and PROC TABULATE tables (default style) when the
   destination closes. PROC TABULATE: merged row titles and headings, the
   page text of a page dimension (one section per page), the same width rule
-  as PROC PRINT; a column heading over several columns and characters whose
-  advance is not measured yet (such as `.`) are an Unsupported error. PROC
-  PRINT: the
+  as PROC PRINT, a column heading over several columns setting a minimum
+  width for each of them; a table wider than the page and characters whose
+  advance is not measured are an Unsupported error. PROC PRINT: the
   table rows, borders, heading and row-header styles, BY lines, SPLIT= line
   breaks and the column widths (from the measured character advances of the
   default fonts). Other procedures, options of
