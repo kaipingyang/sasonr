@@ -42,7 +42,7 @@ A \code{sasonr_result}: \verb{$log} (the log: the program lines with the
 NOTEs, WARNINGs, ERRORs and PUT output; see \code{\link[=sas_log]{sas_log()}}), \verb{$log_events}
 (a tibble of the log events), \verb{$listing} (procedure output), \verb{$ods} (the
 ODS tables of the procedure output in output order, each a
-\code{sas_ods_table}; PROC MEANS and SUMMARY), \verb{$work} (output data sets with trailing blanks removed),
+\code{sasonr_ods_table}; PROC MEANS and SUMMARY), \verb{$work} (output data sets with trailing blanks removed),
 \verb{$translation}, \verb{$macro_vars} (global macro variables), \verb{$status}
 (\code{"ok"} or \code{"error"}), \verb{$errors} (the ERROR messages) and \verb{$error_line}
 (SAS line of the first ERROR). With a \code{session}, \verb{$log}, \verb{$log_events}, \verb{$listing},

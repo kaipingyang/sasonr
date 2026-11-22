@@ -5,6 +5,17 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC PRINT supports `OBS=`, `N`, `LABEL`, `SPLIT=` and the ID, BY, SUM and
+  SUMBY statements: one page per BY group with its byline, observation
+  numbers that continue across pages, subtotals per BY group and the grand
+  total. Each value field is as wide as
+  its widest entry and centred under the heading. Several BY variables with
+  SUM, SUMBY other than the BY variable, N together with SUM, a label of more
+  than two words without `SPLIT=`, an ID variable that is also a BY variable,
+  BY on unsorted data, VAR options and `DOUBLE` are an Unsupported error
+  (`DOUBLE` was accepted and ignored before).
+* The ODS table class is now `sasonr_ods_table`, like the other classes of
+  the package.
 * `ODS OUTPUT Table=` (or the path `Tabulate.Report.Table=`) before a PROC
   TABULATE step writes the table as a data set: the CLASS variables, then
   `_TYPE_`, `_PAGE_` and `_TABLE_`, then one column per analysis variable

@@ -26,7 +26,7 @@ open:
 * the **HTML** document: the same tables with the blue-and-grey style of the
   HTML destination.
 
-PROC MEANS builds its output once, as ODS tables (`sas_ods_table`); the
+PROC MEANS builds its output once, as ODS tables (`sasonr_ods_table`); the
 listing and the HTML document are both rendered from these tables, so they
 always show the same numbers. This article uses one small invented data set
 throughout.

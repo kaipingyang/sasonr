@@ -1133,14 +1133,14 @@ means_tables <- function(d, sp, cells_by, print_types) {
         level <- c(1L, level + 1L)
       }
       path <- if (is.null(by)) "Means.Summary" else paste0("Means.ByGroup", gi, ".Summary")
-      tb <- new_sas_ods_table(
+      tb <- new_sasonr_ods_table(
         tibble::new_tibble(x, nrow = length(cells)), name = "Summary", label = "Summary statistics", path = path,
         proc = "Means", template = "base.summary", by = by, cols = vctrs::vec_rbind(ods_cols(), !!!cols),
         header = ods_header(level = level, text = lapply(header, `[[`, "text"),
                             span = span, columns = lapply(header, `[[`, "columns"),
                             role = vapply(header, `[[`, "", "role"))
       )
-      tables[[length(tables) + 1L]] <- validate_sas_ods_table(tb)
+      tables[[length(tables) + 1L]] <- validate_sasonr_ods_table(tb)
     }
   }
   tables

@@ -1,6 +1,6 @@
 # ODS tables: the output object of a procedure.
 #
-# A `sas_ods_table` is a tibble of raw values (numbers unformatted, character
+# A `sasonr_ods_table` is a tibble of raw values (numbers unformatted, character
 # values as stored) with the SAS metadata of the table as attributes.  The
 # listing (and later the HTML) renderers build their text from it, so every
 # destination shows the same table.
@@ -44,19 +44,19 @@ ods_header <- function(level = integer(), text = list(), span = integer(), colum
   tibble::tibble(level = as.integer(level), text = text, span = as.integer(span), columns = columns, role = role)
 }
 
-new_sas_ods_table <- function(x = tibble::tibble(), name = character(), label = character(), path = character(),
+new_sasonr_ods_table <- function(x = tibble::tibble(), name = character(), label = character(), path = character(),
                               proc = character(), template = character(), by = NULL, cols = ods_cols(),
                               header = ods_header(), notes = character()) {
   stopifnot(is.data.frame(x))
   tibble::new_tibble(
     x, name = name, label = label, path = path, proc = proc, template = template, by = by,
-    cols = cols, header = header, notes = notes, class = "sas_ods_table"
+    cols = cols, header = header, notes = notes, class = "sasonr_ods_table"
   )
 }
 
-validate_sas_ods_table <- function(x) {
-  bad <- function(msg) rlang::abort(paste0("Invalid sas_ods_table: ", msg), class = "sasonr_internal_error")
-  if (!inherits(x, "sas_ods_table") || !tibble::is_tibble(x)) bad("not a tibble of class sas_ods_table")
+validate_sasonr_ods_table <- function(x) {
+  bad <- function(msg) rlang::abort(paste0("Invalid sasonr_ods_table: ", msg), class = "sasonr_internal_error")
+  if (!inherits(x, "sasonr_ods_table") || !tibble::is_tibble(x)) bad("not a tibble of class sasonr_ods_table")
   for (a in c("name", "label", "path", "proc", "template")) {
     v <- attr(x, a, exact = TRUE)
     if (!is.character(v) || length(v) != 1L || is.na(v)) bad(paste0("`", a, "` must be one string"))
@@ -79,9 +79,9 @@ validate_sas_ods_table <- function(x) {
 }
 
 #' @export
-print.sas_ods_table <- function(x, ...) {
+print.sasonr_ods_table <- function(x, ...) {
   a <- function(nm) attr(x, nm, exact = TRUE)
-  cat("<sas_ods_table> ", a("name"), " (", a("label"), ")\n", sep = "")
+  cat("<sasonr_ods_table> ", a("name"), " (", a("label"), ")\n", sep = "")
   cat("  path:     ", a("path"), "\n", sep = "")
   cat("  proc:     ", a("proc"), ", template ", a("template"), "\n", sep = "")
   if (!is.null(a("by"))) cat("  by:       ", a("by")$text, "\n", sep = "")

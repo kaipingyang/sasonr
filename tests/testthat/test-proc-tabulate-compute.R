@@ -61,7 +61,7 @@ test_that("a two-dimensional table has one row per class level", {
   r <- tab_compute(have, "proc tabulate data=have; class grp; var v; table grp, v*mean; run;")
   expect_length(r$tables, 1L)
   t <- r$tables[[1]]
-  expect_s3_class(t, "sas_ods_table")
+  expect_s3_class(t, "sasonr_ods_table")
   expect_identical(attr(t, "name"), "Table")
   expect_identical(attr(t, "label"), "Table 1")
   expect_identical(attr(t, "path"), "Tabulate.Report.Table")

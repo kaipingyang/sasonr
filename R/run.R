@@ -752,7 +752,7 @@ sas_translate <- function(code, work = list(), level = c("auto", "L3")) {
 #'   NOTEs, WARNINGs, ERRORs and PUT output; see [sas_log()]), `$log_events`
 #'   (a tibble of the log events), `$listing` (procedure output), `$ods` (the
 #'   ODS tables of the procedure output in output order, each a
-#'   `sas_ods_table`; PROC MEANS and SUMMARY), `$work` (output data sets with trailing blanks removed),
+#'   `sasonr_ods_table`; PROC MEANS and SUMMARY), `$work` (output data sets with trailing blanks removed),
 #'   `$translation`, `$macro_vars` (global macro variables), `$status`
 #'   (`"ok"` or `"error"`), `$errors` (the ERROR messages) and `$error_line`
 #'   (SAS line of the first ERROR). With a `session`, `$log`, `$log_events`, `$listing`,

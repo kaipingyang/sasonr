@@ -1,6 +1,6 @@
 # PROC PRINT on the PROC registry (proc_registry.R).
 #
-# print_compute() returns one `sas_ods_table` per page (a BY group, or the
+# print_compute() returns one `sasonr_ods_table` per page (a BY group, or the
 # whole listing without BY) with the printed columns as raw values; the
 # listing template base.print lays them out.  Layout rule, per page and per
 # column (measured on 15 listings of the reference output):
@@ -51,7 +51,7 @@ print_compute <- function(d, spec) {
     if (obs) x <- tibble::add_column(x, Obs = as.integer(d$.obs[g]), .before = 1L)
     by <- if (length(spec$by) > 0) list(values = lapply(stats::setNames(spec$by, spec$by), function(v) d[[v]][g[1]]),
                                         text = proc_by_line(d, g[1], spec$by, spec$by_info), group = k) else NULL
-    tb <- new_sas_ods_table(x, name = "Print", label = "Data Set", path = "Print.Print", proc = "Print",
+    tb <- new_sasonr_ods_table(x, name = "Print", label = "Data Set", path = "Print.Print", proc = "Print",
                             template = "base.print", by = by,
                             cols = ods_cols(names(x), role = "var"))
     attr(tb, "print") <- list(

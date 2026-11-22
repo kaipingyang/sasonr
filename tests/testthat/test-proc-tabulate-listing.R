@@ -1040,7 +1040,7 @@ test_that("a table without a statistic keyword runs in strict mode", {
   withr::local_options(sasonr.strict = TRUE)
   r <- sas_run(prog)
   expect_identical(r$listing[c(1, length(r$listing))], rep(strrep("-", 59), 2))
-  expect_s3_class(r$ods[[1]], "sas_ods_table")
+  expect_s3_class(r$ods[[1]], "sasonr_ods_table")
   expect_identical(attr(r$ods[[1]], "name"), "Table")
 })
 

@@ -1,6 +1,6 @@
 # HTML destination: the HTML view of ODS tables.
 #
-# render_html() turns one sas_ods_table into a <table class="sas-table">; the
+# render_html() turns one sasonr_ods_table into a <table class="sas-table">; the
 # cell text comes from the display engine the listing uses (the `format` of
 # each column, ods_cell_text()), so both destinations show the same text.
 # sas_html() assembles the procedure outputs a result sent to the HTML
@@ -70,7 +70,7 @@ render_html_grid <- function(cells, nrow, nhead, summary) {
 
 #' @noRd
 render_html <- function(table) {
-  validate_sas_ods_table(table)
+  validate_sasonr_ods_table(table)
   tpl <- html_templates[[attr(table, "template", exact = TRUE) %||% ""]]
   if (!is.null(tpl)) return(tpl(table))
   cols <- attr(table, "cols", exact = TRUE)

@@ -1,7 +1,7 @@
 # PROC registry and driver.
 #
 # One entry per procedure that runs on the ODS pipeline:
-#   compute(d, spec)  returns list(tables = <sas_ods_table>..., data = <named
+#   compute(d, spec)  returns list(tables = <sasonr_ods_table>..., data = <named
 #                     list of OUT= data sets>, events = <log lines>)
 #   templates         listing template of each table (render_listing())
 # Aliases map to their entry (SUMMARY runs the MEANS entry).  Procedures not

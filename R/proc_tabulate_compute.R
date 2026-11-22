@@ -4,7 +4,7 @@
 # variables with their MISSING / ORDER= / DESCENDING, the analysis variables,
 # variable attributes, the table IRs of proc_tabulate.R, KEYLABEL texts and
 # the PROC FORMAT=).  tabulate_compute(d, sp) computes the cells of every
-# table from the input data (after WHERE) and returns one `sas_ods_table` per
+# table from the input data (after WHERE) and returns one `sasonr_ods_table` per
 # page of each TABLE statement:
 #
 #   data     one row per body row of the printed table: the hidden class
@@ -12,7 +12,7 @@
 #            path does not restrict the variable) and one `stat` column per
 #            column path (raw values; NA is an empty cell, printed as
 #            MISSTEXT)
-#   cols     as for every sas_ods_table; `format` is the cell format of a
+#   cols     as for every sasonr_ods_table; `format` is the cell format of a
 #            column when it is the same in every row
 #   header   the column headings: one cell per heading with `level` (first
 #            heading row, 1 = top), `rowspan`, `span` (number of leaf
@@ -120,7 +120,7 @@ tabulate_compute <- function(d, sp) {
     ir <- sp$irs[[k]]
     tables <- c(tables, tab_table_pages(ir, k, d, sp, lv, tot, stats_of))
   }
-  for (t in tables) validate_sas_ods_table(t)
+  for (t in tables) validate_sasonr_ods_table(t)
   list(tables = tables, data = list(), events = events)
 }
 
@@ -324,7 +324,7 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
       stat = c(rep(NA_character_, length(row_class)), header$stats),
       info = c(unname(sp$info[row_class]), rep(list(NULL), length(stat_names)))
     )
-    t <- new_sas_ods_table(tb, name = "Table", label = paste("Table", k), path = "Tabulate.Report.Table",
+    t <- new_sasonr_ods_table(tb, name = "Table", label = paste("Table", k), path = "Tabulate.Report.Table",
                            proc = "Tabulate", template = "base.tabulate", cols = cols, header = header$cells)
     attr(t, "row_header") <- rh
     attr(t, "formats") <- fmts
