@@ -364,6 +364,12 @@ tk_col <- function(p, k = 0L) {
 # is a format, not an expression.
 parse_put_input_call <- function(p, name, line, col, arg_parser = parse_expr) {
   arg <- arg_parser(p)
+  # PUT(x) / INPUT(s): the parser expects an operator at `)` and ignores the
+  # statement [measured]
+  if (tk_type(p) == "rparen") {
+    abort_syntax_numbered("Expecting an arithmetic operator. (ERROR 388-185)", line, tk_col(p), ")",
+                          also = "ERROR 76-322: Syntax error, statement will be ignored.")
+  }
   if (tk_type(p) != "comma") abort_syntax(paste0("expected ',' and a format in ", toupper(name), "()"), line)
   advance(p)
   qq <- ""

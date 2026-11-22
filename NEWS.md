@@ -5,6 +5,14 @@ the development version provides.
 
 ## Running SAS programs
 
+* A DATA step whose statement is ignored after a syntax ERROR (ERROR
+  76-322, e.g. `PUT()` without a format: ERROR 388-185) compiles on: the
+  ignored assignment leaves its target numeric, the type conversion NOTE of
+  the later statements is written, and a later character format on a
+  numeric variable writes its WARNING and ERROR 48-59 at its own line. In
+  PUT, a character format on a numeric variable writes the WARNING; `$w.`
+  writes the value with `w.`, `$QUOTE.` and `$CHAR.` stop the step with
+  ERROR 48-59.
 * `$QUOTEw.` with a width too small for the text cuts it at the width: a
   doubled quote that the cut would split is dropped, and `$QUOTE1.` writes a
   blank (an Unsupported error before).

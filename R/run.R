@@ -80,6 +80,8 @@ engine_exec <- function(eng, text, line) {
   if (!identical(eng$on_error, "sas")) return(engine_exec_steps(eng, text, line))
   eng$phase <- "compile"
   eng$cur_step <- NULL
+  # the first program line of the chunk (lines of a step parsed again after an ERROR)
+  eng$chunk_line <- line
   # the last program line of the chunk (the source echo after an ERROR)
   eng$chunk_end <- log_chunk_last(text, line)
   tryCatch(engine_exec_steps(eng, text, line),

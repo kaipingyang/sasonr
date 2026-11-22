@@ -261,7 +261,7 @@ err_failed_stmt <- function(kind, vars, target, line) {
 }
 
 # Output metadata (eng$session$meta form) of a DATA step as compiled, or NULL.
-err_data_schema <- function(eng, step) {
+err_data_schema <- function(eng, step, ignored = FALSE) {
   stmts <- list()
   # the names in an invalid statement (ERROR 180-322) must be variables the
   # step compiles anyway: what a new name there adds is not supported
@@ -296,7 +296,26 @@ err_data_schema <- function(eng, step) {
           abort_unsupported("the type conversion NOTE of a step with a call with too many arguments and another ERROR", step$line)
         }
         attr(meta, "conversion_notes") <- conversion_notes()
+      } else if (failed && !replaced && ignored) {
+        # an ignored assignment compiles as `target = .` (numeric); the
+        # conversions of the other statements are written [measured,
+        # cases]; a step parsed again from
+        # the chunk text numbers its lines from 1
+        if (is.null(eng$cur_step)) {
+          off <- (eng$chunk_line %||% 1L) - 1L
+          ct <- ct_diag()
+          for (id in intersect(names(ct$places), c("conv.n2c", "conv.c2n"))) {
+            k <- ct$places[[id]]
+            p <- strsplit(k, ":", fixed = TRUE)
+            ct$places[[id]] <- vapply(p, function(x) sprintf("%d:%s", as.integer(x[1]) + off, x[2]), "")
+          }
+        }
+        attr(meta, "conversion_notes") <- conversion_notes()
       }
+      # the later ERRORs of a step whose first ERROR ignored a statement
+      # (76-322); after another first ERROR they are not measured (none in
+      # the cases)
+      if (length(ct_diag()$secondary) && failed && !replaced && ignored) attr(meta, "secondary") <- ct_diag()$secondary
       return(meta)
     }
     # an ERROR of the analyzer at one statement: replace it by what it contributes at compile time
@@ -358,9 +377,16 @@ err_recover_step <- function(eng, text, e = NULL) {
   if (isTRUE(step$null) || !length(step$outputs)) {
     return(list(kind = "data", outputs = list(), syntax_check = !isTRUE(step$null)))
   }
-  meta <- err_data_schema(eng, step)
+  meta <- err_data_schema(eng, step, ignored = any(grepl("^ERROR 76-322", e$sas_also %||% "")))
   if (is.null(meta) || any(vapply(meta, is.null, logical(1)))) return(NULL)
-  list(kind = "data", outputs = meta, syntax_check = TRUE, conversion_notes = attr(meta, "conversion_notes"))
+  sec <- attr(meta, "secondary")
+  # a step parsed again from the chunk text numbers its lines from 1
+  if (is.null(eng$cur_step) && length(sec)) {
+    off <- (eng$chunk_line %||% 1L) - 1L
+    sec <- lapply(sec, function(s2) { s2$line <- s2$line + off; s2 })
+  }
+  list(kind = "data", outputs = meta, syntax_check = TRUE, conversion_notes = attr(meta, "conversion_notes"),
+       secondary = sec)
 }
 
 err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
@@ -416,6 +442,16 @@ engine_step_error <- function(eng, e, text, sql = FALSE) {
   eng$errors <- c(eng$errors, conditionMessage(e))
   if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
   err_emit_error(eng, e)
+  # ERRORs that the step compiled again after this one finds, each after the
+  # source of its line (with its WARNING first)
+  for (s2 in rec$secondary) {
+    if (identical(eng$phase, "compile") && !isTRUE(e$sas_step_end) && s2$line >= (e$sas_line %||% Inf)) {
+      for (w in s2$before) log_emit(eng, "warning", text = w, src = s2$line, phase = "compile")
+      log_emit(eng, "error", text = s2$text, at = c(s2$line, s2$col), token = s2$token, src = s2$line, phase = "compile")
+    } else {
+      abort_unsupported("a second ERROR of a stopped step before the first one", s2$line)
+    }
+  }
   if (in_sql) {
     if (!isTRUE(eng$sql_noexec)) {
       log_emit(eng, id = "sql.noexec")
