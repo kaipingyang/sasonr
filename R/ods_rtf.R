@@ -177,19 +177,37 @@ rtf_print_table <- function(tb) {
 rtf_write_document <- function(outputs, file) {
   body <- character()
   k <- 0L
-  for (o in outputs) {
+  last_tb <- NULL
+  last_o <- 0L
+  for (o_id in seq_along(outputs)) {
+    o <- outputs[[o_id]]
     if (length(o$titles) || length(o$footnotes)) abort_unsupported("TITLE or FOOTNOTE lines in an ODS RTF document")
     for (tb in o$tables) {
       tpl <- attr(tb, "template", exact = TRUE)
       if (!tpl %in% c("base.print", "base.tabulate")) abort_unsupported(paste0("the ODS RTF output of PROC ", toupper(o$proc)))
       by <- attr(tb, "by", exact = TRUE)
-      if (k > 0L) body <- c(body, "\\pard\\par\\par")
+      if (k > 0L) {
+        # PROC TABULATE pages: a new section; PROC PRINT BY groups: two
+        # empty paragraphs; other sequences of tables are not measured
+        prev <- last_tb
+        if (identical(tpl, "base.tabulate") && identical(attr(prev, "table", exact = TRUE), attr(tb, "table", exact = TRUE)) &&
+            identical(o_id, last_o)) {
+          body <- c(body, "\\pard", "\\sect\\sectd\\linex0\\endnhere\\headery720\\footery360\\marglsxn360\\margrsxn360\\margtsxn360\\margbsxn360",
+                    "{\\header\\pard\\plain\\qc{", "}}", "{\\footer\\pard\\plain\\qc{", "}}")
+        } else if (identical(tpl, "base.print") && identical(attr(prev, "template", exact = TRUE), "base.print") && identical(o_id, last_o)) {
+          body <- c(body, "\\pard\\par\\par")
+        } else {
+          abort_unsupported("an ODS RTF document with the tables of more than one step or TABLE statement")
+        }
+      }
       if (!is.null(by)) {
         body <- c(body, paste0("\\plain\\pard\\keepn\\chcbpat8\\i0\\b\\sb0\\sa0\\ql\\f1\\fs22\\cf1{", rtf_escape(by$text), "}"),
                   "{\\par}", "\\par")
       }
       body <- c(body, if (identical(tpl, "base.tabulate")) rtf_tabulate_table(tb, rtf_widths_override(tb)) else rtf_print_table(tb))
       k <- k + 1L
+      last_tb <- tb
+      last_o <- o_id
     }
   }
   doc <- c(rtf_prefix(), body, "\\pard}")
@@ -213,9 +231,9 @@ rtf_tabulate_table <- function(tb, widths = NULL) {
   fail <- function(what) abort_unsupported(paste0("the PROC TABULATE ODS RTF output of ", what))
   g <- tab_grid_parts(tb, fail)
   if (any(g$head_at != 1L)) fail("a class-variable heading row inside the row dimension")
-  if (!is.null(attr(tb, "page", exact = TRUE))) fail("a page dimension")
+  page <- attr(tb, "page", exact = TRUE)
   if (!is.null(attr(tb, "by", exact = TRUE))) fail("BY groups")
-  if (!is.null(g$box)) fail("a BOX= text")
+  if (!is.null(g$box) && g$nh > 0L && g$has_rows) fail("a BOX= text")
   fmts <- attr(tb, "formats", exact = TRUE)
   cstat <- attr(tb, "cell_stats", exact = TRUE)
   fsrc <- attr(tb, "format_source", exact = TRUE)
@@ -238,6 +256,13 @@ rtf_tabulate_table <- function(tb, widths = NULL) {
     r <= g$nh || r == nrow - 1L || any(vapply(cells, function(cl) cl$r0 == r && cl$r1 > r && cl$r0 > g$nh, logical(1)))
   }, TRUE)
   out <- character()
+  # the page text: a heading row of one cell over the table, bottom border
+  # only; the table below it has no top border
+  if (!is.null(page)) {
+    out <- c(out, "\\trowd\\trkeep\\trhdr\\trql",
+             paste0("\\clbrdrb\\brdrs\\brdrw15\\brdrcf1\\cltxlrtb\\clvertalb\\clcbpat8\\clpadt60\\clpadft3\\clpadr60\\clpadfr3\\cellx", xs[ncol]),
+             rtf_cell_par(rtf_escape(paste(page$text, collapse = " ")), TRUE, TRUE, "l"), "{\\row}")
+  }
   for (r in seq_len(nrow)) {
     header <- r <= g$nh
     defs <- character()
@@ -253,7 +278,7 @@ rtf_tabulate_table <- function(tb, widths = NULL) {
       valign <- if (identical(kind, "box")) "c" else if (identical(kind, "left")) "t" else "b"
       bg <- if (identical(kind, "raw")) 8 else 17
       defs <- c(defs, paste0(
-        if (cl$r0 == 1L) "\\clbrdrt\\brdrs\\brdrw15\\brdrcf1",
+        if (cl$r0 == 1L && is.null(page)) "\\clbrdrt\\brdrs\\brdrw15\\brdrcf1",
         "\\clbrdrb\\brdrs\\brdrw", if (cl$r1 == nrow) 15 else 5, "\\brdrcf1",
         "\\clbrdrl\\brdrs\\brdrw", if (cl$c0 == 1L) 15 else 5, "\\brdrcf1",
         if (cl$c1 == ncol) "\\clbrdrr\\brdrs\\brdrw15\\brdrcf1",
