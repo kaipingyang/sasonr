@@ -16,6 +16,9 @@ the development version provides.
   (`DOUBLE` was accepted and ignored before).
 * The ODS table class is now `sasonr_ods_table`, like the other classes of
   the package.
+* PROC TABULATE `ORDER=FREQ` puts tied levels in data order (the order of
+  their first observation); ties under `ORDER=FREQ` with `DESCENDING` are an
+  Unsupported error.
 * `sas_means_df()`, `sas_tabulate_df()` and `sas_transpose_df()` run one
   procedure on a data frame without a SAS program and return its ODS table
   (or the output data set of PROC TRANSPOSE), the same as the step in

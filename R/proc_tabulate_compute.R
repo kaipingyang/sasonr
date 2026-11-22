@@ -125,27 +125,23 @@ tabulate_compute <- function(d, sp) {
 }
 
 # Class levels of one variable (means_class_levels()) and the level index of
-# every row.  ORDER=FREQ ties are taken only when every candidate order
-# (internal, formatted, data) gives the same sequence.
+# every row.  ORDER=FREQ: descending count, tied levels in the order of their
+# first row (data order) [measured, case tabulate/p08c]; ties under
+# ORDER=FREQ DESCENDING are not measured and fail loud.
 tab_levels <- function(x, cl, info, line) {
   if (identical(cl$order, "freq") && length(x)) {
-    base <- means_class_levels(x, rep(1, length(x)), utils::modifyList(cl, list(order = "internal", descending = FALSE)),
+    base <- means_class_levels(x, rep(1, length(x)), utils::modifyList(cl, list(order = "data", descending = FALSE)),
                                info)
     idx <- match(base$key, base$keys)
     cnt <- tabulate(idx, length(base$keys))
-    if (anyDuplicated(cnt)) {
-      first <- match(seq_along(base$keys), idx)
-      txt <- proc_value_text(base$values, info)
-      for (cv in unique(cnt[duplicated(cnt)])) {
-        tied <- which(cnt == cv)
-        if (cl$descending || !identical(order(first[tied]), seq_along(tied)) ||
-            !identical(order(txt[tied], method = "radix"), seq_along(tied))) {
-          abort_unsupported("PROC TABULATE ORDER=FREQ with tied counts in different internal, formatted and data order", line)
-        }
-      }
+    if (cl$descending && anyDuplicated(cnt)) {
+      abort_unsupported("PROC TABULATE ORDER=FREQ DESCENDING with tied counts", line)
     }
+    ord <- if (cl$descending) order(cnt) else order(-cnt, seq_along(cnt))
+    l <- list(keys = base$keys[ord], values = base$values[ord], key = base$key)
+  } else {
+    l <- means_class_levels(x, rep(1, length(x)), cl, info)
   }
-  l <- means_class_levels(x, rep(1, length(x)), cl, info)
   l$idx <- match(l$key, l$keys)
   l
 }
