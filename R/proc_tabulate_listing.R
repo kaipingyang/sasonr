@@ -171,6 +171,12 @@ listing_base_tabulate <- function(tb, ls, ps = NULL) {
   }
 
   lapply(panels, function(pj) {
+    # a panel in which some heading row starts no cell: SAS lays the heading
+    # of that panel out again with fewer rows, which is not measured
+    if (length(panels) > 1L && g$nh > 0L) {
+      starts <- g$hlev[vapply(seq_len(nrow(g$header)), function(h) length(intersect(g$hleaf[[h]], pj)) > 0L, logical(1))]
+      if (!all(seq_len(g$nh) %in% starts)) fail("a panel whose heading would have fewer rows than the table")
+    }
     cells <- tab_grid(g, pj, function(j, i) cell_text[[j]][i], if (is.null(box)) "" else box$value)
     tab_draw(cells, g$nrow, c(rt_w, widths[pj]), fail, if (is.null(page)) NULL else paste(page$text, collapse = " "))
   })
