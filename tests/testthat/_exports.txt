@@ -274,6 +274,7 @@ internal sas_lag_vec
 internal sas_last
 internal sas_loop_unread
 internal sas_le
+internal sas_log_view
 internal sas_lt
 internal sas_max_op
 internal sas_merge_input

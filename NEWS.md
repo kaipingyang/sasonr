@@ -35,10 +35,12 @@ the development version provides.
   their first observation); ties under `ORDER=FREQ` with `DESCENDING` are an
   Unsupported error.
 * `sas_means_df()`, `sas_tabulate_df()` and `sas_transpose_df()` run one
-  procedure on a data frame without a SAS program and return its ODS table
-  (or the output data set of PROC TRANSPOSE), the same as the step in
-  `sas_run()`; `as.data.frame()`, `sas_log()` and `sas_html()` take the
-  result. A data-level PROC FREQ follows when PROC FREQ produces ODS tables.
+  procedure on a data frame without a program and return its ODS table
+  (or the output data set of PROC TRANSPOSE). They call the computation that
+  `sas_run()` calls for the same step, with the specification from the same
+  parser and builder, so the values are the same. `sas_log()` and
+  `sas_html()` are S3 generics with methods for these results;
+  `as.data.frame()` drops the table attributes. A data-level PROC FREQ follows when PROC FREQ produces ODS tables.
 * `sas_proc_freq()` and `sas_proc_transpose()` are step verbs like
   `sas_proc_sort()` and `sas_proc_means()`: they take a session, the options
   of the PROC statement and one argument per statement, and `sas_script()`

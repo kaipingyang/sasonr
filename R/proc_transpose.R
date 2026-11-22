@@ -46,6 +46,21 @@ parse_proc_transpose <- function(p, line) {
 }
 
 translate_proc_transpose <- function(step, meta, last) {
+  b <- transpose_step_spec(step, meta, last)
+  spec <- b$spec
+  code <- c(
+    sprintf("# ---- PROC TRANSPOSE (SAS line %d)", as.integer(step$line)),
+    paste0(".d <- ", proc_source_code(b$inp)),
+    paste0(".r <- sas_rt_transpose(.d, ", r_lit(spec), ")"),
+    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+  )
+  list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TRANSPOSE", line = step$line,
+       outputs = spec$out, meta = list())
+}
+
+# The computation spec of a PROC TRANSPOSE step (shared by the translator and
+# sas_transpose_df()): list(spec, inp, warnings).
+transpose_step_spec <- function(step, meta, last) {
   o <- step$options
   inp <- proc_input(step, meta, last)
   st <- inp$st
@@ -77,14 +92,7 @@ translate_proc_transpose <- function(step, meta, last) {
     name = o$name %||% "_NAME_", label = o$label %||% "_LABEL_", let = isTRUE(o$let),
     info = proc_var_info(st, unique(c(vars, by$vars, id, idlabel, copy))), out = out$name, out_opts = out$options
   )
-  code <- c(
-    sprintf("# ---- PROC TRANSPOSE (SAS line %d)", as.integer(step$line)),
-    paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_rt_transpose(.d, ", r_lit(spec), ")"),
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
-  )
-  list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TRANSPOSE", line = step$line,
-       outputs = out$name, meta = list())
+  list(spec = spec, inp = inp, warnings = character())
 }
 
 # A SAS variable name from an ID value: invalid characters become `_`, a

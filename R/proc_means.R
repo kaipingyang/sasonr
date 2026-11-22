@@ -284,6 +284,34 @@ parse_means_output <- function(p) {
 # Translation -------------------------------------------------------------------
 
 translate_proc_means <- function(step, meta, last) {
+  b <- means_step_spec(step, meta, last)
+  spec <- b$spec
+  pname <- step$name
+  header <- sprintf("# ---- PROC %s (SAS line %d)", toupper(pname), as.integer(step$line))
+  code <- c(
+    header,
+    paste0(".d <- ", proc_source_code(b$inp)),
+    paste0(".r <- sas_rt_proc(\"", pname, "\", .d, ", r_lit(spec), ")"),
+    ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+    ".ods <- c(.ods, .r$tables)",
+    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+  )
+  outputs <- spec$outputs
+  outs <- vapply(outputs, `[[`, "", "name")
+  static_meta <- lapply(outputs, function(x) means_out_layout(spec, x)$meta)
+  names(static_meta) <- outs
+  # the WARNINGs of KEEP=/DROP=/RENAME= on the OUTPUT data sets
+  warns <- vctrs::list_unchop(lapply(outputs, function(x) {
+    if (length(x$ds_opts) == 0) return(character())
+    ds_out_plan(means_out_layout(spec, x)$meta$vars, x$ds_opts, x$name, x$line)$warnings
+  }), ptype = character(), name_spec = rlang::zap())
+  list(code = paste(code, collapse = "\n"), level = "PROC", reasons = paste("PROC", toupper(pname)),
+       line = step$line, outputs = outs, meta = static_meta, compile_notes = c(b$warnings, warns))
+}
+
+# The computation spec of a PROC MEANS / SUMMARY step (shared by the
+# translator and the data-level sas_means_df()): list(spec, inp, warnings).
+means_step_spec <- function(step, meta, last) {
   pname <- step$name
   o <- step$options
   inp <- proc_input(step, meta, last)
@@ -405,25 +433,7 @@ translate_proc_means <- function(step, meta, last) {
     outputs = outputs
   )
   means_stat_gate(spec, step$line)
-  header <- sprintf("# ---- PROC %s (SAS line %d)", toupper(pname), as.integer(step$line))
-  code <- c(
-    header,
-    paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_rt_proc(\"", pname, "\", .d, ", r_lit(spec), ")"),
-    ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
-    ".ods <- c(.ods, .r$tables)",
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
-  )
-  outs <- vapply(outputs, `[[`, "", "name")
-  static_meta <- lapply(outputs, function(x) means_out_layout(spec, x)$meta)
-  names(static_meta) <- outs
-  # the WARNINGs of KEEP=/DROP=/RENAME= on the OUTPUT data sets
-  warns <- vctrs::list_unchop(lapply(outputs, function(x) {
-    if (length(x$ds_opts) == 0) return(character())
-    ds_out_plan(means_out_layout(spec, x)$meta$vars, x$ds_opts, x$name, x$line)$warnings
-  }), ptype = character(), name_spec = rlang::zap())
-  list(code = paste(code, collapse = "\n"), level = "PROC", reasons = paste("PROC", toupper(pname)),
-       line = step$line, outputs = outs, meta = static_meta, compile_notes = c(o$warnings, warns))
+  list(spec = spec, inp = inp, warnings = o$warnings)
 }
 
 # Every statistic the step computes (printed table and OUTPUT data sets) is

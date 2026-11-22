@@ -28,8 +28,12 @@ test_that("sas_tabulate_df() and sas_transpose_df()", {
 
 test_that("sas_log() and sas_html() take the result", {
   m <- sas_means_df(api_d, var = "x")
-  expect_match(paste(as.character(sas_log(m)), collapse = "\n"), "proc means data=data", fixed = TRUE)
+  expect_s3_class(sas_log(m), "sasonr_log")
+  expect_length(sas_log(m), 0L)
   expect_match(sas_html(m), "<table", fixed = TRUE)
+  # the WARNINGs of the computation are its log
+  t <- sas_tabulate_df(api_d, "grp*grp", class = "grp")
+  expect_match(as.character(sas_log(t)), "crossed with itself", fixed = TRUE)
 })
 
 test_that("arguments are checked", {

@@ -616,6 +616,36 @@ tab_abort_error <- function(lines, before, line, at_end = TRUE) {
 # Translation -----------------------------------------------------------------------
 
 translate_proc_tabulate <- function(step, meta, last) {
+  b <- tab_step_spec(step, meta, last)
+  spec <- b$spec
+  inp <- b$inp
+  header <- sprintf("# ---- PROC TABULATE (SAS line %d)", as.integer(step$line))
+  # the WARNINGs are written when the step runs, before its NOTEs
+  warns <- b$warnings
+  warn_code <- if (length(warns)) paste0(".log <- c(.log, ", r_lit(stats::setNames(warns, rep("msg", length(warns)))), ")")
+  code <- c(
+    header,
+    warn_code,
+    paste0(".d <- ", proc_source_code(inp)),
+    if (is.null(spec$classdata)) {
+      paste0(".r <- sas_rt_proc(\"tabulate\", .d, ", r_lit(spec), ")")
+    } else c(
+      paste0(".cd <- sas_ds(work, ", r_str(spec$classdata), ") |> sas_note_read(", r_str(spec$classdata), ")"),
+      paste0(".r <- sas_rt_proc(\"tabulate\", .d, c(", r_lit(spec), ", list(classdata_rows = .cd)))")
+    ),
+    ".lst <- c(.lst, sas_tab_titles(.titles, .r))",
+    ".ods <- c(.ods, .r$tables)",
+    # the ODS OUTPUT data sets (ods_output.R)
+    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+  )
+  list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TABULATE", line = step$line,
+       outputs = character(), meta = list())
+}
+
+# The computation spec of a PROC TABULATE step after the checks (shared by
+# the translator and sas_tabulate_df()): list(spec, inp, warnings) with the
+# WARNING lines the step writes when it runs.
+tab_step_spec <- function(step, meta, last) {
   found <- step$unsupported
   decl <- tab_declared(step)
   tables <- Filter(function(s) identical(s$stmt, "table"), step$stmts)
@@ -725,25 +755,5 @@ translate_proc_tabulate <- function(step, meta, last) {
   if (length(dup_warn) && length(self_warn)) unexact("a repeated CLASS WARNING and a self-crossing WARNING in one step")
   if (any(nchar(c(warn, dup_warn, self_warn)) > rt_linesize())) unexact("a WARNING longer than the line size")
   spec <- tab_spec(step, decl, irs, inp)
-  header <- sprintf("# ---- PROC TABULATE (SAS line %d)", as.integer(step$line))
-  # the WARNINGs are written when the step runs, before its NOTEs
-  warns <- c(warn, dup_warn, self_warn)
-  warn_code <- if (length(warns)) paste0(".log <- c(.log, ", r_lit(stats::setNames(warns, rep("msg", length(warns)))), ")")
-  code <- c(
-    header,
-    warn_code,
-    paste0(".d <- ", proc_source_code(inp)),
-    if (is.null(spec$classdata)) {
-      paste0(".r <- sas_rt_proc(\"tabulate\", .d, ", r_lit(spec), ")")
-    } else c(
-      paste0(".cd <- sas_ds(work, ", r_str(spec$classdata), ") |> sas_note_read(", r_str(spec$classdata), ")"),
-      paste0(".r <- sas_rt_proc(\"tabulate\", .d, c(", r_lit(spec), ", list(classdata_rows = .cd)))")
-    ),
-    ".lst <- c(.lst, sas_tab_titles(.titles, .r))",
-    ".ods <- c(.ods, .r$tables)",
-    # the ODS OUTPUT data sets (ods_output.R)
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
-  )
-  list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TABULATE", line = step$line,
-       outputs = character(), meta = list())
+  list(spec = spec, inp = inp, warnings = c(warn, dup_warn, self_warn))
 }

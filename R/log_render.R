@@ -562,22 +562,58 @@ sas_log <- function(x, format = c("plain", "ansi", "html"), echo = log_echo_defa
     x <- session
   }
   format <- rlang::arg_match(format, c("plain", "ansi", "html"))
-  x <- data_api_result(x) %||% x
-  ev <- if (inherits(x, "sasonr_result")) {
-    x$log_events %||% rlang::abort("`x` has no log events (a result of an older version of sasonr).", class = "sasonr_error")
-  } else if (R6::is.R6(x) && inherits(x, "SasSession")) {
-    log_session_events(x)
-  } else {
-    rlang::abort("`x` must be a result of `sas_run()` or a session from `sas_session()`.", class = "sasonr_error")
-  }
   if (!rlang::is_bool(echo)) rlang::abort("`echo` must be `TRUE` or `FALSE`.", class = "sasonr_error")
   if (!rlang::is_bool(compact)) rlang::abort("`compact` must be `TRUE` or `FALSE`.", class = "sasonr_error")
+  sas_log_view(x, format, echo, compact)
+}
+
+#' The log view of an object (the S3 generic behind sas_log())
+#'
+#' Methods: a result of [sas_run()] and a session (the log events of the
+#' submissions), an ODS table or list of tables of a data-level PROC function
+#' ([sas_means_df()]: the WARNINGs and NOTEs of the computation).
+#' @param x The object.
+#' @param format,echo,compact As in [sas_log()].
+#' @return As [sas_log()].
+#' @keywords internal
+#' @export
+sas_log_view <- function(x, format, echo, compact) UseMethod("sas_log_view")
+
+#' @export
+sas_log_view.default <- function(x, format, echo, compact) {
+  rlang::abort("`x` must be a result of `sas_run()`, a session from `sas_session()` or a result of a data-level PROC function.",
+               class = "sasonr_error")
+}
+
+log_view_events <- function(ev, format, echo, compact) {
   switch(format,
     plain = new_sasonr_log(log_view_plain(ev, echo, compact)),
     ansi = new_sasonr_log(log_view_ansi(ev, echo, compact)),
     html = log_view_html(ev, echo, compact)
   )
 }
+
+#' @export
+sas_log_view.sasonr_result <- function(x, format, echo, compact) {
+  ev <- x$log_events %||% rlang::abort("`x` has no log events (a result of an older version of sasonr).", class = "sasonr_error")
+  log_view_events(ev, format, echo, compact)
+}
+
+#' @export
+sas_log_view.SasSession <- function(x, format, echo, compact) log_view_events(log_session_events(x), format, echo, compact)
+
+# a data-level result has no program: its log is the messages of the computation
+log_view_lines <- function(x, format) {
+  lines <- attr(x, "sasonr_log", exact = TRUE) %||% character()
+  if (format == "html") return(paste0('<pre class="sas-log">', paste(html_escape(lines), collapse = "\n"), "</pre>"))
+  new_sasonr_log(lines)
+}
+
+#' @export
+sas_log_view.sasonr_ods_table <- function(x, format, echo, compact) log_view_lines(x, format)
+
+#' @export
+sas_log_view.sasonr_ods_list <- function(x, format, echo, compact) log_view_lines(x, format)
 
 # The lines of a log view (sas_log()) with the class that prints them as text.
 new_sasonr_log <- function(x) structure(x, class = "sasonr_log")

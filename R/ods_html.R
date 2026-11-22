@@ -185,17 +185,41 @@ render_html_output <- function(o) {
 #' doc <- sas_html(res)
 #' substr(doc, 1, 60)
 #' @export
-sas_html <- function(x, file = NULL, log = FALSE) {
-  x <- data_api_result(x) %||% x
-  if (!inherits(x, "sasonr_result")) rlang::abort("`x` must be a result of sas_run().")
+sas_html <- function(x, file = NULL, log = FALSE) UseMethod("sas_html")
+
+#' @export
+sas_html.default <- function(x, file = NULL, log = FALSE) {
+  rlang::abort("`x` must be a result of sas_run() or an ODS table of a data-level PROC function.", class = "sasonr_error")
+}
+
+#' @export
+sas_html.sasonr_result <- function(x, file = NULL, log = FALSE) {
+  body <- unlist(lapply(attr(x, "html_output", exact = TRUE) %||% list(), render_html_output))
+  html_document(body, if (isTRUE(log)) sas_log(x, "html"), file)
+}
+
+#' @export
+sas_html.sasonr_ods_table <- function(x, file = NULL, log = FALSE) {
+  sas_html(structure(list(x), class = "sasonr_ods_list", sasonr_log = attr(x, "sasonr_log", exact = TRUE)), file, log)
+}
+
+#' @export
+sas_html.sasonr_ods_list <- function(x, file = NULL, log = FALSE) {
+  tables <- unclass(x)
+  attributes(tables) <- NULL
+  proc <- if (length(tables)) attr(tables[[1]], "proc", exact = TRUE) else ""
+  body <- render_html_output(list(proc = proc, titles = character(), footnotes = character(), tables = tables))
+  html_document(body, if (isTRUE(log)) sas_log(x, "html"), file)
+}
+
+html_document <- function(body, log_html, file) {
   if (!is.null(file) && !(is.character(file) && length(file) == 1L && !is.na(file))) {
     rlang::abort("`file` must be NULL or one path.")
   }
   css <- readLines(system.file("css", "sasonr.css", package = "sasonr"), warn = FALSE)
-  body <- unlist(lapply(attr(x, "html_output", exact = TRUE) %||% list(), render_html_output))
   doc <- paste(c("<!DOCTYPE html>", "<html>", "<head>", '<meta charset="utf-8">', "<title>sasonr output</title>",
                  "<style>", css, "</style>", "</head>", "<body>", '<div class="sasonr-output">', body, "</div>",
-                 if (isTRUE(log)) sas_log(x, "html"), "</body>", "</html>"), collapse = "\n")
+                 log_html, "</body>", "</html>"), collapse = "\n")
   if (is.null(file)) return(doc)
   writeLines(doc, file, useBytes = TRUE)
   invisible(doc)

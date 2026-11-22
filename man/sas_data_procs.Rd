@@ -41,9 +41,12 @@ Run one procedure on a data frame without writing a SAS program.
 \code{sas_means_df()} and \code{sas_tabulate_df()} return the ODS table of the step
 (a \code{sasonr_ods_table}, a tibble with the SAS table attributes), or a list
 of them when there are several (one per BY group); \code{sas_transpose_df()}
-returns the output data set.  The step runs in a new session, so the
-values, the formats of the columns and the log are those of the same step
-in \code{\link[=sas_run]{sas_run()}}; \code{sas_log()} and \code{sas_html()} take the result.
+returns the output data set.  The arguments are read by the same parser
+and specification builder as the PROC step of a program, and the
+computation is the one \code{\link[=sas_run]{sas_run()}} calls for that step, so the values and
+the column attributes are the same.  \code{sas_log()} gives the WARNINGs and
+NOTEs of the computation and \code{sas_html()} the HTML document of the tables
+(both are S3 generics with methods for these results).
 }
 \examples{
 d <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
