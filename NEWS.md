@@ -5,6 +5,9 @@ the development version provides.
 
 ## Running SAS programs
 
+* `$QUOTEw.` with a width too small for the text cuts it at the width: a
+  doubled quote that the cut would split is dropped, and `$QUOTE1.` writes a
+  blank (an Unsupported error before).
 * `ODS RTF FILE="path";` and `ODS RTF CLOSE;` write the RTF document of
   the PROC PRINT and PROC TABULATE tables (default style) when the
   destination closes. PROC TABULATE: merged row titles and headings, the

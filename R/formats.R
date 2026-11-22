@@ -601,20 +601,21 @@ sas_format <- function(x, fmt = NULL) {
       upcase = toupper(x),
       quote = {
         inner <- gsub("\"", "\"\"", sas_rtrim(x), fixed = TRUE)
-        # too long for the width: the text is cut so that the closing quote fits
+        # too long for the width: the text is cut so that the closing quote
+        # fits; a cut through a doubled quote drops its first half; $QUOTE1.
+        # writes a blank [measured, probe quote_width: w = 1..20]
         if (!is.na(w)) {
-          cut <- nchar(inner) > w - 2L
-          # a cut through a doubled quote: the rule is not implemented; fail loud
-          if (any(cut & vapply(seq_along(inner), function(i) {
-            if (!cut[i] || w < 3L) return(FALSE)
-            k <- w - 2L
-            rest <- substr(inner[i], 1L, k)
-            m <- regmatches(rest, regexpr("\"+$", rest))
-            length(m) > 0 && nchar(m) %% 2L == 1L
-          }, logical(1)))) abort_unsupported(paste0("format ", fmt$text, " cutting through an embedded quote"))
-          inner <- substr(inner, 1L, w - 2L)
+          inner <- vapply(inner, function(s) {
+            if (nchar(s) <= w - 2L) return(s)
+            r <- substr(s, 1L, max(w - 2L, 0L))
+            m <- regmatches(r, regexpr("\"+$", r))
+            if (length(m) && nchar(m) %% 2L == 1L) r <- substr(r, 1L, nchar(r) - 1L)
+            r
+          }, "", USE.NAMES = FALSE)
         }
-        paste0("\"", inner, "\"")
+        out_q <- paste0("\"", inner, "\"")
+        if (!is.na(w) && w < 2L) out_q <- rep(strrep(" ", w), length(out_q))
+        out_q
       },
       hex = fmt_hex_char(x, w),
       x
