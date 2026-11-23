@@ -117,12 +117,12 @@ sas_freq_df <- function(data, tables, by = NULL, weight = NULL, options = "") {
   if (length(weight) > 1L) rlang::abort("`weight` must be one variable name.", class = "sasonr_error")
   body <- paste0(data_api_stmt("by", data_api_names(by, "by")), data_api_stmt("weight", weight), "  tables ", tables, ";\n")
   res <- data_api_core(data, "freq", data_api_text("freq", options, body), freq_step_spec)
-  # the other FREQ output (n-way and LIST tables, statistics, NLEVELS) has no ODS
+  # the other FREQ output (n-way and LIST tables) has no ODS
   # table yet: it would be left out of the result
   lines <- Filter(function(tb) identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
   content <- Filter(function(tb) !isTRUE(attr(tb, "decor", exact = TRUE)), lines)
   if (any(lengths(lapply(content, attr, "lines")) > 0L)) {
-    abort_unsupported("sas_freq_df() for output other than one-way and two-way frequency tables (n-way and LIST tables, statistics other than CHISQ and FISHER, NLEVELS)")
+    abort_unsupported("sas_freq_df() for output other than one-way and two-way frequency tables (n-way and LIST tables)")
   }
   res$tables <- Filter(function(tb) !identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
   if (!length(res$tables)) abort_unsupported("sas_freq_df() without a printed table (NOPRINT)")

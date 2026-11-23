@@ -70,8 +70,12 @@ test_that("sas_freq_df() fails loud on output without an ODS table yet", {
   expect_identical(st[[2]]$Statistic[1], "Chi-Square")
   expect_identical(st[[3]]$Name, c("FISHER_F", "XPL_FISH", "XPR_FISH", "XPT_FISH", "XP2_FISH"))
   expect_error(sas_freq_df(d, "g*h*k"), class = "sasonr_unsupported")
-  expect_error(sas_freq_df(d, "g*h / relrisk"), class = "sasonr_unsupported")
-  expect_error(sas_freq_df(d, "g / chisq"), class = "sasonr_unsupported")
+  expect_identical(attr(sas_freq_df(d, "g*h / relrisk")[[2]], "name"), "RelativeRisks")
+  expect_identical(vapply(sas_freq_df(d, "g / chisq"), attr, "", "name"), c("OneWayFreqs", "OneWayChiSq"))
+  expect_identical(vapply(sas_freq_df(d, "g / binomial"), attr, "", "name"),
+                   c("OneWayFreqs", "Binomial", "BinomialCLs", "BinomialTest"))
+  expect_error(sas_freq_df(d, "g / chisq binomial"), class = "sasonr_unsupported")
+  expect_identical(attr(sas_freq_df(d, "g", options = "nlevels")[[1]], "name"), "NLevels")
   expect_error(sas_html(sas_freq_df(d, "g")), class = "sasonr_unsupported")
 })
 

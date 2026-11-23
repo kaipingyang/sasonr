@@ -48,12 +48,15 @@ html_templates <- list(
   base.freq.relrisk = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
   base.freq.relriskcl = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
   base.freq.riskdiff = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.riskdiffcl = function(tb) abort_unsupported("the HTML output of PROC FREQ")
+  base.freq.riskdiffcl = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.binomial = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.onewaychisq = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.nlevels = function(tb) abort_unsupported("the HTML output of PROC FREQ")
 )
 # the templates without an HTML view (sas_html() fails loud on them)
 html_undrawn <- c("base.print", "base.freq.oneway", "base.freq.crosstab", "base.freq.chisq", "base.freq.fisher", "base.freq.cmh",
                   "base.freq.commonrr", "base.freq.breslow", "base.freq.relrisk", "base.freq.relriskcl",
-                  "base.freq.riskdiff", "base.freq.riskdiffcl", "base.freq.lines")
+                  "base.freq.riskdiff", "base.freq.riskdiffcl", "base.freq.binomial", "base.freq.onewaychisq", "base.freq.nlevels", "base.freq.lines")
 
 # A table laid out on a grid: `cells` is a list of rectangles list(r0, r1,
 # c0, c1, text, kind) over logical rows 1..nrow, `kind` "header" (in

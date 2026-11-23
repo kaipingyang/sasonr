@@ -71,6 +71,8 @@ the development version provides.
   parser and builder, so the values are the same. `sas_log()` and
   `sas_html()` are S3 generics with methods for these results;
   `as.data.frame()` drops the table attributes.
+* PROC FREQ CHISQ together with BINOMIAL for a one-way table is an
+  Unsupported error; before, the chi-square test was left out.
 * PROC FREQ TABLES / NOPRINT suppresses only the frequency and
   crosstabulation tables: the statistics requested (CHISQ, FISHER, the
   multiway CMH summary, BINOMIAL) are written; before, the request wrote
@@ -80,9 +82,10 @@ the development version provides.
   are ODS tables (OneWayFreqs, CrossTabFreqs with one row per cell and per
   total, in `$ods`), so are the CHISQ and FISHER results of a two-way table
   (ChiSq, FishersExact), RELRISK (RelativeRisks, RelRiskCL), RISKDIFF
-  (RiskDiffCol1, RiskDiffCol2, PdiffCLs) and the multiway CMH summary (CMH,
-  CommonRelRisks, BreslowDayTest), and `sas_freq_df()` returns them for a data frame.
-  N-way and LIST tables, the other statistics and NLEVELS are not ODS tables yet:
+  (RiskDiffCol1, RiskDiffCol2, PdiffCLs), BINOMIAL (Binomial, BinomialCLs,
+  BinomialTest), the one-way chi-square test (OneWayChiSq), NLEVELS (NLevels)
+  and the multiway CMH summary (CMH, CommonRelRisks, BreslowDayTest), and `sas_freq_df()` returns them for a data frame.
+  N-way and LIST tables are not ODS tables yet:
   `sas_freq_df()` stops with an Unsupported error for them.
 * `sas_html()` of a program result is an Unsupported error, naming the
   procedure and its SAS line, when the HTML destination received PROC PRINT

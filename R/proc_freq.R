@@ -477,6 +477,11 @@ freq_step_spec <- function(step, meta, last) {
         (any(c("chisq", "fisher", "binomial", "relrisk", "riskdiff") %in% names(rq$opts)) || length(exact) > 0)) {
       abort_unsupported("TABLES option NOPRINT with per-stratum statistics of a multiway table", rq$line)
     }
+    # the order and layout of both statistics of a one-way table are not
+    # measured (the chi-square test was left out)
+    if (kv == 1 && isTRUE(rq$opts$chisq) && isTRUE(rq$opts$binomial)) {
+      abort_unsupported("CHISQ together with BINOMIAL for a one-way table", rq$line)
+    }
     if (isTRUE(rq$opts$noprint) && kv == 1 && isTRUE(rq$opts$chisq)) {
       abort_unsupported("TABLES option NOPRINT with the one-way chi-square test", rq$line)
     }
@@ -688,6 +693,8 @@ freq_listing_tables <- function(tables) {
       base.freq.breslow = freq_breslow_listing(tb),
       base.freq.relrisk = , base.freq.relriskcl = freq_relrisk_listing(tb),
       base.freq.riskdiff = , base.freq.riskdiffcl = freq_riskdiff_listing(tb),
+      base.freq.onewaychisq = freq_onewaychisq_listing(tb),
+      base.freq.nlevels = freq_nlevels_listing(tb),
       attr(tb, "lines", exact = TRUE)))
   }
   lst
@@ -799,9 +806,15 @@ freq_nlevels_table <- function(db, sp) {
   miss <- vapply(vars, function(v) length(unique(proc_value_text(db[[v]][freq_is_missing(db[[v]])], sp$info[[v]]))), 1L)
   if (any(miss > 0)) abort_unsupported("NLEVELS with missing levels (Missing Levels columns)")
   disp <- vapply(vars, function(v) sp$info[[v]]$disp, "")
-  w <- max(8L, nchar(disp))
+  new_sasonr_ods_table(tibble::tibble(TableVar = unname(disp), NLevels = unname(as.numeric(nl))), name = "NLevels",
+                       label = "Number of Variable Levels", path = "Freq.NLevels", proc = "Freq", template = "base.freq.nlevels",
+                       cols = ods_cols(c("TableVar", "NLevels"), label = c("Variable", "Levels"), role = c("label", "stat")))
+}
+
+freq_nlevels_listing <- function(tb) {
+  w <- max(8L, nchar(tb$TableVar))
   c("Number of Variable Levels", "", paste0(formatC("Variable", width = -w), "      Levels"), strrep("-", w + 12L),
-    paste0(formatC(disp, width = -w), formatC(as.character(nl), width = 12L)), "")
+    paste0(formatC(tb$TableVar, width = -w), formatC(sprintf("%.0f", tb$NLevels), width = 12L)), "")
 }
 
 # One table request (one-way, two-way or n-way) within a BY group.
@@ -2295,6 +2308,47 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
 # asymptotic (and optionally exact) test.  Column widths:
 # the proportion block is 32 columns wide, 22 when CL= is given (the limits
 # then go in their own table), 35 when the exact test adds its longer labels.
+# BINOMIAL as ODS tables: Binomial (the proportion and its ASE),
+# BinomialCLs (one row per confidence limit type) and BinomialTest (the test
+# of H0, with the exact test when requested).  The listing block is drawn
+# from the same statistics (freq_binomial_listing()) and goes with the first
+# table; the other two add no lines.
+freq_binomial_tables <- function(st, info) {
+  tab <- function(x, name, label, role) {
+    new_sasonr_ods_table(x, name = name, label = label, path = paste0("Freq.Table1.", name), proc = "Freq",
+                         template = "base.freq.binomial", cols = ods_cols(names(x), role = role))
+  }
+  b1 <- tab(tibble::tibble(Name = c("_BIN_", "E_BIN"), Label = c("Proportion", "ASE"), Value = c(st$bin, st$e_bin)),
+            "Binomial", "Binomial Proportion", c("label", "label", "stat"))
+  attr(b1, "lines") <- freq_binomial_listing(st, info)
+  # the limit types the listing shows: Wald and exact by default, the CL= list otherwise
+  cl <- st$bin_cl
+  types <- if (is.null(cl)) c("wald", "exact") else {
+    tt <- if (identical(cl, "all")) c("wald", "wilson", "exact", "agresticoull", "jeffreys") else cl
+    unique(unlist(lapply(tt, function(t) {
+      if (t == "all") c("wald", "wilson", "exact", "agresticoull", "jeffreys")
+      else if (t %in% c("wald", "wilson") && isTRUE(st$correct)) paste0(t, "_corrected") else t
+    })))
+  }
+  types <- intersect(types, names(st$cl))
+  cls <- tibble::tibble(Type = types, LowerCL = vapply(types, function(t) st$cl[[t]][1], 0, USE.NAMES = FALSE),
+                        UpperCL = vapply(types, function(t) st$cl[[t]][2], 0, USE.NAMES = FALSE))
+  b2 <- tab(cls, "BinomialCLs", "Binomial Proportion Confidence Limits", c("label", "stat", "stat"))
+  use_c <- isTRUE(st$correct) && !is.null(st$bin_cl)
+  tv <- c(st$e0_bin, if (use_c) st$zc_bin else st$z_bin, if (use_c) st$plc_bin else st$pl_bin, if (use_c) st$p2c_bin else st$p2_bin)
+  tn <- c("E0_BIN", "Z_BIN", "PL_BIN", "P2_BIN")
+  tl <- c("ASE under H0", "Z", "One-sided Pr", "Two-sided Pr > |Z|")
+  if (isTRUE(st$bin_exact)) {
+    tv <- c(tv, st$xpl_bin, st$xp2_bin)
+    tn <- c(tn, "XPL_BIN", "XP2_BIN")
+    tl <- c(tl, "Exact One-sided Pr", "Exact Two-sided Pr")
+  }
+  b3 <- tab(tibble::tibble(Name = tn, Label = tl, Value = tv), "BinomialTest", "Binomial Proportion Test", c("label", "label", "stat"))
+  attr(b2, "lines") <- character()
+  attr(b3, "lines") <- character()
+  list(b1, b2, b3)
+}
+
 freq_binomial_listing <- function(st, info) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
@@ -2442,7 +2496,9 @@ freq_breslow_listing <- function(tb) {
 # character vector of listing lines or an ODS table (ChiSq, FishersExact)
 # (`pieces = TRUE`), or the listing lines.
 freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum_line = NULL, pieces = FALSE) {
-  if (!is.null(st$bin_var)) return(if (pieces) list(freq_lines_seg(freq_binomial_listing(st, info))) else freq_binomial_listing(st, info))
+  if (!is.null(st$bin_var)) {
+    return(if (pieces) freq_binomial_tables(st, info) else freq_binomial_listing(st, info))
+  }
   segs <- list()
   out <- character()
   # the lines so far become a segment; `decor`: headings, warnings and the
@@ -2481,12 +2537,16 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
     } else {
       "for Equal Proportions"
     }
-    out <- c(out, "   Chi-Square Test", test_line, "",
-             paste0("Chi-Square", formatC(f4(st$pchi), width = 10L)), paste0("DF", formatC(sprintf("%.0f", st$df_pchi), width = 18L)),
-             paste0("Pr > ChiSq", formatC(pv(st$p_pchi), width = 10L)), "",
-             if (isTRUE(st$oneway_small)) c("WARNING: The table cells have expected counts less",
-                                             "         than 5. Chi-Square may not be a valid test.", ""),
+    out <- c(out, "   Chi-Square Test", test_line, "")
+    flush(decor = TRUE)
+    push(new_sasonr_ods_table(tibble::tibble(Name = c("_PCHI_", "DF_PCHI", "P_PCHI"), Label = c("Chi-Square", "DF", "Pr > ChiSq"),
+                                             Value = c(st$pchi, st$df_pchi, st$p_pchi)),
+                              name = "OneWayChiSq", label = "One-Way Chi-Square Test", path = "Freq.Table1.OneWayChiSq", proc = "Freq",
+                              template = "base.freq.onewaychisq", cols = ods_cols(c("Name", "Label", "Value"), role = c("label", "label", "stat"))))
+    out <- c(out, if (isTRUE(st$oneway_small)) c("WARNING: The table cells have expected counts less",
+                                                 "         than 5. Chi-Square may not be a valid test.", ""),
              freq_sample_size(st))
+    flush(decor = TRUE)
   } else if (isTRUE(st$nostat) && k == 2) {
     out <- c(out, hdr, "",
              "Row or column sum zero. No statistics computed for this table.", "", freq_sample_size(st))
@@ -2588,7 +2648,11 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
     flush(decor = TRUE)
     push(freq_relrisk_table(st))
   }
-  if (more) out <- c(out, freq_sample_size(st))
+  if (more) {
+    flush()
+    out <- c(out, freq_sample_size(st))
+    flush(decor = TRUE)
+  }
   finish()
 }
 
@@ -2604,7 +2668,9 @@ freq_seg_lines <- function(seg) {
     base.freq.commonrr = freq_commonrr_listing(seg),
     base.freq.breslow = freq_breslow_listing(seg),
     base.freq.relrisk = , base.freq.relriskcl = freq_relrisk_listing(seg),
-    base.freq.riskdiff = , base.freq.riskdiffcl = freq_riskdiff_listing(seg))
+    base.freq.riskdiff = , base.freq.riskdiffcl = freq_riskdiff_listing(seg),
+    base.freq.binomial = attr(seg, "lines", exact = TRUE),
+    base.freq.onewaychisq = freq_onewaychisq_listing(seg))
 }
 
 # Listing of a ChiSq table: the tests with DF and Prob, then the measures.
@@ -2617,6 +2683,14 @@ freq_chisq_listing <- function(tb) {
            formatC(f4(tb$Value[i]), width = 12L), formatC(pv(tb$Prob[i]), width = 10L))
   }, "")
   c(paste0(formatC("Statistic", width = -27L), "   DF       Value      Prob"), strrep("-", 54), body, "")
+}
+
+# Listing of a OneWayChiSq table.
+freq_onewaychisq_listing <- function(tb) {
+  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
+  pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
+  c(paste0("Chi-Square", formatC(f4(tb$Value[1]), width = 10L)), paste0("DF", formatC(sprintf("%.0f", tb$Value[2]), width = 18L)),
+    paste0("Pr > ChiSq", formatC(pv(tb$Value[3]), width = 10L)), "")
 }
 
 # Listing of a FishersExact table (2x2: one-sided and two-sided; larger
