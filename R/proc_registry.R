@@ -17,7 +17,7 @@ proc_registry <- list(
                   ods_output = function(tables, spec, line) tab_output_data(tables, spec, line)),
   # the procedure title is part of the listing of the tables (freq_listing_tables())
   freq = list(compute = function(d, spec) freq_compute(d, spec), templates = c(Freq = "base.freq.lines"),
-              proctitle = FALSE, listing = function(tables, ls) freq_listing_tables(tables)),
+              listing = function(tables, ls) freq_listing_tables(tables)),
   # one table per page (BY group); no procedure title
   print = list(compute = function(d, spec) print_compute(d, spec), templates = c(Print = "base.print"),
                proctitle = FALSE, listing = function(tables, ls) print_listing_tables(tables))

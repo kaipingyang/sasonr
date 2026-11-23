@@ -773,6 +773,10 @@ freq_compute <- function(d, sp) {
         if (!inherits(pc, "sasonr_ods_table")) {
           tl <- freq_table_lines(as.character(pc), gi, by)
           attr(tl, "decor") <- isTRUE(attr(pc, "decor", exact = TRUE))
+          if (!attr(tl, "decor") && length(pc) > 0L) {
+            rt <- rt_diag()
+            rt$freq_lines <- TRUE
+          }
           return(tl)
         }
         attr(pc, "by") <- by
@@ -2566,6 +2570,8 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
                               template = "base.freq.chisq", cols = ods_cols(names(chi), role = c("label", "stat", "stat", "stat"))))
     did <- TRUE
     if (isTRUE(st$small > 0) && !isTRUE(o$nowarn)) {
+      attr(segs[[length(segs)]], "freq") <- list(warning = sprintf("WARNING: %.0f%% of the cells have expected counts less than 5. Chi-Square may not be a valid test.",
+                                                                    st$small * 100))
       out <- c(out, sprintf(" WARNING: %.0f%% of the cells have expected counts less", st$small * 100),
                "          than 5. Chi-Square may not be a valid test.", "")
       flush(decor = TRUE)

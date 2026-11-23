@@ -38,9 +38,9 @@ html_cell <- function(values, tag = "td", cls = character(), attrs = "") {
 html_templates <- list(
   base.tabulate = function(tb) html_base_tabulate(tb),
   base.print = function(tb) abort_unsupported("the HTML output of PROC PRINT"),
-  base.freq.oneway = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.crosstab = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.chisq = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.oneway = function(tb) html_freq_oneway(tb),
+  base.freq.crosstab = function(tb) html_freq_crosstab(tb),
+  base.freq.chisq = function(tb) html_freq_chisq(tb),
   base.freq.fisher = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
   base.freq.cmh = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
   base.freq.commonrr = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
@@ -54,9 +54,84 @@ html_templates <- list(
   base.freq.nlevels = function(tb) abort_unsupported("the HTML output of PROC FREQ")
 )
 # the templates without an HTML view (sas_html() fails loud on them)
-html_undrawn <- c("base.print", "base.freq.oneway", "base.freq.crosstab", "base.freq.chisq", "base.freq.fisher", "base.freq.cmh",
+html_undrawn <- c("base.print", "base.freq.fisher", "base.freq.cmh",
                   "base.freq.commonrr", "base.freq.breslow", "base.freq.relrisk", "base.freq.relriskcl",
                   "base.freq.riskdiff", "base.freq.riskdiffcl", "base.freq.binomial", "base.freq.onewaychisq", "base.freq.nlevels", "base.freq.lines")
+
+# PROC FREQ tables [measured, freq_html cases: one-way, crosstabulation,
+# chi-square].  The other FREQ tables have no HTML view yet.
+html_freq_table <- function(tb, head, body) {
+  cells <- list()
+  add <- function(r, c, text, kind, cs = 1L) cells[[length(cells) + 1L]] <<- list(r0 = r, r1 = r, c0 = c, c1 = c + cs - 1L, text = text, kind = kind)
+  for (j in seq_along(head)) add(1L, j, head[[j]], "header")
+  for (i in seq_along(body)) for (j in seq_along(body[[i]])) add(i + 1L, j, body[[i]][[j]], if (j == 1L) "rowheader" else "data")
+  render_html_grid(cells, length(body) + 1L, 1L, paste0("Procedure Freq: ", attr(tb, "label", exact = TRUE)))
+}
+
+html_freq_oneway <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  if (!is.null(a$test)) abort_unsupported("the HTML output of a PROC FREQ one-way table with test frequencies or percentages")
+  cols <- attr(tb, "cols", exact = TRUE)
+  shown <- cols$name[!cols$hidden][-1]
+  labs <- c(Frequency = "Frequency", Percent = "Percent", CumFrequency = "Cumulative Frequency", CumPercent = "Cumulative Percent")
+  fmt <- function(nm, v) if (nm %in% c("Frequency", "CumFrequency")) (if (is.na(v)) "." else freq_num(v)) else freq_pct(v)
+  body <- lapply(seq_len(nrow(tb)), function(i) c(a$text[i], vapply(shown, function(nm) fmt(nm, tb[[nm]][i]), "")))
+  html_freq_table(tb, c(a$disp, unname(labs[shown])), body)
+}
+
+html_freq_crosstab <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  cols <- attr(tb, "cols", exact = TRUE)
+  stat_cols <- c(freq = "Frequency", expected = "Expected", deviation = "Deviation", cellchi2 = "CellChiSquare",
+                 pct = "Percent", row = "RowPercent", col = "ColPercent")
+  shown <- names(stat_cols)[!cols$hidden[match(stat_cols, cols$name)]]
+  if (any(c("expected", "deviation", "cellchi2") %in% shown)) {
+    abort_unsupported("the HTML output of a PROC FREQ crosstabulation with EXPECTED, DEVIATION or CELLCHI2")
+  }
+  nr <- a$nr
+  nc <- a$nc
+  at <- function(r, cc, s) {
+    i <- if (!is.na(r) && !is.na(cc)) (r - 1L) * (nc + 1L) + cc else if (!is.na(r)) r * (nc + 1L) else nr * (nc + 1L) + (if (is.na(cc)) nc + 1L else cc)
+    tb[[stat_cols[[s]]]][i]
+  }
+  txt <- function(s, v) if (s == "freq") freq_num(v) else freq_pct(v)
+  legend <- render_html_grid(list(list(r0 = 1L, r1 = 1L, c0 = 1L, c1 = 1L, text = unname(all_labels_freq[shown]), kind = "data")),
+                             1L, 0L, paste0("Procedure Freq: ", attr(tb, "label", exact = TRUE)))
+  rh <- paste0(a$ri$disp, if (!is.null(a$ri$label)) paste0("(", a$ri$label, ")"))
+  ch <- paste0(a$ci$disp, if (!is.null(a$ci$label)) paste0("(", a$ci$label, ")"))
+  # the table heading keeps its words together (no-break spaces)
+  cells <- list(list(r0 = 1L, r1 = 1L, c0 = 1L, c1 = nc + 2L, text = gsub(" ", "\u00a0", paste("Table of", a$ri$disp, "by", a$ci$disp), fixed = TRUE),
+                     kind = "header"),
+                list(r0 = 2L, r1 = 3L, c0 = 1L, c1 = 1L, text = rh, kind = "header"),
+                list(r0 = 2L, r1 = 2L, c0 = 2L, c1 = nc + 2L, text = ch, kind = "header"))
+  add <- function(r, c, text, kind) cells[[length(cells) + 1L]] <<- list(r0 = r, r1 = r, c0 = c, c1 = c, text = text, kind = kind)
+  for (cc in seq_len(nc)) add(3L, cc + 1L, a$ctext[cc], "header")
+  add(3L, nc + 2L, "Total", "header")
+  tot_stats <- intersect(shown, c("freq", "pct"))
+  for (r in seq_len(nr)) {
+    add(3L + r, 1L, a$rtext[r], "rowheader")
+    for (cc in seq_len(nc)) add(3L + r, cc + 1L, vapply(shown, function(s) txt(s, at(r, cc, s)), ""), "data")
+    add(3L + r, nc + 2L, vapply(shown, function(s) if (s %in% tot_stats) txt(s, at(r, NA, s)) else "", ""), "data")
+  }
+  add(4L + nr, 1L, "Total", "rowheader")
+  for (cc in seq_len(nc)) add(4L + nr, cc + 1L, vapply(tot_stats, function(s) txt(s, at(NA, cc, s)), ""), "data")
+  add(4L + nr, nc + 2L, vapply(tot_stats, function(s) txt(s, at(NA, NA, s)), ""), "data")
+  c(legend, render_html_grid(cells, 4L + nr, 3L, paste0("Procedure Freq: ", attr(tb, "label", exact = TRUE))))
+}
+
+html_freq_chisq <- function(tb) {
+  f4 <- function(v) if (is.na(v)) "" else display_fixed(v, 4L)
+  pv <- function(v) if (is.na(v)) "" else trimws(fmt_pvalue(v, 6L, 4L))
+  body <- lapply(seq_len(nrow(tb)), function(i) c(tb$Statistic[i], if (is.na(tb$DF[i])) "" else sprintf("%.0f", tb$DF[i]),
+                                                  f4(tb$Value[i]), pv(tb$Prob[i])))
+  out <- html_freq_table(tb, c("Statistic", "DF", "Value", "Prob"), body)
+  warn <- attr(tb, "freq", exact = TRUE)$warning
+  if (length(warn)) {
+    n <- length(out)
+    out <- c(out[seq_len(n - 2L)], paste0('<tr><td class="sas-data" colspan="4">', html_escape(warn), "</td></tr>"), out[(n - 1L):n])
+  }
+  out
+}
 
 # A table laid out on a grid: `cells` is a list of rectangles list(r0, r1,
 # c0, c1, text, kind) over logical rows 1..nrow, `kind` "header" (in

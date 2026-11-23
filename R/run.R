@@ -318,6 +318,12 @@ engine_exec_steps <- function(eng, text, line) {
     # every table goes to the HTML destination; sas_html() stops on the ones
     # it cannot draw (PROC PRINT, PROC FREQ) instead of leaving them out
     html_tables <- env$.ods
+    # PROC FREQ output that is not an ODS table yet (n-way and LIST tables):
+    # a marker without an HTML view
+    if (isTRUE(rt$freq_lines)) {
+      html_tables <- c(html_tables, list(new_sasonr_ods_table(tibble::tibble(), name = "Freq", label = "Freq", path = "Freq.Freq",
+                                                              proc = "Freq", template = "base.freq.lines")))
+    }
     if (length(html_tables) > 0 && isTRUE(eng$session$ods_html)) {
       eng$html <- c(eng$html, list(list(proc = step$name, line = step$line, titles = env$.titles, footnotes = eng$session$footnotes,
                                           tables = html_tables)))
