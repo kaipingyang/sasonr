@@ -742,7 +742,7 @@ freq_compute <- function(d, sp) {
         # the multiway CMH summary starts a page of its own after the stratum
         # tables; without them it is the first output and the procedure
         # title is written once [measured, cmh]
-        if (length(rq$vars) > 2L && length(st_segs) > 0L && identical(head(as.character(st_segs[[1]]), 1L), "The FREQ Procedure")) {
+        if (length(rq$vars) > 2L && length(st_segs) > 0L && identical(utils::head(as.character(st_segs[[1]]), 1L), "The FREQ Procedure")) {
           if (length(pieces) > 0L) abort_unsupported("TABLES option NOPRINT with a multiway table after other output of the step", rq$line)
           st_segs[[1]] <- freq_lines_seg(as.character(st_segs[[1]])[-(1:2)], decor = TRUE)
         }
