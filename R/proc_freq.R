@@ -470,11 +470,15 @@ freq_step_spec <- function(step, meta, last) {
     if (kv != 2 && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is supported)", rq$line)
     }
-    # NOPRINT suppresses the frequency tables; whether the statistics are
-    # still written is not measured yet
-    if (isTRUE(rq$opts$noprint) && (any(c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff") %in% names(rq$opts)) ||
-                                    length(exact) > 0)) {
-      abort_unsupported("TABLES option NOPRINT together with statistics options", rq$line)
+    # NOPRINT suppresses the frequency tables, not the statistics [measured,
+    # chisq / fisher / two-way, cmh / multiway, binomial / one-way]; the
+    # per-stratum statistics of a multiway table are not measured
+    if (isTRUE(rq$opts$noprint) && kv > 2 &&
+        (any(c("chisq", "fisher", "binomial", "relrisk", "riskdiff") %in% names(rq$opts)) || length(exact) > 0)) {
+      abort_unsupported("TABLES option NOPRINT with per-stratum statistics of a multiway table", rq$line)
+    }
+    if (isTRUE(rq$opts$noprint) && kv == 1 && isTRUE(rq$opts$chisq)) {
+      abort_unsupported("TABLES option NOPRINT with the one-way chi-square test", rq$line)
     }
     # --- option combinations whose listing layout is not supported ----------
     if (isTRUE(rq$opts$missprint) && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
@@ -691,6 +695,17 @@ freq_listing_tables <- function(tables) {
 
 freq_compute <- function(d, sp) {
   info <- sp$info
+  # every request NOPRINT without statistics, no OUT= and no OUTPUT
+  # statement: the step reads nothing [measured, TABLES / NOPRINT]
+  stat_opts <- c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff")
+  idle <- length(sp$requests) > 0L && sp$print && !sp$nlevels && is.null(sp$output) && length(sp$exact) == 0L &&
+    all(vapply(sp$requests, function(r) isTRUE(r$opts$noprint) && is.null(r$opts$out) && !any(stat_opts %in% names(r$opts)), TRUE))
+  if (idle) {
+    rt <- rt_diag()
+    rt$reads <- list()
+    return(list(tables = list(), data = list(),
+                events = "NOTE: Processing will terminate because there are no valid requests for displayed output or output data sets."))
+  }
   groups <- if (!is.null(sp$by)) proc_by_groups(d, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(d)))
   tables <- list()
   outs <- list()
@@ -717,7 +732,24 @@ freq_compute <- function(d, sp) {
                                                    attr(res$tables[[ti]], "name", exact = TRUE))
         }
       }
-      if (!isTRUE(rq$opts$noprint)) pieces <- c(pieces, res$tables)
+      if (isTRUE(rq$opts$noprint)) {
+        st_segs <- res$tables[-seq_len(res$n_freq)]
+        # the statistics of a one-way table get the heading of the table they
+        # belong to [measured, binomial]
+        if (length(rq$vars) == 1L && length(st_segs) > 0L) {
+          st_segs <- c(list(freq_lines_seg(c(paste("Statistics for Table of", info[[rq$vars]]$disp), ""), decor = TRUE)), st_segs)
+        }
+        # the multiway CMH summary starts a page of its own after the stratum
+        # tables; without them it is the first output and the procedure
+        # title is written once [measured, cmh]
+        if (length(rq$vars) > 2L && length(st_segs) > 0L && identical(head(as.character(st_segs[[1]]), 1L), "The FREQ Procedure")) {
+          if (length(pieces) > 0L) abort_unsupported("TABLES option NOPRINT with a multiway table after other output of the step", rq$line)
+          st_segs[[1]] <- freq_lines_seg(as.character(st_segs[[1]])[-(1:2)], decor = TRUE)
+        }
+        pieces <- c(pieces, st_segs)
+      } else {
+        pieces <- c(pieces, res$tables)
+      }
       if (!is.null(rq$opts$out)) {
         nm <- rq$opts$out$name
         byv <- lapply(sp$by, function(v) rep(d[[v]][g[1]], nrow(res$out)))
@@ -868,7 +900,10 @@ freq_one_request <- function(db, wt, rq, sp) {
             freq_stats_listing(res$stats, tab, vars, info, o, sp, pieces = TRUE))
   # the tables of the request: OneWayFreqs / CrossTabFreqs, then the
   # statistics output (ODS tables and listing lines) in listing order
-  res$tables <- c(if (!is.null(res$table)) list(res$table), segs)
+  res$tables <- c(if (!is.null(res[["table"]])) list(res[["table"]]), segs)
+  # the frequency (or crosstabulation) output: the table, or the lines of the
+  # stratum tables of a multiway request
+  res$n_freq <- as.integer(!is.null(res[["table"]])) + as.integer(length(res$listing) > 0L)
   if (!length(res$tables)) res$tables <- list(freq_lines_seg(character()))
   res
 }

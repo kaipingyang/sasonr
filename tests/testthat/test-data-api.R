@@ -92,7 +92,14 @@ test_that("the multiway CMH summary is CMH, CommonRelRisks and BreslowDayTest ta
   expect_identical(r$ods[[2]]$Method, rep(c("Mantel-Haenszel", "Logit"), 3L))
 })
 
-test_that("TABLES / NOPRINT with statistics options fails loud (not measured)", {
-  expect_error(sas_run("data a; input g $ h $; datalines;\na x\nb y\n;\nrun;\nproc freq data=a; tables g*h / chisq noprint; run;"),
-               class = "sasonr_unsupported")
+test_that("TABLES / NOPRINT keeps the statistics and drops the frequency table", {
+  prog <- "data a; input g $ h $; datalines;\na x\na y\nb y\nb y\n;\nrun;\nproc freq data=a; tables g*h / chisq noprint; run;"
+  r <- sas_run(prog)
+  expect_identical(vapply(r$ods, attr, "", "name"), c("ChiSq", "FishersExact"))
+  expect_false(any(grepl("Table of g by h", r$listing, fixed = TRUE) & !grepl("Statistics", r$listing, fixed = TRUE)))
+  withr::local_options(sasonr.step_notes = TRUE)
+  r2 <- sas_run(sub("chisq noprint", "noprint", prog, fixed = TRUE))
+  expect_length(r2$listing, 0L)
+  expect_true(any(grepl("no valid requests for displayed output", as.character(sas_log(r2)), fixed = TRUE)))
+  expect_false(any(grepl("observations read", as.character(sas_log(r2)), fixed = TRUE)))
 })
