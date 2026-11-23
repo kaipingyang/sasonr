@@ -24,7 +24,21 @@ test_that("ODS RTF outside the measured rules fails loud", {
   dir.create("rtf")
   fails <- function(body) expect_error(sas_run(rtf_prog(body)), class = "sasonr_unsupported")
   fails("ods rtf file=\"rtf/out.rtf\";\nproc print data=have; run;")
-  fails("ods rtf file=\"rtf/out.rtf\";\nproc print data=have n; by grp; run;\nods rtf close;")
   fails("ods rtf file=\"rtf/out.rtf\" style=journal;\nproc print data=have; run;\nods rtf close;")
   fails("ods rtf file=\"rtf/out.rtf\";\nproc means data=have; var x; run;\nods rtf close;")
+  # 17 columns of 582 twips: wider than the widest single column group measured
+  expect_error(sas_run(paste0("data w; length col1-col17 $8; array col{17} $ col1-col17; do j = 1 to 17; col{j} = 'iiiiiiii'; end; drop j; run;\n",
+                              "ods rtf file=\"rtf/out.rtf\";\nproc print data=w noobs; run;\nods rtf close;")),
+               class = "sasonr_unsupported")
+})
+
+test_that("the N line widens the columns it spans (N with BY)", {
+  d <- withr::local_tempdir()
+  withr::local_dir(d)
+  dir.create("rtf")
+  sas_run(rtf_prog("ods rtf file=\"rtf/out.rtf\";\nproc print data=have n; by grp; var x; run;\nods rtf close;"))
+  x <- paste(readLines("rtf/out.rtf"), collapse = "")
+  # x: 125 + floor(width of "N = 2" / 2 columns) = 358, so 522 + 358
+  expect_true(all(c("cellx522", "cellx880") %in% regmatches(x, gregexpr("cellx[0-9]+", x))[[1]]))
+  expect_identical(lengths(regmatches(x, gregexpr("N = [12]\\\\cell", x))), 2L)
 })

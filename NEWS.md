@@ -21,13 +21,14 @@ the development version provides.
   destination closes. PROC TABULATE: merged row titles and headings, the
   page text of a page dimension (one section per page), the same width rule
   as PROC PRINT, a column heading over several columns setting a minimum
-  width for each of them; a table wider than the page and characters whose
-  advance is not measured are an Unsupported error. PROC PRINT: the
+  width for each of them. A table wider than 9322 twips (it may be split
+  into column groups) and characters whose advance is not measured are an
+  Unsupported error. PROC PRINT: the
   table rows, borders, heading and row-header styles, BY lines, SPLIT= line
   breaks and the column widths (from the measured character advances of the
-  default fonts). Other procedures, options of
-  the ODS RTF statement, titles in the document, PROC PRINT with N and BY,
-  and a destination left open at the end of the program are an Unsupported
+  default fonts); the N line sets a minimum width for each column it spans
+  (also with BY). Other procedures, options of the ODS RTF statement, titles
+  in the document, and a destination left open at the end of the program are an Unsupported
   error.
 * PROC PRINT supports `OBS=`, `N`, `LABEL`, `SPLIT=` and the ID, BY, SUM and
   SUMBY statements: one page per BY group with its byline, observation

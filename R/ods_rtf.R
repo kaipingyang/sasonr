@@ -21,6 +21,14 @@
 #   blanks, so its widest word counts; the first column adds 10.
 # Characters without a measured advance fail loud.
 
+# A wide table is split into column groups (each repeats the row-header
+# columns), but the split point is not the page width (11520 twips): a group
+# of 17 columns of 582 twips (9904) is already split while 21 columns of 506
+# (10636) are not [measured, probes over 40 character and numeric columns].
+# The widest single group observed for every column pattern is 9322 twips;
+# wider tables fail loud until the rule is measured.
+rtf_one_group_max <- 9322
+
 rtf_char_widths <- local({
   tab <- NULL
   function() {
@@ -122,10 +130,6 @@ rtf_print_table <- function(tb) {
     }
   }
   nr <- length(a$text[[1]]$values)
-  # N with BY widens a column (one measured point), not implemented
-  if (!is.null(a$n) && !is.null(attr(tb, "by", exact = TRUE))) {
-    abort_unsupported("the ODS RTF output of PROC PRINT with the option N and BY")
-  }
   widths <- vapply(seq_len(nc), function(j) {
     data_bold <- role[j]
     hw <- rtf_heading_width(heads[[j]])
@@ -136,14 +140,17 @@ rtf_print_table <- function(tb) {
     w <- max(hw, vw, sw, 0)
     125 + w + if (j == 1L) 10 else 0
   }, 0)
-  if (sum(widths) > 11520) abort_unsupported("an ODS RTF PROC PRINT table wider than the page")
+  n_row <- if (!is.null(a$n)) paste0("N = ", a$n)
+  # the N line spans the columns like a heading over several columns: each
+  # column is at least 125 + floor(N line width / number of columns), +10 on
+  # the first [measured: two to four columns, with and without Obs]
+  if (!is.null(n_row)) {
+    need <- 125 + floor(rtf_text_width(n_row, bold = FALSE) / nc) + c(10, rep(0, nc - 1L))
+    widths <- pmax(widths, need)
+  }
+  if (sum(widths) > rtf_one_group_max) abort_unsupported("an ODS RTF PROC PRINT table that may be split into column groups")
   xs <- cumsum(widths)
   align <- vapply(a$cols, function(c) if (isTRUE(c$char)) "l" else "r", "")
-  n_row <- if (!is.null(a$n)) paste0("N = ", a$n)
-  # an N line wider than the table makes a column grow (not measured)
-  if (!is.null(n_row) && 125 + rtf_text_width(n_row, bold = FALSE) > sum(widths)) {
-    abort_unsupported("an ODS RTF table narrower than its N line")
-  }
   total <- 1L + nr + length(sum_rows) + if (!is.null(n_row)) 1L else 0L
   out <- character()
   row_k <- 0L
@@ -249,9 +256,7 @@ rtf_tabulate_table <- function(tb, widths = NULL) {
   ncol <- g$k + length(g$scols)
   nrow <- g$nrow
   if (is.null(widths)) widths <- rtf_tabulate_widths(cells, ncol, fail)
-  # wider than the page (12240 - 2 * 360 twips): SAS splits the columns into
-  # groups, each with the row titles and its headings (not implemented)
-  if (sum(widths) > 11520) fail("a table wider than the page")
+  if (sum(widths) > rtf_one_group_max) fail("a table that may be split into column groups")
   xs <- cumsum(widths)
   cover <- function(r, c) {
     for (cl in cells) if (cl$r0 <= r && r <= cl$r1 && cl$c0 <= c && c <= cl$c1) return(cl)
