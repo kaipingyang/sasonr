@@ -298,7 +298,15 @@ translate_proc_means <- function(step, meta, last) {
   )
   outputs <- spec$outputs
   outs <- vapply(outputs, `[[`, "", "name")
-  static_meta <- lapply(outputs, function(x) means_out_layout(spec, x)$meta)
+  # with the KEEP=/DROP=/RENAME= of each OUTPUT data set applied, so that a
+  # translation without a run (sas_translate(), sas_script()) gives the
+  # following steps the variables the data set will have
+  static_meta <- lapply(outputs, function(x) {
+    m <- means_out_layout(spec, x)$meta
+    if (length(x$ds_opts) == 0) return(m)
+    d0 <- tibble::as_tibble(stats::setNames(rep(list(logical()), length(m$vars)), m$vars))
+    proc_out_options(d0, m, x$ds_opts, x$line, x$name, warned = TRUE)$meta
+  })
   names(static_meta) <- outs
   # the WARNINGs of KEEP=/DROP=/RENAME= on the OUTPUT data sets
   warns <- vctrs::list_unchop(lapply(outputs, function(x) {

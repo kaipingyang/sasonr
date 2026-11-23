@@ -93,6 +93,10 @@ the development version provides.
   line, when the HTML destination received output that has no HTML view
   yet (PROC PRINT, the other PROC FREQ tables, n-way and LIST tables);
   before, that output was left out of the document.
+* A translation without a run (`sas_translate()`, `sas_script()`) applies
+  the KEEP=, DROP= and RENAME= options of a PROC MEANS OUTPUT data set to
+  the variables it gives the following steps; before, a later step could
+  select `_TYPE_` and `_FREQ_` that KEEP= had removed.
 * The `lang` of a `sas_script()` DATA step node runs a step whose
   vectorised code falls back to row-by-row execution; before, it failed
   with "bad value" (the generated `function` call lacked its srcref element).

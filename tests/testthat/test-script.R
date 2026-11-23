@@ -344,3 +344,13 @@ test_that("a script node's lang runs a step whose vectorised code falls back row
   for (nd in sc) s <- eval(nd$lang, list(s = s), asNamespace("sasonr"))
   expect_identical(as.character(sas_log(s, echo = FALSE)), as.character(sas_log(sas_run(code), echo = FALSE)))
 })
+
+test_that("a translation without a run applies KEEP= of a PROC MEANS OUTPUT data set", {
+  code <- "data ex; input id $ d; datalines;\na 1\na 2\nb 3\n;\nrun;
+proc means data=ex noprint nway; class id; var d; output out=tot(keep=id total) sum=total; run;
+data pct; merge ex tot; by id; p = d / total; run;"
+  sc <- sas_script(sas_translate(code))
+  s <- sas_session()
+  for (nd in sc) s <- eval(nd$lang, list(s = s), asNamespace("sasonr"))
+  expect_identical(sas_work(s)$pct, sas_run(code)$work$pct)
+})
