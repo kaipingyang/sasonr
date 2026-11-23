@@ -682,6 +682,8 @@ freq_listing_tables <- function(tables) {
       base.freq.cmh = freq_cmh_listing(tb),
       base.freq.commonrr = freq_commonrr_listing(tb),
       base.freq.breslow = freq_breslow_listing(tb),
+      base.freq.relrisk = , base.freq.relriskcl = freq_relrisk_listing(tb),
+      base.freq.riskdiff = , base.freq.riskdiffcl = freq_riskdiff_listing(tb),
       attr(tb, "lines", exact = TRUE)))
   }
   lst
@@ -2540,14 +2542,16 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
       out <- c(out, header, "")
       did <- TRUE
     }
-    out <- c(out, freq_riskdiff_listing(st, info))
+    flush(decor = TRUE)
+    for (tb in freq_riskdiff_tables(st)) push(tb)
   }
   if (!is.null(st$rel)) {
     if (!did) {
       out <- c(out, header, "")
       did <- TRUE
     }
-    out <- c(out, freq_relrisk_listing(st, info))
+    flush(decor = TRUE)
+    push(freq_relrisk_table(st))
   }
   if (more) out <- c(out, freq_sample_size(st))
   finish()
@@ -2563,7 +2567,9 @@ freq_seg_lines <- function(seg) {
     base.freq.fisher = freq_fisher_listing(seg),
     base.freq.cmh = freq_cmh_listing(seg),
     base.freq.commonrr = freq_commonrr_listing(seg),
-    base.freq.breslow = freq_breslow_listing(seg))
+    base.freq.breslow = freq_breslow_listing(seg),
+    base.freq.relrisk = , base.freq.relriskcl = freq_relrisk_listing(seg),
+    base.freq.riskdiff = , base.freq.riskdiffcl = freq_riskdiff_listing(seg))
 }
 
 # Listing of a ChiSq table: the tests with DF and Prob, then the measures.
@@ -2591,77 +2597,100 @@ freq_fisher_listing <- function(tb) {
 # RISKDIFF: the column 1 / column 2 "Risk Estimates" tables, the difference row
 # with its exact limits when requested, and (for the selected column) the
 # "Confidence Limits for the Risk Difference" table.
-freq_riskdiff_listing <- function(st, info) {
+freq_riskdiff_tables <- function(st) {
   rd <- st$rd
-  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   zlab <- paste0(format_pct_level(rd$alpha), "%")
-  rowline <- function(lab, risk, ase, lo, hi, cp) {
-    paste(lab, f4(risk), f4(ase), f4(lo), f4(hi), f4(cp[1]), f4(cp[2]))
-  }
-  out <- character()
+  labs <- c(ac = "Agresti-Caffo", exact = "Exact (Score)", ha = "Hauck-Anderson", newcombe = "Newcombe", wald = "Wald")
+  out <- list()
   for (j in 1:2) {
     cp <- rd$cols[[j]]
-    out <- c(out, paste0("Column ", j, " Risk Estimates"), "",
-             paste(zlab, "Exact", zlab),
-             "Risk ASE Confidence Limits Confidence Limits",
-             strrep("-", 77),
-             rowline("Row 1", cp$r1$risk, cp$r1$ase, cp$r1$wald[1], cp$r1$wald[2], cp$r1$cp),
-             rowline("Row 2", cp$r2$risk, cp$r2$ase, cp$r2$wald[1], cp$r2$wald[2], cp$r2$cp),
-             rowline("Total", cp$rt$risk, cp$rt$ase, cp$rt$wald[1], cp$rt$wald[2], cp$rt$cp), "")
-    dline <- paste("Difference", f4(cp$diff), f4(cp$ase_d), f4(cp$wald[1]), f4(cp$wald[2]))
-    if (isTRUE(rd$exact)) dline <- paste(dline, f4(cp$exact[1]), f4(cp$exact[2]))
-    out <- c(out, dline, "", "Difference is (Row 1 - Row 2)")
-    if (isTRUE(rd$exact)) {
-      out <- c(out, "Exact confidence limits for the risk difference are based on a score statistic.")
-    }
-    if (j == rd$column && !is.null(st$rd_cl)) {
-      labs <- c(ac = "Agresti-Caffo", exact = "Exact (Score)", ha = "Hauck-Anderson",
-                newcombe = "Newcombe", wald = "Wald")
+    r <- list(cp$r1, cp$r2, cp$rt)
+    x <- tibble::tibble(Row = c("Row 1", "Row 2", "Total", "Difference"),
+                        Risk = c(vapply(r, `[[`, 0, "risk"), cp$diff), ASE = c(vapply(r, `[[`, 0, "ase"), cp$ase_d),
+                        LowerCL = c(vapply(r, function(z) z$wald[1], 0), cp$wald[1]),
+                        UpperCL = c(vapply(r, function(z) z$wald[2], 0), cp$wald[2]),
+                        ExactLowerCL = c(vapply(r, function(z) z$cp[1], 0), if (isTRUE(rd$exact)) cp$exact[1] else NA_real_),
+                        ExactUpperCL = c(vapply(r, function(z) z$cp[2], 0), if (isTRUE(rd$exact)) cp$exact[2] else NA_real_))
+    has_cl <- j == rd$column && !is.null(st$rd_cl)
+    tb <- new_sasonr_ods_table(x, name = paste0("RiskDiffCol", j), label = paste0("Column ", j, " Risk Estimates"),
+                               path = paste0("Freq.Table1.RiskDiffCol", j), proc = "Freq", template = "base.freq.riskdiff",
+                               cols = ods_cols(names(x), role = c("label", rep("stat", 6L))))
+    attr(tb, "freq") <- list(level = zlab, column = j, exact = isTRUE(rd$exact), has_cl = has_cl)
+    out <- c(out, list(tb))
+    if (has_cl) {
       types <- st$rd_cl$types
       types <- types[order(labs[types])]
-      out <- c(out, "", "Confidence Limits for the Risk Difference",
-               paste("Risk Difference =", f4(cp$diff)), "",
-               paste("Type", zlab, "Confidence Limits"), "")
-      for (t in types) {
-        lim <- st$rd_cl$vals[[t]]
-        out <- c(out, paste(labs[[t]], f4(lim[1]), f4(lim[2])))
-      }
-      out <- c(out, "", paste0("Column ", j, " (", rd$col_disp, " = ", rd$col_text[j], ")"))
+      cl <- tibble::tibble(Type = unname(labs[types]), LowerCL = vapply(types, function(t) st$rd_cl$vals[[t]][1], 0, USE.NAMES = FALSE),
+                           UpperCL = vapply(types, function(t) st$rd_cl$vals[[t]][2], 0, USE.NAMES = FALSE))
+      ct <- new_sasonr_ods_table(cl, name = "PdiffCLs", label = "Confidence Limits for the Risk Difference", path = "Freq.Table1.PdiffCLs",
+                                 proc = "Freq", template = "base.freq.riskdiffcl", cols = ods_cols(names(cl), role = c("label", "stat", "stat")))
+      attr(ct, "freq") <- list(level = zlab, diff = cp$diff, column = paste0("Column ", j, " (", rd$col_disp, " = ", rd$col_text[j], ")"))
+      out <- c(out, list(ct))
     }
-    out <- c(out, "")
   }
   out
 }
 
-# RELRISK: the default "Odds Ratio and Relative Risks" table, or - when CL= is
-# given - the "Confidence Limits for the Relative Risk" table.
-freq_relrisk_listing <- function(st, info) {
-  rel <- st$rel
+# Listing of a RiskDiffCol table (and of the PdiffCLs table after it).
+freq_riskdiff_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
+  a <- attr(tb, "freq", exact = TRUE)
+  if (identical(attr(tb, "template", exact = TRUE), "base.freq.riskdiffcl")) {
+    return(c("", "Confidence Limits for the Risk Difference", paste("Risk Difference =", f4(a$diff)), "",
+             paste("Type", a$level, "Confidence Limits"), "",
+             vapply(seq_len(nrow(tb)), function(i) paste(tb$Type[i], f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), ""),
+             "", a$column, ""))
+  }
+  row <- function(i) paste(tb$Row[i], f4(tb$Risk[i]), f4(tb$ASE[i]), f4(tb$LowerCL[i]), f4(tb$UpperCL[i]), f4(tb$ExactLowerCL[i]), f4(tb$ExactUpperCL[i]))
+  dline <- paste("Difference", f4(tb$Risk[4]), f4(tb$ASE[4]), f4(tb$LowerCL[4]), f4(tb$UpperCL[4]))
+  if (a$exact) dline <- paste(dline, f4(tb$ExactLowerCL[4]), f4(tb$ExactUpperCL[4]))
+  out <- c(paste0("Column ", a$column, " Risk Estimates"), "", paste(a$level, "Exact", a$level),
+           "Risk ASE Confidence Limits Confidence Limits", strrep("-", 77), row(1), row(2), row(3), "",
+           dline, "", "Difference is (Row 1 - Row 2)",
+           if (a$exact) "Exact confidence limits for the risk difference are based on a score statistic.")
+  c(out, if (!a$has_cl) "")
+}
+
+# RELRISK: the RelativeRisks table (odds ratio and the column relative risks
+# with their confidence limits) or, with RELRISK(CL=), the RelRiskCL table of
+# the selected column.
+freq_relrisk_table <- function(st) {
+  rel <- st$rel
   zlab <- paste0(format_pct_level(rel$alpha), "%")
   if (is.null(rel$cl)) {
-    rows <- character()
-    if (!is.na(rel$or)) rows <- c(rows, paste("Odds Ratio", f4(rel$or), f4(rel$or_ci[1]), f4(rel$or_ci[2])))
-    if (!is.na(rel$rr1)) rows <- c(rows, paste("Relative Risk (Column 1)", f4(rel$rr1), f4(rel$rr1_ci[1]), f4(rel$rr1_ci[2])))
-    if (!is.na(rel$rr2)) rows <- c(rows, paste("Relative Risk (Column 2)", f4(rel$rr2), f4(rel$rr2_ci[1]), f4(rel$rr2_ci[2])))
-    out <- c("Odds Ratio and Relative Risks", "",
-             paste("Statistic Value", zlab, "Confidence Limits"), strrep("-", 66), rows)
-    if (length(rows) < 3L) out <- c(out, "", "One or more statistics not computed -- zero cell.")
-    return(c(out, ""))
+    x <- tibble::tibble(Statistic = c("Odds Ratio", "Relative Risk (Column 1)", "Relative Risk (Column 2)"),
+                        Value = c(rel$or, rel$rr1, rel$rr2), LowerCL = c(rel$or_ci[1], rel$rr1_ci[1], rel$rr2_ci[1]),
+                        UpperCL = c(rel$or_ci[2], rel$rr1_ci[2], rel$rr2_ci[2]))
+    x <- x[!is.na(x$Value), ]
+    tb <- new_sasonr_ods_table(x, name = "RelativeRisks", label = "Estimates of the Relative Risk", path = "Freq.Table1.RelativeRisks",
+                               proc = "Freq", template = "base.freq.relrisk", cols = ods_cols(names(x), role = c("label", "stat", "stat", "stat")))
+    attr(tb, "freq") <- list(level = zlab)
+    return(tb)
   }
   labs <- c(exact = "Exact (Score)", score = "Score", wald = "Wald")
   types <- rel$cl
   types <- types[order(labs[types])]
-  l0 <- max(nchar(labs[types])) + 4L
-  out <- c("Confidence Limits for the Relative Risk",
-           paste("Relative Risk =", f4(rel$rr)), "",
-           paste("Type", zlab, "Confidence Limits"), "")
-  for (t in types) {
-    lim <- rel$cl_vals[[t]]
-    out <- c(out, paste(labs[[t]], f4(lim[1]), f4(lim[2])))
+  x <- tibble::tibble(Type = unname(labs[types]), LowerCL = vapply(types, function(t) rel$cl_vals[[t]][1], 0, USE.NAMES = FALSE),
+                      UpperCL = vapply(types, function(t) rel$cl_vals[[t]][2], 0, USE.NAMES = FALSE))
+  tb <- new_sasonr_ods_table(x, name = "RelRiskCL", label = "Confidence Limits for the Relative Risk", path = "Freq.Table1.RelRiskCL",
+                             proc = "Freq", template = "base.freq.relriskcl", cols = ods_cols(names(x), role = c("label", "stat", "stat")))
+  attr(tb, "freq") <- list(level = zlab, rr = rel$rr, column = paste0("Column ", rel$column, " (", rel$col_disp, " = ", rel$col_text[rel$column], ")"))
+  tb
+}
+
+freq_relrisk_listing <- function(tb) {
+  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
+  a <- attr(tb, "freq", exact = TRUE)
+  if (identical(attr(tb, "template", exact = TRUE), "base.freq.relrisk")) {
+    rows <- vapply(seq_len(nrow(tb)), function(i) paste(tb$Statistic[i], f4(tb$Value[i]), f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), "")
+    out <- c("Odds Ratio and Relative Risks", "", paste("Statistic Value", a$level, "Confidence Limits"), strrep("-", 66), rows)
+    if (length(rows) < 3L) out <- c(out, "", "One or more statistics not computed -- zero cell.")
+    return(c(out, ""))
   }
-  out <- c(out, "", paste0("Column ", rel$column, " (", rel$col_disp, " = ", rel$col_text[rel$column], ")"))
-  c(out, "")
+  out <- c("Confidence Limits for the Relative Risk", paste("Relative Risk =", f4(a$rr)), "",
+           paste("Type", a$level, "Confidence Limits"), "",
+           vapply(seq_len(nrow(tb)), function(i) paste(tb$Type[i], f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), ""))
+  c(out, "", a$column, "")
 }
 
 # "Sample Size = n" after the statistics of a table, with the missing count
