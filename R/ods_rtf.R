@@ -239,7 +239,6 @@ rtf_write_document <- function(outputs, file) {
 rtf_tabulate_table <- function(tb, widths = NULL) {
   fail <- function(what) abort_unsupported(paste0("the PROC TABULATE ODS RTF output of ", what))
   g <- tab_grid_parts(tb, fail)
-  if (any(g$head_at != 1L)) fail("a class-variable heading row inside the row dimension")
   page <- attr(tb, "page", exact = TRUE)
   if (!is.null(attr(tb, "by", exact = TRUE))) fail("BY groups")
   if (!is.null(g$box) && g$nh > 0L && g$has_rows) fail("a BOX= text")

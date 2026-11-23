@@ -42,3 +42,16 @@ test_that("the N line widens the columns it spans (N with BY)", {
   expect_true(all(c("cellx522", "cellx880") %in% regmatches(x, gregexpr("cellx[0-9]+", x))[[1]]))
   expect_identical(lengths(regmatches(x, gregexpr("N = [12]\\\\cell", x))), 2L)
 })
+
+test_that("a class heading row inside the row dimension merges the data cells below it", {
+  d <- withr::local_tempdir()
+  withr::local_dir(d)
+  dir.create("rtf")
+  sas_run(rtf_prog("ods rtf file=\"rtf/out.rtf\";\nproc tabulate data=have; class grp; var x; table all grp, x*sum; run;\nods rtf close;"))
+  x <- readLines("rtf/out.rtf")
+  # the data cells of the first level start their merge on the grp heading row
+  g <- grep("{grp\\cell}", x, fixed = TRUE)
+  row_start <- max(grep("\\trowd", x[seq_len(g)], fixed = TRUE))
+  expect_true(any(grepl("\\clvmgf", x[row_start:g], fixed = TRUE)))
+  expect_true(any(grepl("{grp\\cell}", x, fixed = TRUE)))
+})

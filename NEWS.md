@@ -18,7 +18,8 @@ the development version provides.
   blank (an Unsupported error before).
 * `ODS RTF FILE="path";` and `ODS RTF CLOSE;` write the RTF document of
   the PROC PRINT and PROC TABULATE tables (default style) when the
-  destination closes. PROC TABULATE: merged row titles and headings, the
+  destination closes. PROC TABULATE: merged row titles and headings, class heading rows
+  anywhere in the row dimension, the
   page text of a page dimension (one section per page), the same width rule
   as PROC PRINT, a column heading over several columns setting a minimum
   width for each of them. A table wider than 9322 twips (it may be split
