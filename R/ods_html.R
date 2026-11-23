@@ -37,9 +37,12 @@ html_cell <- function(values, tag = "td", cls = character(), attrs = "") {
 # MEANS layout below): the template name of a table picks its renderer.
 html_templates <- list(
   base.tabulate = function(tb) html_base_tabulate(tb),
-  base.freq.oneway = function(tb) abort_unsupported("the HTML view of PROC FREQ tables"),
-  base.freq.crosstab = function(tb) abort_unsupported("the HTML view of PROC FREQ tables")
+  base.print = function(tb) abort_unsupported("the HTML output of PROC PRINT"),
+  base.freq.oneway = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.crosstab = function(tb) abort_unsupported("the HTML output of PROC FREQ")
 )
+# the templates without an HTML view (sas_html() fails loud on them)
+html_undrawn <- c("base.print", "base.freq.oneway", "base.freq.crosstab", "base.freq.lines")
 
 # A table laid out on a grid: `cells` is a list of rectangles list(r0, r1,
 # c0, c1, text, kind) over logical rows 1..nrow, `kind` "header" (in
@@ -196,7 +199,13 @@ sas_html.default <- function(x, file = NULL, log = FALSE) {
 
 #' @export
 sas_html.sasonr_result <- function(x, file = NULL, log = FALSE) {
-  body <- unlist(lapply(attr(x, "html_output", exact = TRUE) %||% list(), render_html_output))
+  outs <- attr(x, "html_output", exact = TRUE) %||% list()
+  # a table the HTML destination received but that has no HTML view
+  for (o in outs) {
+    tpl <- vapply(o$tables, function(tb) attr(tb, "template", exact = TRUE) %||% "", "")
+    if (any(tpl %in% html_undrawn)) abort_unsupported(paste0("the HTML output of PROC ", toupper(o$proc)), o$line)
+  }
+  body <- unlist(lapply(outs, render_html_output))
   html_document(body, if (isTRUE(log)) sas_log(x, "html"), file)
 }
 

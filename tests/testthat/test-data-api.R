@@ -69,3 +69,10 @@ test_that("sas_freq_df() fails loud on output without an ODS table yet", {
   expect_error(sas_freq_df(d, "g / chisq"), class = "sasonr_unsupported")
   expect_error(sas_html(sas_freq_df(d, "g")), class = "sasonr_unsupported")
 })
+
+test_that("sas_html() fails loud on PROC PRINT and PROC FREQ output instead of leaving it out", {
+  r <- sas_run("data a; input g $ x; datalines;\na 1\nb 2\n;\nrun;\nproc means data=a; var x; run;\nproc freq data=a; tables g; run;")
+  expect_error(sas_html(r), "the HTML output of PROC FREQ \\(SAS line 7\\)", class = "sasonr_unsupported")
+  r2 <- sas_run("data a; x = 1; run;\nods html close;\nproc print data=a; run;\nods html;\nproc means data=a; var x; run;")
+  expect_match(sas_html(r2), "sas-table|<table", all = FALSE)
+})

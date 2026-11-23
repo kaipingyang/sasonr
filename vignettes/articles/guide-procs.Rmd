@@ -227,4 +227,6 @@ sasonr stops with a `sasonr_unsupported` condition, naming the SAS line,
 for output requests it does not implement: `ODS HTML FILE=` and the other
 ODS HTML options (write the document with `sas_html(file = )` instead),
 `ODS OUTPUT` with MATCH_ALL, PERSIST= or BY groups, the ODS actions (CLOSE,
-SELECT, EXCLUDE, ...), and FOOTNOTE statements in the HTML document.
+SELECT, EXCLUDE, ...), and FOOTNOTE statements in the HTML document. `sas_html()` also stops when the HTML destination received PROC PRINT or
+PROC FREQ output, which has no HTML view yet (close the destination around
+those steps with `ODS HTML CLOSE;` to get the document of the others).

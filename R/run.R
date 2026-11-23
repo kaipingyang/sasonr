@@ -315,10 +315,11 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (step$type == "proc") eng$session$ods_output <- NULL
     eng$ods <- c(eng$ods, env$.ods)
-    # PROC PRINT and PROC FREQ tables have no HTML view yet
-    html_tables <- Filter(function(tb) !attr(tb, "template", exact = TRUE) %in% c("base.print", "base.freq.oneway", "base.freq.crosstab"), env$.ods)
+    # every table goes to the HTML destination; sas_html() stops on the ones
+    # it cannot draw (PROC PRINT, PROC FREQ) instead of leaving them out
+    html_tables <- env$.ods
     if (length(html_tables) > 0 && isTRUE(eng$session$ods_html)) {
-      eng$html <- c(eng$html, list(list(proc = step$name, titles = env$.titles, footnotes = eng$session$footnotes,
+      eng$html <- c(eng$html, list(list(proc = step$name, line = step$line, titles = env$.titles, footnotes = eng$session$footnotes,
                                           tables = html_tables)))
     }
     if (length(env$.ods) > 0 && !is.null(eng$session$ods_rtf)) {

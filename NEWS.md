@@ -76,8 +76,11 @@ the development version provides.
   total, in `$ods`), and `sas_freq_df()` returns them for a data frame.
   N-way and LIST tables, statistics and NLEVELS are not ODS tables yet:
   `sas_freq_df()` stops with an Unsupported error for them.
-  `sas_html()` of a FREQ table is an Unsupported error; the HTML document of
-  a program still leaves the PROC FREQ and PROC PRINT output out.
+* `sas_html()` of a program result is an Unsupported error, naming the
+  procedure and its SAS line, when the HTML destination received PROC PRINT
+  or PROC FREQ output (which has no HTML view yet); before, that output was
+  left out of the document. `sas_html()` of a FREQ table is an Unsupported
+  error too.
 * `sas_proc_freq()` and `sas_proc_transpose()` are step verbs like
   `sas_proc_sort()` and `sas_proc_means()`: they take a session, the options
   of the PROC statement and one argument per statement, and `sas_script()`
