@@ -2433,12 +2433,10 @@ freq_binomial_listing <- function(st, info) {
   c(out, "", freq_sample_size(st))
 }
 
-# The CMH summary block of a multiway table request: "The FREQ Procedure" (the
-# summary starts its own page), the three Cochran-Mantel-Haenszel statistics,
-# the common odds ratio / relative risks and the Breslow-Day test for
-# stratified 2x2 tables, closed by "Total Sample Size = n".
-# The multiway CMH summary as segments: the headings, the CMH table, the
-# CommonRelRisks and BreslowDayTest tables (2x2 strata), the sample size.
+# The CMH summary of a multiway table request as segments: the headings
+# ("The FREQ Procedure": the summary starts its own page), the CMH table, the
+# CommonRelRisks and BreslowDayTest tables (stratified 2x2 tables), and
+# "Total Sample Size = n".
 freq_cmh_summary <- function(st, vars, info, o) {
   zlab <- paste0(format_pct_level(o$alpha %||% 0.05), "%")
   scores_txt <- if (identical(o$scores, "rank")) "Rank Scores" else "Table Scores"
@@ -2709,9 +2707,9 @@ freq_fisher_listing <- function(tb) {
   c("       Fisher's Exact Test", strrep("-", 34), rows, "")
 }
 
-# RISKDIFF: the column 1 / column 2 "Risk Estimates" tables, the difference row
-# with its exact limits when requested, and (for the selected column) the
-# "Confidence Limits for the Risk Difference" table.
+# RISKDIFF as ODS tables: RiskDiffCol1 and RiskDiffCol2 (the row risks, the
+# difference with its exact limits when requested) and, for the selected
+# column, PdiffCLs (the confidence limits of the risk difference).
 freq_riskdiff_tables <- function(st) {
   rd <- st$rd
   zlab <- paste0(format_pct_level(rd$alpha), "%")
