@@ -322,3 +322,16 @@ proc transpose data=a out=t; var x; run;"
   expect_identical(sas_listing(s), r$listing)
   expect_identical(sas_work(s)$t, r$work$t)
 })
+
+test_that("PROC PRINT and PROC TABULATE become session verbs in the script", {
+  code <- "data a; input g $ h $ x; datalines;\na u 1\nb u 2\na v 3\n;\nrun;
+proc print data=a noobs; var g x; sum x; run;
+proc tabulate data=a; class g; class h; var x; table g all, x*(sum mean); table h, x*n; run;"
+  sc <- sas_script(sas_translate(code))
+  verbs <- vapply(sc, `[[`, "", "verb")
+  expect_true(all(c("sas_proc_print", "sas_proc_tabulate") %in% verbs))
+  s <- sas_session()
+  for (nd in sc) s <- eval(nd$lang, list(s = s), asNamespace("sasonr"))
+  r <- sas_run(code)
+  expect_identical(sas_listing(s), r$listing)
+})

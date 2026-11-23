@@ -7,6 +7,8 @@
 \alias{sas_proc_means}
 \alias{sas_proc_freq}
 \alias{sas_proc_transpose}
+\alias{sas_proc_print}
+\alias{sas_proc_tabulate}
 \alias{sas_proc_sql}
 \alias{sas_proc}
 \alias{sas_options}
@@ -24,6 +26,10 @@ sas_proc_means(session, options = "", ..., line = 1L)
 sas_proc_freq(session, options = "", ..., line = 1L)
 
 sas_proc_transpose(session, options = "", ..., line = 1L)
+
+sas_proc_print(session, options = "", ..., line = 1L)
+
+sas_proc_tabulate(session, options = "", ..., line = 1L)
 
 sas_proc_sql(session, sql, options = "", line = 1L)
 
@@ -79,8 +85,11 @@ gives the variable attributes of the output data sets and the log. When
 vectorised code meets a data error the step is run again row by row from
 its SAS text, as in \code{\link[=sas_run]{sas_run()}}.
 \item \code{sas_proc_sort()}, \code{sas_proc_means()}, \code{sas_proc_freq()},
-\code{sas_proc_transpose()}: the options of the PROC statement
-and one argument per statement (\code{by = "usubjid"}, \code{output = "out=m mean="}), as the program wrote them.
+\code{sas_proc_transpose()}, \code{sas_proc_print()}, \code{sas_proc_tabulate()}: the
+options of the PROC statement and one argument per statement
+(\code{by = "usubjid"}, \code{output = "out=m mean="}, \code{table = "grp, x*sum"}), as
+the program wrote them; a statement given twice is two arguments with
+the same name.
 \item \code{sas_proc_sql()}: the SQL statements of a PROC SQL step.
 \item \code{sas_proc()}: any PROC step as SAS text.
 \item \code{sas_options()}, \code{sas_title()}, \code{sas_global()}: global statements.

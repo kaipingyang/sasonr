@@ -278,7 +278,7 @@ script_node <- function(nd, mode) {
     return(node)
   }
   name <- nd$name %||% ""
-  if (identical(nd$type, "proc") && name %in% c("sort", "means", "freq", "transpose")) {
+  if (identical(nd$type, "proc") && name %in% c("sort", "means", "freq", "transpose", "print", "tabulate")) {
     st <- script_stmts(stext)
     head <- st[[1]]
     opts <- sub("^[[:alnum:]_]+[[:space:]]*", "", head$rest)
@@ -629,9 +629,11 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #'   vectorised code meets a data error the step is run again row by row from
 #'   its SAS text, as in [sas_run()].
 #' * `sas_proc_sort()`, `sas_proc_means()`, `sas_proc_freq()`,
-#'   `sas_proc_transpose()`: the options of the PROC statement
-#'   and one argument per statement (`by = "usubjid"`, `output = "out=m
-#'   mean="`), as the program wrote them.
+#'   `sas_proc_transpose()`, `sas_proc_print()`, `sas_proc_tabulate()`: the
+#'   options of the PROC statement and one argument per statement
+#'   (`by = "usubjid"`, `output = "out=m mean="`, `table = "grp, x*sum"`), as
+#'   the program wrote them; a statement given twice is two arguments with
+#'   the same name.
 #' * `sas_proc_sql()`: the SQL statements of a PROC SQL step.
 #' * `sas_proc()`: any PROC step as SAS text.
 #' * `sas_options()`, `sas_title()`, `sas_global()`: global statements.
@@ -701,6 +703,18 @@ sas_proc_freq <- function(session, options = "", ..., line = 1L) {
 #' @export
 sas_proc_transpose <- function(session, options = "", ..., line = 1L) {
   script_submit(session, script_proc_text("transpose", options, list(...)), line)
+}
+
+#' @rdname sas_step_verbs
+#' @export
+sas_proc_print <- function(session, options = "", ..., line = 1L) {
+  script_submit(session, script_proc_text("print", options, list(...)), line)
+}
+
+#' @rdname sas_step_verbs
+#' @export
+sas_proc_tabulate <- function(session, options = "", ..., line = 1L) {
+  script_submit(session, script_proc_text("tabulate", options, list(...)), line)
 }
 
 #' @rdname sas_step_verbs
