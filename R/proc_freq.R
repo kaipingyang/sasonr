@@ -548,7 +548,7 @@ translate_proc_freq <- function(step, meta, last) {
   code <- c(
     header,
     paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_rt_freq(.d, ", r_lit(spec), ")"),
+    paste0(".r <- sas_rt_proc(\"freq\", .d, ", r_lit(spec), ")"),
     ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
@@ -622,31 +622,68 @@ freq_stat_num <- function(v) {
 }
 
 #' PROC FREQ engine
+#'
+#' Runs the FREQ entry of the PROC registry (`sas_rt_proc("freq", ...)`).
 #' @param d Input data (after WHERE).
 #' @param sp Specification built by the translator.
 #' @export
 #' @keywords internal
 sas_rt_freq <- function(d, sp) {
+  r <- sas_rt_proc("freq", d, sp)
+  list(listing = r$listing, out = r$out)
+}
+
+# The tables of a PROC FREQ step (registry compute()).  Each table holds the
+# listing lines of one piece of output (attr `lines`; the NLEVELS table or
+# one table request) until the ODS tables of FREQ carry their own columns
+# [plan: freq_registry, F1]; `freq_group` is its BY group.
+freq_table_lines <- function(lines, k, by) {
+  tb <- new_sasonr_ods_table(tibble::tibble(), name = "Freq", label = "Freq", path = "Freq.Freq", proc = "Freq",
+                             template = "base.freq.lines", by = by)
+  attr(tb, "lines") <- lines
+  attr(tb, "freq_group") <- k
+  tb
+}
+
+# Listing of the FREQ tables: the procedure title once at the top, or after
+# the BY line of every BY group (each group starts its own page).
+freq_listing_tables <- function(tables) {
+  lst <- character()
+  last <- 0L
+  for (tb in tables) {
+    k <- attr(tb, "freq_group", exact = TRUE)
+    by <- attr(tb, "by", exact = TRUE)
+    if (k != last) {
+      lst <- c(lst, if (!is.null(by)) c("", by$text, "", "The FREQ Procedure", "") else if (last == 0L) c("The FREQ Procedure", ""))
+      last <- k
+    }
+    lst <- c(lst, attr(tb, "lines", exact = TRUE))
+  }
+  lst
+}
+
+freq_compute <- function(d, sp) {
   info <- sp$info
   groups <- if (!is.null(sp$by)) proc_by_groups(d, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(d)))
-  lst <- character()
-  titled <- FALSE
+  tables <- list()
   outs <- list()
   out_rows <- list()
   stat_rows <- list()
-  for (g in groups) {
+  for (gi in seq_along(groups)) {
+    g <- groups[[gi]]
     db <- d[g, , drop = FALSE]
     wt <- if (is.null(sp$weight)) rep(1, nrow(db)) else db[[sp$weight]]
     use <- !is.na(wt)
     if (!sp$zeros && !is.null(sp$weight)) use <- use & wt != 0
     db <- db[use, , drop = FALSE]
     wt <- wt[use]
-    glst <- character()
-    if (!is.null(sp$by) && length(g) > 0) glst <- c(glst, "", proc_by_line(d, g[1], sp$by, info), "")
-    if (sp$nlevels) glst <- c(glst, freq_nlevels_table(db, sp))
+    pieces <- list()
+    by <- if (!is.null(sp$by) && length(g) > 0) list(values = lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
+                                                     text = proc_by_line(d, g[1], sp$by, info), group = gi)
+    if (sp$nlevels) pieces <- c(pieces, list(freq_nlevels_table(db, sp)))
     for (rq in sp$requests) {
       res <- freq_one_request(db, wt, rq, sp)
-      glst <- c(glst, if (!isTRUE(rq$opts$noprint)) res$listing)
+      if (!isTRUE(rq$opts$noprint)) pieces <- c(pieces, list(res$listing))
       if (!is.null(rq$opts$out)) {
         nm <- rq$opts$out$name
         byv <- lapply(sp$by, function(v) rep(d[[v]][g[1]], nrow(res$out)))
@@ -658,17 +695,7 @@ sas_rt_freq <- function(d, sp) {
       if (!is.null(sp$output)) stat_rows[[length(stat_rows) + 1L]] <- c(lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
                                                                      res$stats)
     }
-    if (sp$print && length(glst) > 0 && (sp$nlevels || any(!vapply(sp$requests, function(r) isTRUE(r$opts$noprint), TRUE)))) {
-      if (!is.null(sp$by)) {
-        # each BY group starts its own page: the procedure title goes after the
-        # BY line of every group
-        glst <- append(glst, c("The FREQ Procedure", ""), after = 3L)
-      } else if (!titled) {
-        glst <- append(glst, c("The FREQ Procedure", ""), after = 0L)
-        titled <- TRUE
-      }
-      lst <- c(lst, glst)
-    }
+    if (sp$print) tables <- c(tables, lapply(pieces, freq_table_lines, k = gi, by = by))
   }
   for (nm in names(out_rows)) {
     x <- out_rows[[nm]]
@@ -681,7 +708,7 @@ sas_rt_freq <- function(d, sp) {
     outs[[nm]] <- proc_out_options(data, proc_out_meta(cols), x$opts, x$line)
   }
   if (!is.null(sp$output)) outs[[sp$output$name]] <- freq_output_data(stat_rows, sp)
-  list(listing = if (sp$print) lst else character(), out = outs)
+  list(tables = tables, data = outs, events = character())
 }
 
 freq_col_of <- function(v, info) {

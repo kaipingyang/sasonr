@@ -15,6 +15,9 @@ proc_registry <- list(
                   proctitle = FALSE,
                   listing = function(tables, ls) tab_listing_tables(tables, ls),
                   ods_output = function(tables, spec, line) tab_output_data(tables, spec, line)),
+  # the procedure title is part of the listing of the tables (freq_listing_tables())
+  freq = list(compute = function(d, spec) freq_compute(d, spec), templates = c(Freq = "base.freq.lines"),
+              proctitle = FALSE, listing = function(tables, ls) freq_listing_tables(tables)),
   # one table per page (BY group); no procedure title
   print = list(compute = function(d, spec) print_compute(d, spec), templates = c(Print = "base.print"),
                proctitle = FALSE, listing = function(tables, ls) print_listing_tables(tables))
@@ -49,7 +52,7 @@ sas_rt_proc <- function(name, d, spec) {
   }
   reqs <- rt_diag()$ods_output
   # PROC PRINT: the engine writes the WARNING of a pending request (run.R)
-  if (length(reqs) > 0 && !identical(tolower(name), "print")) {
+  if (length(reqs) > 0 && !tolower(name) %in% c("print", "freq")) {
     # ODS OUTPUT data sets (ods_output.R): PROC MEANS and PROC TABULATE
     if (is.null(e$ods_output) || !tolower(name) %in% c("means", "tabulate")) {
       abort_unsupported(paste0("ODS OUTPUT in a PROC ", toupper(name), " step"), spec$line)
