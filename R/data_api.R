@@ -55,12 +55,14 @@ data_api_tables <- function(res) {
   out
 }
 
-#' Data-level PROC MEANS, PROC TABULATE and PROC TRANSPOSE
+#' Data-level PROC MEANS, PROC TABULATE, PROC FREQ and PROC TRANSPOSE
 #'
 #' Run one procedure on a data frame without writing a SAS program.
-#' `sas_means_df()` and `sas_tabulate_df()` return the ODS table of the step
-#' (a `sasonr_ods_table`, a tibble with the SAS table attributes), or a list
-#' of them when there are several (one per BY group); `sas_transpose_df()`
+#' `sas_means_df()`, `sas_tabulate_df()` and `sas_freq_df()` return the ODS
+#' table of the step (a `sasonr_ods_table`, a tibble with the SAS table
+#' attributes), or a list of them when there are several (one per BY group
+#' or table request); `sas_freq_df()` supports one-way tables
+#' (OneWayFreqs) without statistics options so far; `sas_transpose_df()`
 #' returns the output data set.  The arguments are read by the same parser
 #' and specification builder as the PROC step of a program, and the
 #' computation is the one [sas_run()] calls for that step, so the values and
@@ -74,12 +76,16 @@ data_api_tables <- function(res) {
 #'   `"mean"`, `"std"`, ...); `NULL` gives the default statistics.
 #' @param table The TABLE statement of PROC TABULATE, as SAS text
 #'   (`"grp all, x*(n mean)"`).
+#' @param tables The TABLES statement of PROC FREQ, as SAS text (`"grp sex"`,
+#'   `"grp / nocum"`).
+#' @param weight The WEIGHT variable (one name).
 #' @param options Further options of the PROC statement, as SAS text.
 #' @return See Description.
 #' @examples
 #' d <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
 #' sas_means_df(d, var = "x", class = "grp", stats = c("n", "mean"))
 #' as.data.frame(sas_tabulate_df(d, "grp all, x*(n sum)", class = "grp", var = "x"))
+#' as.data.frame(sas_freq_df(d, "grp"))
 #' sas_transpose_df(d, var = "x")
 #' @name sas_data_procs
 NULL
@@ -101,6 +107,25 @@ sas_tabulate_df <- function(data, table, class = NULL, var = NULL, by = NULL, op
   body <- paste0(data_api_stmt("class", data_api_names(class, "class")), data_api_stmt("by", data_api_names(by, "by")),
                  data_api_stmt("var", data_api_names(var, "var")), "  table ", table, ";\n")
   data_api_tables(data_api_core(data, "tabulate", data_api_text("tabulate", options, body), tab_step_spec))
+}
+
+#' @rdname sas_data_procs
+#' @export
+sas_freq_df <- function(data, tables, by = NULL, weight = NULL, options = "") {
+  if (!rlang::is_string(tables)) rlang::abort("`tables` must be the text of one TABLES statement.", class = "sasonr_error")
+  weight <- data_api_names(weight, "weight")
+  if (length(weight) > 1L) rlang::abort("`weight` must be one variable name.", class = "sasonr_error")
+  body <- paste0(data_api_stmt("by", data_api_names(by, "by")), data_api_stmt("weight", weight), "  tables ", tables, ";\n")
+  res <- data_api_core(data, "freq", data_api_text("freq", options, body), freq_step_spec)
+  # the other FREQ output (crosstabulations, statistics, NLEVELS) has no ODS
+  # table yet: it would be left out of the result
+  lines <- Filter(function(tb) identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
+  if (any(lengths(lapply(lines, attr, "lines")) > 0L)) {
+    abort_unsupported("sas_freq_df() for output other than one-way frequency tables (crosstabulations, statistics, NLEVELS)")
+  }
+  res$tables <- Filter(function(tb) !identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
+  if (!length(res$tables)) abort_unsupported("sas_freq_df() without a printed table (NOPRINT)")
+  data_api_tables(res)
 }
 
 #' @rdname sas_data_procs

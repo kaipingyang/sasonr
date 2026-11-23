@@ -419,7 +419,9 @@ parse_freq_tables <- function(p) {
 
 # Translation -------------------------------------------------------------------
 
-translate_proc_freq <- function(step, meta, last) {
+# The specification of a PROC FREQ step (shared by the translator and
+# sas_freq_df()): list(spec, inp, warnings).
+freq_step_spec <- function(step, meta, last) {
   o <- step$options
   inp <- proc_input(step, meta, last)
   st <- inp$st
@@ -544,12 +546,21 @@ translate_proc_freq <- function(step, meta, last) {
     requests = requests, exact = exact, info = proc_var_info(st, allv),
     output = if (!is.null(out_stmt)) list(name = out_stmt$out$name, ds_opts = out_stmt$out$options, kws = out_stmt$kws)
   )
+  list(spec = spec, inp = inp, warnings = character())
+}
+
+translate_proc_freq <- function(step, meta, last) {
+  b <- freq_step_spec(step, meta, last)
+  spec <- b$spec
+  inp <- b$inp
+  requests <- spec$requests
   header <- sprintf("# ---- PROC FREQ (SAS line %d)", as.integer(step$line))
   code <- c(
     header,
     paste0(".d <- ", proc_source_code(inp)),
     paste0(".r <- sas_rt_proc(\"freq\", .d, ", r_lit(spec), ")"),
     ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+    ".ods <- c(.ods, Filter(function(tb) !identical(attr(tb, \"template\", exact = TRUE), \"base.freq.lines\"), .r$tables))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   out_names <- c(vctrs::list_unchop(lapply(requests, function(r) r$opts$out$name), ptype = character(), name_spec = rlang::zap()), spec$output$name)
@@ -657,7 +668,7 @@ freq_listing_tables <- function(tables) {
       lst <- c(lst, if (!is.null(by)) c("", by$text, "", "The FREQ Procedure", "") else if (last == 0L) c("The FREQ Procedure", ""))
       last <- k
     }
-    lst <- c(lst, attr(tb, "lines", exact = TRUE))
+    lst <- c(lst, if (identical(attr(tb, "template", exact = TRUE), "base.freq.oneway")) freq_oneway_listing(tb) else attr(tb, "lines", exact = TRUE))
   }
   lst
 }
@@ -681,9 +692,13 @@ freq_compute <- function(d, sp) {
     by <- if (!is.null(sp$by) && length(g) > 0) list(values = lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
                                                      text = proc_by_line(d, g[1], sp$by, info), group = gi)
     if (sp$nlevels) pieces <- c(pieces, list(freq_nlevels_table(db, sp)))
-    for (rq in sp$requests) {
+    for (ri in seq_along(sp$requests)) {
+      rq <- sp$requests[[ri]]
       res <- freq_one_request(db, wt, rq, sp)
-      if (!isTRUE(rq$opts$noprint)) pieces <- c(pieces, list(res$listing))
+      if (!is.null(res$table)) {
+        attr(res$tables[[1]], "path") <- paste0("Freq.", if (!is.null(sp$by)) paste0("ByGroup", gi, "."), "Table", ri, ".OneWayFreqs")
+      }
+      if (!isTRUE(rq$opts$noprint)) pieces <- c(pieces, res$tables)
       if (!is.null(rq$opts$out)) {
         nm <- rq$opts$out$name
         byv <- lapply(sp$by, function(v) rep(d[[v]][g[1]], nrow(res$out)))
@@ -695,7 +710,14 @@ freq_compute <- function(d, sp) {
       if (!is.null(sp$output)) stat_rows[[length(stat_rows) + 1L]] <- c(lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
                                                                      res$stats)
     }
-    if (sp$print) tables <- c(tables, lapply(pieces, freq_table_lines, k = gi, by = by))
+    if (sp$print) {
+      tables <- c(tables, lapply(pieces, function(pc) {
+        if (!inherits(pc, "sasonr_ods_table")) return(freq_table_lines(pc, gi, by))
+        attr(pc, "by") <- by
+        attr(pc, "freq_group") <- gi
+        pc
+      }))
+    }
   }
   for (nm in names(out_rows)) {
     x <- out_rows[[nm]]
@@ -814,7 +836,9 @@ freq_one_request <- function(db, wt, rq, sp) {
     abort_unsupported("MISSPRINT with statistics for a table that is not 2x2 (only the 2x2 layout is supported)", rq$line)
   }
   res$stats <- freq_request_stats(stat_tab, stat_lv, vars, info, o, sp, nmiss)
-  res$listing <- c(res$listing, freq_stats_listing(res$stats, tab, vars, info, o, sp))
+  lines <- c(res$listing, freq_stats_listing(res$stats, tab, vars, info, o, sp))
+  # the tables of the request: OneWayFreqs, then the other output as lines
+  res$tables <- c(if (!is.null(res$table)) list(res$table), if (is.null(res$table) || length(lines) > 0) list(lines))
   res
 }
 
@@ -878,8 +902,60 @@ freq_oneway <- function(tab, obs, l, vars, info, o, nmiss, neg, missprint) {
   cpct <- cum / tot * 100
   show_pct <- !isTRUE(o$nopercent) && !neg
   show_cum <- !isTRUE(o$nocum)
-  # listing
-  vals <- l$text
+  # the OneWayFreqs table: the raw class values and the statistics; the
+  # columns the options leave out are hidden
+  x <- list()
+  x[[v]] <- l$values
+  x$Frequency <- cnt
+  if (!is.null(test) && identical(test$kind, "f")) x$TestFrequency <- test$values
+  x$Percent <- pct
+  if (!is.null(test) && identical(test$kind, "p")) x$TestPercent <- test$values * 100
+  mp <- is_m & missprint
+  x$CumFrequency <- ifelse(mp, NA_real_, cum)
+  x$CumPercent <- ifelse(mp, NA_real_, cpct)
+  x <- tibble::as_tibble(x)
+  hidden <- c(FALSE, isTRUE(o$nofreq), if (!is.null(test) && identical(test$kind, "f")) FALSE, !show_pct,
+              if (!is.null(test) && identical(test$kind, "p")) FALSE, !show_cum || isTRUE(o$nofreq), !show_cum || !show_pct)
+  tb <- new_sasonr_ods_table(x, name = "OneWayFreqs", label = "One-Way Frequencies", path = paste0("Freq.Table1.OneWayFreqs"),
+                             proc = "Freq", template = "base.freq.oneway",
+                             cols = ods_cols(names(x), label = c(i$disp, names(x)[-1]), hidden = hidden,
+                                             role = c("class", rep("stat", ncol(x) - 1L))))
+  attr(tb, "freq") <- list(disp = i$disp, char = i$char, text = l$text, test = test$kind, nmiss = nmiss)
+  # OUT= (missing levels keep their count with a missing PERCENT)
+  out_cols <- list(freq_col_of(v, info), list(name = "count", disp = "COUNT", char = FALSE, len = 8L, label = "Frequency Count"),
+                   list(name = "percent", disp = "PERCENT", char = FALSE, len = 8L, label = "Percent of Total Frequency"))
+  od <- list()
+  od[[v]] <- l$values
+  od$count <- cnt
+  od$percent <- pct
+  if (isTRUE(o$outcum)) {
+    out_cols <- c(out_cols, list(list(name = "cum_freq", disp = "CUM_FREQ", char = FALSE, len = 8L, label = "Cumulative Frequency Count"),
+                                 list(name = "cum_pct", disp = "CUM_PCT", char = FALSE, len = 8L, label = "Cumulative Percent")))
+    od$cum_freq <- cum
+    od$cum_pct <- cpct
+  }
+  keep <- isTRUE(o$sparse) | cnt != 0 | obs > 0
+  od <- tibble::as_tibble(lapply(od, function(x) x[keep]))
+  list(table = tb, out = od, out_cols = out_cols)
+}
+
+# Listing of a OneWayFreqs table (template base.freq.oneway).
+freq_oneway_listing <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  cols <- attr(tb, "cols", exact = TRUE)
+  shown <- function(nm) nm %in% cols$name[!cols$hidden]
+  i <- list(disp = a$disp, char = a$char)
+  o <- list(nofreq = !shown("Frequency"))
+  show_pct <- shown("Percent")
+  show_cum <- shown("CumFrequency") || shown("CumPercent")
+  test <- if (!is.null(a$test)) list(kind = a$test, values = if (identical(a$test, "f")) tb$TestFrequency else tb$TestPercent / 100)
+  cnt <- tb$Frequency
+  pct <- tb$Percent
+  cum <- tb$CumFrequency
+  cpct <- tb$CumPercent
+  n <- nrow(tb)
+  nmiss <- a$nmiss
+  vals <- a$text
   right <- !i$char
   W <- max(c(nchar(i$disp), nchar(vals)))
   pad <- function(x) formatC(x, width = if (right) W else -W)
@@ -927,7 +1003,7 @@ freq_oneway <- function(tab, obs, l, vars, info, o, nmiss, neg, missprint) {
     if (show_pct) s <- paste0(s, formatC(freq_pct(pct[j]), width = 11L), " ")
     if (!is.null(test) && identical(test$kind, "p")) s <- paste0(s, formatC(freq_pct(test$values[j] * 100), width = 11L), " ")
     if (show_cum) {
-      mp <- is_m[j] && missprint
+      mp <- is.na(cum[j])
       if (!isTRUE(o$nofreq)) s <- paste0(s, formatC(if (mp) "." else freq_num(cum[j]), width = 13L), " ")
       if (show_pct) s <- paste0(s, formatC(if (mp) "." else freq_pct(cpct[j]), width = 12L), "  ")
     }
@@ -936,22 +1012,7 @@ freq_oneway <- function(tab, obs, l, vars, info, o, nmiss, neg, missprint) {
   lst <- c(if (show_cum) sas_rtrim(top), head, strrep("-", width), body)
   if (nmiss > 0) lst <- c(lst, "", paste0(strrep(" ", max(0L, (width - 21L) %/% 2L)), "Frequency Missing = ", freq_num(nmiss)))
   lst <- c(lst, "")
-  # OUT= (missing levels keep their count with a missing PERCENT)
-  out_cols <- list(freq_col_of(v, info), list(name = "count", disp = "COUNT", char = FALSE, len = 8L, label = "Frequency Count"),
-                   list(name = "percent", disp = "PERCENT", char = FALSE, len = 8L, label = "Percent of Total Frequency"))
-  od <- list()
-  od[[v]] <- l$values
-  od$count <- cnt
-  od$percent <- pct
-  if (isTRUE(o$outcum)) {
-    out_cols <- c(out_cols, list(list(name = "cum_freq", disp = "CUM_FREQ", char = FALSE, len = 8L, label = "Cumulative Frequency Count"),
-                                 list(name = "cum_pct", disp = "CUM_PCT", char = FALSE, len = 8L, label = "Cumulative Percent")))
-    od$cum_freq <- cum
-    od$cum_pct <- cpct
-  }
-  keep <- isTRUE(o$sparse) | cnt != 0 | obs > 0
-  od <- tibble::as_tibble(lapply(od, function(x) x[keep]))
-  list(listing = lst, out = od, out_cols = out_cols)
+  lst
 }
 
 freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, stratum = NULL) {

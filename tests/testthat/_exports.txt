@@ -229,6 +229,7 @@ public sas_proc_freq
 public sas_proc_transpose
 public sas_means_df
 public sas_tabulate_df
+public sas_freq_df
 public sas_transpose_df
 public sas_proc_sql
 public sas_proc

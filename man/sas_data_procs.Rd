@@ -4,8 +4,9 @@
 \alias{sas_data_procs}
 \alias{sas_means_df}
 \alias{sas_tabulate_df}
+\alias{sas_freq_df}
 \alias{sas_transpose_df}
-\title{Data-level PROC MEANS, PROC TABULATE and PROC TRANSPOSE}
+\title{Data-level PROC MEANS, PROC TABULATE, PROC FREQ and PROC TRANSPOSE}
 \usage{
 sas_means_df(
   data,
@@ -17,6 +18,8 @@ sas_means_df(
 )
 
 sas_tabulate_df(data, table, class = NULL, var = NULL, by = NULL, options = "")
+
+sas_freq_df(data, tables, by = NULL, weight = NULL, options = "")
 
 sas_transpose_df(data, var = NULL, by = NULL, id = NULL, options = "")
 }
@@ -32,15 +35,22 @@ sas_transpose_df(data, var = NULL, by = NULL, id = NULL, options = "")
 
 \item{table}{The TABLE statement of PROC TABULATE, as SAS text
 (\code{"grp all, x*(n mean)"}).}
+
+\item{tables}{The TABLES statement of PROC FREQ, as SAS text (\code{"grp sex"},
+\code{"grp / nocum"}).}
+
+\item{weight}{The WEIGHT variable (one name).}
 }
 \value{
 See Description.
 }
 \description{
 Run one procedure on a data frame without writing a SAS program.
-\code{sas_means_df()} and \code{sas_tabulate_df()} return the ODS table of the step
-(a \code{sasonr_ods_table}, a tibble with the SAS table attributes), or a list
-of them when there are several (one per BY group); \code{sas_transpose_df()}
+\code{sas_means_df()}, \code{sas_tabulate_df()} and \code{sas_freq_df()} return the ODS
+table of the step (a \code{sasonr_ods_table}, a tibble with the SAS table
+attributes), or a list of them when there are several (one per BY group
+or table request); \code{sas_freq_df()} supports one-way tables
+(OneWayFreqs) without statistics options so far; \code{sas_transpose_df()}
 returns the output data set.  The arguments are read by the same parser
 and specification builder as the PROC step of a program, and the
 computation is the one \code{\link[=sas_run]{sas_run()}} calls for that step, so the values and
@@ -52,5 +62,6 @@ NOTEs of the computation and \code{sas_html()} the HTML document of the tables
 d <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
 sas_means_df(d, var = "x", class = "grp", stats = c("n", "mean"))
 as.data.frame(sas_tabulate_df(d, "grp all, x*(n sum)", class = "grp", var = "x"))
+as.data.frame(sas_freq_df(d, "grp"))
 sas_transpose_df(d, var = "x")
 }

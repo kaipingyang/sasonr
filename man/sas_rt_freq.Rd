@@ -12,6 +12,6 @@ sas_rt_freq(d, sp)
 \item{sp}{Specification built by the translator.}
 }
 \description{
-PROC FREQ engine
+Runs the FREQ entry of the PROC registry (\code{sas_rt_proc("freq", ...)}).
 }
 \keyword{internal}

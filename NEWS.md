@@ -66,7 +66,13 @@ the development version provides.
   `sas_run()` calls for the same step, with the specification from the same
   parser and builder, so the values are the same. `sas_log()` and
   `sas_html()` are S3 generics with methods for these results;
-  `as.data.frame()` drops the table attributes. A data-level PROC FREQ follows when PROC FREQ produces ODS tables.
+  `as.data.frame()` drops the table attributes.
+* PROC FREQ runs on the same PROC pipeline: its one-way tables are ODS
+  tables (OneWayFreqs, in `$ods`), and `sas_freq_df()` returns them for a
+  data frame. Crosstabulations, statistics and NLEVELS are not ODS tables
+  yet: `sas_freq_df()` stops with an Unsupported error for them.
+  `sas_html()` of a FREQ table is an Unsupported error; the HTML document of
+  a program still leaves the PROC FREQ and PROC PRINT output out.
 * `sas_proc_freq()` and `sas_proc_transpose()` are step verbs like
   `sas_proc_sort()` and `sas_proc_means()`: they take a session, the options
   of the PROC statement and one argument per statement, and `sas_script()`

@@ -181,7 +181,8 @@ res_out$work$stats
 
 ## Procedures on data frames
 
-`sas_means_df()`, `sas_tabulate_df()` and `sas_transpose_df()` run one
+`sas_means_df()`, `sas_tabulate_df()`, `sas_freq_df()` (one-way tables) and
+`sas_transpose_df()` run one
 procedure on a data frame without a program. They read their arguments
 with the same parser and specification builder as the PROC step of a
 program and call the same computation, so the table is the one the program
@@ -193,6 +194,7 @@ d <- data.frame(arm = c("A", "A", "B", "B"), aval = c(10.2, 11.8, 10.9, 10.4))
 m <- sas_means_df(d, var = "aval", class = "arm", stats = c("n", "mean"))
 as.data.frame(m)
 as.data.frame(sas_tabulate_df(d, "arm all, aval*(n mean)", class = "arm", var = "aval"))
+as.data.frame(sas_freq_df(d, "arm"))
 ```
 
 ## The RTF document

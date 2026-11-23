@@ -36,7 +36,8 @@ html_cell <- function(values, tag = "td", cls = character(), attrs = "") {
 # HTML templates of the tables that are not drawn from their columns (the
 # MEANS layout below): the template name of a table picks its renderer.
 html_templates <- list(
-  base.tabulate = function(tb) html_base_tabulate(tb)
+  base.tabulate = function(tb) html_base_tabulate(tb),
+  base.freq.oneway = function(tb) abort_unsupported("the HTML view of PROC FREQ tables")
 )
 
 # A table laid out on a grid: `cells` is a list of rectangles list(r0, r1,

@@ -41,3 +41,27 @@ test_that("arguments are checked", {
   expect_error(sas_means_df(list(x = 1), var = "x"), class = "sasonr_error")
   expect_error(sas_tabulate_df(api_d, c("a", "b")), class = "sasonr_error")
 })
+
+test_that("sas_freq_df() gives the OneWayFreqs table of the program", {
+  d <- data.frame(g = c("a", "a", "b", NA), w = c(1, 2, 3, 4))
+  tb <- sas_freq_df(d, "g")
+  expect_s3_class(tb, "sasonr_ods_table")
+  expect_identical(attr(tb, "name"), "OneWayFreqs")
+  expect_identical(attr(tb, "path"), "Freq.Table1.OneWayFreqs")
+  expect_equal(tb$Frequency, c(2, 1))
+  expect_equal(tb$CumPercent, c(200 / 3, 100))
+  r <- sas_run("data d; input g $ w; datalines;\na 1\na 2\nb 3\n. 4\n;\nrun;\nproc freq data=d; tables g; run;")
+  expect_equal(as.data.frame(r$ods[[1]])[-1], as.data.frame(tb)[-1])
+  tw <- sas_freq_df(d, "g", weight = "w")
+  expect_equal(tw$Frequency, c(3, 3))
+  two <- sas_freq_df(d, "g w")
+  expect_s3_class(two, "sasonr_ods_list")
+  expect_identical(vapply(two, attr, "", "path"), c("Freq.Table1.OneWayFreqs", "Freq.Table2.OneWayFreqs"))
+})
+
+test_that("sas_freq_df() fails loud on output without an ODS table yet", {
+  d <- data.frame(g = c("a", "a", "b"), h = c("x", "y", "y"))
+  expect_error(sas_freq_df(d, "g*h"), class = "sasonr_unsupported")
+  expect_error(sas_freq_df(d, "g / chisq"), class = "sasonr_unsupported")
+  expect_error(sas_html(sas_freq_df(d, "g")), class = "sasonr_unsupported")
+})
