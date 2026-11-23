@@ -60,8 +60,12 @@ test_that("sas_freq_df() gives the OneWayFreqs table of the program", {
 })
 
 test_that("sas_freq_df() fails loud on output without an ODS table yet", {
-  d <- data.frame(g = c("a", "a", "b"), h = c("x", "y", "y"))
-  expect_error(sas_freq_df(d, "g*h"), class = "sasonr_unsupported")
+  d <- data.frame(g = c("a", "a", "b"), h = c("x", "y", "y"), k = c("u", "u", "v"))
+  ct <- sas_freq_df(d, "g*h")
+  expect_identical(attr(ct, "name"), "CrossTabFreqs")
+  expect_identical(ct[["_TYPE_"]], c("11", "11", "10", "11", "11", "10", "01", "01", "00"))
+  expect_equal(ct$Frequency, c(1, 1, 2, 0, 1, 1, 1, 2, 3))
+  expect_error(sas_freq_df(d, "g*h*k"), class = "sasonr_unsupported")
   expect_error(sas_freq_df(d, "g / chisq"), class = "sasonr_unsupported")
   expect_error(sas_html(sas_freq_df(d, "g")), class = "sasonr_unsupported")
 })

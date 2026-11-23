@@ -49,8 +49,8 @@ Run one procedure on a data frame without writing a SAS program.
 \code{sas_means_df()}, \code{sas_tabulate_df()} and \code{sas_freq_df()} return the ODS
 table of the step (a \code{sasonr_ods_table}, a tibble with the SAS table
 attributes), or a list of them when there are several (one per BY group
-or table request); \code{sas_freq_df()} supports one-way tables
-(OneWayFreqs) without statistics options so far; \code{sas_transpose_df()}
+or table request); \code{sas_freq_df()} supports one-way (OneWayFreqs) and
+two-way (CrossTabFreqs) tables without statistics options so far; \code{sas_transpose_df()}
 returns the output data set.  The arguments are read by the same parser
 and specification builder as the PROC step of a program, and the
 computation is the one \code{\link[=sas_run]{sas_run()}} calls for that step, so the values and

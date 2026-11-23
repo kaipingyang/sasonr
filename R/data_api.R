@@ -61,8 +61,8 @@ data_api_tables <- function(res) {
 #' `sas_means_df()`, `sas_tabulate_df()` and `sas_freq_df()` return the ODS
 #' table of the step (a `sasonr_ods_table`, a tibble with the SAS table
 #' attributes), or a list of them when there are several (one per BY group
-#' or table request); `sas_freq_df()` supports one-way tables
-#' (OneWayFreqs) without statistics options so far; `sas_transpose_df()`
+#' or table request); `sas_freq_df()` supports one-way (OneWayFreqs) and
+#' two-way (CrossTabFreqs) tables without statistics options so far; `sas_transpose_df()`
 #' returns the output data set.  The arguments are read by the same parser
 #' and specification builder as the PROC step of a program, and the
 #' computation is the one [sas_run()] calls for that step, so the values and
@@ -117,11 +117,11 @@ sas_freq_df <- function(data, tables, by = NULL, weight = NULL, options = "") {
   if (length(weight) > 1L) rlang::abort("`weight` must be one variable name.", class = "sasonr_error")
   body <- paste0(data_api_stmt("by", data_api_names(by, "by")), data_api_stmt("weight", weight), "  tables ", tables, ";\n")
   res <- data_api_core(data, "freq", data_api_text("freq", options, body), freq_step_spec)
-  # the other FREQ output (crosstabulations, statistics, NLEVELS) has no ODS
+  # the other FREQ output (n-way and LIST tables, statistics, NLEVELS) has no ODS
   # table yet: it would be left out of the result
   lines <- Filter(function(tb) identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
   if (any(lengths(lapply(lines, attr, "lines")) > 0L)) {
-    abort_unsupported("sas_freq_df() for output other than one-way frequency tables (crosstabulations, statistics, NLEVELS)")
+    abort_unsupported("sas_freq_df() for output other than one-way and two-way frequency tables (n-way and LIST tables, statistics, NLEVELS)")
   }
   res$tables <- Filter(function(tb) !identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
   if (!length(res$tables)) abort_unsupported("sas_freq_df() without a printed table (NOPRINT)")

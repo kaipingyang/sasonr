@@ -316,7 +316,7 @@ engine_exec_steps <- function(eng, text, line) {
     if (step$type == "proc") eng$session$ods_output <- NULL
     eng$ods <- c(eng$ods, env$.ods)
     # PROC PRINT and PROC FREQ tables have no HTML view yet
-    html_tables <- Filter(function(tb) !attr(tb, "template", exact = TRUE) %in% c("base.print", "base.freq.oneway"), env$.ods)
+    html_tables <- Filter(function(tb) !attr(tb, "template", exact = TRUE) %in% c("base.print", "base.freq.oneway", "base.freq.crosstab"), env$.ods)
     if (length(html_tables) > 0 && isTRUE(eng$session$ods_html)) {
       eng$html <- c(eng$html, list(list(proc = step$name, titles = env$.titles, footnotes = eng$session$footnotes,
                                           tables = html_tables)))

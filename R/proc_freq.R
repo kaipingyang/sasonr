@@ -668,7 +668,10 @@ freq_listing_tables <- function(tables) {
       lst <- c(lst, if (!is.null(by)) c("", by$text, "", "The FREQ Procedure", "") else if (last == 0L) c("The FREQ Procedure", ""))
       last <- k
     }
-    lst <- c(lst, if (identical(attr(tb, "template", exact = TRUE), "base.freq.oneway")) freq_oneway_listing(tb) else attr(tb, "lines", exact = TRUE))
+    lst <- c(lst, switch(attr(tb, "template", exact = TRUE),
+      base.freq.oneway = freq_oneway_listing(tb),
+      base.freq.crosstab = freq_crosstab_listing(tb),
+      attr(tb, "lines", exact = TRUE)))
   }
   lst
 }
@@ -696,7 +699,8 @@ freq_compute <- function(d, sp) {
       rq <- sp$requests[[ri]]
       res <- freq_one_request(db, wt, rq, sp)
       if (!is.null(res$table)) {
-        attr(res$tables[[1]], "path") <- paste0("Freq.", if (!is.null(sp$by)) paste0("ByGroup", gi, "."), "Table", ri, ".OneWayFreqs")
+        attr(res$tables[[1]], "path") <- paste0("Freq.", if (!is.null(sp$by)) paste0("ByGroup", gi, "."), "Table", ri, ".",
+                                                attr(res$tables[[1]], "name", exact = TRUE))
       }
       if (!isTRUE(rq$opts$noprint)) pieces <- c(pieces, res$tables)
       if (!is.null(rq$opts$out)) {
@@ -776,6 +780,11 @@ freq_one_request <- function(db, wt, rq, sp) {
   dd <- db[keep, , drop = FALSE]
   ww <- wt[keep]
   if (any(ww < 0)) abort_unsupported("negative weights are not supported in PROC FREQ", rq$line)
+  clash <- intersect(toupper(vars), toupper(c("Frequency", "TestFrequency", "Percent", "TestPercent", "CumFrequency", "CumPercent",
+                                                  "_TYPE_", "Expected", "Deviation", "CellChiSquare", "RowPercent", "ColPercent")))
+  if (length(clash) > 0L || anyDuplicated(toupper(vars))) {
+    abort_unsupported(paste0("a PROC FREQ table variable named like a column of its ODS table (", clash[1] %||% toupper(vars[1]), ")"), rq$line)
+  }
   lv <- lapply(vars, function(v) freq_levels(dd[[v]], ww, info[[v]], sp$order))
   names(lv) <- vars
   idx <- lapply(vars, function(v) match(lv[[v]]$key, lv[[v]]$keys))
@@ -1044,91 +1053,68 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   show <- c(freq = !isTRUE(o$nofreq), expected = isTRUE(o$expected), deviation = isTRUE(o$deviation),
             cellchi2 = isTRUE(o$cellchi2), pct = !isTRUE(o$nopercent), row = !isTRUE(o$norow),
             col = !isTRUE(o$nocol))
-  show <- show[show]
-  all_labels <- c(freq = "Frequency", expected = "Expected", deviation = "Deviation",
-                  cellchi2 = "Cell Chi-Square", pct = "Percent", row = "Row Pct", col = "Col Pct")
-  labels <- all_labels[names(show)]
-  rvals <- lr$text
-  cvals <- lc$text
-  R <- max(c(9L, nchar(labels), nchar(rvals) + 1L))
-  C <- max(c(8L, nchar(cvals), 7L))
-  lst <- c(title %||% paste("Table of", ri$disp, "by", ci$disp), stratum, "")
-  # variable headings carry the label in parentheses; a row heading that does
-  # not fit before the first column puts the column heading on the next line
-  rh <- paste0(ri$disp, if (!is.null(ri$label)) paste0("(", ri$label, ")"))
-  ch <- paste0(ci$disp, if (!is.null(ci$label)) paste0("(", ci$label, ")"))
-  lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -(R + 1L)), ch) else c(rh, paste0(strrep(" ", R + 1L), ch)))
+  # the CrossTabFreqs table: one row per cell (_TYPE_ "11"), row total ("10"),
+  # column total ("01") and the grand total ("00"); a statistic that is not
+  # defined for a cell (MISSPRINT levels, an empty row) is missing
+  rows <- rbind(
+    data.frame(r = rep(seq_len(nr), each = nc + 1L), c = rep(c(seq_len(nc), NA), nr)),
+    data.frame(r = NA, c = c(seq_len(nc), NA))
+  )
+  type <- ifelse(!is.na(rows$r) & !is.na(rows$c), "11", ifelse(!is.na(rows$r), "10", ifelse(!is.na(rows$c), "01", "00")))
+  na <- NA_real_
+  stat <- function(r, cc, s) {
+    if (!is.na(r) && !is.na(cc)) {
+      x <- tab[r, cc]
+      ex <- if (tot > 0) rt_[r] * ct_[cc] / tot else na
+      m <- mptab && (missr[r] || missc[cc])
+      return(switch(s, freq = x,
+        pct = if (m) na else x / (if (mptab) tot_nm else tot) * 100,
+        expected = ex, deviation = if (is.na(ex)) na else x - ex,
+        cellchi2 = if (is.na(ex) || ex == 0) na else (x - ex)^2 / ex,
+        row = { d <- if (mptab) rt_nm[r] else rt_[r]; if (m || d == 0) na else x / d * 100 },
+        col = { d <- if (mptab) ct_nm[cc] else ct_[cc]; if (m || d == 0) na else x / d * 100 }))
+    }
+    if (!is.na(r)) {
+      if (mptab && missr[r]) return(na)
+      return(switch(s, freq = if (mptab) rt_nm[r] else rt_[r], pct = if (mptab) rt_nm[r] / tot_nm * 100 else rt_[r] / tot * 100, na))
+    }
+    if (!is.na(cc)) {
+      if (mptab && missc[cc]) return(na)
+      return(switch(s, freq = if (mptab) ct_nm[cc] else ct_[cc], pct = if (mptab) ct_nm[cc] / tot_nm * 100 else ct_[cc] / tot * 100, na))
+    }
+    switch(s, freq = if (mptab) tot_nm else tot, pct = if (mptab || tot > 0) 100 else na, na)
+  }
+  sv <- function(s) vapply(seq_len(nrow(rows)), function(i) stat(rows$r[i], rows$c[i], s), 0)
+  x <- list()
+  x[[vars[1]]] <- lr$values[rows$r]
+  x[[vars[2]]] <- lc$values[rows$c]
+  x[["_TYPE_"]] <- type
+  x$Frequency <- sv("freq")
+  x$Expected <- sv("expected")
+  x$Deviation <- sv("deviation")
+  x$CellChiSquare <- sv("cellchi2")
+  x$Percent <- sv("pct")
+  x$RowPercent <- sv("row")
+  x$ColPercent <- sv("col")
+  x <- tibble::as_tibble(x)
+  stat_cols <- c(freq = "Frequency", expected = "Expected", deviation = "Deviation", cellchi2 = "CellChiSquare",
+                 pct = "Percent", row = "RowPercent", col = "ColPercent")
+  hidden <- c(FALSE, FALSE, TRUE, !show[names(stat_cols)])
+  tb <- new_sasonr_ods_table(x, name = "CrossTabFreqs", label = "Cross-Tabular Freq Table", path = "Freq.Table1.CrossTabFreqs",
+                             proc = "Freq", template = "base.freq.crosstab",
+                             cols = ods_cols(names(x), label = c(ri$disp, ci$disp, "_TYPE_", stat_cols),
+                                             hidden = unname(hidden), role = c("class", "class", "label", rep("stat", 7L))))
   # a user-format label keeps its leading blanks in the column heading ('  50+ ')
-  chv <- cvals
+  C <- max(c(8L, nchar(lc$text), 7L))
+  chv <- lc$text
   if (!is.null(ci$fmt) && !is.null(user_fmt(ci$fmt$name, is.character(lc$values) || isTRUE(ci$fmt$char)))) {
     chv <- substr(sas_rtrim(sas_format(lc$values, ci$fmt)), 1L, C)
-    chv[is.na(chv)] <- cvals[is.na(chv)]
+    chv[is.na(chv)] <- lc$text[is.na(chv)]
   }
-  chead <- paste(vapply(chv, function(x) formatC(x, width = if (proc_right_align(ci)) C else -C), ""), collapse = "|")
-  for (j in seq_along(labels)) {
-    lab <- formatC(labels[j], width = -R)
-    lst <- c(lst, if (j < length(labels)) paste0(lab, "|") else paste0(lab, "|", chead, "|  Total"))
-  }
-  sep <- paste0(strrep("-", R), "+", strrep(paste0(strrep("-", C), "+"), nc))
-  lst <- c(lst, sep)
-  cell <- function(x) paste0(formatC(x, width = C - 1L), " ")
-  for (r in seq_len(nr)) {
-    rv <- if (!proc_right_align(ri)) formatC(rvals[r], width = -R) else paste0(formatC(rvals[r], width = R - 1L), " ")
-    lines <- character()
-    first <- TRUE
-    for (s in names(labels)) {
-      vals <- vapply(seq_len(nc), function(cc) {
-        x <- tab[r, cc]
-        ex <- if (tot > 0) rt_[r] * ct_[cc] / tot else NA_real_
-        if (mptab) {
-          switch(s, freq = freq_num(x),
-                 pct = if (missr[r] || missc[cc]) "." else freq_pct(x / tot_nm * 100),
-                 expected = freq_stat_num(ex), deviation = freq_stat_num(if (is.na(ex)) NA_real_ else x - ex),
-                 cellchi2 = freq_stat_num(if (is.na(ex) || ex == 0) NA_real_ else (x - ex)^2 / ex),
-                 row = if (missr[r] || missc[cc]) "." else if (rt_nm[r] == 0) "." else freq_pct(x / rt_nm[r] * 100),
-                 col = if (missr[r] || missc[cc]) "." else if (ct_nm[cc] == 0) "." else freq_pct(x / ct_nm[cc] * 100))
-        } else {
-          switch(s, freq = freq_num(x), pct = freq_pct(x / tot * 100),
-                 expected = freq_stat_num(ex), deviation = freq_stat_num(if (is.na(ex)) NA_real_ else x - ex),
-                 cellchi2 = freq_stat_num(if (is.na(ex) || ex == 0) NA_real_ else (x - ex)^2 / ex),
-                 row = if (rt_[r] == 0) "." else freq_pct(x / rt_[r] * 100),
-                 col = if (ct_[cc] == 0) "." else freq_pct(x / ct_[cc] * 100))
-        }
-      }, "")
-      totv <- if (mptab) {
-        switch(s, freq = if (missr[r]) "." else freq_num(rt_nm[r]),
-               pct = if (missr[r]) "." else freq_pct(rt_nm[r] / tot_nm * 100), "")
-      } else {
-        switch(s, freq = freq_num(rt_[r]), pct = freq_pct(rt_[r] / tot * 100), "")
-      }
-      lines <- c(lines, sas_rtrim(paste0(if (first) rv else strrep(" ", R), "|", paste(vapply(vals, cell, ""), collapse = "|"), "|",
-                                         formatC(totv, width = 7L))))
-      first <- FALSE
-    }
-    lst <- c(lst, lines, sep)
-  }
-  if (mptab) {
-    tl <- paste0(formatC("Total", width = -R), " ",
-                 paste(vapply(seq_len(nc), function(cc) cell(if (missc[cc]) "." else freq_num(ct_nm[cc])), ""), collapse = " "),
-                 " ", formatC(freq_num(tot_nm), width = 7L))
-    lst <- c(lst, sas_rtrim(tl))
-    if ("pct" %in% names(show)) {
-      lst <- c(lst, sas_rtrim(paste0(strrep(" ", R), " ",
-                                     paste(vapply(seq_len(nc), function(cc) cell(if (missc[cc]) "." else freq_pct(ct_nm[cc] / tot_nm * 100)), ""), collapse = " "),
-                                     " ", formatC(freq_pct(100), width = 7L))))
-    }
-  } else {
-    tl <- paste0(formatC("Total", width = -R), " ", paste(vapply(ct_, function(x) cell(freq_num(x)), ""), collapse = " "), " ",
-                 formatC(freq_num(tot), width = 7L))
-    lst <- c(lst, sas_rtrim(tl))
-    if ("pct" %in% names(show)) {
-      lst <- c(lst, sas_rtrim(paste0(strrep(" ", R), " ", paste(vapply(ct_, function(x) cell(freq_pct(x / tot * 100)), ""), collapse = " "),
-                                     " ", formatC(if (tot > 0) freq_pct(100) else ".", width = 7L))))
-    }
-  }
-  if (nmiss > 0 && is.null(stratum)) lst <- c(lst, "", paste0("Frequency Missing = ", freq_num(nmiss)))
+  attr(tb, "freq") <- list(ri = ri, ci = ci, rtext = lr$text, ctext = lc$text, chead = chv, title = title, stratum = stratum,
+                           nmiss = nmiss, nr = nr, nc = nc)
+  R <- max(c(9L, nchar(all_labels_freq[names(show)[show]]), nchar(lr$text) + 1L))
   if (R + 1L + (C + 1L) * nc + 7L > 132L) abort_unsupported("a crosstabulation wider than the line size (multi-panel tables)")
-  lst <- c(lst, "")
   # OUT=
   grid <- expand.grid(r = seq_len(nr), c = seq_len(nc))
   grid <- grid[order(grid$r, grid$c), ]
@@ -1150,7 +1136,71 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
     out_cols <- c(out_cols, list(list(name = "pct_row", disp = "PCT_ROW", char = FALSE, len = 8L, label = "Percent of Row Frequency"),
                                  list(name = "pct_col", disp = "PCT_COL", char = FALSE, len = 8L, label = "Percent of Column Frequency")))
   }
-  list(listing = lst, out = tibble::as_tibble(od), out_cols = out_cols)
+  list(table = tb, out = tibble::as_tibble(od), out_cols = out_cols)
+}
+
+all_labels_freq <- c(freq = "Frequency", expected = "Expected", deviation = "Deviation",
+                     cellchi2 = "Cell Chi-Square", pct = "Percent", row = "Row Pct", col = "Col Pct")
+
+# Listing of a CrossTabFreqs table (template base.freq.crosstab).
+freq_crosstab_listing <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  cols <- attr(tb, "cols", exact = TRUE)
+  stat_cols <- c(freq = "Frequency", expected = "Expected", deviation = "Deviation", cellchi2 = "CellChiSquare",
+                 pct = "Percent", row = "RowPercent", col = "ColPercent")
+  shown <- !cols$hidden[match(stat_cols, cols$name)]
+  labels <- all_labels_freq[names(stat_cols)[shown]]
+  ri <- a$ri
+  ci <- a$ci
+  nr <- a$nr
+  nc <- a$nc
+  rvals <- a$rtext
+  cvals <- a$ctext
+  type <- tb[["_TYPE_"]]
+  # the value of statistic s in the cell (r, cc); r or cc NA for a total
+  at <- function(r, cc, s) {
+    i <- if (!is.na(r) && !is.na(cc)) (r - 1L) * (nc + 1L) + cc else if (!is.na(r)) r * (nc + 1L) else nr * (nc + 1L) + (if (is.na(cc)) nc + 1L else cc)
+    tb[[stat_cols[[s]]]][i]
+  }
+  R <- max(c(9L, nchar(labels), nchar(rvals) + 1L))
+  C <- max(c(8L, nchar(cvals), 7L))
+  lst <- c(a$title %||% paste("Table of", ri$disp, "by", ci$disp), a$stratum, "")
+  # variable headings carry the label in parentheses; a row heading that does
+  # not fit before the first column puts the column heading on the next line
+  rh <- paste0(ri$disp, if (!is.null(ri$label)) paste0("(", ri$label, ")"))
+  ch <- paste0(ci$disp, if (!is.null(ci$label)) paste0("(", ci$label, ")"))
+  lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -(R + 1L)), ch) else c(rh, paste0(strrep(" ", R + 1L), ch)))
+  chead <- paste(vapply(a$chead, function(x) formatC(x, width = if (proc_right_align(ci)) C else -C), ""), collapse = "|")
+  for (j in seq_along(labels)) {
+    lab <- formatC(labels[j], width = -R)
+    lst <- c(lst, if (j < length(labels)) paste0(lab, "|") else paste0(lab, "|", chead, "|  Total"))
+  }
+  sep <- paste0(strrep("-", R), "+", strrep(paste0(strrep("-", C), "+"), nc))
+  lst <- c(lst, sep)
+  cell <- function(x) paste0(formatC(x, width = C - 1L), " ")
+  txt <- function(s, v) switch(s, freq = freq_num(v), pct = , row = , col = freq_pct(v), freq_stat_num(v))
+  for (r in seq_len(nr)) {
+    rv <- if (!proc_right_align(ri)) formatC(rvals[r], width = -R) else paste0(formatC(rvals[r], width = R - 1L), " ")
+    lines <- character()
+    first <- TRUE
+    for (s in names(labels)) {
+      vals <- vapply(seq_len(nc), function(cc) txt(s, at(r, cc, s)), "")
+      totv <- if (s %in% c("freq", "pct")) txt(s, at(r, NA, s)) else ""
+      lines <- c(lines, sas_rtrim(paste0(if (first) rv else strrep(" ", R), "|", paste(vapply(vals, cell, ""), collapse = "|"), "|",
+                                         formatC(totv, width = 7L))))
+      first <- FALSE
+    }
+    lst <- c(lst, lines, sep)
+  }
+  tl <- paste0(formatC("Total", width = -R), " ", paste(vapply(seq_len(nc), function(cc) cell(freq_num(at(NA, cc, "freq"))), ""), collapse = " "),
+               " ", formatC(freq_num(at(NA, NA, "freq")), width = 7L))
+  lst <- c(lst, sas_rtrim(tl))
+  if ("pct" %in% names(labels)) {
+    lst <- c(lst, sas_rtrim(paste0(strrep(" ", R), " ", paste(vapply(seq_len(nc), function(cc) cell(freq_pct(at(NA, cc, "pct"))), ""), collapse = " "),
+                                   " ", formatC(freq_pct(at(NA, NA, "pct")), width = 7L))))
+  }
+  if (a$nmiss > 0 && is.null(a$stratum)) lst <- c(lst, "", paste0("Frequency Missing = ", freq_num(a$nmiss)))
+  c(lst, "")
 }
 
 freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
@@ -1226,7 +1276,7 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
       tw <- freq_twoway(sub, sub_obs + 1, lv[(k - 1L):k], vars[(k - 1L):k], info, o, 0, sp,
                         title = paste("Table", ti, "of", info[[vars[k - 1L]]]$disp, "by", info[[vars[k]]]$disp),
                         stratum = paste("Controlling for", ctl))
-      lst <- c(lst, tw$listing)
+      lst <- c(lst, freq_crosstab_listing(tw$table))
       # CHISQ / FISHER of a multiway request print one statistics block after
       # each stratum table ("Statistics for Table k of ...")
       if (isTRUE(o$chisq) || isTRUE(o$fisher)) {
