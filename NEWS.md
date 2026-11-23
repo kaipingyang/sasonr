@@ -5,6 +5,10 @@ the development version provides.
 
 ## Running SAS programs
 
+* `options(sasonr.start_time = <POSIXct>)` sets the session start time that
+  the automatic macro variables SYSDATE, SYSDATE9, SYSDAY and SYSTIME
+  report, so a program that branches on `&SYSDAY` gives the same result on
+  any day.
 * A DATA step whose statement is ignored after a syntax ERROR (ERROR
   76-322, e.g. `PUT()` without a format: ERROR 388-185) compiles on: the
   ignored assignment leaves its target numeric, the type conversion NOTE of

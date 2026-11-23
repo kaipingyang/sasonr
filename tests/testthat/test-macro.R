@@ -309,3 +309,11 @@ test_that("%' outside %STR, %NRSTR, %QUOTE and %NRQUOTE fails loud", {
   expect_error(sas_run("%let q = %quote(%'); %put q=&q;"), class = "sasonr_unsupported")
   expect_error(sas_run("%let q = %nrquote(%\"); %put q=&q;"), class = "sasonr_unsupported")
 })
+
+test_that("options(sasonr.start_time =) pins SYSDATE9, SYSDAY and SYSTIME", {
+  withr::local_options(sasonr.start_time = as.POSIXct("2026-11-24 09:05:00", tz = "UTC"))
+  r <- sas_run("%put &sysdate9 &sysday &systime;")
+  expect_true(any(grepl("24NOV2026 Tuesday 09:05", as.character(sas_log(r)), fixed = TRUE)))
+  withr::local_options(sasonr.start_time = "Tuesday")
+  expect_error(sas_run("%put &sysday;"), class = "sasonr_error")
+})

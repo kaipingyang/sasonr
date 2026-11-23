@@ -38,7 +38,13 @@ new_macro_session <- function(exec = NULL) {
   ses$macros <- new.env(parent = emptyenv())
   ses$exec <- exec
   ses$line <- 1L
-  now <- Sys.time()
+  # the session start time: options(sasonr.start_time = <POSIXct>) pins it
+  # (SYSDATE, SYSDATE9, SYSDAY, SYSTIME), e.g. for a program that branches
+  # on &SYSDAY
+  now <- getOption("sasonr.start_time") %||% Sys.time()
+  if (!inherits(now, "POSIXct") || length(now) != 1L || is.na(now)) {
+    rlang::abort("Option `sasonr.start_time` must be one date-time (POSIXct).", class = "sasonr_error")
+  }
   auto <- list(
     sysdate = toupper(format(now, "%d%b%y")), sysdate9 = toupper(format(now, "%d%b%Y")),
     sysday = format(now, "%A"), systime = format(now, "%H:%M"), sysver = "9.4",
