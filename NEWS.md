@@ -93,6 +93,9 @@ the development version provides.
   line, when the HTML destination received output that has no HTML view
   yet (PROC PRINT, the other PROC FREQ tables, n-way and LIST tables);
   before, that output was left out of the document.
+* The `lang` of a `sas_script()` DATA step node runs a step whose
+  vectorised code falls back to row-by-row execution; before, it failed
+  with "bad value" (the generated `function` call lacked its srcref element).
 * `sas_proc_print()` and `sas_proc_tabulate()` are step verbs too, and
   `sas_script()` writes PROC PRINT and PROC TABULATE steps with them.
 * `sas_proc_freq()` and `sas_proc_transpose()` are step verbs like

@@ -265,7 +265,9 @@ script_node <- function(nd, mode) {
   if (identical(nd$type, "data")) {
     level <- if (isTRUE(nd$rerun)) "L3" else NULL
     code <- paste(tr$code, collapse = "\n")
-    fn <- rlang::call2("function", as.pairlist(alist(work = )), rlang::call2("{", !!!as.list(cg_exec(tr$exprs))))
+    # a `function` call has four elements (the last one the srcref); with three
+    # rlang fails to capture the call stack of a condition raised in the step
+    fn <- rlang::call2("function", as.pairlist(alist(work = )), rlang::call2("{", !!!as.list(cg_exec(tr$exprs))), NULL)
     lang <- rlang::call2("sas_data_step", quote(s), outs, fn, sas = stext, line = line, level = level)
     text <- paste0("s |> sas_data_step(", r_chr(outs), ", \\(work) {\n",
                    paste0("  ", strsplit(code, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n}, sas = ", r_raw(stext),

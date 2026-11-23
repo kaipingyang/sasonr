@@ -335,3 +335,12 @@ proc tabulate data=a; class g; class h; var x; table g all, x*(sum mean); table 
   r <- sas_run(code)
   expect_identical(sas_listing(s), r$listing)
 })
+
+test_that("a script node's lang runs a step whose vectorised code falls back row by row", {
+  # CATS into a short variable with bytes outside ASCII is decided row by row
+  code <- "data _null_; length c4 $4; c4 = cats('a', 'é', 'é'); put c4= $hex8.; run;"
+  sc <- sas_script(sas_translate(code))
+  s <- sas_session()
+  for (nd in sc) s <- eval(nd$lang, list(s = s), asNamespace("sasonr"))
+  expect_identical(as.character(sas_log(s, echo = FALSE)), as.character(sas_log(sas_run(code), echo = FALSE)))
+})
