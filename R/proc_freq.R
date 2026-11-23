@@ -470,6 +470,12 @@ freq_step_spec <- function(step, meta, last) {
     if (kv != 2 && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("RELRISK / RISKDIFF for a table that is not 2x2 (only the 2x2 layout is supported)", rq$line)
     }
+    # NOPRINT suppresses the frequency tables; whether the statistics are
+    # still written is not measured yet
+    if (isTRUE(rq$opts$noprint) && (any(c("chisq", "fisher", "binomial", "cmh", "cmh1", "cmh2", "relrisk", "riskdiff") %in% names(rq$opts)) ||
+                                    length(exact) > 0)) {
+      abort_unsupported("TABLES option NOPRINT together with statistics options", rq$line)
+    }
     # --- option combinations whose listing layout is not supported ----------
     if (isTRUE(rq$opts$missprint) && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("MISSPRINT with RELRISK / RISKDIFF (the combination is not supported)", rq$line)

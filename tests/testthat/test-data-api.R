@@ -91,3 +91,8 @@ test_that("the multiway CMH summary is CMH, CommonRelRisks and BreslowDayTest ta
   expect_identical(nm, c("CMH", "CommonRelRisks", "BreslowDayTest"))
   expect_identical(r$ods[[2]]$Method, rep(c("Mantel-Haenszel", "Logit"), 3L))
 })
+
+test_that("TABLES / NOPRINT with statistics options fails loud (not measured)", {
+  expect_error(sas_run("data a; input g $ h $; datalines;\na x\nb y\n;\nrun;\nproc freq data=a; tables g*h / chisq noprint; run;"),
+               class = "sasonr_unsupported")
+})
