@@ -81,3 +81,13 @@ test_that("sas_html() fails loud on PROC PRINT and PROC FREQ output instead of l
   r2 <- sas_run("data a; x = 1; run;\nods html close;\nproc print data=a; run;\nods html;\nproc means data=a; var x; run;")
   expect_match(sas_html(r2), "sas-table|<table", all = FALSE)
 })
+
+test_that("the multiway CMH summary is CMH, CommonRelRisks and BreslowDayTest tables", {
+  r <- sas_run(paste0("data a; input s $ g $ h $ n; datalines;\n",
+                      "1 a x 3\n1 a y 5\n1 b x 7\n1 b y 2\n2 a x 4\n2 a y 4\n2 b x 6\n2 b y 1\n;\nrun;\n",
+                      "proc freq data=a; weight n; tables s*g*h / cmh; run;"))
+  expect_true(any(grepl("Breslow-Day", r$listing, fixed = TRUE)))
+  nm <- vapply(r$ods, attr, "", "name")
+  expect_identical(nm, c("CMH", "CommonRelRisks", "BreslowDayTest"))
+  expect_identical(r$ods[[2]]$Method, rep(c("Mantel-Haenszel", "Logit"), 3L))
+})

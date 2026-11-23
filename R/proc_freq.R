@@ -673,6 +673,9 @@ freq_listing_tables <- function(tables) {
       base.freq.crosstab = freq_crosstab_listing(tb),
       base.freq.chisq = freq_chisq_listing(tb),
       base.freq.fisher = freq_fisher_listing(tb),
+      base.freq.cmh = freq_cmh_listing(tb),
+      base.freq.commonrr = freq_commonrr_listing(tb),
+      base.freq.breslow = freq_breslow_listing(tb),
       attr(tb, "lines", exact = TRUE)))
   }
   lst
@@ -2333,45 +2336,63 @@ freq_binomial_listing <- function(st, info) {
 # summary starts its own page), the three Cochran-Mantel-Haenszel statistics,
 # the common odds ratio / relative risks and the Breslow-Day test for
 # stratified 2x2 tables, closed by "Total Sample Size = n".
+# The multiway CMH summary as segments: the headings, the CMH table, the
+# CommonRelRisks and BreslowDayTest tables (2x2 strata), the sample size.
 freq_cmh_summary <- function(st, vars, info, o) {
-  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
-  pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
   zlab <- paste0(format_pct_level(o$alpha %||% 0.05), "%")
   scores_txt <- if (identical(o$scores, "rank")) "Rank Scores" else "Table Scores"
   k <- length(vars)
   rowd <- info[[vars[k - 1L]]]$disp
   cold <- info[[vars[k]]]$disp
   strata_disp <- vapply(vars[seq_len(k - 2L)], function(v) info[[v]]$disp, "")
-  out <- c("The FREQ Procedure", "",
-           paste("Summary Statistics for", rowd, "by", cold),
-           paste("Controlling for", paste(strata_disp, collapse = " ")),
-           paste0("Cochran-Mantel-Haenszel Statistics (Based on ", scores_txt, ")"),
-           "Statistic Alternative Hypothesis DF Value Prob",
-           strrep("-", 63))
-  rows <- list(c("1", "Nonzero Correlation", st$df_cmhcor, st$cmhcor, st$p_cmhcor),
-               c("2", "Row Mean Scores Differ", st$df_cmhrms, st$cmhrms, st$p_cmhrms),
-               c("3", "General Association", st$df_cmhga, st$cmhga, st$p_cmhga))
-  for (r in rows) {
-    out <- c(out, paste(r[1], r[2], sprintf("%.0f", as.numeric(r[3])), f4(as.numeric(r[4])), pv(as.numeric(r[5]))))
+  tab <- function(x, name, label, tpl, role) {
+    new_sasonr_ods_table(x, name = name, label = label, path = paste0("Freq.Table1.", name), proc = "Freq", template = tpl,
+                         cols = ods_cols(names(x), role = role))
   }
+  segs <- list(freq_lines_seg(c("The FREQ Procedure", "", paste("Summary Statistics for", rowd, "by", cold),
+                                paste("Controlling for", paste(strata_disp, collapse = " ")),
+                                paste0("Cochran-Mantel-Haenszel Statistics (Based on ", scores_txt, ")")), decor = TRUE))
+  cm <- tibble::tibble(Statistic = 1:3, AltHyp = c("Nonzero Correlation", "Row Mean Scores Differ", "General Association"),
+                       DF = c(st$df_cmhcor, st$df_cmhrms, st$df_cmhga), Value = c(st$cmhcor, st$cmhrms, st$cmhga),
+                       Prob = c(st$p_cmhcor, st$p_cmhrms, st$p_cmhga))
+  segs <- c(segs, list(tab(cm, "CMH", "Cochran-Mantel-Haenszel Statistics", "base.freq.cmh", c("label", "label", "stat", "stat", "stat"))))
   cc <- st$cmh_common
   if (!is.null(cc)) {
-    out <- c(out, "", "Common Odds Ratio and Relative Risks",
-             paste("Statistic Method Value", zlab, "Confidence Limits"), strrep("-", 85),
-             paste("Odds Ratio Mantel-Haenszel", f4(cc$ormh[1]), f4(cc$ormh[2]), f4(cc$ormh[3])),
-             paste("Logit", f4(cc$orl[1]), f4(cc$orl[2]), f4(cc$orl[3])),
-             paste("Relative Risk (Column 1) Mantel-Haenszel", f4(cc$rr1[1]), f4(cc$rr1[2]), f4(cc$rr1[3])),
-             paste("Logit", f4(cc$rr1l[1]), f4(cc$rr1l[2]), f4(cc$rr1l[3])),
-             paste("Relative Risk (Column 2) Mantel-Haenszel", f4(cc$rr2[1]), f4(cc$rr2[2]), f4(cc$rr2[3])),
-             paste("Logit", f4(cc$rr2l[1]), f4(cc$rr2l[2]), f4(cc$rr2l[3])))
+    m <- list(cc$ormh, cc$orl, cc$rr1, cc$rr1l, cc$rr2, cc$rr2l)
+    rr <- tibble::tibble(Statistic = rep(c("Odds Ratio", "Relative Risk (Column 1)", "Relative Risk (Column 2)"), each = 2L),
+                         Method = rep(c("Mantel-Haenszel", "Logit"), 3L), Value = vapply(m, `[`, 0, 1L),
+                         LowerCL = vapply(m, `[`, 0, 2L), UpperCL = vapply(m, `[`, 0, 3L))
+    rt <- tab(rr, "CommonRelRisks", "Common Relative Risks", "base.freq.commonrr", c("label", "label", "stat", "stat", "stat"))
+    attr(rt, "freq") <- list(level = zlab)
+    segs <- c(segs, list(rt))
     if (!is.null(cc$bd)) {
-      out <- c(out, "", "Breslow-Day Test for", "Homogeneity of Odds Ratios", strrep("-", 26),
-               paste("Chi-Square", f4(cc$bd$chisq)),
-               paste("DF", sprintf("%.0f", cc$bd$df)),
-               paste("Pr > ChiSq", pv(cc$bd$p)))
+      bd <- tibble::tibble(Name = c("_BDCHI_", "DF_BDCHI", "P_BDCHI"), Label = c("Chi-Square", "DF", "Pr > ChiSq"),
+                           Value = c(cc$bd$chisq, cc$bd$df, cc$bd$p))
+      segs <- c(segs, list(tab(bd, "BreslowDayTest", "Breslow-Day Test", "base.freq.breslow", c("label", "label", "stat"))))
     }
   }
-  c(out, "", paste("Total Sample Size =", freq_num(st$n)), "")
+  c(segs, list(freq_lines_seg(c("", paste("Total Sample Size =", freq_num(st$n)), ""), decor = TRUE)))
+}
+
+# Listings of the multiway CMH summary tables.
+freq_cmh_listing <- function(tb) {
+  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
+  pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
+  c("Statistic Alternative Hypothesis DF Value Prob", strrep("-", 63),
+    vapply(seq_len(nrow(tb)), function(i) paste(tb$Statistic[i], tb$AltHyp[i], sprintf("%.0f", tb$DF[i]), f4(tb$Value[i]), pv(tb$Prob[i])), ""))
+}
+freq_commonrr_listing <- function(tb) {
+  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
+  c("", "Common Odds Ratio and Relative Risks", paste("Statistic Method Value", attr(tb, "freq", exact = TRUE)$level, "Confidence Limits"),
+    strrep("-", 85),
+    vapply(seq_len(nrow(tb)), function(i) paste(c(if (identical(tb$Method[i], "Mantel-Haenszel")) tb$Statistic[i], tb$Method[i],
+                                                  f4(tb$Value[i]), f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), collapse = " "), ""))
+}
+freq_breslow_listing <- function(tb) {
+  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
+  pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
+  c("", "Breslow-Day Test for", "Homogeneity of Odds Ratios", strrep("-", 26),
+    paste("Chi-Square", f4(tb$Value[1])), paste("DF", sprintf("%.0f", tb$Value[2])), paste("Pr > ChiSq", pv(tb$Value[3])))
 }
 
 # The statistics output of one table request: a list of segments, each a
@@ -2399,7 +2420,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
   # Mantel-Haenszel Statistics"); the per-stratum statistics are printed by
   # freq_nway right after each stratum table
   if (k > 2L) {
-    if (!is.null(st$cmhcor)) out <- freq_cmh_summary(st, vars, info, o)
+    if (!is.null(st$cmhcor)) segs <- freq_cmh_summary(st, vars, info, o)
     return(finish())
   }
   # RISKDIFF / RELRISK print their blocks after the test statistics and share a
@@ -2533,7 +2554,10 @@ freq_seg_lines <- function(seg) {
   if (!inherits(seg, "sasonr_ods_table")) return(as.character(seg))
   switch(attr(seg, "template", exact = TRUE),
     base.freq.chisq = freq_chisq_listing(seg),
-    base.freq.fisher = freq_fisher_listing(seg))
+    base.freq.fisher = freq_fisher_listing(seg),
+    base.freq.cmh = freq_cmh_listing(seg),
+    base.freq.commonrr = freq_commonrr_listing(seg),
+    base.freq.breslow = freq_breslow_listing(seg))
 }
 
 # Listing of a ChiSq table: the tests with DF and Prob, then the measures.
