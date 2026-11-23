@@ -73,8 +73,9 @@ the development version provides.
   `as.data.frame()` drops the table attributes.
 * PROC FREQ runs on the same PROC pipeline: its one-way and two-way tables
   are ODS tables (OneWayFreqs, CrossTabFreqs with one row per cell and per
-  total, in `$ods`), and `sas_freq_df()` returns them for a data frame.
-  N-way and LIST tables, statistics and NLEVELS are not ODS tables yet:
+  total, in `$ods`), so are the CHISQ and FISHER results of a two-way table
+  (ChiSq, FishersExact), and `sas_freq_df()` returns them for a data frame.
+  N-way and LIST tables, the other statistics and NLEVELS are not ODS tables yet:
   `sas_freq_df()` stops with an Unsupported error for them.
 * `sas_html()` of a program result is an Unsupported error, naming the
   procedure and its SAS line, when the HTML destination received PROC PRINT

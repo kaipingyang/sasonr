@@ -671,6 +671,8 @@ freq_listing_tables <- function(tables) {
     lst <- c(lst, switch(attr(tb, "template", exact = TRUE),
       base.freq.oneway = freq_oneway_listing(tb),
       base.freq.crosstab = freq_crosstab_listing(tb),
+      base.freq.chisq = freq_chisq_listing(tb),
+      base.freq.fisher = freq_fisher_listing(tb),
       attr(tb, "lines", exact = TRUE)))
   }
   lst
@@ -698,9 +700,11 @@ freq_compute <- function(d, sp) {
     for (ri in seq_along(sp$requests)) {
       rq <- sp$requests[[ri]]
       res <- freq_one_request(db, wt, rq, sp)
-      if (!is.null(res$table)) {
-        attr(res$tables[[1]], "path") <- paste0("Freq.", if (!is.null(sp$by)) paste0("ByGroup", gi, "."), "Table", ri, ".",
-                                                attr(res$tables[[1]], "name", exact = TRUE))
+      for (ti in seq_along(res$tables)) {
+        if (inherits(res$tables[[ti]], "sasonr_ods_table")) {
+          attr(res$tables[[ti]], "path") <- paste0("Freq.", if (!is.null(sp$by)) paste0("ByGroup", gi, "."), "Table", ri, ".",
+                                                   attr(res$tables[[ti]], "name", exact = TRUE))
+        }
       }
       if (!isTRUE(rq$opts$noprint)) pieces <- c(pieces, res$tables)
       if (!is.null(rq$opts$out)) {
@@ -716,7 +720,11 @@ freq_compute <- function(d, sp) {
     }
     if (sp$print) {
       tables <- c(tables, lapply(pieces, function(pc) {
-        if (!inherits(pc, "sasonr_ods_table")) return(freq_table_lines(pc, gi, by))
+        if (!inherits(pc, "sasonr_ods_table")) {
+          tl <- freq_table_lines(as.character(pc), gi, by)
+          attr(tl, "decor") <- isTRUE(attr(pc, "decor", exact = TRUE))
+          return(tl)
+        }
         attr(pc, "by") <- by
         attr(pc, "freq_group") <- gi
         pc
@@ -845,9 +853,12 @@ freq_one_request <- function(db, wt, rq, sp) {
     abort_unsupported("MISSPRINT with statistics for a table that is not 2x2 (only the 2x2 layout is supported)", rq$line)
   }
   res$stats <- freq_request_stats(stat_tab, stat_lv, vars, info, o, sp, nmiss)
-  lines <- c(res$listing, freq_stats_listing(res$stats, tab, vars, info, o, sp))
-  # the tables of the request: OneWayFreqs, then the other output as lines
-  res$tables <- c(if (!is.null(res$table)) list(res$table), if (is.null(res$table) || length(lines) > 0) list(lines))
+  segs <- c(if (length(res$listing)) list(freq_lines_seg(res$listing)),
+            freq_stats_listing(res$stats, tab, vars, info, o, sp, pieces = TRUE))
+  # the tables of the request: OneWayFreqs / CrossTabFreqs, then the
+  # statistics output (ODS tables and listing lines) in listing order
+  res$tables <- c(if (!is.null(res$table)) list(res$table), segs)
+  if (!length(res$tables)) res$tables <- list(freq_lines_seg(character()))
   res
 }
 
@@ -2363,9 +2374,24 @@ freq_cmh_summary <- function(st, vars, info, o) {
   c(out, "", paste("Total Sample Size =", freq_num(st$n)), "")
 }
 
-freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum_line = NULL) {
-  if (!is.null(st$bin_var)) return(freq_binomial_listing(st, info))
+# The statistics output of one table request: a list of segments, each a
+# character vector of listing lines or an ODS table (ChiSq, FishersExact)
+# (`pieces = TRUE`), or the listing lines.
+freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum_line = NULL, pieces = FALSE) {
+  if (!is.null(st$bin_var)) return(if (pieces) list(freq_lines_seg(freq_binomial_listing(st, info))) else freq_binomial_listing(st, info))
+  segs <- list()
   out <- character()
+  # the lines so far become a segment; `decor`: headings, warnings and the
+  # sample size around the tables (no table content)
+  flush <- function(decor = FALSE) {
+    if (length(out)) segs[[length(segs) + 1L]] <<- freq_lines_seg(out, decor)
+    out <<- character()
+  }
+  push <- function(tb) segs[[length(segs) + 1L]] <<- tb
+  finish <- function() {
+    flush()
+    if (pieces) segs else unlist(lapply(segs, freq_seg_lines))
+  }
   k <- length(vars)
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
@@ -2373,12 +2399,13 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
   # Mantel-Haenszel Statistics"); the per-stratum statistics are printed by
   # freq_nway right after each stratum table
   if (k > 2L) {
-    return(if (!is.null(st$cmhcor)) freq_cmh_summary(st, vars, info, o) else character())
+    if (!is.null(st$cmhcor)) out <- freq_cmh_summary(st, vars, info, o)
+    return(finish())
   }
   # RISKDIFF / RELRISK print their blocks after the test statistics and share a
   # single "Statistics for Table of ..." heading and a single Sample Size line.
   more <- !is.null(st$rd) || !is.null(st$rel)
-  if (isTRUE(st$nostat_structural)) return(character())
+  if (isTRUE(st$nostat_structural)) return(finish())
   header <- title %||% paste("Statistics for Table of", info[[vars[1]]]$disp, "by", info[[vars[2]]]$disp)
   hdr <- if (!is.null(stratum_line)) c(header, stratum_line) else header
   did <- FALSE
@@ -2405,16 +2432,19 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
     rows <- list(c("Chi-Square", st$df_pchi, st$pchi, st$p_pchi), c("Likelihood Ratio Chi-Square", st$df_lrchi, st$lrchi, st$p_lrchi))
     if (!is.null(st$ajchi)) rows <- c(rows, list(c("Continuity Adj. Chi-Square", 1, st$ajchi, st$p_ajchi)))
     rows <- c(rows, list(c("Mantel-Haenszel Chi-Square", 1, st$mhchi, st$p_mhchi)))
-    body <- vapply(rows, function(r) paste0(formatC(r[1], width = -27L), formatC(sprintf("%.0f", as.numeric(r[2])), width = 5L),
-                                            formatC(f4(as.numeric(r[3])), width = 12L), formatC(pv(as.numeric(r[4])), width = 10L)), "")
-    body <- c(body, vapply(list(c("Phi Coefficient", st$phi), c("Contingency Coefficient", st$contgy), c("Cramer's V", st$cramv)),
-                           function(r) paste0(formatC(r[1], width = -32L), formatC(f4(as.numeric(r[2])), width = 12L)), ""))
-    out <- c(out, hdr, "",
-             paste0(formatC("Statistic", width = -27L), "   DF       Value      Prob"), strrep("-", 54), body, "")
+    rows <- c(rows, list(c("Phi Coefficient", NA, st$phi, NA), c("Contingency Coefficient", NA, st$contgy, NA),
+                         c("Cramer's V", NA, st$cramv, NA)))
+    chi <- tibble::tibble(Statistic = vapply(rows, `[[`, "", 1L), DF = as.numeric(vapply(rows, `[[`, "", 2L)),
+                          Value = as.numeric(vapply(rows, `[[`, "", 3L)), Prob = as.numeric(vapply(rows, `[[`, "", 4L)))
+    out <- c(out, hdr, "")
+    flush(decor = TRUE)
+    push(new_sasonr_ods_table(chi, name = "ChiSq", label = "Chi-Square Tests", path = "Freq.Table1.ChiSq", proc = "Freq",
+                              template = "base.freq.chisq", cols = ods_cols(names(chi), role = c("label", "stat", "stat", "stat"))))
     did <- TRUE
     if (isTRUE(st$small > 0) && !isTRUE(o$nowarn)) {
       out <- c(out, sprintf(" WARNING: %.0f%% of the cells have expected counts less", st$small * 100),
                "          than 5. Chi-Square may not be a valid test.", "")
+      flush(decor = TRUE)
     }
     if (!is.null(st$exact_chisq)) {
       # EXACT CHISQ: one block per chi-square test with its exact conditional
@@ -2432,23 +2462,27 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
                blk("Likelihood Ratio Chi-Square Test", st$lrchi, st$df_lrchi, st$p_lrchi, ex[["lr"]]),
                blk("Mantel-Haenszel Chi-Square Test", st$mhchi, 1, st$p_mhchi, ex[["mh"]]))
     }
-    if (is.null(st$fisher) && !more) out <- c(out, freq_sample_size(st))
+    if (is.null(st$fisher) && !more) {
+      flush()
+      out <- c(out, freq_sample_size(st))
+      flush(decor = TRUE)
+    }
   }
   if (!is.null(st$fisher) && k == 2) {
     fz <- st$fisher
-    if (!is.null(fz$xpl)) {
-      out <- c(out, "       Fisher's Exact Test", strrep("-", 34),
-               paste0(formatC("Cell (1,1) Frequency (F)", width = -26L), formatC(freq_num(fz$fisher_f), width = 8L)),
-               paste0(formatC("Left-sided Pr <= F", width = -26L), formatC(pv(fz$xpl), width = 8L)),
-               paste0(formatC("Right-sided Pr >= F", width = -26L), formatC(pv(fz$xpr), width = 8L)), "",
-               paste0(formatC("Table Probability (P)", width = -26L), formatC(pv(fz$xpt), width = 8L)),
-               paste0(formatC("Two-sided Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "")
-      if (!more) out <- c(out, freq_sample_size(st))
+    flush()
+    fx <- if (!is.null(fz$xpl)) {
+      tibble::tibble(Name = c("FISHER_F", "XPL_FISH", "XPR_FISH", "XPT_FISH", "XP2_FISH"),
+                     Label = c("Cell (1,1) Frequency (F)", "Left-sided Pr <= F", "Right-sided Pr >= F", "Table Probability (P)", "Two-sided Pr <= P"),
+                     Value = c(fz$fisher_f, fz$xpl, fz$xpr, fz$xpt, fz$xp2))
     } else {
-      out <- c(out, "       Fisher's Exact Test", strrep("-", 34),
-               paste0(formatC("Table Probability (P)", width = -26L), formatC(pv(fz$xpt), width = 8L)),
-               paste0(formatC("Pr <= P", width = -26L), formatC(pv(fz$xp2), width = 8L)), "")
-      if (!more) out <- c(out, freq_sample_size(st))
+      tibble::tibble(Name = c("XPT_FISH", "XP2_FISH"), Label = c("Table Probability (P)", "Pr <= P"), Value = c(fz$xpt, fz$xp2))
+    }
+    push(new_sasonr_ods_table(fx, name = "FishersExact", label = "Fisher's Exact Test", path = "Freq.Table1.FishersExact", proc = "Freq",
+                              template = "base.freq.fisher", cols = ods_cols(names(fx), role = c("label", "label", "stat"))))
+    if (!more) {
+      out <- c(out, freq_sample_size(st))
+      flush(decor = TRUE)
     }
   }
   if (!is.null(st$bin)) {
@@ -2489,7 +2523,39 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
     out <- c(out, freq_relrisk_listing(st, info))
   }
   if (more) out <- c(out, freq_sample_size(st))
-  out
+  finish()
+}
+
+freq_lines_seg <- function(lines, decor = FALSE) structure(lines, decor = decor)
+
+# The listing lines of a segment of the statistics output.
+freq_seg_lines <- function(seg) {
+  if (!inherits(seg, "sasonr_ods_table")) return(as.character(seg))
+  switch(attr(seg, "template", exact = TRUE),
+    base.freq.chisq = freq_chisq_listing(seg),
+    base.freq.fisher = freq_fisher_listing(seg))
+}
+
+# Listing of a ChiSq table: the tests with DF and Prob, then the measures.
+freq_chisq_listing <- function(tb) {
+  f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
+  pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
+  body <- vapply(seq_len(nrow(tb)), function(i) {
+    if (is.na(tb$DF[i])) return(paste0(formatC(tb$Statistic[i], width = -32L), formatC(f4(tb$Value[i]), width = 12L)))
+    paste0(formatC(tb$Statistic[i], width = -27L), formatC(sprintf("%.0f", tb$DF[i]), width = 5L),
+           formatC(f4(tb$Value[i]), width = 12L), formatC(pv(tb$Prob[i]), width = 10L))
+  }, "")
+  c(paste0(formatC("Statistic", width = -27L), "   DF       Value      Prob"), strrep("-", 54), body, "")
+}
+
+# Listing of a FishersExact table (2x2: one-sided and two-sided; larger
+# tables: the table probability and Pr <= P).
+freq_fisher_listing <- function(tb) {
+  pv <- function(v) trimws(fmt_pvalue(v, 6L, 4L))
+  line <- function(i) paste0(formatC(tb$Label[i], width = -26L),
+                             formatC(if (identical(tb$Name[i], "FISHER_F")) freq_num(tb$Value[i]) else pv(tb$Value[i]), width = 8L))
+  rows <- if (nrow(tb) == 5L) c(line(1), line(2), line(3), "", line(4), line(5)) else c(line(1), line(2))
+  c("       Fisher's Exact Test", strrep("-", 34), rows, "")
 }
 
 # RISKDIFF: the column 1 / column 2 "Risk Estimates" tables, the difference row

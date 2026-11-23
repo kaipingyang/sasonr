@@ -120,8 +120,9 @@ sas_freq_df <- function(data, tables, by = NULL, weight = NULL, options = "") {
   # the other FREQ output (n-way and LIST tables, statistics, NLEVELS) has no ODS
   # table yet: it would be left out of the result
   lines <- Filter(function(tb) identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
-  if (any(lengths(lapply(lines, attr, "lines")) > 0L)) {
-    abort_unsupported("sas_freq_df() for output other than one-way and two-way frequency tables (n-way and LIST tables, statistics, NLEVELS)")
+  content <- Filter(function(tb) !isTRUE(attr(tb, "decor", exact = TRUE)), lines)
+  if (any(lengths(lapply(content, attr, "lines")) > 0L)) {
+    abort_unsupported("sas_freq_df() for output other than one-way and two-way frequency tables (n-way and LIST tables, statistics other than CHISQ and FISHER, NLEVELS)")
   }
   res$tables <- Filter(function(tb) !identical(attr(tb, "template", exact = TRUE), "base.freq.lines"), res$tables)
   if (!length(res$tables)) abort_unsupported("sas_freq_df() without a printed table (NOPRINT)")
