@@ -41,11 +41,12 @@ html_templates <- list(
   base.print = function(tb) abort_unsupported("the HTML output of PROC PRINT"),
   base.freq.oneway = function(tb) html_freq_oneway(tb),
   base.freq.crosstab = function(tb) html_freq_crosstab(tb),
+  base.freq.list = function(tb) html_freq_list(tb),
   base.freq.chisq = function(tb) html_freq_chisq(tb),
   base.freq.fisher = function(tb) html_freq_fisher(tb),
-  base.freq.cmh = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.commonrr = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.breslow = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.cmh = function(tb) html_freq_cmh(tb),
+  base.freq.commonrr = function(tb) html_freq_commonrr(tb),
+  base.freq.breslow = function(tb) html_freq_breslow(tb),
   base.freq.relrisk = function(tb) html_freq_relrisk(tb),
   base.freq.relriskcl = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
   base.freq.riskdiff = function(tb) html_freq_riskdiff(tb),
@@ -55,8 +56,7 @@ html_templates <- list(
   base.freq.nlevels = function(tb) html_freq_nlevels(tb)
 )
 # the templates without an HTML view (sas_html() fails loud on them)
-html_undrawn <- c("base.print", "base.freq.cmh", "base.freq.commonrr", "base.freq.breslow",
-                  "base.freq.relriskcl", "base.freq.riskdiffcl", "base.freq.lines")
+html_undrawn <- c("base.print", "base.freq.relriskcl", "base.freq.riskdiffcl", "base.freq.lines")
 
 # PROC FREQ tables [measured, freq_html cases: one-way, crosstabulation,
 # chi-square].  The other FREQ tables have no HTML view yet.
@@ -99,27 +99,43 @@ html_freq_crosstab <- function(tb) {
                              1L, 0L, paste0("Procedure Freq: ", attr(tb, "label", exact = TRUE)))
   rh <- paste0(a$ri$disp, if (!is.null(a$ri$label)) paste0("(", a$ri$label, ")"))
   ch <- paste0(a$ci$disp, if (!is.null(a$ci$label)) paste0("(", a$ci$label, ")"))
-  # the table heading keeps its words together (no-break spaces)
-  cells <- list(list(r0 = 1L, r1 = 1L, c0 = 1L, c1 = nc + 2L, text = gsub(" ", "\u00a0", paste("Table of", a$ri$disp, "by", a$ci$disp), fixed = TRUE),
-                     kind = "header"),
-                list(r0 = 2L, r1 = 3L, c0 = 1L, c1 = 1L, text = rh, kind = "header"),
-                list(r0 = 2L, r1 = 2L, c0 = 2L, c1 = nc + 2L, text = ch, kind = "header"))
+  # the table heading keeps its words together (no-break spaces); a stratum
+  # of a multiway request adds its "Controlling for" row
+  nbsp <- function(x) gsub(" ", "\u00a0", x, fixed = TRUE)
+  sr <- if (is.null(a$stratum)) 0L else 1L
+  cells <- c(list(list(r0 = 1L, r1 = 1L, c0 = 1L, c1 = nc + 2L, text = nbsp(a$title %||% paste("Table of", a$ri$disp, "by", a$ci$disp)),
+                       kind = "header")),
+             if (sr) list(list(r0 = 2L, r1 = 2L, c0 = 1L, c1 = nc + 2L, text = nbsp(a$stratum), kind = "header")),
+             list(list(r0 = 2L + sr, r1 = 3L + sr, c0 = 1L, c1 = 1L, text = rh, kind = "header"),
+                  list(r0 = 2L + sr, r1 = 2L + sr, c0 = 2L, c1 = nc + 2L, text = ch, kind = "header")))
   add <- function(r, c, text, kind) cells[[length(cells) + 1L]] <<- list(r0 = r, r1 = r, c0 = c, c1 = c, text = text, kind = kind)
-  for (cc in seq_len(nc)) add(3L, cc + 1L, a$ctext[cc], "header")
-  add(3L, nc + 2L, "Total", "header")
+  for (cc in seq_len(nc)) add(3L + sr, cc + 1L, a$ctext[cc], "header")
+  add(3L + sr, nc + 2L, "Total", "header")
   tot_stats <- intersect(shown, c("freq", "pct"))
   for (r in seq_len(nr)) {
-    add(3L + r, 1L, a$rtext[r], "rowheader")
-    for (cc in seq_len(nc)) add(3L + r, cc + 1L, vapply(shown, function(s) txt(s, at(r, cc, s)), ""), "data")
-    add(3L + r, nc + 2L, vapply(shown, function(s) if (s %in% tot_stats) txt(s, at(r, NA, s)) else "", ""), "data")
+    add(3L + sr + r, 1L, a$rtext[r], "rowheader")
+    for (cc in seq_len(nc)) add(3L + sr + r, cc + 1L, vapply(shown, function(s) txt(s, at(r, cc, s)), ""), "data")
+    add(3L + sr + r, nc + 2L, vapply(shown, function(s) if (s %in% tot_stats) txt(s, at(r, NA, s)) else "", ""), "data")
   }
-  add(4L + nr, 1L, "Total", "rowheader")
-  for (cc in seq_len(nc)) add(4L + nr, cc + 1L, vapply(tot_stats, function(s) txt(s, at(NA, cc, s)), ""), "data")
-  add(4L + nr, nc + 2L, vapply(tot_stats, function(s) txt(s, at(NA, NA, s)), ""), "data")
-  c(legend, render_html_grid(cells, 4L + nr, 3L, paste0("Procedure Freq: ", attr(tb, "label", exact = TRUE))))
+  add(4L + sr + nr, 1L, "Total", "rowheader")
+  for (cc in seq_len(nc)) add(4L + sr + nr, cc + 1L, vapply(tot_stats, function(s) txt(s, at(NA, cc, s)), ""), "data")
+  add(4L + sr + nr, nc + 2L, vapply(tot_stats, function(s) txt(s, at(NA, NA, s)), ""), "data")
+  c(legend, render_html_grid(cells, 4L + sr + nr, 3L + sr, paste0("Procedure Freq: ", attr(tb, "label", exact = TRUE))))
+}
+
+html_freq_list <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  cols <- attr(tb, "cols", exact = TRUE)
+  stats <- c(Frequency = "Frequency", Percent = "Percent", CumFrequency = "Cumulative Frequency", CumPercent = "Cumulative Percent")
+  shown <- names(stats)[!cols$hidden[match(names(stats), cols$name)]]
+  fmt <- function(nm, v) if (nm %in% c("Frequency", "CumFrequency")) freq_num(v) else freq_pct(v)
+  body <- lapply(seq_len(nrow(tb)), function(i) c(vapply(seq_len(a$k), function(j) a$text[[j]][i], ""),
+                                                  vapply(shown, function(nm) fmt(nm, tb[[nm]][i]), "")))
+  html_freq_table(tb, c(a$disp, unname(stats[shown])), body)
 }
 
 html_freq_chisq <- function(tb) {
+  if (!is.null(attr(tb, "stratum", exact = TRUE))) abort_unsupported("the HTML output of the statistics of a stratum of a PROC FREQ multiway table")
   f4 <- function(v) if (is.na(v)) "" else display_fixed(v, 4L)
   pv <- function(v) if (is.na(v)) "" else trimws(fmt_pvalue(v, 6L, 4L))
   body <- lapply(seq_len(nrow(tb)), function(i) c(tb$Statistic[i], if (is.na(tb$DF[i])) "" else sprintf("%.0f", tb$DF[i]),
@@ -158,6 +174,7 @@ html_f4 <- function(v) if (is.na(v)) "" else display_fixed(v, 4L)
 html_pv <- function(v) if (is.na(v)) "" else trimws(fmt_pvalue(v, 6L, 4L))
 
 html_freq_fisher <- function(tb) {
+  if (!is.null(attr(tb, "stratum", exact = TRUE))) abort_unsupported("the HTML output of the statistics of a stratum of a PROC FREQ multiway table")
   if (nrow(tb) != 5L) abort_unsupported("the HTML output of Fisher's exact test for a table that is not 2x2")
   val <- function(i) if (identical(tb$Name[i], "FISHER_F")) freq_num(tb$Value[i]) else html_pv(tb$Value[i])
   rows <- lapply(1:5, function(i) list(hc(tb$Label[i]), hc(val(i))))
@@ -217,6 +234,31 @@ html_freq_binomial <- function(tb) {
                    list(hc(paste0("One-sided Pr ", side, " Z")), hc(html_pv(tb$Value[3]))), list(hc("Two-sided Pr > |Z|"), hc(html_pv(tb$Value[4]))))
       html_freq_rows("Binomial Proportion Test", list(list(hc(paste0("Test of H0: Proportion = ", freq_num(a$p0)), 2L))), body)
     })
+}
+
+# The multiway CMH summary tables [measured, freq_html f16].
+html_freq_cmh <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  head <- list(list(hc(gsub(" ", "\u00a0", paste0("Cochran-Mantel-Haenszel Statistics (Based on ", a$scores, ")"), fixed = TRUE), 5L)),
+               list(hc("Statistic"), hc("Alternative Hypothesis"), hc("DF"), hc("Value"), hc("Prob")))
+  body <- lapply(seq_len(nrow(tb)), function(i) list(hc(as.character(tb$Statistic[i])), hc(tb$AltHyp[i]), hc(sprintf("%.0f", tb$DF[i])),
+                                                     hc(html_f4(tb$Value[i])), hc(html_pv(tb$Prob[i]))))
+  html_freq_rows("Cochran-Mantel-Haenszel Statistics", head, body)
+}
+
+html_freq_commonrr <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  head <- list(list(hc("Common Odds Ratio and Relative Risks", 5L)),
+               list(hc("Statistic"), hc("Method"), hc("Value"), hc(paste0(a$level, "\u00a0Confidence\u00a0Limits"), 2L)))
+  body <- lapply(seq_len(nrow(tb)), function(i) list(hc(if (identical(tb$Method[i], "Logit")) "" else tb$Statistic[i]), hc(tb$Method[i]),
+                                                     hc(html_f4(tb$Value[i])), hc(html_f4(tb$LowerCL[i])), hc(html_f4(tb$UpperCL[i]))))
+  html_freq_rows("Common Relative Risk Estimates", head, body)
+}
+
+html_freq_breslow <- function(tb) {
+  body <- list(list(hc("Chi-Square"), hc(html_f4(tb$Value[1]))), list(hc("DF"), hc(sprintf("%.0f", tb$Value[2]))),
+               list(hc("Pr > ChiSq"), hc(html_pv(tb$Value[3]))))
+  html_freq_rows("Breslow-Day Test", list(list(hc("Breslow-Day Test for\nHomogeneity of Odds Ratios", 2L))), body)
 }
 
 html_freq_onewaychisq <- function(tb) {

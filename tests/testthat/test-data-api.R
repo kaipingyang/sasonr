@@ -69,7 +69,8 @@ test_that("sas_freq_df() fails loud on output without an ODS table yet", {
   expect_identical(vapply(st, attr, "", "name"), c("CrossTabFreqs", "ChiSq", "FishersExact"))
   expect_identical(st[[2]]$Statistic[1], "Chi-Square")
   expect_identical(st[[3]]$Name, c("FISHER_F", "XPL_FISH", "XPR_FISH", "XPT_FISH", "XP2_FISH"))
-  expect_error(sas_freq_df(d, "g*h*k"), class = "sasonr_unsupported")
+  expect_identical(vapply(sas_freq_df(d, "g*h*k"), attr, "", "name"), c("CrossTabFreqs", "CrossTabFreqs"))
+  expect_identical(attr(sas_freq_df(d, "g*h / list"), "name"), "List")
   expect_identical(attr(sas_freq_df(d, "g*h / relrisk")[[2]], "name"), "RelativeRisks")
   expect_identical(vapply(sas_freq_df(d, "g / chisq"), attr, "", "name"), c("OneWayFreqs", "OneWayChiSq"))
   expect_identical(vapply(sas_freq_df(d, "g / binomial"), attr, "", "name"),
@@ -86,8 +87,8 @@ test_that("sas_html() fails loud on PROC PRINT and PROC FREQ output instead of l
   r <- sas_run("data a; input g $ x; datalines;\na 1\nb 2\n;\nrun;\nproc means data=a; var x; run;\nproc print data=a; run;")
   expect_error(sas_html(r), "the HTML output of PROC PRINT \\(SAS line 7\\)", class = "sasonr_unsupported")
   # FREQ output without an ODS table (n-way) and FREQ tables without an HTML view
-  r3 <- sas_run("data a; input s $ g $ h $; datalines;\n1 a x\n1 b y\n2 a y\n;\nrun;\nproc freq data=a; tables s*g*h; run;")
-  expect_error(sas_html(r3), "PROC FREQ", class = "sasonr_unsupported")
+  r3 <- sas_run("data a; input s $ g $ h $; datalines;\n1 a x\n1 b y\n2 a y\n;\nrun;\nproc freq data=a; tables s*g*h / chisq; run;")
+  expect_error(sas_html(r3), "stratum", class = "sasonr_unsupported")
   r4 <- sas_run("data a; input g $ h $; datalines;\na x\nb y\na y\nb x\n;\nrun;\nproc freq data=a; tables g*h / relrisk(cl=wald); run;")
   expect_error(sas_html(r4), "PROC FREQ", class = "sasonr_unsupported")
   r2 <- sas_run("data a; x = 1; run;\nods html close;\nproc print data=a; run;\nods html;\nproc means data=a; var x; run;")
@@ -100,8 +101,8 @@ test_that("the multiway CMH summary is CMH, CommonRelRisks and BreslowDayTest ta
                       "proc freq data=a; weight n; tables s*g*h / cmh; run;"))
   expect_true(any(grepl("Breslow-Day", r$listing, fixed = TRUE)))
   nm <- vapply(r$ods, attr, "", "name")
-  expect_identical(nm, c("CMH", "CommonRelRisks", "BreslowDayTest"))
-  expect_identical(r$ods[[2]]$Method, rep(c("Mantel-Haenszel", "Logit"), 3L))
+  expect_identical(nm, c("CrossTabFreqs", "CrossTabFreqs", "CMH", "CommonRelRisks", "BreslowDayTest"))
+  expect_identical(r$ods[[4]]$Method, rep(c("Mantel-Haenszel", "Logit"), 3L))
 })
 
 test_that("TABLES / NOPRINT keeps the statistics and drops the frequency table", {

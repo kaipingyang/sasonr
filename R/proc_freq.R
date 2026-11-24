@@ -679,6 +679,7 @@ freq_listing_tables <- function(tables) {
     lst <- c(lst, switch(attr(tb, "template", exact = TRUE),
       base.freq.oneway = freq_oneway_listing(tb),
       base.freq.crosstab = freq_crosstab_listing(tb),
+      base.freq.list = freq_list_listing(tb),
       base.freq.chisq = freq_chisq_listing(tb),
       base.freq.fisher = freq_fisher_listing(tb),
       base.freq.cmh = freq_cmh_listing(tb),
@@ -906,14 +907,14 @@ freq_one_request <- function(db, wt, rq, sp) {
     abort_unsupported("MISSPRINT with statistics for a table that is not 2x2 (only the 2x2 layout is supported)", rq$line)
   }
   res$stats <- freq_request_stats(stat_tab, stat_lv, vars, info, o, sp, nmiss)
-  segs <- c(if (length(res$listing)) list(freq_lines_seg(res$listing)),
+  segs <- c(res$pieces, if (length(res$listing)) list(freq_lines_seg(res$listing)),
             freq_stats_listing(res$stats, tab, vars, info, o, sp, pieces = TRUE))
   # the tables of the request: OneWayFreqs / CrossTabFreqs, then the
   # statistics output (ODS tables and listing lines) in listing order
   res$tables <- c(if (!is.null(res[["table"]])) list(res[["table"]]), segs)
   # the frequency (or crosstabulation) output: the table, or the lines of the
   # stratum tables of a multiway request
-  res$n_freq <- as.integer(!is.null(res[["table"]])) + as.integer(length(res$listing) > 0L)
+  res$n_freq <- as.integer(!is.null(res[["table"]])) + length(res$pieces) + as.integer(length(res$listing) > 0L)
   if (!length(res$tables)) res$tables <- list(freq_lines_seg(character()))
   res
 }
@@ -1279,51 +1280,29 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
   cnt <- tab[combos]
   nobs <- obs[combos]
   lst <- character()
+  pieces <- list()
   if (isTRUE(o$list)) {
     keep <- cnt != 0 | nobs > 0 | isTRUE(o$sparse)
     cmb <- combos[keep, , drop = FALSE]
     cc <- cnt[keep]
-    texts <- lapply(seq_len(k), function(j) lv[[j]]$text[cmb[, j]])
-    Ws <- vapply(seq_len(k), function(j) max(c(nchar(info[[vars[j]]]$disp), nchar(texts[[j]]))), 1L)
-    rights <- vapply(vars, function(v) !info[[v]]$char, TRUE)
-    padj <- function(x, j) formatC(x, width = if (rights[j]) Ws[j] else -Ws[j])
+    cum <- cumsum(cc)
+    x <- list()
+    for (j in seq_len(k)) x[[vars[j]]] <- lv[[j]]$values[cmb[, j]]
+    x$Frequency <- cc
+    x$Percent <- cc / tot * 100
+    x$CumFrequency <- cum
+    x$CumPercent <- cum / tot * 100
+    x <- tibble::as_tibble(x)
     show_pct <- !isTRUE(o$nopercent)
     show_cum <- !isTRUE(o$nocum)
-    W <- sum(Ws) + 4L * (k - 1L)
-    head <- paste(vapply(seq_len(k), function(j) padj(info[[vars[j]]]$disp, j), ""), collapse = "    ")
-    top <- strrep(" ", W)
-    width <- W + 13L
-    head <- paste0(head, "    Frequency")
-    top <- paste0(top, strrep(" ", 13))
-    if (show_pct) {
-      head <- paste0(head, "     Percent")
-      top <- paste0(top, strrep(" ", 12))
-      width <- width + 12L
-    }
-    if (show_cum) {
-      head <- paste0(head, "     Frequency")
-      top <- paste0(top, "    Cumulative")
-      width <- width + 14L
-      if (show_pct) {
-        head <- paste0(head, "      Percent")
-        top <- paste0(top, "    Cumulative")
-        width <- width + 14L
-      }
-    }
-    cum <- cumsum(cc)
-    body <- vapply(seq_along(cc), function(r) {
-      s <- paste(vapply(seq_len(k), function(j) padj(texts[[j]][r], j), ""), collapse = "    ")
-      s <- paste0(s, formatC(freq_num(cc[r]), width = 12L), " ")
-      if (show_pct) s <- paste0(s, formatC(freq_pct(cc[r] / tot * 100), width = 11L), " ")
-      if (show_cum) {
-        s <- paste0(s, formatC(freq_num(cum[r]), width = 13L), " ")
-        if (show_pct) s <- paste0(s, formatC(freq_pct(cum[r] / tot * 100), width = 12L), "  ")
-      }
-      sas_rtrim(s)
-    }, "")
-    lst <- c(if (show_cum) sas_rtrim(top), head, strrep("-", width), body)
-    if (nmiss > 0) lst <- c(lst, "", paste0(strrep(" ", max(0L, (width - 21L) %/% 2L)), "Frequency Missing = ", freq_num(nmiss)))
-    lst <- c(lst, "")
+    tb <- new_sasonr_ods_table(x, name = "List", label = "LIST Frequencies", path = "Freq.Table1.List", proc = "Freq",
+                               template = "base.freq.list",
+                               cols = ods_cols(names(x), label = c(vapply(vars, function(v) info[[v]]$disp, ""), names(x)[-seq_len(k)]),
+                                               hidden = c(rep(FALSE, k + 1L), !show_pct, !show_cum, !show_cum || !show_pct),
+                                               role = c(rep("class", k), rep("stat", 4L))))
+    attr(tb, "freq") <- list(k = k, disp = vapply(vars, function(v) info[[v]]$disp, ""), right = vapply(vars, function(v) !info[[v]]$char, TRUE),
+                             text = lapply(seq_len(k), function(j) lv[[j]]$text[cmb[, j]]), nmiss = nmiss)
+    pieces <- list(tb)
   } else {
     # one crosstabulation per stratum (combination of the leading variables)
     sdims <- dims[seq_len(k - 2L)]
@@ -1343,7 +1322,7 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
       tw <- freq_twoway(sub, sub_obs + 1, lv[(k - 1L):k], vars[(k - 1L):k], info, o, 0, sp,
                         title = paste("Table", ti, "of", info[[vars[k - 1L]]]$disp, "by", info[[vars[k]]]$disp),
                         stratum = paste("Controlling for", ctl))
-      lst <- c(lst, freq_crosstab_listing(tw$table))
+      pieces <- c(pieces, list(tw$table))
       # CHISQ / FISHER of a multiway request print one statistics block after
       # each stratum table ("Statistics for Table k of ...")
       if (isTRUE(o$chisq) || isTRUE(o$fisher)) {
@@ -1354,10 +1333,16 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
         sp2$exact <- character()
         sp2$output <- NULL
         stv <- freq_request_stats(sub, lv[(k - 1L):k], vars[(k - 1L):k], info, o2, sp2, 0)
-        lst <- c(lst, freq_stats_listing(
+        sseg <- freq_stats_listing(
           stv, sub, vars[(k - 1L):k], info, o2, sp2,
           title = paste("Statistics for Table", ti, "of", info[[vars[k - 1L]]]$disp, "by", info[[vars[k]]]$disp),
-          stratum_line = paste("Controlling for", ctl)))
+          stratum_line = paste("Controlling for", ctl), pieces = TRUE)
+        # (the statistics of a stratum: their HTML headings are not measured)
+        sseg <- lapply(sseg, function(x) {
+          if (inherits(x, "sasonr_ods_table")) attr(x, "stratum") <- ctl
+          x
+        })
+        pieces <- c(pieces, sseg)
       }
     }
   }
@@ -1373,7 +1358,54 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
                 list(list(name = "count", disp = "COUNT", char = FALSE, len = 8L, label = "Frequency Count"),
                      list(name = "percent", disp = "PERCENT", char = FALSE, len = 8L, label = "Percent of Total Frequency")))
   if (isTRUE(o$outpct)) abort_unsupported("OUTPCT for n-way tables")
-  list(listing = lst, out = tibble::as_tibble(od), out_cols = out_cols)
+  list(pieces = pieces, listing = character(), out = tibble::as_tibble(od), out_cols = out_cols)
+}
+
+# Listing of a List table (template base.freq.list): the LIST layout of an
+# n-way (or two-way) request.
+freq_list_listing <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  cols <- attr(tb, "cols", exact = TRUE)
+  k <- a$k
+  texts <- a$text
+  Ws <- vapply(seq_len(k), function(j) max(c(nchar(a$disp[j]), nchar(texts[[j]]))), 1L)
+  padj <- function(x, j) formatC(x, width = if (a$right[j]) Ws[j] else -Ws[j])
+  show_pct <- !cols$hidden[cols$name == "Percent"]
+  show_cum <- !cols$hidden[cols$name == "CumFrequency"]
+  W <- sum(Ws) + 4L * (k - 1L)
+  head <- paste(vapply(seq_len(k), function(j) padj(a$disp[j], j), ""), collapse = "    ")
+  top <- strrep(" ", W)
+  width <- W + 13L
+  head <- paste0(head, "    Frequency")
+  top <- paste0(top, strrep(" ", 13))
+  if (show_pct) {
+    head <- paste0(head, "     Percent")
+    top <- paste0(top, strrep(" ", 12))
+    width <- width + 12L
+  }
+  if (show_cum) {
+    head <- paste0(head, "     Frequency")
+    top <- paste0(top, "    Cumulative")
+    width <- width + 14L
+    if (show_pct) {
+      head <- paste0(head, "      Percent")
+      top <- paste0(top, "    Cumulative")
+      width <- width + 14L
+    }
+  }
+  body <- vapply(seq_len(nrow(tb)), function(r) {
+    s <- paste(vapply(seq_len(k), function(j) padj(texts[[j]][r], j), ""), collapse = "    ")
+    s <- paste0(s, formatC(freq_num(tb$Frequency[r]), width = 12L), " ")
+    if (show_pct) s <- paste0(s, formatC(freq_pct(tb$Percent[r]), width = 11L), " ")
+    if (show_cum) {
+      s <- paste0(s, formatC(freq_num(tb$CumFrequency[r]), width = 13L), " ")
+      if (show_pct) s <- paste0(s, formatC(freq_pct(tb$CumPercent[r]), width = 12L), "  ")
+    }
+    sas_rtrim(s)
+  }, "")
+  lst <- c(if (show_cum) sas_rtrim(top), head, strrep("-", width), body)
+  if (a$nmiss > 0) lst <- c(lst, "", paste0(strrep(" ", max(0L, (width - 21L) %/% 2L)), "Frequency Missing = ", freq_num(a$nmiss)))
+  c(lst, "")
 }
 
 # Statistics ---------------------------------------------------------------------------
@@ -2452,7 +2484,9 @@ freq_cmh_summary <- function(st, vars, info, o) {
   cm <- tibble::tibble(Statistic = 1:3, AltHyp = c("Nonzero Correlation", "Row Mean Scores Differ", "General Association"),
                        DF = c(st$df_cmhcor, st$df_cmhrms, st$df_cmhga), Value = c(st$cmhcor, st$cmhrms, st$cmhga),
                        Prob = c(st$p_cmhcor, st$p_cmhrms, st$p_cmhga))
-  segs <- c(segs, list(tab(cm, "CMH", "Cochran-Mantel-Haenszel Statistics", "base.freq.cmh", c("label", "label", "stat", "stat", "stat"))))
+  cmt <- tab(cm, "CMH", "Cochran-Mantel-Haenszel Statistics", "base.freq.cmh", c("label", "label", "stat", "stat", "stat"))
+  attr(cmt, "freq") <- list(scores = scores_txt)
+  segs <- c(segs, list(cmt))
   cc <- st$cmh_common
   if (!is.null(cc)) {
     m <- list(cc$ormh, cc$orl, cc$rr1, cc$rr1l, cc$rr2, cc$rr2l)
