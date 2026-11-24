@@ -80,17 +80,18 @@ test_that("sas_freq_df() fails loud on output without an ODS table yet", {
   expect_identical(attr(sas_freq_df(d, "g", options = "nlevels")[[1]], "name"), "NLevels")
   expect_match(sas_html(sas_freq_df(d, "g*h")), "Table\u00a0of\u00a0g\u00a0by\u00a0h", fixed = TRUE)
   expect_match(sas_html(sas_freq_df(d, "g / binomial")), "Test of H0: Proportion = 0.5", fixed = TRUE)
-  expect_error(sas_html(sas_freq_df(d, "g*h / relrisk(cl=wald)")), class = "sasonr_unsupported")
+  d2 <- data.frame(g = c("a", "a", "b", "b", "a", "b"), h = c("x", "y", "x", "y", "x", "y"))
+  expect_match(sas_html(sas_freq_df(d2, "g*h / relrisk(cl=wald)")), "Relative Risk =", fixed = TRUE)
 })
 
 test_that("sas_html() fails loud on PROC PRINT and PROC FREQ output instead of leaving it out", {
   r <- sas_run("data a; input g $ x; datalines;\na 1\nb 2\n;\nrun;\nproc means data=a; var x; run;\nproc print data=a; run;")
   expect_error(sas_html(r), "the HTML output of PROC PRINT \\(SAS line 7\\)", class = "sasonr_unsupported")
-  # FREQ output without an ODS table (n-way) and FREQ tables without an HTML view
+  # FREQ tables without a measured HTML view
   r3 <- sas_run("data a; input s $ g $ h $; datalines;\n1 a x\n1 b y\n2 a y\n;\nrun;\nproc freq data=a; tables s*g*h / chisq; run;")
   expect_error(sas_html(r3), "stratum", class = "sasonr_unsupported")
-  r4 <- sas_run("data a; input g $ h $; datalines;\na x\nb y\na y\nb x\n;\nrun;\nproc freq data=a; tables g*h / relrisk(cl=wald); run;")
-  expect_error(sas_html(r4), "PROC FREQ", class = "sasonr_unsupported")
+  r4 <- sas_run("data a; input g $ h $; datalines;\na x\nb y\na y\nb x\n;\nrun;\nproc freq data=a; tables g / binomial; exact binomial; run;")
+  expect_error(sas_html(r4), "binomial test", class = "sasonr_unsupported")
   r2 <- sas_run("data a; x = 1; run;\nods html close;\nproc print data=a; run;\nods html;\nproc means data=a; var x; run;")
   expect_match(sas_html(r2), "sas-table|<table", all = FALSE)
 })

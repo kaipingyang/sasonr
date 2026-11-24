@@ -48,15 +48,15 @@ html_templates <- list(
   base.freq.commonrr = function(tb) html_freq_commonrr(tb),
   base.freq.breslow = function(tb) html_freq_breslow(tb),
   base.freq.relrisk = function(tb) html_freq_relrisk(tb),
-  base.freq.relriskcl = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.relriskcl = function(tb) html_freq_relriskcl(tb),
   base.freq.riskdiff = function(tb) html_freq_riskdiff(tb),
-  base.freq.riskdiffcl = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.riskdiffcl = function(tb) html_freq_riskdiffcl(tb),
   base.freq.binomial = function(tb) html_freq_binomial(tb),
   base.freq.onewaychisq = function(tb) html_freq_onewaychisq(tb),
   base.freq.nlevels = function(tb) html_freq_nlevels(tb)
 )
 # the templates without an HTML view (sas_html() fails loud on them)
-html_undrawn <- c("base.print", "base.freq.relriskcl", "base.freq.riskdiffcl", "base.freq.lines")
+html_undrawn <- c("base.print", "base.freq.lines")
 
 # PROC FREQ tables [measured, freq_html cases: one-way, crosstabulation,
 # chi-square].  The other FREQ tables have no HTML view yet.
@@ -200,6 +200,24 @@ html_freq_relrisk <- function(tb) {
   body <- lapply(seq_len(nrow(tb)), function(i) list(hc(tb$Statistic[i]), hc(html_f4(tb$Value[i])), hc(html_f4(tb$LowerCL[i])),
                                                      hc(html_f4(tb$UpperCL[i]))))
   html_freq_rows("Relative Risk Estimates", head, body)
+}
+
+# RELRISK(CL=) and RISKDIFF(CL=) confidence-limit tables [measured,
+# freq_html f19, f20; the no-break spaces are where the HTML destination
+# writes them].
+html_freq_cl <- function(tb, summary, title, value) {
+  a <- attr(tb, "freq", exact = TRUE)
+  head <- list(list(hc(title, 3L)), list(hc(value, 3L)), list(hc("Type"), hc(paste0(a$level, "\u00a0Confidence\u00a0Limits"), 2L)))
+  body <- lapply(seq_len(nrow(tb)), function(i) list(hc(tb$Type[i]), hc(html_f4(tb$LowerCL[i])), hc(html_f4(tb$UpperCL[i]))))
+  html_freq_rows(summary, head, c(body, list(list(hc(gsub(" ", "\u00a0", a$column, fixed = TRUE), 3L)))))
+}
+html_freq_relriskcl <- function(tb) {
+  html_freq_cl(tb, "Relative Risk Confidence Limits", "Confidence Limits for the\nRelative Risk",
+               paste("Relative Risk =", html_f4(attr(tb, "freq", exact = TRUE)$rr)))
+}
+html_freq_riskdiffcl <- function(tb) {
+  html_freq_cl(tb, "Risk Difference Confidence Limits", "Confidence Limits for the Risk\nDifference",
+               gsub(" ", "\u00a0", paste("Risk Difference =", html_f4(attr(tb, "freq", exact = TRUE)$diff)), fixed = TRUE))
 }
 
 # BINOMIAL: three tables.  Without CL= the Wald and exact limits are rows of

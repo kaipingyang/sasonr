@@ -92,7 +92,7 @@ the development version provides.
 * `sas_html()` draws the PROC FREQ one-way tables, crosstabulations (with
   the cell-statistics legend), the chi-square table, Fisher's exact test
   (2x2), the column risk estimates of RISKDIFF, the odds ratio and relative
-  risks of RELRISK, the BINOMIAL tables, the one-way chi-square test,
+  risks of RELRISK, the confidence limits of RELRISK(CL=) and RISKDIFF(CL=), the BINOMIAL tables, the one-way chi-square test,
   NLEVELS, the stratum crosstabulations of a multiway request, the LIST
   table and the multiway CMH summary, as in the HTML destination. It is an Unsupported error, naming the procedure and its SAS
   line, when the HTML destination received output that has no HTML view
