@@ -2341,6 +2341,11 @@ freq_binomial_tables <- function(st, info) {
     tl <- c(tl, "Exact One-sided Pr", "Exact Two-sided Pr")
   }
   b3 <- tab(tibble::tibble(Name = tn, Label = tl, Value = tv), "BinomialTest", "Binomial Proportion Test", c("label", "label", "stat"))
+  conf <- paste0(format((1 - st$alpha) * 100, trim = TRUE, scientific = FALSE), "%")
+  attr(b1, "freq") <- list(level = conf, var = info[[st$bin_var]]$disp %||% st$bin_var, value = st$bin_level, default_cl = is.null(st$bin_cl),
+                           wald = st$cl$wald, exact = st$cl$exact)
+  attr(b2, "freq") <- list(level = conf, prop = st$bin, default_cl = is.null(st$bin_cl))
+  attr(b3, "freq") <- list(p0 = st$p0, exact = isTRUE(st$bin_exact), corrected = use_c)
   attr(b2, "lines") <- character()
   attr(b3, "lines") <- character()
   list(b1, b2, b3)
@@ -2541,6 +2546,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
                                              Value = c(st$pchi, st$df_pchi, st$p_pchi)),
                               name = "OneWayChiSq", label = "One-Way Chi-Square Test", path = "Freq.Table1.OneWayChiSq", proc = "Freq",
                               template = "base.freq.onewaychisq", cols = ods_cols(c("Name", "Label", "Value"), role = c("label", "label", "stat"))))
+    attr(segs[[length(segs)]], "freq") <- list(test = test_line, small = isTRUE(st$oneway_small))
     out <- c(out, if (isTRUE(st$oneway_small)) c("WARNING: The table cells have expected counts less",
                                                  "         than 5. Chi-Square may not be a valid test.", ""),
              if (both) "" else freq_sample_size(st))

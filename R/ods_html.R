@@ -27,7 +27,8 @@ ods_cell_text <- function(v, col) {
 # One <td>/<th>: `values` of length one is a plain cell, more values are
 # stacked (one sas-stack block per value, top to bottom).
 html_cell <- function(values, tag = "td", cls = character(), attrs = "") {
-  values <- ifelse(nzchar(values), html_escape(values), "&nbsp;")
+  # a line break inside a value ("\n") is a <br/>
+  values <- ifelse(nzchar(values), gsub("\n", "<br/>", html_escape(values), fixed = TRUE), "&nbsp;")
   body <- if (length(values) == 1L) values else paste0('<div class="sas-stack">', values, "</div>", collapse = "")
   cls <- c(cls, if (length(values) > 1L) "sas-stacked")
   paste0("<", tag, if (length(cls)) paste0(' class="', paste(cls, collapse = " "), '"'), attrs, ">", body, "</", tag, ">")
@@ -41,22 +42,21 @@ html_templates <- list(
   base.freq.oneway = function(tb) html_freq_oneway(tb),
   base.freq.crosstab = function(tb) html_freq_crosstab(tb),
   base.freq.chisq = function(tb) html_freq_chisq(tb),
-  base.freq.fisher = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.fisher = function(tb) html_freq_fisher(tb),
   base.freq.cmh = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
   base.freq.commonrr = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
   base.freq.breslow = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.relrisk = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.relrisk = function(tb) html_freq_relrisk(tb),
   base.freq.relriskcl = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.riskdiff = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
+  base.freq.riskdiff = function(tb) html_freq_riskdiff(tb),
   base.freq.riskdiffcl = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.binomial = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.onewaychisq = function(tb) abort_unsupported("the HTML output of PROC FREQ"),
-  base.freq.nlevels = function(tb) abort_unsupported("the HTML output of PROC FREQ")
+  base.freq.binomial = function(tb) html_freq_binomial(tb),
+  base.freq.onewaychisq = function(tb) html_freq_onewaychisq(tb),
+  base.freq.nlevels = function(tb) html_freq_nlevels(tb)
 )
 # the templates without an HTML view (sas_html() fails loud on them)
-html_undrawn <- c("base.print", "base.freq.fisher", "base.freq.cmh",
-                  "base.freq.commonrr", "base.freq.breslow", "base.freq.relrisk", "base.freq.relriskcl",
-                  "base.freq.riskdiff", "base.freq.riskdiffcl", "base.freq.binomial", "base.freq.onewaychisq", "base.freq.nlevels", "base.freq.lines")
+html_undrawn <- c("base.print", "base.freq.cmh", "base.freq.commonrr", "base.freq.breslow",
+                  "base.freq.relriskcl", "base.freq.riskdiffcl", "base.freq.lines")
 
 # PROC FREQ tables [measured, freq_html cases: one-way, crosstabulation,
 # chi-square].  The other FREQ tables have no HTML view yet.
@@ -131,6 +131,105 @@ html_freq_chisq <- function(tb) {
     out <- c(out[seq_len(n - 2L)], paste0('<tr><td class="sas-data" colspan="4">', html_escape(warn), "</td></tr>"), out[(n - 1L):n])
   }
   out
+}
+
+# A FREQ statistics table as rows of cells: `head` and `body` are lists of
+# rows, each a list of cells list(text, cs = column span); the first cell of
+# a body row is a row header unless the row is one cell over all columns.
+html_freq_rows <- function(summary, head, body) {
+  cells <- list()
+  put <- function(rows, r0, kind) {
+    for (i in seq_along(rows)) {
+      c0 <- 1L
+      for (cl in rows[[i]]) {
+        cs <- cl$cs %||% 1L
+        k <- if (kind == "header") "header" else if (c0 == 1L && length(rows[[i]]) > 1L) "rowheader" else "data"
+        cells[[length(cells) + 1L]] <<- list(r0 = r0 + i - 1L, r1 = r0 + i - 1L, c0 = c0, c1 = c0 + cs - 1L, text = cl$text, kind = k)
+        c0 <- c0 + cs
+      }
+    }
+  }
+  put(head, 1L, "header")
+  put(body, length(head) + 1L, "data")
+  render_html_grid(cells, length(head) + length(body), length(head), paste0("Procedure Freq: ", summary))
+}
+hc <- function(text, cs = 1L) list(text = text, cs = cs)
+html_f4 <- function(v) if (is.na(v)) "" else display_fixed(v, 4L)
+html_pv <- function(v) if (is.na(v)) "" else trimws(fmt_pvalue(v, 6L, 4L))
+
+html_freq_fisher <- function(tb) {
+  if (nrow(tb) != 5L) abort_unsupported("the HTML output of Fisher's exact test for a table that is not 2x2")
+  val <- function(i) if (identical(tb$Name[i], "FISHER_F")) freq_num(tb$Value[i]) else html_pv(tb$Value[i])
+  rows <- lapply(1:5, function(i) list(hc(tb$Label[i]), hc(val(i))))
+  html_freq_rows("Fisher's Exact Test", list(list(hc("Fisher's Exact Test", 2L))), c(rows[1:3], list(list(hc(""), hc(""))), rows[4:5]))
+}
+
+html_freq_riskdiff <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  if (a$exact) abort_unsupported("the HTML output of RISKDIFF with exact confidence limits")
+  head <- list(list(hc(paste0("Column ", a$column, " Risk Estimates"), 7L)),
+               list(hc(""), hc("Risk"), hc("ASE"), hc(paste(a$level, "Confidence Limits"), 2L), hc(paste("Exact", a$level, "Confidence Limits"), 2L)))
+  body <- lapply(1:4, function(i) list(hc(tb$Row[i]), hc(html_f4(tb$Risk[i])), hc(html_f4(tb$ASE[i])), hc(html_f4(tb$LowerCL[i])),
+                                       hc(html_f4(tb$UpperCL[i])), hc(html_f4(tb$ExactLowerCL[i])), hc(html_f4(tb$ExactUpperCL[i]))))
+  html_freq_rows(paste0("Column ", a$column, " Risk Estimates"), head, c(body, list(list(hc("Difference is (Row 1 - Row 2)", 7L)))))
+}
+
+html_freq_relrisk <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  if (nrow(tb) < 3L) abort_unsupported("the HTML output of RELRISK with a zero cell")
+  # (no-break spaces in this heading, as in the HTML destination)
+  head <- list(list(hc("Odds Ratio and Relative Risks", 4L)),
+               list(hc("Statistic"), hc("Value"), hc(paste0(a$level, "\u00a0Confidence\u00a0Limits"), 2L)))
+  body <- lapply(seq_len(nrow(tb)), function(i) list(hc(tb$Statistic[i]), hc(html_f4(tb$Value[i])), hc(html_f4(tb$LowerCL[i])),
+                                                     hc(html_f4(tb$UpperCL[i]))))
+  html_freq_rows("Relative Risk Estimates", head, body)
+}
+
+# BINOMIAL: three tables.  Without CL= the Wald and exact limits are rows of
+# the Binomial table and BinomialCLs draws nothing; with CL= they are the
+# BinomialCLs table.
+html_freq_binomial <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  switch(attr(tb, "name", exact = TRUE),
+    Binomial = {
+      body <- list(list(hc("Proportion"), hc(html_f4(tb$Value[1]))), list(hc("ASE"), hc(html_f4(tb$Value[2]))))
+      if (a$default_cl) {
+        lim <- function(lab, v) list(hc(paste(a$level, lab)), hc(html_f4(v)))
+        body <- c(body, list(lim("Lower Conf Limit", a$wald[1]), lim("Upper Conf Limit", a$wald[2]), list(hc(""), hc("")),
+                             list(hc("Exact Conf Limits"), hc("")), lim("Lower Conf Limit", a$exact[1]), lim("Upper Conf Limit", a$exact[2])))
+      }
+      html_freq_rows("Binomial Proportion", list(list(hc("Binomial Proportion", 2L)), list(hc(paste(a$var, "=", a$value), 2L))), body)
+    },
+    BinomialCLs = {
+      if (a$default_cl) return(character())
+      nm <- c(wald = "Wald", wilson = "Wilson", exact = "Clopper-Pearson (Exact)", agresticoull = "Agresti-Coull",
+              jeffreys = "Jeffreys", wald_corrected = "Wald (Corrected)", wilson_corrected = "Wilson (Corrected)")
+      o <- order(nm[tb$Type])
+      head <- list(list(hc("Confidence Limits for the\nBinomial Proportion", 3L)), list(hc(paste("Proportion =", html_f4(a$prop)), 3L)),
+                   list(hc("Type"), hc(paste0(a$level, "\u00a0Confidence\u00a0Limits"), 2L)))
+      body <- lapply(o, function(i) list(hc(unname(nm[tb$Type[i]])), hc(html_f4(tb$LowerCL[i])), hc(html_f4(tb$UpperCL[i]))))
+      html_freq_rows("Binomial Confidence Limits", head, body)
+    },
+    BinomialTest = {
+      if (a$exact || a$corrected) abort_unsupported("the HTML output of the exact or continuity-corrected binomial test")
+      side <- if (tb$Value[2] > 0) ">" else "<"
+      body <- list(list(hc("ASE under H0"), hc(html_f4(tb$Value[1]))), list(hc("Z"), hc(html_f4(tb$Value[2]))),
+                   list(hc(paste0("One-sided Pr ", side, " Z")), hc(html_pv(tb$Value[3]))), list(hc("Two-sided Pr > |Z|"), hc(html_pv(tb$Value[4]))))
+      html_freq_rows("Binomial Proportion Test", list(list(hc(paste0("Test of H0: Proportion = ", freq_num(a$p0)), 2L))), body)
+    })
+}
+
+html_freq_onewaychisq <- function(tb) {
+  a <- attr(tb, "freq", exact = TRUE)
+  if (a$small) abort_unsupported("the HTML output of the one-way chi-square test with small expected counts")
+  body <- list(list(hc("Chi-Square"), hc(html_f4(tb$Value[1]))), list(hc("DF"), hc(sprintf("%.0f", tb$Value[2]))),
+               list(hc("Pr > ChiSq"), hc(html_pv(tb$Value[3]))))
+  html_freq_rows("One-Way Chi-Square Test", list(list(hc(paste0("Chi-Square Test\n", a$test), 2L))), body)
+}
+
+html_freq_nlevels <- function(tb) {
+  body <- lapply(seq_len(nrow(tb)), function(i) list(hc(tb$TableVar[i]), hc(sprintf("%.0f", tb$NLevels[i]))))
+  html_freq_rows("NLevels", list(list(hc("Number of Variable\nLevels", 2L)), list(hc("Variable"), hc("Levels"))), body)
 }
 
 # A table laid out on a grid: `cells` is a list of rectangles list(r0, r1,
