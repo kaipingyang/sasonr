@@ -1337,9 +1337,15 @@ freq_nway <- function(tab, obs, lv, vars, info, o, nmiss, sp) {
           stv, sub, vars[(k - 1L):k], info, o2, sp2,
           title = paste("Statistics for Table", ti, "of", info[[vars[k - 1L]]]$disp, "by", info[[vars[k]]]$disp),
           stratum_line = paste("Controlling for", ctl), pieces = TRUE)
-        # (the statistics of a stratum: their HTML headings are not measured)
+        # the first statistics table of a stratum carries its heading (in the
+        # HTML document a title block before the table) [measured, f21]
+        first <- TRUE
         sseg <- lapply(sseg, function(x) {
-          if (inherits(x, "sasonr_ods_table")) attr(x, "stratum") <- ctl
+          if (inherits(x, "sasonr_ods_table") && first) {
+            attr(x, "heading") <- c(paste("Statistics for Table", ti, "of", info[[vars[k - 1L]]]$disp, "by", info[[vars[k]]]$disp),
+                                    paste("Controlling for", ctl))
+            first <<- FALSE
+          }
           x
         })
         pieces <- c(pieces, sseg)
@@ -2214,7 +2220,10 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       sel <- hit[1]
     }
     alpha <- o$alpha %||% 0.05
-    if (isTRUE(bo$exact) || "binomial" %in% sp$exact) {
+    # BINOMIAL(EXACT) asks for the exact (Clopper-Pearson) confidence limits,
+    # as CL=EXACT; the exact test is the EXACT BINOMIAL statement [measured]
+    if (isTRUE(bo$exact)) bo$cl <- unique(c(bo$cl, "exact"))
+    if ("binomial" %in% sp$exact) {
       n_bin <- sum(cnt_nm)
       # the exact binomial test enumerates integer tables: a fractional WEIGHT
       # makes it undefined (and crashed the listing without this guard)
@@ -2226,7 +2235,7 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
     st$bin_level <- txt[sel]
     st$bin_var <- vars[1]
     st$bin_cl <- bo$cl
-    st$bin_exact <- isTRUE(bo$exact) || "binomial" %in% sp$exact
+    st$bin_exact <- "binomial" %in% sp$exact
   }
   if (any(c("chisq", "fisher") %in% want)) {
     if (k == 1) {
@@ -2352,7 +2361,7 @@ freq_binomial_tables <- function(st, info) {
   attr(b1, "lines") <- freq_binomial_listing(st, info)
   # the limit types the listing shows: Wald and exact by default, the CL= list otherwise
   cl <- st$bin_cl
-  types <- if (is.null(cl)) c("wald", "exact") else {
+  types <- if (is.null(cl)) c(if (isTRUE(st$correct)) "wald_corrected" else "wald", "exact") else {
     tt <- if (identical(cl, "all")) c("wald", "wilson", "exact", "agresticoull", "jeffreys") else cl
     unique(unlist(lapply(tt, function(t) {
       if (t == "all") c("wald", "wilson", "exact", "agresticoull", "jeffreys")
@@ -2363,7 +2372,7 @@ freq_binomial_tables <- function(st, info) {
   cls <- tibble::tibble(Type = types, LowerCL = vapply(types, function(t) st$cl[[t]][1], 0, USE.NAMES = FALSE),
                         UpperCL = vapply(types, function(t) st$cl[[t]][2], 0, USE.NAMES = FALSE))
   b2 <- tab(cls, "BinomialCLs", "Binomial Proportion Confidence Limits", c("label", "stat", "stat"))
-  use_c <- isTRUE(st$correct) && !is.null(st$bin_cl)
+  use_c <- isTRUE(st$correct)
   tv <- c(st$e0_bin, if (use_c) st$zc_bin else st$z_bin, if (use_c) st$plc_bin else st$pl_bin, if (use_c) st$p2c_bin else st$p2_bin)
   tn <- c("E0_BIN", "Z_BIN", "PL_BIN", "P2_BIN")
   tl <- c("ASE under H0", "Z", "One-sided Pr", "Two-sided Pr > |Z|")
@@ -2375,9 +2384,9 @@ freq_binomial_tables <- function(st, info) {
   b3 <- tab(tibble::tibble(Name = tn, Label = tl, Value = tv), "BinomialTest", "Binomial Proportion Test", c("label", "label", "stat"))
   conf <- paste0(format((1 - st$alpha) * 100, trim = TRUE, scientific = FALSE), "%")
   attr(b1, "freq") <- list(level = conf, var = info[[st$bin_var]]$disp %||% st$bin_var, value = st$bin_level, default_cl = is.null(st$bin_cl),
-                           wald = st$cl$wald, exact = st$cl$exact)
+                           wald = if (isTRUE(st$correct)) st$cl$wald_corrected else st$cl$wald, exact = st$cl$exact)
   attr(b2, "freq") <- list(level = conf, prop = st$bin, default_cl = is.null(st$bin_cl))
-  attr(b3, "freq") <- list(p0 = st$p0, exact = isTRUE(st$bin_exact), corrected = use_c)
+  attr(b3, "freq") <- list(p0 = st$p0, exact = isTRUE(st$bin_exact), corrected = use_c, default_cl = is.null(st$bin_cl))
   attr(b2, "lines") <- character()
   attr(b3, "lines") <- character()
   list(b1, b2, b3)
@@ -2404,8 +2413,10 @@ freq_binomial_listing <- function(st, info) {
            line("ASE", f4(st$e_bin), w_prop))
   cl <- st$bin_cl
   if (is.null(cl)) {
-    out <- c(out, line(paste0(conf_pct, "% Lower Conf Limit"), f4(st$cl$wald[1]), w_prop),
-             line(paste0(conf_pct, "% Upper Conf Limit"), f4(st$cl$wald[2]), w_prop), "",
+    # with CORRECT the Wald limits are the corrected ones [measured]
+    wl <- if (isTRUE(st$correct)) st$cl$wald_corrected else st$cl$wald
+    out <- c(out, line(paste0(conf_pct, "% Lower Conf Limit"), f4(wl[1]), w_prop),
+             line(paste0(conf_pct, "% Upper Conf Limit"), f4(wl[2]), w_prop), "",
              "Exact Conf Limits",
              line(paste0(conf_pct, "% Lower Conf Limit"), f4(st$cl$exact[1]), w_prop),
              line(paste0(conf_pct, "% Upper Conf Limit"), f4(st$cl$exact[2]), w_prop), "")
@@ -2441,7 +2452,7 @@ freq_binomial_listing <- function(st, info) {
   # longer headings (P= with five or more decimals) have no measured layout
   if (nchar(h0) > 31L) abort_unsupported(paste0("BINOMIAL P=", freq_num(st$p0), " (heading layout)"))
   out <- c(out, paste0(strrep(" ", max(0L, (32L - nchar(h0)) %/% 2L)), h0), "")
-  use_c <- isTRUE(st$correct) && !is.null(cl)
+  use_c <- isTRUE(st$correct)
   zt <- if (use_c) st$zc_bin else st$z_bin
   pone <- if (use_c) st$plc_bin else st$pl_bin
   ptwo <- if (use_c) st$p2c_bin else st$p2_bin
@@ -2452,7 +2463,10 @@ freq_binomial_listing <- function(st, info) {
            line("Z", f4(zt), w_test),
            line(paste0("One-sided Pr ", side, "  Z"), pv(pone), w_test),
            line("Two-sided Pr > |Z|", pv(ptwo), w_test))
-  if (use_c) out <- c(out, "", "The asymptotic test includes a continuity correction.")
+  if (use_c) {
+    out <- c(out, "", if (is.null(cl)) c("The asymptotic confidence limits and test", "    include a continuity correction.") else
+      "The asymptotic test includes a continuity correction.")
+  }
   if (exact) {
     l0 <- max(nchar(c("One-sided Pr >=  P", "Two-sided = 2 * One-sided"))) + 4L
     side_exact <- if (st$bin >= st$p0) ">=" else "<="

@@ -89,7 +89,7 @@ test_that("sas_html() fails loud on PROC PRINT and PROC FREQ output instead of l
   expect_error(sas_html(r), "the HTML output of PROC PRINT \\(SAS line 7\\)", class = "sasonr_unsupported")
   # FREQ tables without a measured HTML view
   r3 <- sas_run("data a; input s $ g $ h $; datalines;\n1 a x\n1 b y\n2 a y\n;\nrun;\nproc freq data=a; tables s*g*h / chisq; run;")
-  expect_error(sas_html(r3), "stratum", class = "sasonr_unsupported")
+  expect_match(sas_html(r3), "Controlling for s=1", fixed = TRUE)
   r4 <- sas_run("data a; input g $ h $; datalines;\na x\nb y\na y\nb x\n;\nrun;\nproc freq data=a; tables g / binomial; exact binomial; run;")
   expect_error(sas_html(r4), "binomial test", class = "sasonr_unsupported")
   r2 <- sas_run("data a; x = 1; run;\nods html close;\nproc print data=a; run;\nods html;\nproc means data=a; var x; run;")

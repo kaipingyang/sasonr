@@ -71,6 +71,12 @@ the development version provides.
   parser and builder, so the values are the same. `sas_log()` and
   `sas_html()` are S3 generics with methods for these results;
   `as.data.frame()` drops the table attributes.
+* PROC FREQ BINOMIAL(EXACT) gives the exact (Clopper-Pearson) confidence
+  limits, as CL=EXACT; before, it ran the exact binomial test (which is the
+  EXACT BINOMIAL statement) and kept the Wald limits. BINOMIAL(CORRECT)
+  applies the continuity correction to the Wald limits and to the test
+  also without CL= (before, it was ignored there), with the footnote of the
+  listing.
 * PROC FREQ CHISQ together with BINOMIAL for a one-way table writes the
   chi-square test, then the binomial block, then the sample size once,
   whatever the order of the options; before, the chi-square test was left
@@ -93,8 +99,9 @@ the development version provides.
   the cell-statistics legend), the chi-square table, Fisher's exact test
   (2x2), the column risk estimates of RISKDIFF, the odds ratio and relative
   risks of RELRISK, the confidence limits of RELRISK(CL=) and RISKDIFF(CL=), the BINOMIAL tables, the one-way chi-square test,
-  NLEVELS, the stratum crosstabulations of a multiway request, the LIST
-  table and the multiway CMH summary, as in the HTML destination. It is an Unsupported error, naming the procedure and its SAS
+  NLEVELS, the stratum crosstabulations of a multiway request and the
+  statistics of each stratum, the LIST table and the multiway CMH summary,
+  as in the HTML destination. It is an Unsupported error, naming the procedure and its SAS
   line, when the HTML destination received output that has no HTML view
   yet (PROC PRINT, the other PROC FREQ tables, n-way and LIST tables);
   before, that output was left out of the document.

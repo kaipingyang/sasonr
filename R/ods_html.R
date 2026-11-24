@@ -134,8 +134,17 @@ html_freq_list <- function(tb) {
   html_freq_table(tb, c(a$disp, unname(stats[shown])), body)
 }
 
+# The title block before the statistics of a stratum of a multiway request.
+html_freq_heading <- function(tb) {
+  h <- attr(tb, "heading", exact = TRUE)
+  if (is.null(h)) return(character())
+  paste0('<div class="sas-proctitle">', paste(html_escape(h), collapse = "<br/>"), "</div>")
+}
+
 html_freq_chisq <- function(tb) {
-  if (!is.null(attr(tb, "stratum", exact = TRUE))) abort_unsupported("the HTML output of the statistics of a stratum of a PROC FREQ multiway table")
+  c(html_freq_heading(tb), html_freq_chisq_table(tb))
+}
+html_freq_chisq_table <- function(tb) {
   f4 <- function(v) if (is.na(v)) "" else display_fixed(v, 4L)
   pv <- function(v) if (is.na(v)) "" else trimws(fmt_pvalue(v, 6L, 4L))
   body <- lapply(seq_len(nrow(tb)), function(i) c(tb$Statistic[i], if (is.na(tb$DF[i])) "" else sprintf("%.0f", tb$DF[i]),
@@ -174,7 +183,9 @@ html_f4 <- function(v) if (is.na(v)) "" else display_fixed(v, 4L)
 html_pv <- function(v) if (is.na(v)) "" else trimws(fmt_pvalue(v, 6L, 4L))
 
 html_freq_fisher <- function(tb) {
-  if (!is.null(attr(tb, "stratum", exact = TRUE))) abort_unsupported("the HTML output of the statistics of a stratum of a PROC FREQ multiway table")
+  c(html_freq_heading(tb), html_freq_fisher_table(tb))
+}
+html_freq_fisher_table <- function(tb) {
   if (nrow(tb) != 5L) abort_unsupported("the HTML output of Fisher's exact test for a table that is not 2x2")
   val <- function(i) if (identical(tb$Name[i], "FISHER_F")) freq_num(tb$Value[i]) else html_pv(tb$Value[i])
   rows <- lapply(1:5, function(i) list(hc(tb$Label[i]), hc(val(i))))
@@ -240,16 +251,26 @@ html_freq_binomial <- function(tb) {
       nm <- c(wald = "Wald", wilson = "Wilson", exact = "Clopper-Pearson (Exact)", agresticoull = "Agresti-Coull",
               jeffreys = "Jeffreys", wald_corrected = "Wald (Corrected)", wilson_corrected = "Wilson (Corrected)")
       o <- order(nm[tb$Type])
-      head <- list(list(hc("Confidence Limits for the\nBinomial Proportion", 3L)), list(hc(paste("Proportion =", html_f4(a$prop)), 3L)),
+      # the heading wraps to the width of the table: measured for Wilson
+      # (wrapped) and Clopper-Pearson (one line) only
+      title <- if (identical(tb$Type, "wilson")) "Confidence Limits for the\nBinomial Proportion" else
+        if (identical(tb$Type, "exact")) "Confidence Limits for the Binomial Proportion" else
+          abort_unsupported("the HTML output of the binomial confidence limits of these types")
+      head <- list(list(hc(title, 3L)), list(hc(paste("Proportion =", html_f4(a$prop)), 3L)),
                    list(hc("Type"), hc(paste0(a$level, "\u00a0Confidence\u00a0Limits"), 2L)))
       body <- lapply(o, function(i) list(hc(unname(nm[tb$Type[i]])), hc(html_f4(tb$LowerCL[i])), hc(html_f4(tb$UpperCL[i]))))
       html_freq_rows("Binomial Confidence Limits", head, body)
     },
     BinomialTest = {
-      if (a$exact || a$corrected) abort_unsupported("the HTML output of the exact or continuity-corrected binomial test")
+      if (a$exact) abort_unsupported("the HTML output of the exact binomial test")
       side <- if (tb$Value[2] > 0) ">" else "<"
       body <- list(list(hc("ASE under H0"), hc(html_f4(tb$Value[1]))), list(hc("Z"), hc(html_f4(tb$Value[2]))),
                    list(hc(paste0("One-sided Pr ", side, " Z")), hc(html_pv(tb$Value[3]))), list(hc("Two-sided Pr > |Z|"), hc(html_pv(tb$Value[4]))))
+      # the continuity-correction footnote [measured, f23 / f24]
+      if (a$corrected) {
+        body <- c(body, list(list(hc(if (a$default_cl) "The asymptotic confidence limits and test\ninclude a continuity correction." else
+          "The asymptotic test includes a continuity\ncorrection.", 2L))))
+      }
       html_freq_rows("Binomial Proportion Test", list(list(hc(paste0("Test of H0: Proportion = ", freq_num(a$p0)), 2L))), body)
     })
 }
