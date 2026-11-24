@@ -691,7 +691,9 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #'   text names them).
 #' @param fn A function of `work` whose body is the code of the step.
 #' @param sas SAS text of the step.
-#' @param line The SAS line the step starts on (line numbers in the log).
+#' @param line The SAS line the step starts on (line numbers in the log). For
+#'   the PROC verbs also one line per statement, the PROC statement first, to
+#'   keep the program's layout.
 #' @param level `NULL` (the level of the translation) or `"L3"` (the step ran
 #'   row by row).
 #' @param options Options of the PROC (or OPTIONS) statement as SAS text.
@@ -699,6 +701,7 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #' @param sql SQL statements, each ending with a semicolon.
 #' @param title The text of a TITLE statement (quoted SAS strings).
 #' @param n The title line (`TITLEn`).
+#' @param text The lines a macro invocation wrote with %PUT.
 #' @return The session, invisibly.
 #' @examples
 #' s <- sas_session(work = list(a = data.frame(x = c(2, 1, 3))))

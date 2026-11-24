@@ -56,7 +56,9 @@ text names them).}
 
 \item{sas}{SAS text of the step.}
 
-\item{line}{The SAS line the step starts on (line numbers in the log).}
+\item{line}{The SAS line the step starts on (line numbers in the log). For
+the PROC verbs also one line per statement, the PROC statement first, to
+keep the program's layout.}
 
 \item{level}{\code{NULL} (the level of the translation) or \code{"L3"} (the step ran
 row by row).}
@@ -70,6 +72,8 @@ row by row).}
 \item{title}{The text of a TITLE statement (quoted SAS strings).}
 
 \item{n}{The title line (\code{TITLEn}).}
+
+\item{text}{The lines a macro invocation wrote with \%PUT.}
 }
 \value{
 The session, invisibly.
