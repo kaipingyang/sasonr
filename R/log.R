@@ -318,7 +318,10 @@ log_bind_callbacks <- function(eng, rt, ses) {
   rt$on_warn <- if (eng$step_notes) function(msg) log_emit(eng, "warning", text = paste("WARNING:", msg), src = src())
   rt$on_error <- function(msg) log_emit(eng, "error", text = paste("ERROR:", msg), src = src())
   rt$on_note <- function(msg) log_emit(eng, "note", text = msg, src = src())
-  ses$on_put <- function(line) log_emit(eng, "put", text = line, src = src())
+  ses$on_put <- function(line) {
+    log_emit(eng, "put", text = line, src = src())
+    script_record_put(eng, ses, line, src())
+  }
   invisible()
 }
 

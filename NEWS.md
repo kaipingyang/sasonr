@@ -93,6 +93,12 @@ the development version provides.
   line, when the HTML destination received output that has no HTML view
   yet (PROC PRINT, the other PROC FREQ tables, n-way and LIST tables);
   before, that output was left out of the document.
+* The trace of a run (`sas_script()` of a `sas_run()` result) keeps what a
+  macro invocation writes with %PUT outside its steps, with the new verb
+  `sas_macro_put()`; before, those lines were missing from the script's log.
+* The PROC verbs take `line` as one line per statement (the PROC statement
+  first), and `sas_script()` passes it when statements share a line, so the
+  messages that name a line inside the step name the program's line.
 * A translation without a run (`sas_translate()`, `sas_script()`) applies
   the KEEP=, DROP= and RENAME= options of a PROC MEANS OUTPUT data set to
   the variables it gives the following steps; before, a later step could

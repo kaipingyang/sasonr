@@ -15,6 +15,7 @@
 \alias{sas_title}
 \alias{sas_global}
 \alias{sas_deferred}
+\alias{sas_macro_put}
 \title{Run one SAS step in a session}
 \usage{
 sas_data_step(session, data, fn, sas, line = 1L, level = NULL)
@@ -42,6 +43,8 @@ sas_title(session, title = "", n = 1L, line = 1L)
 sas_global(session, sas, line = 1L)
 
 sas_deferred(session, sas, line = 1L)
+
+sas_macro_put(session, text, line = 1L)
 }
 \arguments{
 \item{session}{A session from \code{\link[=sas_session]{sas_session()}}.}
@@ -91,6 +94,8 @@ options of the PROC statement and one argument per statement
 the program wrote them; a statement given twice is two arguments with
 the same name.
 \item \code{sas_proc_sql()}: the SQL statements of a PROC SQL step.
+\item \code{sas_macro_put()}: in the trace of a run, the lines a macro invocation
+wrote with \%PUT while it was expanded (outside its steps).
 \item \code{sas_proc()}: any PROC step as SAS text.
 \item \code{sas_options()}, \code{sas_title()}, \code{sas_global()}: global statements.
 \item \code{sas_deferred()}: SAS text with macro code, run through the macro

@@ -27,6 +27,8 @@ script_record <- function(eng, step, text, line, tr = NULL) {
                col = if (is.null(step$span)) 1L else as.integer(step$span[["col"]]),
                sas = script_slice(text, line, step$span), tr = tr, macro_stack = stack)
   if (eng$execute && !length(stack) && !is.null(node$sas)) node <- script_inner_macro(eng, node)
+  # the %PUT lines of the invocations before this step
+  script_flush_puts(eng)
   eng$script <- c(eng$script, list(node))
   if (step$type %in% c("sql", "proc")) eng$sql_seen <- TRUE
   if (identical(step$type, "sql_begin")) eng$sql_begin_line <- step$line
@@ -50,6 +52,35 @@ script_inner_macro <- function(eng, node) {
        why = "macro statements inside the step", traced = TRUE)
 }
 
+# A trace: what a macro invocation writes with %PUT while the macro processor
+# expands it (outside a step) is not in the code of the steps it generates.
+# The lines wait (eng$script_puts) until the invocation generates a step: then
+# they become a node before it (script_record()).  An invocation that
+# generates no step is kept as open code and runs again, so its lines are
+# dropped when an open-code node covers its line (script_open_code()).
+script_record_put <- function(eng, ses, text, line) {
+  if (!isTRUE(eng$execute) || !length(ses$frames) || is.null(eng$program)) return(invisible())
+  eng$script_puts <- c(eng$script_puts, list(list(type = "put", line = line, text = text, macro_stack = list())))
+  invisible()
+}
+
+script_drop_puts <- function(eng, from, to) {
+  keep <- vapply(eng$script_puts, function(p) p$line < from || p$line > to, TRUE)
+  eng$script_puts <- eng$script_puts[keep]
+  invisible()
+}
+
+# The waiting %PUT lines of invocations before line `from` (their lines are
+# covered by steps already) become nodes.
+script_flush_puts <- function(eng, before = Inf) {
+  now <- vapply(eng$script_puts, function(p) p$line < before, TRUE)
+  if (any(now)) {
+    eng$script <- c(eng$script, eng$script_puts[now])
+    eng$script_puts <- eng$script_puts[!now]
+  }
+  invisible()
+}
+
 # The program lines before a chunk (at `line`) that no chunk covered: open
 # code with only macro statements (%LET, %PUT, macro definitions and calls
 # that generate no step).  They become a node that runs them through the
@@ -67,11 +98,14 @@ script_open_code <- function(eng, text, line, end = FALSE) {
     if (!is.null(ct) && !nrow(ct)) return(invisible())
     if (!is.null(ct)) first <- line + ct$line[1] - 1L
   }
+  script_flush_puts(eng, before = from)
   if (first - 1L >= from && from <= length(src)) {
     lines <- src[from:min(first - 1L, length(src))]
     tok <- tryCatch(sas_lex(paste(lines, collapse = "\n")), error = function(e) NULL)
     if (is.null(tok) || nrow(tok) > 0L) {
       skip <- if (is.null(tok)) 0L else tok$line[1] - 1L
+      # the invocations on these lines run again: their %PUT lines with them
+      script_drop_puts(eng, from, min(first - 1L, length(src)))
       eng$script <- c(eng$script, list(list(type = "macro", line = from + skip, macro_stack = list(),
                                             sas = sub("[[:space:]]+$", "", paste(lines[(skip + 1L):length(lines)], collapse = "\n")))))
     }
@@ -232,6 +266,11 @@ script_node <- function(nd, mode) {
   line <- as.integer(nd$line)
   stext <- nd$sas %||% ""
   lines <- script_lines_of(line, stext)
+  if (identical(nd$type, "put")) {
+    lang <- rlang::call2("sas_macro_put", quote(s), nd$text, line = line)
+    text <- paste0("s |> sas_macro_put(", r_str(nd$text), ", line = ", line, "L)")
+    return(new_script_node("sas_macro_put", lang, text, "", line, kind, why = "%PUT output of a macro invocation"))
+  }
   if (identical(nd$type, "macro")) {
     lang <- rlang::call2("sas_deferred", quote(s), stext, line = line)
     text <- paste0("s |> sas_deferred(", r_raw(stext), ", line = ", line, "L)")
@@ -287,10 +326,12 @@ script_node <- function(nd, mode) {
     body <- Filter(function(x) !x$key %in% c("run", "quit"), st[-1])
     verb <- paste0("sas_proc_", name)
     args <- stats::setNames(lapply(body, `[[`, "rest"), vapply(body, `[[`, "", "key"))
-    lang <- rlang::call2(verb, quote(s), opts, !!!args, line = line)
+    pl <- script_proc_lines(c(list(head), body), line)
+    lang <- rlang::call2(verb, quote(s), opts, !!!args, line = pl)
     text <- paste0("s |> ", verb, "(", paste(c(r_str(opts), vapply(seq_along(args), function(i) {
       paste0(names(args)[i], " = ", r_str(args[[i]]))
-    }, ""), paste0("line = ", line, "L")), collapse = ", "), ")")
+    }, ""), paste0("line = ", if (length(pl) == 1L) paste0(pl, "L") else paste0("c(", paste0(pl, "L", collapse = ", "), ")"))),
+      collapse = ", "), ")")
     # (the sort order, which later steps check, is kept in the session)
     return(new_script_node(verb, lang, text, stext, lines, kind, outs, paste0("PROC ", toupper(name), " runs in the session")))
   }
@@ -397,7 +438,8 @@ script_stmts <- function(stext) {
       text <- script_cut(lines, tok$line[start], tok$col[start], tok$line[i], tok$col[i])
       key <- tolower(tok$value[start])
       rest <- if (i > start + 1L) script_cut(lines, tok$line[start + 1L], tok$col[start + 1L], tok$line[i], tok$col[i]) else ""
-      out <- c(out, list(list(key = key, rest = sub("[[:space:]]+$", "", rest), text = sub("[[:space:]]+$", "", text))))
+      out <- c(out, list(list(key = key, rest = sub("[[:space:]]+$", "", rest), text = sub("[[:space:]]+$", "", text),
+                              line = as.integer(tok$line[start]))))
     }
     start <- i + 1L
   }
@@ -637,6 +679,8 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #'   the program wrote them; a statement given twice is two arguments with
 #'   the same name.
 #' * `sas_proc_sql()`: the SQL statements of a PROC SQL step.
+#' * `sas_macro_put()`: in the trace of a run, the lines a macro invocation
+#'   wrote with %PUT while it was expanded (outside its steps).
 #' * `sas_proc()`: any PROC step as SAS text.
 #' * `sas_options()`, `sas_title()`, `sas_global()`: global statements.
 #' * `sas_deferred()`: SAS text with macro code, run through the macro
@@ -675,48 +719,77 @@ sas_data_step <- function(session, data, fn, sas, line = 1L, level = NULL) {
   script_submit(session, sas, line, override = exprs, level = level)
 }
 
-script_proc_text <- function(name, options, stmts) {
+# The text of a PROC step from its options and statements.  `line`: the SAS
+# line of the PROC statement, or one line per statement (the PROC statement
+# first), which puts each statement on its line of the program, so that the
+# messages that name a line inside the step name the program's line.
+script_proc_text <- function(name, options, stmts, line = 1L) {
   if (length(stmts) && (is.null(names(stmts)) || any(!nzchar(names(stmts))))) {
     rlang::abort("Every statement must be named (`by = \"x\"`).", class = "sasonr_error")
   }
-  body <- if (length(stmts)) paste0("  ", names(stmts), " ", unlist(stmts), ";\n", collapse = "") else ""
-  paste0("proc ", name, if (nzchar(options)) " ", options, ";\n", body, "run;")
+  head <- paste0("proc ", name, if (nzchar(options)) " ", options, ";")
+  st <- if (length(stmts)) paste0(names(stmts), " ", unlist(stmts), ";") else character()
+  if (length(line) == 1L) {
+    return(paste0(head, "\n", paste0("  ", st, "\n", collapse = ""), "run;"))
+  }
+  if (length(line) != length(st) + 1L || is.unsorted(line)) {
+    rlang::abort("`line` must be one line, or one line per statement in order (the PROC statement first).",
+                 class = "sasonr_error")
+  }
+  out <- head
+  cur <- line[1] + lengths(gregexpr("\n", head, fixed = TRUE)) * grepl("\n", head, fixed = TRUE)
+  for (k in seq_along(st)) {
+    gap <- line[k + 1L] - cur
+    out <- paste0(out, if (gap > 0L) paste0(strrep("\n", gap), "  ") else " ", st[k])
+    cur <- line[k + 1L] + if (grepl("\n", st[k], fixed = TRUE)) lengths(gregexpr("\n", st[k], fixed = TRUE)) else 0L
+  }
+  paste0(out, "\nrun;")
+}
+
+# The `line` argument of a PROC verb for statements `st` of a step at `line`:
+# one line when the default layout (one statement per line) puts every
+# statement on its program line, else the line of each statement.
+script_proc_lines <- function(st, line) {
+  abs <- line + vapply(st, `[[`, 1L, "line") - 1L
+  nl <- function(x) if (grepl("\n", x, fixed = TRUE)) lengths(gregexpr("\n", x, fixed = TRUE)) else 0L
+  dflt <- line + c(0L, cumsum(vapply(st, function(x) nl(x$text) + 1L, 1L)))[seq_along(st)]
+  if (identical(as.integer(abs), as.integer(dflt))) line else as.integer(abs)
 }
 
 #' @rdname sas_step_verbs
 #' @export
 sas_proc_sort <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("sort", options, list(...)), line)
+  script_submit(session, script_proc_text("sort", options, list(...), line), line[1])
 }
 
 #' @rdname sas_step_verbs
 #' @export
 sas_proc_means <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("means", options, list(...)), line)
+  script_submit(session, script_proc_text("means", options, list(...), line), line[1])
 }
 
 #' @rdname sas_step_verbs
 #' @export
 sas_proc_freq <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("freq", options, list(...)), line)
+  script_submit(session, script_proc_text("freq", options, list(...), line), line[1])
 }
 
 #' @rdname sas_step_verbs
 #' @export
 sas_proc_transpose <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("transpose", options, list(...)), line)
+  script_submit(session, script_proc_text("transpose", options, list(...), line), line[1])
 }
 
 #' @rdname sas_step_verbs
 #' @export
 sas_proc_print <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("print", options, list(...)), line)
+  script_submit(session, script_proc_text("print", options, list(...), line), line[1])
 }
 
 #' @rdname sas_step_verbs
 #' @export
 sas_proc_tabulate <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("tabulate", options, list(...)), line)
+  script_submit(session, script_proc_text("tabulate", options, list(...), line), line[1])
 }
 
 #' @rdname sas_step_verbs
@@ -748,6 +821,20 @@ sas_global <- function(session, sas, line = 1L) script_submit(session, sas, line
 #' @rdname sas_step_verbs
 #' @export
 sas_deferred <- function(session, sas, line = 1L) script_submit(session, sas, line, macro = TRUE)
+
+#' @rdname sas_step_verbs
+#' @export
+sas_macro_put <- function(session, text, line = 1L) {
+  check_session(session)
+  if (!is.character(text)) rlang::abort("`text` must be a character vector.", class = "sasonr_error")
+  line <- vctrs::vec_cast(line, integer())
+  session_enter(session)
+  on.exit(session_leave(session), add = TRUE)
+  eng <- new_engine(session, "auto", execute = TRUE)
+  on.exit(engine_flush(eng), add = TRUE)
+  for (t in text) log_emit(eng, "put", text = t, src = line)
+  invisible(session)
+}
 
 #' Show tidylog messages for an expression
 #'

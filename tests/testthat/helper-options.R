@@ -1,9 +1,5 @@
-# Most tests compare PUT output only; step-level NOTEs are tested in test-notes.R.
-options(sasonr.step_notes = FALSE)
-# Unit tests that expect an ERROR of the program check the classed condition
-# (sas_run(on_error = "abort")); the batch-mode error handling (on_error =
-# "sas", the default) is tested in test-on-error.R.
-options(sasonr.on_error = "abort")
+# The test options are set in setup-options.R (run by the test runner only,
+# not by pkgload::load_all(), so they do not leak into a development session).
 
 # A direct call of an approximate or unsupported function with
 # sasonr.strict = FALSE, its sasonr_strict_warning muffled (the strict gate of
