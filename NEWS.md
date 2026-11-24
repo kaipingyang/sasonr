@@ -88,8 +88,7 @@ the development version provides.
   BinomialTest), the one-way chi-square test (OneWayChiSq), NLEVELS (NLevels)
   and the multiway CMH summary (CMH, CommonRelRisks, BreslowDayTest), and `sas_freq_df()` returns them for a data frame.
   The stratum crosstabulations of a multiway request and the LIST table
-  are ODS tables too (CrossTabFreqs, List):
-  `sas_freq_df()` stops with an Unsupported error for them.
+  are ODS tables too (CrossTabFreqs, List).
 * `sas_html()` draws the PROC FREQ one-way tables, crosstabulations (with
   the cell-statistics legend), the chi-square table, Fisher's exact test
   (2x2), the column risk estimates of RISKDIFF, the odds ratio and relative
