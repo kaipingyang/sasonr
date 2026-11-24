@@ -477,14 +477,7 @@ freq_step_spec <- function(step, meta, last) {
         (any(c("chisq", "fisher", "binomial", "relrisk", "riskdiff") %in% names(rq$opts)) || length(exact) > 0)) {
       abort_unsupported("TABLES option NOPRINT with per-stratum statistics of a multiway table", rq$line)
     }
-    # the order and layout of both statistics of a one-way table are not
-    # measured (the chi-square test was left out)
-    if (kv == 1 && isTRUE(rq$opts$chisq) && isTRUE(rq$opts$binomial)) {
-      abort_unsupported("CHISQ together with BINOMIAL for a one-way table", rq$line)
-    }
-    if (isTRUE(rq$opts$noprint) && kv == 1 && isTRUE(rq$opts$chisq)) {
-      abort_unsupported("TABLES option NOPRINT with the one-way chi-square test", rq$line)
-    }
+
     # --- option combinations whose listing layout is not supported ----------
     if (isTRUE(rq$opts$missprint) && any(c("relrisk", "riskdiff") %in% names(rq$opts))) {
       abort_unsupported("MISSPRINT with RELRISK / RISKDIFF (the combination is not supported)", rq$line)
@@ -2498,7 +2491,10 @@ freq_breslow_listing <- function(tb) {
 # character vector of listing lines or an ODS table (ChiSq, FishersExact)
 # (`pieces = TRUE`), or the listing lines.
 freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum_line = NULL, pieces = FALSE) {
-  if (!is.null(st$bin_var)) {
+  # BINOMIAL alone; with CHISQ the chi-square test comes first, whatever the
+  # order of the options, and the sample size once at the end [measured]
+  both <- !is.null(st$bin_var) && isTRUE(st$oneway_chi) && isTRUE(o$chisq)
+  if (!is.null(st$bin_var) && !both) {
     return(if (pieces) freq_binomial_tables(st, info) else freq_binomial_listing(st, info))
   }
   segs <- list()
@@ -2547,8 +2543,10 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
                               template = "base.freq.onewaychisq", cols = ods_cols(c("Name", "Label", "Value"), role = c("label", "label", "stat"))))
     out <- c(out, if (isTRUE(st$oneway_small)) c("WARNING: The table cells have expected counts less",
                                                  "         than 5. Chi-Square may not be a valid test.", ""),
-             freq_sample_size(st))
+             if (both) "" else freq_sample_size(st))
     flush(decor = TRUE)
+    # the binomial block follows, closed by the sample size
+    if (both) for (tb in freq_binomial_tables(st, info)) push(tb)
   } else if (isTRUE(st$nostat) && k == 2) {
     out <- c(out, hdr, "",
              "Row or column sum zero. No statistics computed for this table.", "", freq_sample_size(st))
@@ -2613,7 +2611,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
       flush(decor = TRUE)
     }
   }
-  if (!is.null(st$bin)) {
+  if (!is.null(st[["bin"]]) && is.null(st$bin_var)) {
     a <- o$alpha %||% 0.05
     lvl <- paste0(format_pct_level(a), "%")
     lab <- info[[vars[1]]]

@@ -74,7 +74,8 @@ test_that("sas_freq_df() fails loud on output without an ODS table yet", {
   expect_identical(vapply(sas_freq_df(d, "g / chisq"), attr, "", "name"), c("OneWayFreqs", "OneWayChiSq"))
   expect_identical(vapply(sas_freq_df(d, "g / binomial"), attr, "", "name"),
                    c("OneWayFreqs", "Binomial", "BinomialCLs", "BinomialTest"))
-  expect_error(sas_freq_df(d, "g / chisq binomial"), class = "sasonr_unsupported")
+  expect_identical(vapply(sas_freq_df(d, "g / binomial chisq"), attr, "", "name"),
+                   c("OneWayFreqs", "OneWayChiSq", "Binomial", "BinomialCLs", "BinomialTest"))
   expect_identical(attr(sas_freq_df(d, "g", options = "nlevels")[[1]], "name"), "NLevels")
   expect_match(sas_html(sas_freq_df(d, "g*h")), "Table\u00a0of\u00a0g\u00a0by\u00a0h", fixed = TRUE)
   expect_error(sas_html(sas_freq_df(d, "g / binomial")), class = "sasonr_unsupported")

@@ -71,8 +71,10 @@ the development version provides.
   parser and builder, so the values are the same. `sas_log()` and
   `sas_html()` are S3 generics with methods for these results;
   `as.data.frame()` drops the table attributes.
-* PROC FREQ CHISQ together with BINOMIAL for a one-way table is an
-  Unsupported error; before, the chi-square test was left out.
+* PROC FREQ CHISQ together with BINOMIAL for a one-way table writes the
+  chi-square test, then the binomial block, then the sample size once,
+  whatever the order of the options; before, the chi-square test was left
+  out.
 * PROC FREQ TABLES / NOPRINT suppresses only the frequency and
   crosstabulation tables: the statistics requested (CHISQ, FISHER, the
   multiway CMH summary, BINOMIAL) are written; before, the request wrote
