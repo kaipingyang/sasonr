@@ -14,8 +14,9 @@ the development version provides.
   CALL EXECUTE routine executed successfully, but no SAS statements were
   generated.". An entry without text keeps its number. A macro call kept
   by `%NRSTR` runs when its entry runs (one echo line for the entry). Other
-  macro quoting, a numeric argument, an echo longer than LINESIZE and an ERROR in the
-  generated code fail loud. `sas_translate()` keeps such a program as SAS text from the
+  macro quoting, a numeric argument, an echo longer than LINESIZE and an ERROR in an
+  entry with more than one step fail loud; an ERROR in a one-step entry
+  stops that step and the queue goes on. `sas_translate()` keeps such a program as SAS text from the
   step with `CALL EXECUTE` on.
 * `options(sasonr.start_time = <POSIXct>)` sets the session start time that
   the automatic macro variables SYSDATE, SYSDATE9, SYSDAY and SYSTIME

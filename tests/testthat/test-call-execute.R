@@ -69,3 +69,13 @@ test_that("%NRSTR keeps a macro call for the time the entry runs: one echo line"
   expect_identical(lg[k + 1L], "")
   expect_identical(lg[k + 2L], "NOTE: The data set WORK.M1 has 1 observations and 1 variables.")
 })
+
+test_that("an ERROR in a generated step stops that step and the queue goes on", {
+  withr::local_options(sasonr.on_error = "sas")
+  lg <- ce_log("data _null_; call execute('proc print data=work.nosuch; run;'); call execute('data good; y=2; run;'); run;")
+  k <- which(lg == "1         + proc print data=work.nosuch; run;")
+  expect_length(k, 1L)
+  expect_match(lg[k + 1L], "^ERROR: ")
+  expect_true("2         + data good; y=2; run;" %in% lg)
+  expect_true("NOTE: The data set WORK.GOOD has 1 observations and 1 variables." %in% lg)
+})
