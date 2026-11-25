@@ -55,3 +55,9 @@ test_that("macro code that generates no text writes its NOTE", {
   expect_true("NOTE: CALL EXECUTE routine executed successfully, but no SAS statements were generated." %in% lg)
   expect_true("q=1" %in% lg)
 })
+
+test_that("an entry without text keeps its number", {
+  lg <- as.character(sas_log(sas_run("data _null_; call execute('%let w=5;'); call execute('data b; y=&w; run;'); run;")))
+  expect_true("2         + data b; y=5; run;" %in% lg)
+  expect_false(any(grepl("no SAS statements", lg)))
+})

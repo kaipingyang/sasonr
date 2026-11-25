@@ -376,9 +376,9 @@ engine_call_execute_drain <- function(eng, line) {
     log_emit(eng, id = "call_execute.none", phase = "step_close")
     return(invisible())
   }
-  if (!all(nzchar(q))) abort_unsupported("CALL EXECUTE calls of which some generated no text (not supported)", line)
+  # an entry without text keeps its number (the next one is echoed as 2 +)
   ls <- eng$session$options$linesize %||% 132L
-  plans <- lapply(seq_along(q), function(n) ce_entry_plan(q[[n]], n, ls, line))
+  plans <- lapply(which(nzchar(q)), function(n) ce_entry_plan(q[[n]], n, ls, line))
   log_emit(eng, id = "call_execute.generated", phase = "step_close")
   # the generated steps are not steps of the script (sas_script()): there the
   # DATA step queues the text again and the session runs it
