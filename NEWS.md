@@ -5,6 +5,10 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC FREQ: a crosstable whose row variable heading (with its label) is
+  longer than the row label column and fits on one line with the column
+  heading fails loud (measured: both on one line; sasonr put the column
+  heading on the next line).
 * PROC SQL `CREATE TABLE` records sort information that PROC CONTENTS
   shows: `ORDER BY` of result columns (by name, alias or position, with
   `DESC`), `GROUP BY` of one result column and `SELECT DISTINCT` of one

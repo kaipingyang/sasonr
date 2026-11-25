@@ -689,3 +689,8 @@ proc freq data=have; weight n; tables g*h / relrisk(cl=(wald score)) riskdiff(cl
   expect_false(anyNA(k))
   expect_false(is.unsorted(k))
 })
+
+test_that("a crosstable row heading longer than its column that fits on one line with the column heading fails loud", {
+  expect_error(sas_run("data d; input grp $ sub $; datalines;\na s1\nb s2\n;\nrun;\nproc freq data=d; tables grp*sub; label grp = 'Study Group' sub = 'Subgroup'; run;"),
+               class = "sasonr_unsupported")
+})

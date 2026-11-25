@@ -1243,6 +1243,12 @@ freq_crosstab_listing <- function(tb) {
   # not fit before the first column puts the column heading on the next line
   rh <- paste0(ri$disp, if (!is.null(ri$label)) paste0("(", ri$label, ")"))
   ch <- paste0(ci$disp, if (!is.null(ci$label)) paste0("(", ci$label, ")"))
+  # measured: a row heading longer than the row label column with the column
+  # heading on the next line when both would not fit the table width; when they
+  # would, the measured output has them on one line, at a column that is not measured
+  if (nchar(rh) > R && nchar(rh) + 5L + nchar(ch) <= R + 1L + (C + 1L) * nc + 7L) {
+    abort_unsupported("a PROC FREQ crosstable whose row variable heading is longer than its column and fits on one line with the column heading (its layout is not measured)")
+  }
   lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -(R + 1L)), ch) else c(rh, paste0(strrep(" ", R + 1L), ch)))
   chead <- paste(vapply(a$chead, function(x) formatC(x, width = if (proc_right_align(ci)) C else -C), ""), collapse = "|")
   for (j in seq_along(labels)) {
