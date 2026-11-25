@@ -1139,3 +1139,11 @@ test_that("numbered variable lists in VAR / CLASS and (v1-v3) in a TABLE dimensi
   expect_error(sas_run(paste0(a, "proc tabulate data=have; class grp; var v1-v3; table grp, v1-v3*sum; run;")),
                class = "sasonr_unsupported")
 })
+
+test_that("a table without a row dimension wider than the line is split into panels with (Continued)", {
+  prog <- paste0("data have; array v{30} v1-v30; do j = 1 to 30; v{j} = 1000000 * j; end; drop j; run;\n",
+                 "proc tabulate data=have; var v1-v30; table (v1-v30)*sum; run;")
+  l <- sas_run(prog)$listing
+  expect_identical(sum(l == "(Continued)"), 2L)
+  expect_true(any(grepl("^\\|    v11     \\|", l)))
+})

@@ -166,7 +166,6 @@ listing_base_tabulate <- function(tb, ls, ps = NULL) {
   }
   panels <- c(panels, list(cur))
   if (length(panels) > 1L) {
-    if (!has_rows) fail("several panels of a table without a row dimension")
     if (!is.null(box)) fail("several panels with a BOX= text")
   }
 

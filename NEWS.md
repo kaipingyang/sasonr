@@ -7,7 +7,9 @@ the development version provides.
 
 * PROC TABULATE: numbered variable lists (`v1-v30`) in the VAR and CLASS
   statements, and as the whole content of parentheses in a TABLE dimension
-  (`(v1-v30)*sum`); other variable list forms still fail loud.
+  (`(v1-v30)*sum`); other variable list forms still fail loud. A table without a row dimension
+  that is wider than the line is split into panels in the listing, as one
+  with a row dimension.
 * PROC FREQ: a crosstable whose row variable heading (with its label) is
   longer than the row label column and fits on one line with the column
   heading fails loud (measured: both on one line; sasonr put the column
