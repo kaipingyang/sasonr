@@ -113,6 +113,9 @@ sas_proc_contents <- function(work, name, m, sp) {
   cv <- contents_vars(m)
   np <- contents_npos(cv)
   n <- length(cv$vars)
+  if (isTRUE(m$sortedby_unknown)) {
+    abort_unsupported("PROC CONTENTS of a table whose sort information after PROC SQL is not measured (GROUP BY of several columns, DISTINCT of several columns, a set operation, a sorted data set read as it is)")
+  }
   lst <- character()
   if (!isTRUE(sp$noprint)) {
     now <- format(Sys.time(), "%m/%d/%Y %H:%M:%S")
@@ -145,8 +148,9 @@ sas_proc_contents <- function(work, name, m, sp) {
       }
     }
     if (!is.null(m$sortedby)) {
-      lst <- c(lst, "Sort Information", "", paste0("Sortedby       ", paste(ifelse(m$sortedby$descending, paste("DESCENDING", toupper(m$sortedby$vars)), m$sortedby$vars), collapse = " ")),
-               "Validated      YES", "Character Set  ANSI", "")
+      if (isTRUE(m$sortedby$noduprec)) abort_unsupported("PROC CONTENTS of a data set sorted with NODUPREC (its sort option line is not measured)")
+      lst <- c(lst, "Sort Information", "", paste0("Sortedby       ", paste(ifelse(m$sortedby$descending, paste("DESCENDING", m$sortedby$vars), m$sortedby$vars), collapse = " ")),
+               "Validated      YES", "Character Set  ASCII", if (isTRUE(m$sortedby$nodupkey)) "Sort Option    NODUPKEY", "")
     }
   }
   out <- list()

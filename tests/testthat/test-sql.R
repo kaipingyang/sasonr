@@ -370,3 +370,29 @@ test_that("after an INSERT SET type ERROR syntax-check mode starts at QUIT", {
   expect_true(any(r$log == "e2 syserr=1012"))
   expect_true(any(r$log == "end syserr=3"))
 })
+
+test_that("CREATE TABLE records the sort information of ORDER BY, one-column GROUP BY and DISTINCT", {
+  base <- "data a; input id x; datalines;\n2 5\n1 3\n2 4\n;\nrun;\n"
+  sb <- function(q) {
+    r <- sas_run(paste0(base, "proc sql; create table t as ", q, "; quit;\nproc contents data=t; run;"))
+    l <- trimws(gsub("\\s+", " ", r$listing))
+    c(sorted = sub(".*Sorted ", "", grep("Sorted (YES|NO)", l, value = TRUE)[1]),
+      by = sub("^Sortedby ", "", grep("^Sortedby ", l, value = TRUE)[1] %||% NA),
+      opt = any(l == "Sort Option NODUPKEY"))
+  }
+  expect_identical(sb("select * from a order by id desc, x"), c(sorted = "YES", by = "DESCENDING id x", opt = "FALSE"))
+  expect_identical(sb("select id, x*2 as y from a order by y")[["by"]], "y")
+  expect_identical(sb("select * from a order by x*2")[["sorted"]], "NO")
+  expect_identical(sb("select x from a order by id")[["sorted"]], "NO")
+  expect_identical(sb("select id, sum(x) as s from a group by id"), c(sorted = "YES", by = "id", opt = "TRUE"))
+  expect_identical(sb("select id, x, sum(x) as s from a group by id"), c(sorted = "YES", by = "id", opt = "FALSE"))
+  expect_identical(sb("select distinct id from a"), c(sorted = "YES", by = "id", opt = "TRUE"))
+})
+
+test_that("PROC CONTENTS of a table whose SQL sort information is not measured fails loud", {
+  base <- "data a; input id x; datalines;\n2 5\n1 3\n;\nrun;\n"
+  expect_error(sas_run(paste0(base, "proc sql; create table t as select distinct id, x from a; quit;\nproc contents data=t; run;")),
+               class = "sasonr_unsupported")
+  expect_error(sas_run(paste0(base, "proc sql; create table t as select id, x, count(*) as n from a group by id, x; quit;\nproc contents data=t; run;")),
+               class = "sasonr_unsupported")
+})

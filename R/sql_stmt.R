@@ -184,11 +184,59 @@ sql_store <- function(eng, name, d, meta, ordered = TRUE, last = TRUE) {
 }
 
 sql_stmt_create <- function(eng, st) {
-  res <- sql_outobs(eng, sql_query(st$query, eng))
+  res <- sql_query(st$query, eng)
+  remerge <- isTRUE(res$remerge)
+  res <- sql_outobs(eng, res)
   tb <- sql_rel_to_table(eng, res, st$line)
+  tb$meta$sortedby <- NULL
+  sb <- sql_sort_info(eng, st$query, vapply(res$cols, `[[`, "", "name"), remerge)
+  if (identical(sb, "unknown")) tb$meta$sortedby_unknown <- TRUE else tb$meta$sortedby <- sb
   sql_store(eng, st$table, tb$data, tb$meta, ordered = isTRUE(res$ordered))
   sql_msg(eng, "sql.table_created", name = toupper(st$table), nrow = nrow(tb$data), ncol = ncol(tb$data))
   sql_set_status(eng, nrow(tb$data))
+}
+
+# The sort information CREATE TABLE records (PROC CONTENTS "Sort
+# Information", Validated YES).  Measured: ORDER BY of result columns (by
+# name, alias or position; DESC) records them, an ORDER BY with an expression
+# or a column not in the result records none; UNION (without ALL) of one
+# column ordered by it adds the sort option NODUPKEY; without ORDER BY,
+# GROUP BY of one result column records it (NODUPKEY when the query does not
+# remerge; GROUP BY of a column not in the result records none) and SELECT DISTINCT of one column records it with NODUPKEY; a
+# query without ORDER BY, GROUP BY or DISTINCT (also a join) records none.
+# "unknown": a shape that is not measured (PROC CONTENTS fails loud on it).
+sql_sort_info <- function(eng, q, out, remerge = FALSE) {
+  low <- tolower(out)
+  ref_name <- function(e) {
+    k <- sql_item_position(e, "ORDER BY")
+    if (!is.null(k)) return(if (k >= 1 && k <= length(out)) out[k] else NA_character_)
+    if (identical(e$node, "col") && sum(low == tolower(e$name)) == 1L) return(out[low == tolower(e$name)])
+    NA_character_
+  }
+  sb <- function(v, desc = rep(FALSE, length(v)), nodupkey = FALSE) list(vars = v, descending = desc, nodupkey = nodupkey, noduprec = FALSE)
+  setop_distinct <- identical(q$node, "setop") && !isTRUE(q$all) && !identical(q$op, "outer union")
+  if (length(q$order) > 0) {
+    vars <- vapply(q$order, function(o) ref_name(o$expr), "")
+    if (anyNA(vars)) return(NULL)
+    if (anyDuplicated(tolower(vars))) return("unknown")
+    desc <- vapply(q$order, function(o) isTRUE(o$desc), logical(1))
+    unique_rows <- setop_distinct || isTRUE(q$distinct) || (length(q$group) > 0 && !remerge)
+    if (!unique_rows) return(sb(vars, desc))
+    # rows unique by the keys: measured for UNION of one column ordered by it
+    if (setop_distinct && length(out) == 1L && length(vars) == 1L) return(sb(vars, desc, nodupkey = TRUE))
+    return("unknown")
+  }
+  if (identical(q$node, "setop")) return(if (setop_distinct) "unknown" else NULL)
+  if (length(q$group) > 0) {
+    if (length(q$group) != 1L) return("unknown")
+    v <- ref_name(q$group[[1]])
+    return(if (is.na(v)) NULL else sb(v, nodupkey = !remerge))
+  }
+  if (isTRUE(q$distinct)) return(if (length(out) == 1L) sb(out, nodupkey = TRUE) else "unknown")
+  # a single sorted data set read as it is: not measured
+  if (length(q$from) == 1L && identical(q$from[[1]]$kind, "table") &&
+      !is.null(eng$session$meta[[tolower(q$from[[1]]$name)]]$sortedby)) return("unknown")
+  NULL
 }
 
 sql_stmt_create_cols <- function(eng, st) {

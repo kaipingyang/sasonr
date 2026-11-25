@@ -541,6 +541,8 @@ sql_select <- function(q, eng, outer) {
     out$ordered <- TRUE
   }
   out$used_outer <- isTRUE(qt$used_outer)
+  # GROUP BY that remerges (sql_sort_info())
+  out$remerge <- isTRUE(remerge)
   out
 }
 

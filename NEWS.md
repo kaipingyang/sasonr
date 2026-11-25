@@ -5,6 +5,14 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC SQL `CREATE TABLE` records sort information that PROC CONTENTS
+  shows: `ORDER BY` of result columns (by name, alias or position, with
+  `DESC`), `GROUP BY` of one result column and `SELECT DISTINCT` of one
+  column (with the sort option NODUPKEY when the rows are unique by it), and
+  `UNION` of one column ordered by it. Query shapes whose sort information
+  is not measured make PROC CONTENTS of the table fail loud. PROC CONTENTS
+  also writes `Character Set ASCII` (it wrote ANSI), the `Sort Option
+  NODUPKEY` line, and the names after `DESCENDING` as stored.
 * PROC FREQ: `RELRISK(CL=)` together with `RISKDIFF(CL=)` on a 2x2 table
   (CL= alone in both) writes both confidence-limit tables, in the listing
   and in ODS HTML.
