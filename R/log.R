@@ -387,6 +387,9 @@ log_emit_buffer <- function(eng, buf, phase = "run") {
   if (!length(buf)) return(invisible())
   nm <- names(buf)
   put <- if (is.null(nm)) rep(TRUE, length(buf)) else is.na(nm) | nm != "msg"
+  # a PUT line longer than LINESIZE is split by SAS; that is not implemented
+  ls <- eng$session$options$linesize %||% 132L
+  if (any(put & nchar(unname(buf)) > ls)) abort_unsupported("a PUT line in the log longer than LINESIZE (not supported)")
   log_emit_lines(eng, unname(buf), phase = phase, put = put)
 }
 
@@ -418,6 +421,11 @@ log_fill <- function(lines, args, id) {
 log_render <- function(id, args = list(), ls = rt_linesize()) {
   m <- log_entry(id)
   lines <- log_fill(m$template, args, id)
+  # the WHERE line of the NOTE wraps in SAS when it is longer than LINESIZE;
+  # where it breaks is not implemented
+  if (identical(id, "ds.read_where") && any(nchar(lines) > ls)) {
+    abort_unsupported("a WHERE clause whose NOTE line is longer than LINESIZE (not supported)")
+  }
   switch(m$wrap,
     none = lines,
     fixed = if (nchar(lines[1]) <= ls) lines else c(m$wrapped, lines[-1]),

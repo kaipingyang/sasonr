@@ -35,7 +35,6 @@ test_that("CALL EXECUTE outside the supported text fails loud", {
   fails("'data a; x=1;'")
   fails("' data a; x=1; run;'")
   fails("'data a; ' || '0A'x || 'x=1; run;'")
-  fails(paste0("'data a; x=\"", strrep("y", 140), "\"; run;'"))
   fails("'proc print data=nosuch; run;'")
 })
 
@@ -78,4 +77,20 @@ test_that("an ERROR in a generated step stops that step and the queue goes on", 
   expect_match(lg[k + 1L], "^ERROR: ")
   expect_true("2         + data good; y=2; run;" %in% lg)
   expect_true("NOTE: The data set WORK.GOOD has 1 observations and 1 variables." %in% lg)
+})
+
+test_that("a long echo breaks at the blank before the word that does not fit; continuation lines start in column 1", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  code <- "options ls=80;\ndata _null_; call execute('data w; a=1; b=2; c=3; d=4; e=5; f=6; g=7; h=8; i=9; j=10; k=11; l=12; m=13; n=14; o=15; p=16; q=17; r=18; run;'); run;"
+  lg <- as.character(sas_log(sas_run(code)))
+  k <- grep("^1         \\+ data w;", lg)
+  expect_identical(lg[k], "1         + data w; a=1; b=2; c=3; d=4; e=5; f=6; g=7; h=8; i=9; j=10; k=11;")
+  expect_identical(lg[k + 1L], "l=12; m=13; n=14; o=15; p=16; q=17; r=18; run;")
+})
+
+test_that("a word longer than LINESIZE in the echo starts a new line and is cut", {
+  f <- sasonr:::ce_echo_wrap("1         + ", paste0("put \"", strrep("x", 140), "\"; run;"), 132L, stop)
+  expect_identical(f[1], "1         + put")
+  expect_identical(nchar(f[2]), 132L)
+  expect_identical(f[3], paste0(strrep("x", 9), "\"; run;"))
 })

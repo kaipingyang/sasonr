@@ -5,6 +5,9 @@ the development version provides.
 
 ## Running SAS programs
 
+* A PUT line in the log and the WHERE line of the "observations read" NOTE
+  that are longer than LINESIZE fail loud (SAS breaks them; sasonr wrote
+  them on one line).
 * `sas_script()`: a step on whose lines the macro processor wrote a WARNING
   (an unresolved `&name`) is kept as SAS text in the trace, so running the
   script writes the WARNING again.
@@ -16,8 +19,10 @@ the development version provides.
   it generates is queued, and macro code that generates none writes "NOTE:
   CALL EXECUTE routine executed successfully, but no SAS statements were
   generated.". An entry without text keeps its number. A macro call kept
-  by `%NRSTR` runs when its entry runs (one echo line for the entry). Other
-  macro quoting, a numeric argument, an echo longer than LINESIZE and an ERROR in an
+  by `%NRSTR` runs when its entry runs (one echo line for the entry). An echo longer than LINESIZE breaks at the blank before the
+  word that does not fit, the lines after it starting in column 1; a word
+  longer than LINESIZE starts a new line and is cut. Other
+  macro quoting, a numeric argument, an ERROR in an
   entry with more than one step fail loud; an ERROR in a one-step entry
   stops that step and the queue goes on. `sas_translate()` keeps such a program as SAS text from the
   step with `CALL EXECUTE` on.
