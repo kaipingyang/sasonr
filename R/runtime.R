@@ -1725,6 +1725,25 @@ sas_symput <- function(symtab, name, value, trim = TRUE, scope = NULL) {
   invisible(NULL)
 }
 
+#' CALL EXECUTE
+#'
+#' Queues the text of its argument; the engine runs the queue after the DATA
+#' step ends (engine_call_execute_drain()).
+#' @export
+#' @keywords internal
+sas_call_execute <- function(symtab, value, .line = NULL) {
+  if (!length(.line) || is.na(.line[1])) .line <- NULL
+  if (!inherits(symtab, "sasonr_macro_session")) abort_unsupported("CALL EXECUTE outside sas_run()", .line)
+  if (!is.character(value)) abort_unsupported("CALL EXECUTE with a numeric argument (not supported)", .line)
+  value <- sub(" +$", "", value)
+  if (any(grepl("[%&]", value))) {
+    abort_unsupported("CALL EXECUTE with % or & in its argument (macro processing of the argument is not supported)", .line)
+  }
+  if (any(!nzchar(value))) abort_unsupported("CALL EXECUTE with a blank argument (not supported)", .line)
+  symtab$ce_queue <- c(symtab$ce_queue, value)
+  invisible(NULL)
+}
+
 # Control flow signals for L3 code ----------------------------------------
 
 #' @export

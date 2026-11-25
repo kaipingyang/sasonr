@@ -979,7 +979,7 @@ parse_call_stmt <- function(p) {
   advance(p)
   if (tk_type(p) != "name" || tk_type(p, 1L) != "lparen") abort_syntax("expected CALL routine(...)", line)
   routine <- tk_low(p)
-  if (!routine %in% c("symput", "symputx", "missing", "sortn", "sortc", "cats", "catt", "catx", "cat")) {
+  if (!routine %in% c("symput", "symputx", "execute", "missing", "sortn", "sortc", "cats", "catt", "catx", "cat")) {
     abort_unsupported(paste0("CALL ", toupper(routine)), line)
   }
   call <- parse_call(p)
@@ -990,6 +990,10 @@ parse_call_stmt <- function(p) {
     k <- if (routine == "catx") 2L else 1L
     if (nargs < k || call$args[[k]]$node != "var") abort_syntax(paste0("CALL ", toupper(routine), " needs a result variable"), line)
     return(list(stmt = "assign", target = call$args[[k]], value = call, line = line))
+  }
+  if (routine == "execute") {
+    if (nargs != 1) abort_syntax("wrong number of arguments to CALL EXECUTE", line)
+    return(list(stmt = "call", routine = routine, args = call$args, line = line))
   }
   if (routine %in% c("missing", "sortn", "sortc")) {
     if (nargs < 1) abort_syntax(paste0("CALL ", toupper(routine), " requires arguments"), line)

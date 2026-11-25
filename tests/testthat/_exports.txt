@@ -244,6 +244,7 @@ public sasonr_tidy_log
 internal sas_and
 internal sas_arith
 internal sas_between
+internal sas_call_execute
 internal sas_carry
 internal sas_chain
 internal sas_char

@@ -1,0 +1,40 @@
+# CALL EXECUTE: the queue runs after the DATA step, each step echoed as `N + text`.
+
+ce_log <- function(code) {
+  withr::local_options(sasonr.step_notes = TRUE)
+  as.character(sas_log(sas_run(code)))
+}
+
+test_that("the queued entries run after the step, one echo line per step", {
+  lg <- ce_log(paste0("data base; input g $ v; datalines;\na 1\nb 2\n;\nrun;\n",
+                      "data _null_; set base; call execute('data o' || trim(g) || '; set base; where g=\"' || trim(g) || '\"; run;'); run;"))
+  k <- which(lg == "NOTE: CALL EXECUTE generated line.")
+  expect_length(k, 1L)
+  expect_identical(lg[k - 1L], "NOTE: There were 2 observations read from the data set WORK.BASE.")
+  expect_identical(lg[k + 1L], "1         + data oa; set base; where g=\"a\"; run;")
+  expect_identical(lg[k + 2L], "")
+  expect_true("2         + data ob; set base; where g=\"b\"; run;" %in% lg)
+})
+
+test_that("a second step of the same entry blanks what came before it, a newline counting as one", {
+  r <- sas_run("data _null_; call execute('data a; x=1; run;' || '0A'x || 'data b; y=2; run;'); run;")
+  lg <- as.character(sas_log(r))
+  expect_true("1         + data a; x=1; run;" %in% lg)
+  expect_true(paste0("1         + ", strrep(" ", 18), "data b; y=2; run;") %in% lg)
+  expect_identical(r$work$b$y, 2)
+})
+
+test_that("CALL EXECUTE outside the supported text fails loud", {
+  fails <- function(arg) {
+    expect_error(sas_run(paste0("data _null_; call execute(", arg, "); run;")), class = "sasonr_unsupported")
+  }
+  fails("'%let a=1;'")
+  fails("'data a; x=&y; run;'")
+  fails("1")
+  fails("'title \"t\";'")
+  fails("'data a; x=1;'")
+  fails("' data a; x=1; run;'")
+  fails("'data a; ' || '0A'x || 'x=1; run;'")
+  fails(paste0("'data a; x=\"", strrep("y", 140), "\"; run;'"))
+  fails("'proc print data=nosuch; run;'")
+})

@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* `CALL EXECUTE` in a DATA step: the text is queued and runs after the
+  step, with "NOTE: CALL EXECUTE generated line." and the `N + text` echo
+  of each generated step. Text made of DATA and PROC steps that end with
+  `RUN;` or `QUIT;` is supported; macro triggers (`%`, `&`), a numeric
+  argument, an echo longer than LINESIZE and an ERROR in the generated code
+  fail loud. `sas_translate()` keeps such a program as SAS text from the
+  step with `CALL EXECUTE` on.
 * `options(sasonr.start_time = <POSIXct>)` sets the session start time that
   the automatic macro variables SYSDATE, SYSDATE9, SYSDAY and SYSTIME
   report, so a program that branches on `&SYSDAY` gives the same result on

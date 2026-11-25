@@ -153,6 +153,15 @@ script_dynamic <- function(code) {
     any(tok$type == "macro_var" & grepl("^&+(sys|sql)", v))
 }
 
+# Whether a chunk of text holds a CALL EXECUTE statement.
+script_has_call_execute <- function(text) {
+  tok <- tryCatch(sas_lex(text), error = function(e) NULL)
+  if (is.null(tok) || nrow(tok) < 3L) return(FALSE)
+  v <- tolower(tok$value)
+  k <- which(tok$type == "name" & v == "call")
+  any(k + 2L <= nrow(tok) & tok$type[k + 1L] == "name" & v[k + 1L] == "execute" & tok$type[k + 2L] == "lparen")
+}
+
 # sas_translate(): in a program that can depend on run-time values
 # (script_dynamic()), the first chunk the macro processor changed and
 # everything after it are kept as SAS text (one deferred node); when macro
