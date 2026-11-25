@@ -161,6 +161,7 @@ sysfunc_table <- list(
   trim = list(args = "c", min = 1), left = list(args = "c", min = 1),
   cats = list(args = "c*", min = 1), catx = list(args = "c*", min = 2),
   today = list(args = character(), min = 0), date = list(args = character(), min = 0),
+  datetime = list(args = character(), min = 0), time = list(args = character(), min = 0),
   putn = list(args = c("n", "f"), min = 2), putc = list(args = c("c", "f"), min = 2),
   sum = list(args = "n*", min = 1), min = list(args = "n*", min = 1), max = list(args = "n*", min = 1),
   int = list(args = "n", min = 1), abs = list(args = "n", min = 1), round = list(args = c("n", "n"), min = 1),

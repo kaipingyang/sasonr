@@ -71,6 +71,10 @@ the development version provides.
   parser and builder, so the values are the same. `sas_log()` and
   `sas_html()` are S3 generics with methods for these results;
   `as.data.frame()` drops the table attributes.
+* `%SYSFUNC` accepts BAND, BYTE, CONSTANT, COUNT, COUNTW, PUTC, RANK,
+  REPEAT, REVERSE, and the clock functions DATETIME, TIME and TODAY, now
+  supported in the macro context (function registry); DATETIME and TIME are
+  zero-argument calls there like TODAY.
 * PROC FREQ BINOMIAL(EXACT) gives the exact (Clopper-Pearson) confidence
   limits, as CL=EXACT; before, it ran the exact binomial test (which is the
   EXACT BINOMIAL statement) and kept the Wald limits. BINOMIAL(CORRECT)

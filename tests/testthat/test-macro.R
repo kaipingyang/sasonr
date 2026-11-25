@@ -88,13 +88,10 @@ test_that("character macro functions", {
 
 test_that("%SYSFUNC supports a small function set and formats", {
   today <- toupper(format(Sys.Date(), "%d%b%Y"))
-  # TODAY() is supported in the DATA step only: in %SYSFUNC it is gated
-  expect_error(mlog("%put %sysfunc(today(), date9.);"), class = "sasonr_strict_error")
-  withr::with_options(list(sasonr.strict = FALSE), {
-    expect_identical(withCallingHandlers(mlog("%put %sysfunc(today(), date9.);"),
-                                         sasonr_strict_warning = function(w) invokeRestart("muffleWarning")),
-                     c(today, "NOTE: sasonr used approximate implementations: function TODAY in %SYSFUNC."))
-  })
+  # TODAY() is supported in the macro context (function registry)
+  expect_identical(mlog("%put %sysfunc(today(), date9.);"), today)
+  # a function not yet supported in the macro context is gated
+  expect_error(mlog("%put %sysfunc(anyalpha(abc));"), class = "sasonr_strict_error")
   expect_equal(mlog("%put %sysfunc(putn(5, z3.)) %sysfunc(compress(a b c)) %sysfunc(sum(1, 2.5));"), "005 abc 3.5")
   expect_equal(mlog("%put %sysfunc(cats(a, b, c))|%sysfunc(upcase(x))|%sysfunc(strip(  y  ));"), "abc|X|y")
   expect_error(sas_run("%put %sysfunc(rand(uniform));"), class = "sasonr_unsupported")

@@ -2,7 +2,7 @@
 "$","format","1","supported"
 "$CHAR","format","8","supported"
 "$HEX","format","2","partial"
-"$QUOTE","format","8","partial"
+"$QUOTE","format","8","supported"
 "$UPCASE","format","8","supported"
 "B8601DA","format","10","supported"
 "BEST","format","12","partial"
