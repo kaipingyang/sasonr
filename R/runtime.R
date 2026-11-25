@@ -1757,9 +1757,6 @@ sas_call_execute <- function(symtab, value, .line = NULL) {
     rt$on_note <- msg
     value <- withCallingHandlers(mp_scan_text(mp_src(value), symtab, mode = "code")$text,
                                  sasonr_macro_warning = function(w) msg(conditionMessage(w)))
-    if (any(mq_is_masked_cp(utf8ToInt(value)))) {
-      abort_unsupported("CALL EXECUTE with macro quoting (%NRSTR...) in its argument (not supported)", .line)
-    }
     # the text the macro code generates starts at its first non-blank
     value <- sub("^[ \n\t]+", "", sub("[ \n\t]+$", "", value))
     if (grepl("\n", value)) abort_unsupported("CALL EXECUTE with macro code that generates more than one line (not supported)", .line)

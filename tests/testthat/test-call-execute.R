@@ -61,3 +61,11 @@ test_that("an entry without text keeps its number", {
   expect_true("2         + data b; y=5; run;" %in% lg)
   expect_false(any(grepl("no SAS statements", lg)))
 })
+
+test_that("%NRSTR keeps a macro call for the time the entry runs: one echo line", {
+  lg <- ce_log("%macro m(n);\ndata m&n;\n  z=&n;\nrun;\n%mend m;\ndata _null_; call execute('%nrstr(%m(1))'); run;")
+  k <- which(lg == "1         + %m(1)")
+  expect_length(k, 1L)
+  expect_identical(lg[k + 1L], "")
+  expect_identical(lg[k + 2L], "NOTE: The data set WORK.M1 has 1 observations and 1 variables.")
+})

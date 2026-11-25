@@ -12,8 +12,9 @@ the development version provides.
   call (`%LET`, `%PUT` between the step's PUT lines, macro calls); the text
   it generates is queued, and macro code that generates none writes "NOTE:
   CALL EXECUTE routine executed successfully, but no SAS statements were
-  generated.". Macro quoting (`%NRSTR`), generated text on more than one
-  line, a numeric argument, an echo longer than LINESIZE and an ERROR in the
+  generated.". An entry without text keeps its number. A macro call kept
+  by `%NRSTR` runs when its entry runs (one echo line for the entry). Other
+  macro quoting, a numeric argument, an echo longer than LINESIZE and an ERROR in the
   generated code fail loud. `sas_translate()` keeps such a program as SAS text from the
   step with `CALL EXECUTE` on.
 * `options(sasonr.start_time = <POSIXct>)` sets the session start time that
