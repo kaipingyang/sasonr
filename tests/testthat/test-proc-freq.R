@@ -690,7 +690,11 @@ proc freq data=have; weight n; tables g*h / relrisk(cl=(wald score)) riskdiff(cl
   expect_false(is.unsorted(k))
 })
 
-test_that("a crosstable row heading longer than its column that fits on one line with the column heading fails loud", {
-  expect_error(sas_run("data d; input grp $ sub $; datalines;\na s1\nb s2\n;\nrun;\nproc freq data=d; tables grp*sub; label grp = 'Study Group' sub = 'Subgroup'; run;"),
-               class = "sasonr_unsupported")
+test_that("crosstable headings: one line with five blanks when they fit, row values in pieces of 16", {
+  l <- sas_run("data d; input grp $ sub $; datalines;\na s1\nb s2\n;\nrun;\nproc freq data=d; tables grp*sub; label grp = 'Study Group' sub = 'Subgroup'; run;")$listing
+  expect_true("grp(Study Group)     sub(Subgroup)" %in% l)
+  l <- sas_run(paste0("data d; input g $ h $; datalines;\na x\nb y\n;\nrun;\nproc format; value $rf 'a'='RRRRRRRRRRRRRRRRRRXY' 'b'='B'; run;\n",
+                      "proc freq data=d; tables g*h; format g $rf.; run;"))$listing
+  expect_true(any(startsWith(l, "RRRRRRRRRRRRRRRR |")))
+  expect_true(any(startsWith(l, "RRXY             |")))
 })

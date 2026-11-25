@@ -1239,7 +1239,9 @@ freq_crosstab_listing <- function(tb) {
     i <- if (!is.na(r) && !is.na(cc)) (r - 1L) * (nc + 1L) + cc else if (!is.na(r)) r * (nc + 1L) else nr * (nc + 1L) + (if (is.na(cc)) nc + 1L else cc)
     tb[[stat_cols[[s]]]][i]
   }
-  R <- max(c(9L, nchar(labels), nchar(rvals) + 1L))
+  # a row value is written in pieces of 16 characters (measured): the row
+  # label column is at most 17 wide for the values
+  R <- max(c(9L, nchar(labels), pmin(nchar(rvals), 16L) + 1L))
   C <- max(c(8L, nchar(cvals), 7L))
   lst <- c(a$title %||% paste("Table of", ri$disp, "by", ci$disp), a$stratum, "")
   # variable headings carry the label in parentheses; a row heading that does
@@ -1249,10 +1251,11 @@ freq_crosstab_listing <- function(tb) {
   # measured: a row heading longer than the row label column with the column
   # heading on the next line when both would not fit the table width; when they
   # would, the measured output has them on one line, at a column that is not measured
-  if (nchar(rh) > R && nchar(rh) + 5L + nchar(ch) <= R + 1L + (C + 1L) * nc + 7L) {
-    abort_unsupported("a PROC FREQ crosstable whose row variable heading is longer than its column and fits on one line with the column heading (its layout is not measured)")
-  }
-  lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -(R + 1L)), ch) else c(rh, paste0(strrep(" ", R + 1L), ch)))
+  # (measured): five blanks between them on one line when the row heading is
+  # longer than the row label column and both fit the table width
+  one_line <- nchar(rh) + 5L + nchar(ch) <= R + 1L + (C + 1L) * nc + 7L
+  lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -(R + 1L)), ch) else if (one_line) paste0(rh, strrep(" ", 5L), ch) else
+    c(rh, paste0(strrep(" ", R + 1L), ch)))
   chead <- paste(vapply(a$chead, function(x) formatC(x, width = if (proc_right_align(ci)) C else -C), ""), collapse = "|")
   for (j in seq_along(labels)) {
     lab <- formatC(labels[j], width = -R)
@@ -1263,15 +1266,19 @@ freq_crosstab_listing <- function(tb) {
   cell <- function(x) paste0(formatC(x, width = C - 1L), " ")
   txt <- function(s, v) switch(s, freq = freq_num(v), pct = , row = , col = freq_pct(v), freq_stat_num(v))
   for (r in seq_len(nr)) {
-    rv <- if (!proc_right_align(ri)) formatC(rvals[r], width = -R) else paste0(formatC(rvals[r], width = R - 1L), " ")
+    pieces <- if (nchar(rvals[r]) > 16L) substring(rvals[r], seq(1L, nchar(rvals[r]), 16L), pmin(seq(1L, nchar(rvals[r]), 16L) + 15L, nchar(rvals[r]))) else rvals[r]
+    if (length(pieces) > 1L && (proc_right_align(ri) || length(pieces) > length(labels))) {
+      abort_unsupported("a PROC FREQ crosstable row value longer than 16 characters (right-aligned, or more pieces than statistic lines)")
+    }
+    rv <- if (!proc_right_align(ri)) formatC(pieces, width = -R) else paste0(formatC(pieces, width = R - 1L), " ")
     lines <- character()
-    first <- TRUE
+    k <- 0L
     for (s in names(labels)) {
+      k <- k + 1L
       vals <- vapply(seq_len(nc), function(cc) txt(s, at(r, cc, s)), "")
       totv <- if (s %in% c("freq", "pct")) txt(s, at(r, NA, s)) else ""
-      lines <- c(lines, sas_rtrim(paste0(if (first) rv else strrep(" ", R), "|", paste(vapply(vals, cell, ""), collapse = "|"), "|",
+      lines <- c(lines, sas_rtrim(paste0(if (k <= length(rv)) rv[k] else strrep(" ", R), "|", paste(vapply(vals, cell, ""), collapse = "|"), "|",
                                          formatC(totv, width = 7L))))
-      first <- FALSE
     }
     lst <- c(lst, lines, sep)
   }

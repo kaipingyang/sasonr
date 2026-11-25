@@ -23,10 +23,12 @@ the development version provides.
   (`(v1-v30)*sum`); other variable list forms still fail loud. A table without a row dimension
   that is wider than the line is split into panels in the listing, as one
   with a row dimension.
-* PROC FREQ: a crosstable whose row variable heading (with its label) is
-  longer than the row label column and fits on one line with the column
-  heading fails loud (measured: both on one line; sasonr put the column
-  heading on the next line).
+* PROC FREQ crosstable headings: a row variable heading longer than the
+  row label column stays on one line with the column heading (five blanks
+  between them) when both fit the table width, else the column heading goes
+  to the next line; a row value longer than 16 characters is written in
+  pieces of 16 on the statistic lines (sasonr put the column heading on the
+  next line and widened the column).
 * PROC SQL `CREATE TABLE` records sort information that PROC CONTENTS
   shows: `ORDER BY` of result columns (by name, alias or position, with
   `DESC`), `GROUP BY` of one result column and `SELECT DISTINCT` of one
