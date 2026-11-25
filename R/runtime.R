@@ -1727,8 +1727,10 @@ sas_symput <- function(symtab, name, value, trim = TRUE, scope = NULL) {
 
 #' CALL EXECUTE
 #'
-#' Queues the text of its argument; the engine runs the queue after the DATA
-#' step ends (engine_call_execute_drain()).
+#' Runs the macro code of its argument now (`%LET`, `%PUT`, macro calls) and
+#' queues the text that results; the engine runs the queue after the DATA
+#' step ends (engine_call_execute_drain()).  Returns the `%PUT` lines, which
+#' go to the step's log buffer between its PUT lines.
 #' @export
 #' @keywords internal
 sas_call_execute <- function(symtab, value, .line = NULL) {
@@ -1736,12 +1738,36 @@ sas_call_execute <- function(symtab, value, .line = NULL) {
   if (!inherits(symtab, "sasonr_macro_session")) abort_unsupported("CALL EXECUTE outside sas_run()", .line)
   if (!is.character(value)) abort_unsupported("CALL EXECUTE with a numeric argument (not supported)", .line)
   value <- sub(" +$", "", value)
-  if (any(grepl("[%&]", value))) {
-    abort_unsupported("CALL EXECUTE with % or & in its argument (macro processing of the argument is not supported)", .line)
+  puts <- character()
+  macro <- grepl("[%&]", value)
+  if (macro) {
+    if (length(symtab$frames)) abort_unsupported("CALL EXECUTE with macro code in a step that a macro generated (not supported)", .line)
+    rt <- rt_diag()
+    old <- list(put = symtab$on_put, warn = rt$on_warn, error = rt$on_error, note = rt$on_note)
+    on.exit({
+      symtab$on_put <- old$put
+      rt$on_warn <- old$warn
+      rt$on_error <- old$error
+      rt$on_note <- old$note
+    }, add = TRUE)
+    symtab$on_put <- function(line) puts <<- c(puts, line)
+    msg <- function(m) abort_unsupported(paste0("a macro message from the CALL EXECUTE argument (", m, ")"), .line)
+    rt$on_warn <- msg
+    rt$on_error <- msg
+    rt$on_note <- msg
+    value <- withCallingHandlers(mp_scan_text(mp_src(value), symtab, mode = "code")$text,
+                                 sasonr_macro_warning = function(w) msg(conditionMessage(w)))
+    if (any(mq_is_masked_cp(utf8ToInt(value)))) {
+      abort_unsupported("CALL EXECUTE with macro quoting (%NRSTR...) in its argument (not supported)", .line)
+    }
+    # the text the macro code generates starts at its first non-blank
+    value <- sub("^[ \n\t]+", "", sub("[ \n\t]+$", "", value))
+    if (grepl("\n", value)) abort_unsupported("CALL EXECUTE with macro code that generates more than one line (not supported)", .line)
+  } else if (!nzchar(value)) {
+    abort_unsupported("CALL EXECUTE with a blank argument (not supported)", .line)
   }
-  if (any(!nzchar(value))) abort_unsupported("CALL EXECUTE with a blank argument (not supported)", .line)
   symtab$ce_queue <- c(symtab$ce_queue, value)
-  invisible(NULL)
+  puts
 }
 
 # Control flow signals for L3 code ----------------------------------------

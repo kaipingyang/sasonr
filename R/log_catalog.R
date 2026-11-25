@@ -43,6 +43,7 @@ log_catalog <- list(
   sasonr.echo_omitted = log_msg("note", "NOTE: sasonr wrote no source echo for this submission: <reason>.",
                                 wrap = "linesize"),
   call_execute.generated = log_msg("note", "NOTE: CALL EXECUTE generated line."),
+  call_execute.none = log_msg("note", "NOTE: CALL EXECUTE routine executed successfully, but no SAS statements were generated."),
   step.stopped = log_msg("note", "NOTE: sasonr stopped processing this step because of errors.", neutral = TRUE),
   step.syntax_check = log_msg("note", c("NOTE: Due to ERROR(s) above, sasonr set option OBS=0, enabling syntax check mode.",
                                         "      This prevents execution of subsequent data modification statements."),

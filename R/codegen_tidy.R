@@ -1143,7 +1143,9 @@ gen_row_stmt <- function(s, cx) {
     },
     put = list(assign_lang(rlang::sym(cx$sink), rlang::call2("c", rlang::sym(cx$sink), put_line_lang(s, cx)))),
     call = if (s$routine %in% c("missing", "sortn", "sortc")) gen_row_call_vars(s, cx) else if (s$routine == "execute") {
-      list(cg_call("sas_call_execute", list(rlang::sym(".symtab"), g(s$args[[1]]), .line = as.integer(s$line))))
+      # the %PUT lines of its macro code go to the log between the PUT lines
+      list(assign_lang(rlang::sym(".log"), rlang::call2("c", rlang::sym(".log"),
+                                                        cg_call("sas_call_execute", list(rlang::sym(".symtab"), g(s$args[[1]]), .line = as.integer(s$line))))))
     } else {
       args <- lapply(s$args, function(a) cg_call("sas_chr_arg", list(g(a), s$routine, .line = as.integer(s$line))))
       list(cg_call("sas_symput", c(list(rlang::sym(".symtab"), args[[1]], args[[2]], trim = s$routine == "symputx"),

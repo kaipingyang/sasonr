@@ -7,7 +7,9 @@
 sas_call_execute(symtab, value, .line = NULL)
 }
 \description{
-Queues the text of its argument; the engine runs the queue after the DATA
-step ends (engine_call_execute_drain()).
+Runs the macro code of its argument now (\verb{\%LET}, \verb{\%PUT}, macro calls) and
+queues the text that results; the engine runs the queue after the DATA
+step ends (engine_call_execute_drain()).  Returns the \verb{\%PUT} lines, which
+go to the step's log buffer between its PUT lines.
 }
 \keyword{internal}

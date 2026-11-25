@@ -371,6 +371,12 @@ engine_call_execute_drain <- function(eng, line) {
   if (!is.null(eng$ce_echo) && eng$ce_k < length(eng$ce_echo) || isTRUE(eng$ce_more)) {
     abort_unsupported("CALL EXECUTE in generated code with more generated code after it (not supported)", line)
   }
+  # macro code that generated no text: only its macro statements took effect
+  if (!any(nzchar(q))) {
+    log_emit(eng, id = "call_execute.none", phase = "step_close")
+    return(invisible())
+  }
+  if (!all(nzchar(q))) abort_unsupported("CALL EXECUTE calls of which some generated no text (not supported)", line)
   ls <- eng$session$options$linesize %||% 132L
   plans <- lapply(seq_along(q), function(n) ce_entry_plan(q[[n]], n, ls, line))
   log_emit(eng, id = "call_execute.generated", phase = "step_close")
