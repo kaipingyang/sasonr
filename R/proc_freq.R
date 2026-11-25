@@ -793,7 +793,10 @@ freq_compute <- function(d, sp) {
       data <- tibble::as_tibble(stats::setNames(lapply(cols, function(c) if (c$char) character() else numeric()),
                                                 vapply(cols, `[[`, "", "name")))
     }
-    outs[[nm]] <- proc_out_options(data, proc_out_meta(cols), x$opts, x$line)
+    m <- proc_out_meta(cols)
+    # the data set label of a TABLES OUT= data set (measured)
+    m$memlabel <- "Frequency Counts and Percentages"
+    outs[[nm]] <- proc_out_options(data, m, x$opts, x$line)
   }
   if (!is.null(sp$output)) outs[[sp$output$name]] <- freq_output_data(stat_rows, sp)
   list(tables = tables, data = outs, events = character())

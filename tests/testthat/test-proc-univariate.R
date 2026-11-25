@@ -24,9 +24,8 @@ test_that("PROC UNIVARIATE writes no observations-read NOTE", {
 test_that("what U1 does not cover fails loud", {
   fails <- function(body) expect_error(sas_run(paste0(univ_data, body)), class = "sasonr_unsupported")
   fails("proc univariate data=d; var v; run;")
-  fails("proc univariate data=d noprint; var v; output out=s mean=m skewness=sk; run;")
-  fails("proc univariate data=d noprint; var v; output out=s n=n mean=mean css=css std=std; run;")
-  fails("proc univariate data=d noprint; class v; var v; output out=s n=n; run;")
+  fails("proc univariate data=d noprint; var v; output out=s mean=m gini=g; run;")
+  fails("proc univariate data=d noprint; weight v; var v; output out=s n=n; run;")
 })
 
 test_that("the tests for location give the measured statistics and p values", {
@@ -36,4 +35,15 @@ test_that("the tests for location give the measured statistics and p values", {
   b <- sasonr:::univ_location_tests(c(1, 2, NA, 4, NA, 6))
   expect_equal(c(b$m, b$s, b$p_m, b$p_s), c(2, 5, 0.125, 0.125))
   expect_equal(round(b$p_t, 4), 0.0609)
+})
+
+test_that("several analysis variables, BY and CLASS: columns by statistic then variable, one row per group", {
+  d <- "data a; input g $ a b; datalines;\nx 1 10\nx 2 20\ny 3 30\ny 5 50\n;\nrun;\n"
+  r <- sas_run(paste0(d, "proc univariate data=a noprint; var a b; output out=o mean=ma mb n=na nb; run;"))
+  expect_identical(names(r$work$o), c("na", "nb", "ma", "mb"))
+  r <- sas_run(paste0(d, "proc univariate data=a noprint; by g; var a; output out=o n=cn mean=cm; run;"))
+  expect_identical(r$work$o$cm, c(1.5, 4))
+  r <- sas_run(paste0(d, "proc univariate data=a noprint; class g; var a; output out=o mean=cm median=md; run;"))
+  expect_identical(as.character(r$work$o$g), c("x", "y"))
+  expect_identical(r$meta$o$memlabel, "Selected Summary Statistics (Percentile Definition=5)")
 })

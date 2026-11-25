@@ -5,13 +5,19 @@ the development version provides.
 
 ## Running SAS programs
 
-* PROC UNIVARIATE, first block: `NOPRINT` with `OUTPUT OUT=` for one
-  analysis variable and the statistics N NMISS MEAN SUM STD VAR CSS USS MIN
-  MAX MEDIAN Q1 Q3 (and P25 P50 P75), with `VARDEF=` and `PCTLDEF=`. The
-  OUT= columns follow the measured order (known for some sets of
-  statistics; other sets fail loud) and carry SAS's labels; the step writes
-  no observations-read NOTE. Printed output, BY, CLASS, WEIGHT, FREQ, ID and
-  PCTLPTS= fail loud.
+* PROC UNIVARIATE: `NOPRINT` with `OUTPUT OUT=` for one or several analysis
+  variables, with BY and one CLASS variable, `VARDEF=` and `PCTLDEF=`, and
+  34 statistics (N NMISS NOBS MEAN SUM STD VAR SKEWNESS KURTOSIS SUMWGT MAX
+  MIN RANGE the quartiles and P1-P99 QRANGE MODE CSS USS CV STDMEAN T PROBT
+  MSIGN PROBM SIGNRANK PROBS). The OUT= columns follow the measured order
+  (by statistic, then variable), carry SAS's labels, and the data set has
+  type OUT and the label "Selected Summary Statistics" (with the percentile
+  definition when a percentile is requested); the step writes no
+  observations-read NOTE. Printed output, WEIGHT, FREQ, ID, PCTLPTS=, the
+  robust and normality statistics, and a signed rank test of more than 20
+  nonzero differences fail loud.
+* PROC FREQ: a TABLES OUT= data set has the label "Frequency Counts and
+  Percentages".
 * PROC TABULATE: numbered variable lists (`v1-v30`) in the VAR and CLASS
   statements, and as the whole content of parentheses in a TABLE dimension
   (`(v1-v30)*sum`); other variable list forms still fail loud. A table without a row dimension
