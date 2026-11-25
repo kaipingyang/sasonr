@@ -5,6 +5,9 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC FREQ: `RELRISK(CL=)` together with `RISKDIFF(CL=)` on a 2x2 table
+  (CL= alone in both) writes both confidence-limit tables, in the listing
+  and in ODS HTML.
 * A PUT line in the log and the WHERE line of the "observations read" NOTE
   that are longer than LINESIZE fail loud (SAS breaks them; sasonr wrote
   them on one line).

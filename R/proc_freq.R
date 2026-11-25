@@ -489,9 +489,15 @@ freq_step_spec <- function(step, meta, last) {
     }
     rd0 <- rq$opts$riskdiff_opts %||% list()
     rel0 <- rq$opts$relrisk_opts %||% list()
+    # measured: a 2x2 table with only CL= in both (the risk difference limits
+    # after the column 1 risks, the relative risk limits after the column 2
+    # risks); other suboptions, ALPHA=, EXACT or strata are not
     if (isTRUE(rq$opts$relrisk) && isTRUE(rq$opts$riskdiff) &&
-        length(rel0$cl) > 0 && length(rd0$cl) > 0) {
-      abort_unsupported("RELRISK(CL=) together with RISKDIFF(CL=) (two confidence-limit tables in one listing are not supported)", rq$line)
+        length(rel0$cl) > 0 && length(rd0$cl) > 0 &&
+        (kv != 2L || !identical(rd0$column, 1L) || isTRUE(rd0$correct) || isTRUE(rd0$norisks) ||
+         !identical(rel0$column, 1L) || isTRUE(rel0$printall) || !is.null(rq$opts$alpha) ||
+         any(c("riskdiff", "relrisk", "rrc1", "rrc2", "or") %in% exact))) {
+      abort_unsupported("RELRISK(CL=) together with RISKDIFF(CL=) with other options (supported: CL= alone in both, a 2x2 table)", rq$line)
     }
     if ("riskdiff" %in% exact && isTRUE(rq$opts$riskdiff) && is.null(rd0$cl)) {
       abort_unsupported("EXACT RISKDIFF without the RISKDIFF(CL=) confidence-limit table (that layout is not supported)", rq$line)

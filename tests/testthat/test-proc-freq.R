@@ -197,9 +197,11 @@ A 2
 ;
 run;
 proc freq data=d; weight w; tables a; run;", "negative weights")
-  # two confidence-limit tables in one listing are not supported
-  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / relrisk(cl=(wald)) riskdiff(cl=(wald)); run;"),
-      "two confidence-limit tables")
+  # both confidence-limit tables: only CL= alone in both is supported
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / relrisk(cl=(wald)) riskdiff(cl=(wald) column=2); run;"),
+      "RISKDIFF(CL=) with other options")
+  err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / relrisk(cl=(wald)) riskdiff(cl=(wald)) alpha=0.1; run;"),
+      "RISKDIFF(CL=) with other options")
   # EXACT RISKDIFF layout is supported only together with RISKDIFF(CL=)
   err(paste(freq_data, "proc freq data=d; weight n; tables trt*resp / riskdiff; exact riskdiff; run;"),
       "EXACT RISKDIFF without the RISKDIFF(CL=)")
@@ -670,4 +672,20 @@ test_that("the BINOMIAL test heading is centred over the test table, rounded dow
   expect_identical(h0("binomial(p=0.95)")[1], " Test of H0: Proportion = 0.95")
   expect_identical(h0("binomial(p=0.05)")[1], " Test of H0: Proportion = 0.05")
   expect_identical(h0("binomial(p=12.5)")[1], " Test of H0: Proportion = 0.125")
+})
+
+test_that("RELRISK(CL=) with RISKDIFF(CL=): the risk difference limits after the column 1 risks, the relative risk limits after the column 2 risks", {
+  r <- sas_run("data have; input g $ h $ n; datalines;
+a x 10
+a y 6
+b x 4
+b y 12
+;
+run;
+proc freq data=have; weight n; tables g*h / relrisk(cl=(wald score)) riskdiff(cl=(wald newcombe)); run;")
+  l <- trimws(gsub("\\s+", " ", r$listing))
+  k <- match(c("Column 1 Risk Estimates", "Confidence Limits for the Risk Difference", "Newcombe 0.0330 0.6161",
+               "Column 2 Risk Estimates", "Confidence Limits for the Relative Risk", "Score 1.0599 6.5954", "Wald 0.9867 6.3343"), l)
+  expect_false(anyNA(k))
+  expect_false(is.unsorted(k))
 })
