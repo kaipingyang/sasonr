@@ -520,6 +520,10 @@ print_header_lines <- function(h, dw) {
   n <- nchar(h)
   ch <- strsplit(h, "")[[1]]
   cut <- which(ch[-n] %in% letters & ch[-1] %in% LETTERS)
+  # (measured once: x_SumWgt over a narrow column is written x_ / Sum / Wgt)
+  if (n > dw && length(cut) > 0 && grepl("_", h, fixed = TRUE)) {
+    abort_unsupported(paste0("the heading of the variable ", h, " (an underscore and a lowercase-uppercase change, wider than its values)"))
+  }
   if (n > dw && length(cut) > 0 && !grepl("_", h, fixed = TRUE)) {
     m <- vapply(cut, function(i) max(i, n - i), 1L)
     i <- cut[which.min(m)]

@@ -5,6 +5,12 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC PRINT LABEL: a label of three to five words that is wider than the
+  column is written on at most three lines, at the narrowest width that
+  allows it (a longer label still fails loud). A variable name with an
+  underscore and a lowercase-uppercase change that is wider than its values
+  (such as an AUTONAME name) fails loud: SAS splits it, at places not yet
+  measured.
 * PROC SQL reads `DICTIONARY.COLUMNS` and `DICTIONARY.TABLES` (and the
   views `SASHELP.VCOLUMN` / `SASHELP.VTABLE`) for the WORK members, data
   sets and views: a query must restrict `libname = 'WORK'`, and the TABLES

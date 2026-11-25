@@ -78,8 +78,23 @@ print_heading <- function(c, fw, split) {
   if (isTRUE(c$label)) {
     if (nchar(h) <= fw) return(h)
     w <- strsplit(trimws(h), " +")[[1]]
-    if (length(w) > 2L) abort_unsupported("a PROC PRINT label of more than two words without SPLIT=")
-    return(w)
+    if (length(w) <= 2L) return(w)
+    # (measured with 5 words) the narrowest width at which the words, put on
+    # lines greedily, take at most three lines
+    if (length(w) > 5L) abort_unsupported("a PROC PRINT label of more than five words without SPLIT=")
+    for (wd in seq.int(max(nchar(w)), nchar(h))) {
+      lines <- character()
+      cur <- ""
+      for (x in w) {
+        if (!nzchar(cur)) cur <- x else if (nchar(cur) + 1L + nchar(x) <= wd) cur <- paste(cur, x) else {
+          lines <- c(lines, cur)
+          cur <- x
+        }
+      }
+      lines <- c(lines, cur)
+      if (length(lines) <= 3L) return(lines)
+    }
+    return(h)
   }
   if (c$name == "Obs" && is.null(c$label)) return(h)
   print_header_lines(h, fw)$lines

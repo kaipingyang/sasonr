@@ -63,6 +63,6 @@ test_that("PROC PRINT outside the measured rules fails loud", {
   fails("proc print data=have n; sum x; run;")
   fails("proc print data=have; by grp sub; sum x; run;")
   fails("proc print data=have; id sub grp; run;")
-  fails("data b; set have; label x='a b c'; run; proc print data=b label; var x; run;")
+  fails("data b; set have; label x='a b c d e f'; run; proc print data=b label; var x; run;")
   fails("proc print data=have double; run;")
 })
