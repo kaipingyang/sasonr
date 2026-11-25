@@ -177,3 +177,48 @@ univ_compute <- function(d, spec) {
   }
   list(tables = list(), data = data, events = character())
 }
+
+# Tests for location (Mu0 = `mu0`): Student's t, the sign test and the
+# Wilcoxon signed rank test.  M = (n+ - n-) / 2 over the nonzero differences,
+# its p value the two-sided binomial tail; S = sum of the ranks of the positive
+# differences - nt (nt + 1) / 4 with mid-ranks for ties, its p value from the
+# exact distribution of the rank sum (nt <= 20).  A larger nt fails loud until
+# its large-sample approximation is measured.
+univ_location_tests <- function(x, mu0 = 0) {
+  x <- x[!is.na(x)]
+  n <- length(x)
+  d <- x - mu0
+  out <- list(t = NA_real_, p_t = NA_real_, m = NA_real_, p_m = NA_real_, s = NA_real_, p_s = NA_real_)
+  if (n > 1) {
+    k <- stats_moments(x, "means", need = c("mean", "stderr"))
+    se <- k$stderr
+    if (!is.na(se) && se > 0) {
+      out$t <- (k$mean - mu0) / se
+      out$p_t <- 2 * stats::pt(-abs(out$t), n - 1)
+    }
+  }
+  nz <- d[d != 0]
+  nt <- length(nz)
+  if (nt > 0) {
+    np <- sum(nz > 0)
+    nm <- nt - np
+    out$m <- (np - nm) / 2
+    out$p_m <- min(1, 2 * stats::pbinom(min(np, nm), nt, 0.5))
+    r <- rank(abs(nz))
+    out$s <- sum(r[nz > 0]) - nt * (nt + 1) / 4
+    if (nt > 20) abort_unsupported("the signed rank test of more than 20 nonzero differences (its approximation is not measured)")
+    # exact null distribution of the sum of the positive mid-ranks: each rank
+    # enters with probability 1/2; doubled ranks are integers
+    r2 <- as.integer(round(2 * r))
+    tot <- sum(r2)
+    dist <- c(1, rep(0, tot))
+    for (v in r2) dist <- dist + c(rep(0, v), dist[seq_len(length(dist) - v)])
+    dist <- dist / 2^nt
+    obs <- as.integer(round(2 * sum(r[nz > 0])))
+    mid <- tot / 2
+    dev <- abs(obs - mid)
+    vals <- seq.int(0L, tot)
+    out$p_s <- min(1, sum(dist[abs(vals - mid) >= dev - 1e-9]))
+  }
+  out
+}

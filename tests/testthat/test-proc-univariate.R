@@ -28,3 +28,12 @@ test_that("what U1 does not cover fails loud", {
   fails("proc univariate data=d noprint; var v; output out=s n=n mean=mean css=css std=std; run;")
   fails("proc univariate data=d noprint; class v; var v; output out=s n=n; run;")
 })
+
+test_that("the tests for location give the measured statistics and p values", {
+  a <- sasonr:::univ_location_tests(c(30, 40))
+  expect_equal(c(a$t, a$m, a$s, a$p_m, a$p_s), c(7, 1, 1.5, 0.5, 0.5))
+  expect_equal(round(a$p_t, 4), 0.0903)
+  b <- sasonr:::univ_location_tests(c(1, 2, NA, 4, NA, 6))
+  expect_equal(c(b$m, b$s, b$p_m, b$p_s), c(2, 5, 0.125, 0.125))
+  expect_equal(round(b$p_t, 4), 0.0609)
+})
