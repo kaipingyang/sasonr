@@ -25,7 +25,7 @@ test_that("what U1 does not cover fails loud", {
   fails <- function(body) expect_error(sas_run(paste0(univ_data, body)), class = "sasonr_unsupported")
   fails("proc univariate data=d; var v; run;")
   fails("proc univariate data=d noprint; var v; output out=s mean=m gini=g; run;")
-  fails("proc univariate data=d noprint; weight v; var v; output out=s n=n; run;")
+  fails("proc univariate data=d noprint; freq v; var v; output out=s n=n; run;")
 })
 
 test_that("the tests for location give the measured statistics and p values", {
