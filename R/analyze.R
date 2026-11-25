@@ -1205,6 +1205,7 @@ out_meta <- function(an) {
     names(labs) <- names(infs) <- names(len) <- o$out_names
     res[[o$name]] <- list(vars = o$out_names, type = type, len = len, formats = Filter(Negate(is.null), fmts), disp = disp,
                           labels = Filter(Negate(is.null), labs), informats = Filter(Negate(is.null), infs))
+    if (!is.null(o$options$label)) res[[o$name]]$memlabel <- o$options$label
   }
   res
 }

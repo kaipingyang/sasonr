@@ -396,3 +396,19 @@ test_that("PROC CONTENTS of a table whose SQL sort information is not measured f
   expect_error(sas_run(paste0(base, "proc sql; create table t as select id, x, count(*) as n from a group by id, x; quit;\nproc contents data=t; run;")),
                class = "sasonr_unsupported")
 })
+
+test_that("DICTIONARY.COLUMNS and TABLES describe the WORK members", {
+  base <- paste0("data have; length g $8; input id x g $; label id='Identifier'; format x 8.2; datalines;\n1 10 a\n;\nrun;\n",
+                 "data lab(label='Second'); y = 1; run;\n")
+  r <- sas_run(paste0(base, "proc sql; create table c as select memname, name, type, npos, varnum, label, format from dictionary.columns ",
+                      "where libname='WORK' and memname='HAVE'; quit;"))
+  c <- r$work$c
+  expect_identical(c$name, c("g", "id", "x"))
+  expect_identical(c$npos, c(16, 0, 8))
+  expect_identical(c$format, c("", "", "8.2"))
+  r <- sas_run(paste0(base, "proc sql; create table t as select memname, nobs, nvar, memlabel from dictionary.tables where libname='WORK'; quit;"))
+  expect_identical(r$work$t$memlabel, c("", "Second"))
+  expect_error(sas_run(paste0(base, "proc sql; create table t as select * from dictionary.columns; quit;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste0(base, "proc sql; create table t as select crdate from dictionary.tables where libname='WORK'; quit;")),
+               class = "sasonr_unsupported")
+})

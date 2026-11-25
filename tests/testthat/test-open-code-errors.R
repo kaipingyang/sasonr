@@ -24,3 +24,7 @@ test_that("under NOSYNTAXCHECK the ERROR starts no syntax-check mode", {
   lg <- oce_log("options nosyntaxcheck;\ndata a; x=1; run;\nfoo;\ndata b; y=2; run;")
   expect_true("NOTE: The data set WORK.B has 1 observations and 1 variables." %in% lg)
 })
+
+test_that("numbered TITLE / FOOTNOTE statements are not unknown words", {
+  expect_false(any(grepl("ERROR 180-322", tryCatch(oce_log("footnote2 'x';\ndata a; x=1; run;"), error = function(e) ""))))
+})

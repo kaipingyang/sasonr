@@ -148,7 +148,7 @@ parse_global_stmt <- function(p, open_code = FALSE) {
                 end_line = end_line))
   }
   # a word that starts no statement SAS knows (measured in open code)
-  if (open_code && !low %in% global_stmt_known) {
+  if (open_code && !low %in% global_stmt_known && !split_trailing_digits(low)$base %in% global_stmt_known) {
     abort_global("Statement is not valid or it is used out of proper order. (ERROR 180-322)", line, "unknown_stmt",
                  open_code, col = tk_col(p), token = tk_val(p))
   }

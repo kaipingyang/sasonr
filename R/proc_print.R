@@ -97,6 +97,11 @@ listing_base_print <- function(tb) {
   }, 1L)
   heads <- lapply(seq_len(nc), function(j) print_heading(a$cols[[j]], fws[j], a$split))
   widths <- pmax(fws, vapply(heads, function(h) max(nchar(h)), 1L))
+  # wider than the line: SAS stacks the headings vertically or splits the
+  # columns into panels; neither is implemented (the lines would be too long)
+  if (sum(widths) + 4L * (nc - 1L) > rt_linesize()) {
+    abort_unsupported("a PROC PRINT table wider than LINESIZE (vertical headings and column panels are not implemented)")
+  }
   multi <- vapply(heads, length, 1L) > 1L
   off <- ifelse(multi, ceiling((widths - fws) / 2), floor((widths - fws) / 2))
   cell <- function(j, s, field = TRUE) {

@@ -100,7 +100,7 @@ parse_data_step <- function(p) {
   while (tk_type(p) != "semi") {
     if (tk_type(p) == "str") abort_unsupported("a quoted physical data set name (permanent data set)", tk_line(p))
     if (tk_type(p) != "name") abort_syntax(paste("expected a data set name but found", tok_desc(p)), tk_line(p))
-    outputs <- c(outputs, list(parse_ds_ref(p, "output")))
+    outputs <- c(outputs, list(parse_ds_ref(p, "data_output")))
   }
   advance(p)
   if (length(outputs) == 0) abort_unsupported("DATA statement without a data set name", line)
@@ -171,6 +171,11 @@ parse_ds_options <- function(p, context) {
     } else if (opt == "in" && context == "input") {
       opts$in_var <- tk_low(p)
       expect_type(p, "name", "a variable name after IN=")
+    } else if (opt == "label" && context == "data_output") {
+      # the data set label of a DATA step output (at most 256 characters)
+      if (!tk_type(p) %in% c("str", "str_macro")) abort_syntax("expected a quoted label after LABEL=", line)
+      opts$label <- substr(tk_val(p), 1L, 256L)
+      advance(p)
     } else if (opt %in% c("firstobs", "obs") && context == "input") {
       # n, nK / nM / nG / nT (multiples of 1024), MIN or MAX (the largest count);
       # MIN is 1 for FIRSTOBS= and 0 for OBS=
@@ -189,7 +194,7 @@ parse_ds_options <- function(p, context) {
         opts[[opt]] <- v
       }
     } else {
-      abort_unsupported(paste0("data set option ", toupper(opt), "= on ", context, " data set"), line)
+      abort_unsupported(paste0("data set option ", toupper(opt), "= on ", sub("data_", "", context), " data set"), line)
     }
   }
   advance(p)

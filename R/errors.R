@@ -82,7 +82,7 @@ err_parse_recover <- function(text) {
     out <- list()
     while (tk_type(p) != "semi") {
       if (tk_type(p) != "name") abort_syntax("data set name", tk_line(p))
-      out <- c(out, list(parse_ds_ref(p, "output")))
+      out <- c(out, list(parse_ds_ref(p, "data_output")))
     }
     advance(p)
     out

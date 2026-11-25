@@ -149,8 +149,7 @@ parse_sql_table_name <- function(p) {
   advance(p)
   libref <- NULL
   if (tk_type(p) == "dot" && tk_type(p, 1L) == "name") {
-    if (name == "dictionary") abort_unsupported("DICTIONARY tables", line)
-    if (name != "work" && name != "sashelp") {
+    if (name != "work" && name != "sashelp" && name != "dictionary") {
       abort_unsupported(paste0("library ", toupper(name), " (only WORK and SASHELP are available)"), line)
     }
     libref <- name

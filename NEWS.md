@@ -5,6 +5,15 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC SQL reads `DICTIONARY.COLUMNS` and `DICTIONARY.TABLES` (and the
+  views `SASHELP.VCOLUMN` / `SASHELP.VTABLE`) for the WORK members, data
+  sets and views: a query must restrict `libname = 'WORK'`, and the TABLES
+  columns that depend on the host (dates, sizes, pages, encoding ...) fail
+  loud. Other DICTIONARY tables fail loud.
+* The `LABEL=` data set option on a DATA step output data set sets its
+  label (PROC CONTENTS, DICTIONARY.TABLES).
+* PROC PRINT of a table wider than LINESIZE fails loud (sasonr wrote the
+  lines longer than LINESIZE; SAS stacks the headings or splits the columns).
 * A word or a number that starts no statement in open code (`foo;`, `1;`),
   and an unresolved macro call at the start of an open-code statement that
   ends with `;` (`%nosuch;`, `%nosuch(1, 2);`, with its WARNING), write

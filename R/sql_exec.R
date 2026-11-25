@@ -29,7 +29,13 @@ sql_empty_rel <- function(n = 1L) list(data = tibble::tibble(.rows = n), cols = 
 sql_table_rel <- function(src, eng, outer) {
   name <- src$name
   quals <- src$alias %||% name
-  if (identical(src$libref, "sashelp")) {
+  dict <- sql_dict_name(src$libref, name)
+  if (!is.null(dict)) {
+    dd <- sql_dict_data(eng, dict, src$line)
+    d <- dd$data
+    m <- dd$meta
+    o <- src$options
+  } else if (identical(src$libref, "sashelp")) {
     # members of the SASHELP store (R/sashelp.R: options(sasonr.sashelp_dir));
     # a missing member fails loud inside sashelp_member()
     d <- sashelp_member(name, src$line)
@@ -352,6 +358,10 @@ sql_resolve_item_ref <- function(e, items, rel) {
 }
 
 sql_select <- function(q, eng, outer) {
+  for (f in q$from) {
+    k <- if (identical(f$kind, "table")) sql_dict_name(f$libref, f$name)
+    if (!is.null(k)) sql_dict_check(q, k, f$line %||% q$line)
+  }
   fr <- sql_from(q$from, q$where, eng, outer)
   rel <- fr$rel
   ctx <- sql_ctx(eng, rel, outer, items = q$items)
