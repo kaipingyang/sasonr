@@ -341,6 +341,21 @@ tab_parse_factor <- function(p, uns) {
     tab_skip_value(p)
     return(list(node = "style", line = line, col = col))
   }
+  # a numbered range list as the whole content of parentheses, `(v1-v30)`:
+  # the concatenation of its variables
+  if (is_op(p, "-", 1L) && tk_type(p, 2L) == "name" && tk_type(p, -1L) == "lparen" && tk_type(p, 3L) == "rparen") {
+    a <- regmatches(tk_val(p), regexec("^(.*?)([0-9]+)$", tk_val(p)))[[1]]
+    b <- regmatches(tk_val(p, 2L), regexec("^(.*?)([0-9]+)$", tk_val(p, 2L)))[[1]]
+    if (length(a) == 3L && length(b) == 3L && tolower(a[2]) == tolower(b[2]) && nzchar(a[2]) &&
+        as.integer(a[3]) <= as.integer(b[3])) {
+      ks <- seq.int(as.integer(a[3]), as.integer(b[3]))
+      advance(p, 3L)
+      items <- lapply(ks, function(k) list(node = "cross", items = list(
+        list(node = "elem", name = tolower(paste0(a[2], k)), text = paste0(a[2], k), label = NA_character_,
+             denom = NULL, line = line, col = col))))
+      return(list(node = "paren", inner = list(node = "concat", items = items), line = line, col = col))
+    }
+  }
   if ((is_op(p, ":", 1L) && tk_adjacent(p, 0L, 1L)) || is_op(p, "-", 1L)) {
     tab_note(uns, "a variable list in a TABLE statement", line)
     advance(p)
@@ -382,9 +397,22 @@ tab_declared <- function(step) {
   var_text <- character()
   var_line <- NA_integer_
   item_names <- function(items) {
-    ok <- vapply(items, function(it) identical(it$kind, "name"), logical(1))
-    list(ok = all(ok), names = vapply(items[ok], `[[`, "", "name"),
-         text = vapply(items[ok], function(it) it$text %||% it$name, ""))
+    # names and numbered ranges (v1-v30; the names keep the spelling of the first one)
+    ok <- vapply(items, function(it) it$kind %in% c("name", "range"), logical(1))
+    nm <- character()
+    tx <- character()
+    for (it in items[ok]) {
+      if (identical(it$kind, "name")) {
+        nm <- c(nm, it$name)
+        tx <- c(tx, it$text %||% it$name)
+      } else {
+        r <- expand_numbered_range(it$from, it$to, step$line)
+        base <- if (is.null(it$text)) NULL else split_trailing_digits(it$text)$base
+        nm <- c(nm, r)
+        tx <- c(tx, if (is.null(base)) r else paste0(base, substring(r, nchar(base) + 1L)))
+      }
+    }
+    list(ok = all(ok), names = nm, text = tx)
   }
   lists <- FALSE
   for (j in seq_along(step$stmts)) {

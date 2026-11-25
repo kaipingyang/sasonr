@@ -1129,3 +1129,13 @@ run;
     "|c                              |       40.00|",
     "----------------------------------------------"))
 })
+
+test_that("numbered variable lists in VAR / CLASS and (v1-v3) in a TABLE dimension expand to the variables", {
+  a <- "data have; input grp $ v1 v2 v3; datalines;\na 1 2 3\nb 4 5 6\n;\nrun;\n"
+  r1 <- sas_run(paste0(a, "proc tabulate data=have; class grp; var v1-v3; table grp, (v1-v3)*sum; run;"))
+  r2 <- sas_run(paste0(a, "proc tabulate data=have; class grp; var v1 v2 v3; table grp, (v1 v2 v3)*sum; run;"))
+  expect_identical(r1$listing, r2$listing)
+  # a list that is not the whole content of parentheses is not measured
+  expect_error(sas_run(paste0(a, "proc tabulate data=have; class grp; var v1-v3; table grp, v1-v3*sum; run;")),
+               class = "sasonr_unsupported")
+})
