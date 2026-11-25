@@ -20,7 +20,8 @@ the development version provides.
   ERROR 180-322 and start syntax-check mode at the next DATA step (none
   under NOSYNTAXCHECK); the program may also end there. They failed loud.
 * PROC UNIVARIATE: `NOPRINT` with `OUTPUT OUT=` for one or several analysis
-  variables, with BY and one CLASS variable, `VARDEF=` and `PCTLDEF=`, and
+  variables, with BY and one CLASS variable, `VARDEF=`, `PCTLDEF=`,
+  `PCTLPTS=` with `PCTLPRE=` and `PCTLNAME=`, and
   34 statistics (N NMISS NOBS MEAN SUM STD VAR SKEWNESS KURTOSIS SUMWGT MAX
   MIN RANGE the quartiles and P1-P99 QRANGE MODE CSS USS CV STDMEAN T PROBT
   MSIGN PROBM SIGNRANK PROBS). The OUT= columns follow the measured order
@@ -29,7 +30,7 @@ the development version provides.
   definition when a percentile is requested); the step writes no
   observations-read NOTE. WEIGHT gives the weighted N, SUM, MEAN, VAR, STD,
   CSS and USS (other statistics with WEIGHT fail loud). Printed output,
-  FREQ, ID, PCTLPTS=, the
+  FREQ, ID, PCTLPTS= with TO / BY or WEIGHT, the
   robust and normality statistics, and a signed rank test of more than 20
   nonzero differences fail loud.
 * PROC FREQ: a TABLES OUT= data set has the label "Frequency Counts and

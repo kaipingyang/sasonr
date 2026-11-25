@@ -101,6 +101,18 @@ parse_univ_output <- function(p) {
       out$out <- parse_ds_ref(p, "output")
       next
     }
+    if (kw %in% c("pctlpts", "pctlpre", "pctlname") && is_op(p, "=", 1L)) {
+      advance(p, 2L)
+      vals <- character()
+      while (tk_type(p) %in% c("num", "name") && !is_op(p, "=", 1L)) {
+        if (kw == "pctlpts" && tk_type(p) == "name") abort_unsupported("PCTLPTS= with TO / BY", sline)
+        vals <- c(vals, tk_val(p))
+        advance(p)
+        if (tk_type(p) == "comma") advance(p)
+      }
+      out[[kw]] <- vals
+      next
+    }
     st <- univ_stat_alias[kw]
     if (is.na(st)) abort_unsupported(paste0("PROC UNIVARIATE OUTPUT statistic ", toupper(kw)), sline)
     advance(p)
@@ -164,6 +176,24 @@ univ_step_spec <- function(step, meta, last) {
     for (x in sp) for (j in seq_along(x$names)) {
       cols[[length(cols) + 1L]] <- list(stat = x$stat, var = vars[j], name = x$names[j], disp = x$disp[j])
     }
+    # PCTLPTS=: after the statistics, by percentile, then by variable; the
+    # name is the prefix of the variable and the percentile (a "." as "_")
+    # or the PCTLNAME= name (measured)
+    if (length(s$pctlpts)) {
+      pts <- as.numeric(s$pctlpts)
+      if (anyNA(pts) || any(pts < 0 | pts > 100)) abort_syntax("PCTLPTS= values must be from 0 to 100", s$line)
+      if (!length(s$pctlpre)) abort_unsupported("PCTLPTS= without PCTLPRE=", s$line)
+      if (length(s$pctlpre) > length(vars)) abort_syntax("More PCTLPRE= prefixes than analysis variables", s$line)
+      if (length(s$pctlname) && length(s$pctlname) != length(pts)) abort_unsupported("PCTLNAME= with another number of names than PCTLPTS=", s$line)
+      if (length(weight)) abort_unsupported("PROC UNIVARIATE WEIGHT with PCTLPTS= (not measured)", s$line)
+      for (k in seq_along(pts)) for (j in seq_along(s$pctlpre)) {
+        suf <- if (length(s$pctlname)) s$pctlname[k] else gsub(".", "_", s$pctlpts[k], fixed = TRUE)
+        nm <- paste0(s$pctlpre[j], suf)
+        cols[[length(cols) + 1L]] <- list(stat = "pctlpt", pct = pts[k], var = vars[j], name = tolower(nm), disp = nm)
+      }
+    } else if (length(s$pctlpre) || length(s$pctlname)) {
+      abort_syntax("PCTLPRE= or PCTLNAME= without PCTLPTS=", s$line)
+    }
     list(name = tolower(s$out$name), cols = cols, line = s$line)
   })
   if (!length(outputs)) abort_unsupported("PROC UNIVARIATE NOPRINT without an OUTPUT statement", step$line)
@@ -191,12 +221,13 @@ translate_proc_univariate <- function(step, meta, last) {
 
 univ_out_meta <- function(spec, x) {
   cols <- c(spec$groups, lapply(x$cols, function(c) list(name = c$name, disp = c$disp, char = FALSE, len = 8L,
-                                                         label = paste0(univ_stat_label[[c$stat]], ", ", spec$disp[[c$var]]))))
+                                                         label = paste0(if (c$stat == "pctlpt") sprintf("the %8.4f percentile", c$pct) else univ_stat_label[[c$stat]],
+                                                                        ", ", spec$disp[[c$var]]))))
   m <- proc_out_meta(cols)
   # the data set type OUT and label (measured); the percentile definition is
   # named when a percentile is requested
   m$typemem <- "OUT"
-  pct <- any(vapply(x$cols, `[[`, "", "stat") %in% c("median", "q1", "q3", "qrange", "p1", "p5", "p10", "p90", "p95", "p99"))
+  pct <- any(vapply(x$cols, `[[`, "", "stat") %in% c("median", "q1", "q3", "qrange", "p1", "p5", "p10", "p90", "p95", "p99", "pctlpt"))
   m$memlabel <- paste0("Selected Summary Statistics", if (pct) paste0(" (Percentile Definition=", spec$pctldef, ")"))
   m
 }
@@ -241,7 +272,7 @@ univ_weighted_moments <- function(x, w, vardef) {
 }
 
 univ_compute <- function(d, spec) {
-  stats <- unique(unlist(lapply(spec$outputs, function(o) vapply(o$cols, `[[`, "", "stat"))))
+  stats <- setdiff(unique(unlist(lapply(spec$outputs, function(o) vapply(o$cols, `[[`, "", "stat")))), "pctlpt")
   gv <- c(spec$by, spec$class)
   if (length(spec$by)) {
     key <- interaction(lapply(spec$by, function(v) d[[v]]), drop = TRUE, lex.order = TRUE)
@@ -275,7 +306,11 @@ univ_compute <- function(d, spec) {
       vals <- lapply(spec$vars, function(v) univ_var_stats(as.numeric(d[[v]][ix]), stats, spec, wv))
       names(vals) <- spec$vars
       grp <- lapply(gv, function(v) d[[v]][ix[1]])
-      st <- lapply(o$cols, function(c) unname(vals[[c$var]][[c$stat]]))
+      st <- lapply(o$cols, function(c) {
+        if (c$stat != "pctlpt") return(unname(vals[[c$var]][[c$stat]]))
+        x <- sort(as.numeric(d[[c$var]][ix]))
+        means_quantile(x, c$pct / 100, spec$pctldef)
+      })
       c(stats::setNames(grp, gv), stats::setNames(st, vapply(o$cols, `[[`, "", "name")))
     })
     cols <- lapply(names(recs[[1]] %||% list()), function(nm) unlist(lapply(recs, `[[`, nm)))

@@ -55,3 +55,12 @@ test_that("WEIGHT: weighted mean and a two-pass corrected sum of squares, by VAR
   expect_error(sas_run(paste0(d, "proc univariate data=w noprint; var x; weight wt; output out=s median=md; run;")),
                class = "sasonr_unsupported")
 })
+
+test_that("PCTLPTS= with PCTLPRE= and PCTLNAME=: names, order and labels", {
+  d <- "data d; input a b; datalines;\n1 10\n2 20\n3 30\n4 40\n;\nrun;\n"
+  r <- sas_run(paste0(d, "proc univariate data=d noprint; var a b; output out=o pctlpts=2.5 33 pctlpre=a_ b_; run;"))
+  expect_identical(names(r$work$o), c("a_2_5", "b_2_5", "a_33", "b_33"))
+  expect_identical(r$meta$o$labels[["a_2_5"]], "the   2.5000 percentile, a")
+  r <- sas_run(paste0(d, "proc univariate data=d noprint; var a; output out=o pctlpts=10 90 pctlpre=p_ pctlname=lo hi; run;"))
+  expect_identical(names(r$work$o), c("p_lo", "p_hi"))
+})
