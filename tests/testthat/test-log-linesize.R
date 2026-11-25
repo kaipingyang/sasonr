@@ -1,7 +1,17 @@
 # Log lines that SAS wraps at LINESIZE and sasonr does not break: fail loud.
 
-test_that("a PUT line longer than LINESIZE fails loud", {
-  expect_error(sas_run(paste0("data _null_; length s $200; s = repeat('a', 199); put s; run;")), class = "sasonr_unsupported")
+test_that("a PUT of one value wider than LINESIZE is cut every LINESIZE characters", {
+  lg <- as.character(sas_log(sas_run("data _null_; length s $200; s = repeat('a', 199); put s; run;")))
+  expect_true(strrep("a", 132) %in% lg)
+  expect_true(strrep("a", 68) %in% lg)
+})
+
+test_that("list PUT starts a value on a new line when it does not fit; a line of exactly LINESIZE stays", {
+  lg <- as.character(sas_log(sas_run(paste0("options ls=80;\ndata _null_; length a b c $20 d $17; a = repeat('a', 19); b = a; c = a; ",
+                                             "d = repeat('d', 16); put a b c d; put a b c d a; run;"))))
+  full <- paste(strrep("a", 20), strrep("a", 20), strrep("a", 20), strrep("d", 17))
+  expect_identical(sum(lg == full), 2L)
+  expect_true(strrep("a", 20) %in% lg)
 })
 
 test_that("a WHERE NOTE line longer than LINESIZE breaks before the word that does not fit, lines but the last at most LINESIZE - 1", {

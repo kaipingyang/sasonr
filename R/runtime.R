@@ -1335,6 +1335,15 @@ sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize(), .file = FALSE, .
     if (.file && any(nchar(sas_rtrim(unlist(strsplit(line, "\n", fixed = TRUE)))) > .ls)) {
       abort_unsupported_construct("PUT item longer than the FILE LRECL", .line)
     }
+    # the log: a PUT of one item wider than LINESIZE is cut every LINESIZE
+    # characters (measured for one item; after other items it is not)
+    if (!.file && length(parts) == 1L) {
+      line <- vapply(line, function(l) {
+        l <- sas_rtrim(l)
+        if (nchar(l) <= .ls) return(l)
+        paste(substring(l, seq(1L, nchar(l), by = .ls), pmin(seq(1L, nchar(l), by = .ls) + .ls - 1L, nchar(l))), collapse = "\n")
+      }, "", USE.NAMES = FALSE)
+    }
   }
   sas_rtrim(line)
 }

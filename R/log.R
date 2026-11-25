@@ -389,7 +389,8 @@ log_emit_buffer <- function(eng, buf, phase = "run") {
   put <- if (is.null(nm)) rep(TRUE, length(buf)) else is.na(nm) | nm != "msg"
   # a PUT line longer than LINESIZE is split by SAS; that is not implemented
   ls <- eng$session$options$linesize %||% 132L
-  if (any(put & nchar(unname(buf)) > ls)) abort_unsupported("a PUT line in the log longer than LINESIZE (not supported)")
+  long <- vapply(strsplit(unname(buf), "\n", fixed = TRUE), function(x) any(nchar(x) > ls), logical(1))
+  if (any(put & long)) abort_unsupported("a PUT line in the log longer than LINESIZE (not supported)")
   log_emit_lines(eng, unname(buf), phase = phase, put = put)
 }
 

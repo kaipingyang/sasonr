@@ -20,7 +20,8 @@ the development version provides.
   breaks before the word that does not fit, every line but the
   last at most LINESIZE - 1 columns, continuation lines indented by 6, a
   word too long for a line cut at LINESIZE - 6 (sasonr wrote it on one
-  line). A PUT line in the log longer than LINESIZE fails loud.
+  line). A PUT of one value wider than LINESIZE writes it cut every LINESIZE
+  characters; a wider value after other items fails loud.
 * `sas_script()`: a step on whose lines the macro processor wrote a WARNING
   (an unresolved `&name`) is kept as SAS text in the trace, so running the
   script writes the WARNING again.
