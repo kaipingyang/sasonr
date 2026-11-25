@@ -47,3 +47,11 @@ test_that("several analysis variables, BY and CLASS: columns by statistic then v
   expect_identical(as.character(r$work$o$g), c("x", "y"))
   expect_identical(r$meta$o$memlabel, "Selected Summary Statistics (Percentile Definition=5)")
 })
+
+test_that("WEIGHT: weighted mean and a two-pass corrected sum of squares, by VARDEF=", {
+  d <- "data w; input x wt; datalines;\n10 3\n20 1\n30 1\n;\nrun;\n"
+  r <- sas_run(paste0(d, "proc univariate data=w noprint; var x; weight wt; output out=s n=n mean=mean css=css var=var; run;"))
+  expect_identical(c(r$work$s$mean, r$work$s$css, r$work$s$var), c(16, 320, 160))
+  expect_error(sas_run(paste0(d, "proc univariate data=w noprint; var x; weight wt; output out=s median=md; run;")),
+               class = "sasonr_unsupported")
+})

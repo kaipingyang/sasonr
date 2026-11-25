@@ -80,7 +80,8 @@ parse_proc_univariate <- function(p, line) {
       attrib = parse_attrib(p),
       by = parse_by(p),
       class = parse_items_stmt(p, "class"),
-      weight = , freq = , id = , histogram = , qqplot = , probplot = , ppplot = , cdfplot = ,
+      weight = parse_items_stmt(p, "weight"),
+      freq = , id = , histogram = , qqplot = , probplot = , ppplot = , cdfplot = ,
       inset = abort_unsupported(paste0("PROC UNIVARIATE ", toupper(kw), " statement"), sline),
       abort_syntax("Statement is not valid or it is used out of proper order. (ERROR 180-322)", sline, tk_col(p), tk_val(p))
     )
@@ -135,8 +136,11 @@ univ_step_spec <- function(step, meta, last) {
   if (length(class) > 1L) abort_unsupported("PROC UNIVARIATE with more than one CLASS variable", step$line)
   miss <- setdiff(c(by, class), vars_in)
   if (length(miss)) abort_runtime(paste0("Variable ", toupper(miss[1]), " not found."), step$line)
+  ws <- of("weight")
+  weight <- if (length(ws)) proc_resolve(ws[[length(ws)]]$items, st, ws[[length(ws)]]$line) else NULL
+  if (length(weight) > 1L) abort_syntax("expected one variable in the WEIGHT statement", step$line)
   vars <- if (length(vs)) proc_resolve(vs[[length(vs)]]$items, st, vs[[length(vs)]]$line) else
-    setdiff(vars_in[vapply(vars_in, function(v) !identical(st$info[[v]]$type, "char"), logical(1))], c(by, class))
+    setdiff(vars_in[vapply(vars_in, function(v) !identical(st$info[[v]]$type, "char"), logical(1))], c(by, class, weight))
   for (v in vars) {
     if (identical(st$info[[v]]$type, "char")) abort_runtime(paste0("Variable ", toupper(v), " in list does not match type prescribed for this list."), step$line)
   }
@@ -145,6 +149,12 @@ univ_step_spec <- function(step, meta, last) {
     if (is.null(s$out)) abort_unsupported("PROC UNIVARIATE OUTPUT without OUT=", s$line)
     stats <- vapply(s$specs, `[[`, "", "stat")
     if (anyDuplicated(stats)) abort_unsupported("PROC UNIVARIATE OUTPUT statistic requested twice", s$line)
+    wq <- intersect(stats, c("median", "q1", "q3", "qrange", "p1", "p5", "p10", "p90", "p95", "p99", "mode", "range",
+                             "t", "probt", "msign", "probm", "signrank", "probs", "nobs"))
+    wq <- c(wq, intersect(stats, c("stderr", "cv", "skew", "kurt")))
+    if (length(weight) && length(wq)) {
+      abort_unsupported(paste0("PROC UNIVARIATE WEIGHT with the statistic ", toupper(wq[1]), " (not measured)"), s$line)
+    }
     if (any(lengths(lapply(s$specs, `[[`, "names")) > length(vars))) {
       abort_syntax("More names than analysis variables in the OUTPUT statement", s$line)
     }
@@ -158,7 +168,7 @@ univ_step_spec <- function(step, meta, last) {
   })
   if (!length(outputs)) abort_unsupported("PROC UNIVARIATE NOPRINT without an OUTPUT statement", step$line)
   list(spec = list(vars = vars, disp = stats::setNames(lapply(vars, function(v) col_info(v)$disp), vars),
-                   groups = lapply(c(by, class), col_info), by = by, class = class, outputs = outputs,
+                   groups = lapply(c(by, class), col_info), by = by, class = class, weight = weight, outputs = outputs,
                    vardef = o$vardef %||% "df", pctldef = o$pctldef %||% 5L, line = step$line),
        inp = inp)
 }
@@ -192,12 +202,14 @@ univ_out_meta <- function(spec, x) {
 }
 
 # The statistics of one analysis variable in one group.
-univ_var_stats <- function(x, stats, spec) {
+univ_var_stats <- function(x, stats, spec, w = NULL) {
   sp <- list(vardef = spec$vardef, qntldef = spec$pctldef, alpha = 0.05, exclnpwgt = FALSE, freq = NULL)
   mstats <- intersect(stats, c("n", "nmiss", "mean", "sum", "std", "var", "skew", "kurt", "sumwgt", "max", "min",
                                 "range", "q3", "median", "q1", "qrange", "p1", "p5", "p10", "p90", "p95", "p99",
                                 "mode", "css", "uss", "cv", "stderr"))
-  val <- as.list(means_cell_stats(x, rep(1, length(x)), NULL, mstats, sp, TRUE))
+  val <- as.list(means_cell_stats(x, rep(1, length(x)), w, mstats, sp, TRUE))
+  if (!is.null(w)) val[intersect(names(val), c("mean", "css", "var", "std", "stderr", "cv"))] <- NULL
+  if (!is.null(w)) val <- c(val, univ_weighted_moments(x, w, spec$vardef))
   val$nobs <- length(x)
   # several modes: the smallest, without a NOTE under NOPRINT (measured)
   if (any(c("t", "probt", "msign", "probm", "signrank", "probs") %in% stats)) {
@@ -210,6 +222,22 @@ univ_var_stats <- function(x, stats, spec) {
     val$probs <- lt$p_s
   }
   val
+}
+
+# Weighted moments (measured): the weighted mean, then the corrected sum of
+# squares in a second pass over the values; the divisor of VARDEF=.
+univ_weighted_moments <- function(x, w, vardef) {
+  ok <- !is.na(x) & !is.na(w) & w > 0
+  x <- x[ok]
+  w <- w[ok]
+  n <- length(x)
+  if (n == 0) return(list(mean = NA_real_, css = NA_real_, var = NA_real_, std = NA_real_))
+  W <- sum(w)
+  m <- sum(w * x) / W
+  css <- sum(w * (x - m)^2)
+  div <- switch(vardef, df = n - 1, n = n, wdf = W - 1, weight = W)
+  v <- if (div > 0) css / div else NA_real_
+  list(mean = m, css = css, var = v, std = sqrt(v))
 }
 
 univ_compute <- function(d, spec) {
@@ -243,7 +271,8 @@ univ_compute <- function(d, spec) {
   data <- list()
   for (o in spec$outputs) {
     recs <- lapply(rows, function(ix) {
-      vals <- lapply(spec$vars, function(v) univ_var_stats(as.numeric(d[[v]][ix]), stats, spec))
+      wv <- if (length(spec$weight)) as.numeric(d[[spec$weight]][ix])
+      vals <- lapply(spec$vars, function(v) univ_var_stats(as.numeric(d[[v]][ix]), stats, spec, wv))
       names(vals) <- spec$vars
       grp <- lapply(gv, function(v) d[[v]][ix[1]])
       st <- lapply(o$cols, function(c) unname(vals[[c$var]][[c$stat]]))

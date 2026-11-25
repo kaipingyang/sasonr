@@ -27,7 +27,9 @@ the development version provides.
   (by statistic, then variable), carry SAS's labels, and the data set has
   type OUT and the label "Selected Summary Statistics" (with the percentile
   definition when a percentile is requested); the step writes no
-  observations-read NOTE. Printed output, WEIGHT, FREQ, ID, PCTLPTS=, the
+  observations-read NOTE. WEIGHT gives the weighted N, SUM, MEAN, VAR, STD,
+  CSS and USS (other statistics with WEIGHT fail loud). Printed output,
+  FREQ, ID, PCTLPTS=, the
   robust and normality statistics, and a signed rank test of more than 20
   nonzero differences fail loud.
 * PROC FREQ: a TABLES OUT= data set has the label "Frequency Counts and
