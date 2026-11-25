@@ -18,6 +18,9 @@ proc_registry <- list(
   # the procedure title is part of the listing of the tables (freq_listing_tables())
   freq = list(compute = function(d, spec) freq_compute(d, spec), templates = c(Freq = "base.freq.lines"),
               listing = function(tables, ls) freq_listing_tables(tables)),
+  # NOPRINT with OUTPUT OUT= only (block U1): no listing
+  univariate = list(compute = function(d, spec) univ_compute(d, spec), templates = character(),
+                    proctitle = FALSE, listing = function(tables, ls) character()),
   # one table per page (BY group); no procedure title
   print = list(compute = function(d, spec) print_compute(d, spec), templates = c(Print = "base.print"),
                proctitle = FALSE, listing = function(tables, ls) print_listing_tables(tables))

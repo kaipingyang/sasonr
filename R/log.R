@@ -602,6 +602,8 @@ log_emit_reads <- function(eng, tr) {
     log_emit(eng, id = "ds.merge_repeats", phase = "step_end")
   }
   if (identical(tr$reasons, "PROC SORT")) rt$reads <- Filter(function(r) r$n > 0, rt$reads)
+  # PROC UNIVARIATE writes no NOTE about the observations it read
+  if (identical(tr$reasons, "PROC UNIVARIATE")) rt$reads <- list()
   print <- identical(tr$reasons, "PROC PRINT")
   for (r in rt$reads) {
     nm <- toupper(r$name)

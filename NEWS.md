@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC UNIVARIATE, first block: `NOPRINT` with `OUTPUT OUT=` for one
+  analysis variable and the statistics N NMISS MEAN SUM STD VAR CSS USS MIN
+  MAX MEDIAN Q1 Q3 (and P25 P50 P75), with `VARDEF=` and `PCTLDEF=`. The
+  OUT= columns follow the measured order (known for some sets of
+  statistics; other sets fail loud) and carry SAS's labels; the step writes
+  no observations-read NOTE. Printed output, BY, CLASS, WEIGHT, FREQ, ID and
+  PCTLPTS= fail loud.
 * PROC TABULATE: numbered variable lists (`v1-v30`) in the VAR and CLASS
   statements, and as the whole content of parentheses in a TABLE dimension
   (`(v1-v30)*sum`); other variable list forms still fail loud. A table without a row dimension
