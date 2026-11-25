@@ -42,6 +42,14 @@ mp_percent <- function(nm, raw, src, ses, sink, mode, in_dq) {
       if (in_dq || mode != "code") {
         mac_warn(paste0("Apparent invocation of macro ", toupper(nm), " not resolved."))
         sink$add(paste0("%", raw))
+      } else if (isTRUE(sink$compiler) && !isTRUE(sink$step) && isTRUE(sink$at_stmt_start()) &&
+                 src_at(src, src_skip_ws(src)) %in% c(59L, 40L)) {
+        # in open code, at the start of a statement that ends with `;` (also
+        # after arguments): the WARNING, then the text goes on unchanged to
+        # the compiler, which finds no statement there (measured)
+        mac_warn(paste0("Apparent invocation of macro ", toupper(nm), " not resolved."), before_line = TRUE)
+        sink$add(paste0("%", raw))
+        src$unchanged <- TRUE
       } else {
         abort_unsupported(paste0("macro %", toupper(nm), " is not defined (autocall library not available)"), line)
       }

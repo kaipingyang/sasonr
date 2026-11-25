@@ -42,10 +42,11 @@ abort_runtime <- function(msg, line = NULL) {
 # error and `open_code` says whether the statement stands outside a step: the
 # error model (engine_global_error(), errors.R) handles only the cases it
 # supports, everything else fails loud.
-abort_global <- function(msg, line, what, open_code = FALSE) {
+abort_global <- function(msg, line, what, open_code = FALSE, col = NULL, token = NULL) {
   if (!is.null(line) && length(line) == 1 && !is.na(line)) msg <- paste0(msg, " (SAS line ", line, ")")
   rlang::abort(paste("Syntax error:", msg), class = c("sasonr_global_error", "sasonr_syntax_error", "sasonr_error"),
-               sas_line = line, what = what, open_code = open_code)
+               sas_line = line, what = what, open_code = open_code, sas_col = col, sas_token = token,
+               sas_wrap = !is.null(col))
 }
 
 `%||%` <- function(x, y) if (is.null(x)) y else x

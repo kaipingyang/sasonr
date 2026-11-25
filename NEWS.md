@@ -5,6 +5,11 @@ the development version provides.
 
 ## Running SAS programs
 
+* A word or a number that starts no statement in open code (`foo;`, `1;`),
+  and an unresolved macro call at the start of an open-code statement that
+  ends with `;` (`%nosuch;`, `%nosuch(1, 2);`, with its WARNING), write
+  ERROR 180-322 and start syntax-check mode at the next DATA step (none
+  under NOSYNTAXCHECK); the program may also end there. They failed loud.
 * PROC UNIVARIATE: `NOPRINT` with `OUTPUT OUT=` for one or several analysis
   variables, with BY and one CLASS variable, `VARDEF=` and `PCTLDEF=`, and
   34 statistics (N NMISS NOBS MEAN SUM STD VAR SKEWNESS KURTOSIS SUMWGT MAX

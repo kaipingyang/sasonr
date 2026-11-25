@@ -406,17 +406,25 @@ err_set_macro <- function(eng, syserr = NULL, syscc = NULL) {
 # errors, an error inside a step or PROC SQL, in syntax-check mode or under
 # NOSYNTAXCHECK are not supported: fail loud.
 engine_global_error <- function(eng, e) {
-  if (!identical(e$what, "linesize") || !isTRUE(e$open_code) || isTRUE(eng$sql_open) ||
-      isTRUE(eng$syntax_check) || isTRUE(eng$sc_pending) || isTRUE(eng$session$options$nosyntaxcheck)) {
+  nosc <- isTRUE(eng$session$options$nosyntaxcheck)
+  if (!e$what %in% c("linesize", "unknown_stmt") || !isTRUE(e$open_code) || isTRUE(eng$sql_open) ||
+      isTRUE(eng$syntax_check) || isTRUE(eng$sc_pending) || (nosc && !identical(e$what, "unknown_stmt"))) {
     abort_unsupported(paste0("the error handling of this ERROR in a global statement (", err_message_lines(e), ")"),
                       e$sas_line %||% NULL)
   }
   eng$status <- "error"
   eng$errors <- c(eng$errors, conditionMessage(e))
   if (is.null(eng$error_line)) eng$error_line <- e$sas_line %||% NA_integer_
+  # ERROR 180-322 in open code has a blank line before it (measured; ERROR
+  # 13-12 of OPTIONS has none)
+  if (identical(e$what, "unknown_stmt")) log_emit(eng, "echo", phase = "compile", src = e$sas_line)
   err_emit_error(eng, e)
   err_set_macro(eng, syscc = 1012)
-  eng$sc_pending <- TRUE
+  # (measured for ERROR 180-322: under NOSYNTAXCHECK no syntax-check mode)
+  if (!nosc) {
+    eng$sc_pending <- TRUE
+    eng$sc_pending_what <- e$what
+  }
   invisible()
 }
 

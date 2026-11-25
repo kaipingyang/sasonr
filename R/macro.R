@@ -212,9 +212,13 @@ mac_error_note <- function(msg) {
   invisible()
 }
 
-mac_warn <- function(msg, class = "sasonr_macro_warning") {
+# `before_line`: the WARNING comes before the echo of the line being read
+# (an unresolved macro call at the start of an open-code statement).
+mac_warn <- function(msg, class = "sasonr_macro_warning", before_line = FALSE) {
   rt <- rt_diag()
-  if (is.function(rt$on_warn)) rt$on_warn(msg)
+  if (is.function(rt$on_warn)) {
+    if (before_line) rt$on_warn(msg, before_line = TRUE) else rt$on_warn(msg)
+  }
   cli::cli_warn(msg, class = class)
 }
 
@@ -622,6 +626,11 @@ mp_scan <- function(src, ses, sink, mode = "code", stop = NULL, mask_lit = FALSE
 # program line of the text that follows (`in_quote`: inside a quoted
 # string), so the program lines after it keep their numbers.
 mp_consumed <- function(src, ses, sink, i0, i1, in_quote = FALSE) {
+  # text the macro processor passed on unchanged (an unresolved macro call)
+  if (isTRUE(src$unchanged)) {
+    src$unchanged <- FALSE
+    return(invisible())
+  }
   if (is.null(src$line_of) || i1 <= i0) return(invisible())
   last <- min(i1 - 1L, src$n)
   ses$macro_lines <- union(ses$macro_lines, src$line_of[i0]:src$line_of[last])
@@ -704,6 +713,7 @@ mp_trigger <- function(src, ses, sink, mode, in_dq, put_eq) {
   # the text a trigger in the program generates is at the trigger's line,
   # which is macro-affected from now on (the rest of the lines it spans:
   # mp_consumed())
+  was <- ses$macro_lines
   if (!is.null(src$line_of)) {
     ses$line <- src$line_of[src$i]
     ses$macro_lines <- union(ses$macro_lines, ses$line)
@@ -713,6 +723,9 @@ mp_trigger <- function(src, ses, sink, mode, in_dq, put_eq) {
   name <- src_word(src, k)
   src$i <- k + nchar(name)
   mp_percent(tolower(name), name, src, ses, sink, mode, in_dq)
+  # a call passed on unchanged leaves its line as it is
+  if (isTRUE(src$unchanged)) ses$macro_lines <- was
+  invisible()
 }
 
 # `&...` reference run: (&+ name .?)+ resolved in passes; `&&` -> `&`.

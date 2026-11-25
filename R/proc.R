@@ -147,8 +147,21 @@ parse_global_stmt <- function(p, open_code = FALSE) {
     return(list(type = "global", kind = "options", opts = opts, ls = ls, ps = ps, formdlim = formdlim, line = line,
                 end_line = end_line))
   }
+  # a word that starts no statement SAS knows (measured in open code)
+  if (open_code && !low %in% global_stmt_known) {
+    abort_global("Statement is not valid or it is used out of proper order. (ERROR 180-322)", line, "unknown_stmt",
+                 open_code, col = tk_col(p), token = tk_val(p))
+  }
   abort_unsupported(paste0("global statement ", toupper(tk_val(p))), line)
 }
+
+# Global statements of SAS that sasonr does not implement (they fail loud;
+# any other word in open code is ERROR 180-322).
+global_stmt_known <- c("ods", "dm", "endsas", "goptions", "axis", "symbol", "legend", "pattern", "catname",
+                       "lock", "skip", "page", "resetline", "sasfile", "x", "systask", "waitfor", "missing",
+                       "%include", "include", "sysecho", "datalines", "cards", "run", "quit", "data", "proc",
+                       "abort", "comment", "endrsubmit", "rsubmit", "signon", "signoff", "killtask", "listtask",
+                       "ods", "title", "footnote", "options", "libname", "filename", "%let", "infile", "file")
 
 proc_end_reached <- function(p) {
   at_eof(p) || (is_kw(p, c("data", "proc")) && !is_op(p, c("=", "+"), 1L))

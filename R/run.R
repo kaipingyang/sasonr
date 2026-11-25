@@ -861,7 +861,8 @@ engine_program <- function(eng, code) {
   mp_scan(mp_src(text, line_of = TRUE), eng$session$macro, sink, mode = "code")
   sink$finish()
   if (!isTRUE(eng$deferred)) script_open_code(eng, "", length(eng$program$lines) + 1L, end = TRUE)
-  if (isTRUE(eng$sc_pending)) {
+  # (measured: after ERROR 180-322 in open code a program may end there)
+  if (isTRUE(eng$sc_pending) && !identical(eng$sc_pending_what, "unknown_stmt")) {
     abort_unsupported("the end of a program after an ERROR in a global statement (supported: a DATA step follows)")
   }
   # the RTF file is written when the destination closes; a program that

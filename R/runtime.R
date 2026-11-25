@@ -1760,7 +1760,7 @@ sas_call_execute <- function(symtab, value, .line = NULL) {
       rt$on_note <- old$note
     }, add = TRUE)
     symtab$on_put <- function(line) puts <<- c(puts, line)
-    msg <- function(m) abort_unsupported(paste0("a macro message from the CALL EXECUTE argument (", m, ")"), .line)
+    msg <- function(m, ...) abort_unsupported(paste0("a macro message from the CALL EXECUTE argument (", m, ")"), .line)
     rt$on_warn <- msg
     rt$on_error <- msg
     rt$on_note <- msg

@@ -19,6 +19,7 @@ sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
   toks <- if (is.data.frame(code)) code else sas_lex(code)
   if (resolved) toks$type[toks$type == "str_macro"] <- "str"
   p <- new_parser(toks)
+  p$resolved <- resolved
   steps <- list()
   # a chunk that continues an open PROC SQL (statements are executed one by one)
   if (sql_open) {
@@ -39,8 +40,19 @@ sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
       advance(p)
       next
     }
+    # a macro call left unresolved by the macro processor (it wrote its
+    # WARNING) starts no statement: ERROR 180-322 (measured)
+    if (t == "macro" && isTRUE(p$resolved)) {
+      # (the marker is under the % alone)
+      abort_global("Statement is not valid or it is used out of proper order. (ERROR 180-322)", line, "unknown_stmt",
+                   TRUE, col = tk_col(p), token = "%")
+    }
     if (t %in% c("macro", "macro_var", "str_macro")) {
       abort_unsupported(paste0("macro code ", tk_val(p), " (run the program with sas_run() to expand macros)"), line)
+    }
+    if (t == "num") {
+      abort_global("Statement is not valid or it is used out of proper order. (ERROR 180-322)", line, "unknown_stmt",
+                   TRUE, col = tk_col(p), token = tk_val(p))
     }
     if (t != "name") abort_syntax(paste("unexpected", tok_desc(p)), line)
     low <- tk_low(p)
