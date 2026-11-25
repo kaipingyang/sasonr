@@ -44,12 +44,13 @@ script_inner_macro <- function(eng, node) {
   if (last > length(src) || !any(seq.int(node$line, last) %in% eng$session$macro$macro_lines)) return(node)
   orig <- paste(src[node$line:last], collapse = "\n")
   tok <- tryCatch(sas_lex(orig), error = function(e) NULL)
-  if (is.null(tok) || !any(tok$type == "macro")) return(node)
+  warned <- any(seq.int(node$line, last) %in% eng$macro_warn_lines)
+  if (is.null(tok) || (!any(tok$type == "macro") && !warned)) return(node)
   # the step must start and end on its lines alone
   if (!identical(tok$line[1], 1L) || !identical(tok$type[nrow(tok)], "semi")) return(node)
   eng$script_upto <- max(eng$script_upto %||% 0L, last)
   list(type = "deferred", line = node$line, sas = sub("[[:space:]]+$", "", orig), macro_stack = list(),
-       why = "macro statements inside the step", traced = TRUE)
+       why = if (any(tok$type == "macro")) "macro statements inside the step" else "a macro WARNING inside the step", traced = TRUE)
 }
 
 # A trace: what a macro invocation writes with %PUT while the macro processor

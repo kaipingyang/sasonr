@@ -318,7 +318,12 @@ log_flush <- function(eng) {
 # Macro-time events follow the line the macro processor has reached.
 log_bind_callbacks <- function(eng, rt, ses) {
   src <- function() max(ses$line %||% 0L, eng$src_line %||% 0L)
-  rt$on_warn <- if (eng$step_notes) function(msg) log_emit(eng, "warning", text = paste("WARNING:", msg), src = src())
+  rt$on_warn <- if (eng$step_notes) function(msg) {
+    # the program lines with a macro-time WARNING (a step on them is kept as
+    # SAS text in the trace, script_inner_macro(), so it writes it again)
+    eng$macro_warn_lines <- c(eng$macro_warn_lines, ses$line %||% NA_integer_)
+    log_emit(eng, "warning", text = paste("WARNING:", msg), src = src())
+  }
   rt$on_error <- function(msg) log_emit(eng, "error", text = paste("ERROR:", msg), src = src())
   rt$on_note <- function(msg) log_emit(eng, "note", text = msg, src = src())
   ses$on_put <- function(line) {

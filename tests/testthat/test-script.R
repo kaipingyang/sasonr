@@ -354,3 +354,15 @@ data pct; merge ex tot; by id; p = d / total; run;"
   for (nd in sc) s <- eval(nd$lang, list(s = s), asNamespace("sasonr"))
   expect_identical(sas_work(s)$pct, sas_run(code)$work$pct)
 })
+
+test_that("a step with a macro-time WARNING is kept as SAS text in the trace, so the WARNING comes again", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  r <- suppressWarnings(sas_run("data a; x=\"&nosuch\"; run;"))
+  s <- sas_script(r)
+  expect_true(any(grepl("a macro WARNING inside the step", as.character(s), fixed = TRUE)))
+  f <- withr::local_tempfile(fileext = ".R")
+  writeLines(as.character(s), f)
+  e <- new.env()
+  suppressWarnings(sys.source(f, envir = e))
+  expect_true("WARNING: Apparent symbolic reference NOSUCH not resolved." %in% as.character(sas_log(e$s)))
+})

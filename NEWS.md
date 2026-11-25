@@ -5,6 +5,9 @@ the development version provides.
 
 ## Running SAS programs
 
+* `sas_script()`: a step on whose lines the macro processor wrote a WARNING
+  (an unresolved `&name`) is kept as SAS text in the trace, so running the
+  script writes the WARNING again.
 * `CALL EXECUTE` in a DATA step: the text is queued and runs after the
   step, with "NOTE: CALL EXECUTE generated line." and the `N + text` echo
   of each generated step. Text made of DATA and PROC steps that end with
