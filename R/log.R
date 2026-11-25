@@ -421,11 +421,7 @@ log_fill <- function(lines, args, id) {
 log_render <- function(id, args = list(), ls = rt_linesize()) {
   m <- log_entry(id)
   lines <- log_fill(m$template, args, id)
-  # the WHERE line of the NOTE wraps in SAS when it is longer than LINESIZE;
-  # where it breaks is not implemented
-  if (identical(id, "ds.read_where") && any(nchar(lines) > ls)) {
-    abort_unsupported("a WHERE clause whose NOTE line is longer than LINESIZE (not supported)")
-  }
+  if (identical(id, "ds.read_where") && nchar(lines[2]) > ls) lines <- c(lines[1], log_wrap_where(lines[2], ls))
   switch(m$wrap,
     none = lines,
     fixed = if (nchar(lines[1]) <= ls) lines else c(m$wrapped, lines[-1]),
@@ -440,6 +436,41 @@ log_render <- function(id, args = list(), ls = rt_linesize()) {
     },
     rlang::abort(paste0("log message `", id, "`: unknown wrap rule `", m$wrap, "`."), .internal = TRUE)
   )
+}
+
+# The WHERE line of a NOTE longer than LINESIZE: lines indented by 6 that
+# break at the blank before the word that does not fit, each line but the
+# last at most LINESIZE - 1 columns; a word too long for a line of its own
+# starts a new line and is cut every LINESIZE - 6 characters.  A last line
+# of exactly LINESIZE columns is not measured.
+log_wrap_where <- function(line, ls) {
+  ind <- strrep(" ", 6L)
+  words <- strsplit(sub("^ {6}", "", line), " ", fixed = TRUE)[[1]]
+  if (!length(words) || any(!nzchar(words))) {
+    abort_unsupported("a WHERE clause with more than one blank in a row in a NOTE line longer than LINESIZE (not supported)")
+  }
+  out <- character()
+  cur <- ""
+  for (w in words) {
+    if (nchar(w) > ls - 7L) {
+      if (nzchar(cur)) out <- c(out, paste0(ind, cur))
+      while (nchar(w) > ls - 6L) {
+        out <- c(out, paste0(ind, substr(w, 1L, ls - 6L)))
+        w <- substr(w, ls - 5L, nchar(w))
+      }
+      cur <- w
+    } else if (!nzchar(cur)) {
+      cur <- w
+    } else if (6L + nchar(cur) + 1L + nchar(w) <= ls - 1L) {
+      cur <- paste(cur, w)
+    } else {
+      out <- c(out, paste0(ind, cur))
+      cur <- w
+    }
+  }
+  out <- c(out, paste0(ind, cur))
+  if (nchar(out[length(out)]) >= ls) abort_unsupported("a WHERE clause whose NOTE ends in a line of LINESIZE columns (not supported)")
+  out
 }
 
 # Places of merged messages ------------------------------------------------------

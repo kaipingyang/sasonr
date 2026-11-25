@@ -8,9 +8,11 @@ the development version provides.
 * PROC FREQ: `RELRISK(CL=)` together with `RISKDIFF(CL=)` on a 2x2 table
   (CL= alone in both) writes both confidence-limit tables, in the listing
   and in ODS HTML.
-* A PUT line in the log and the WHERE line of the "observations read" NOTE
-  that are longer than LINESIZE fail loud (SAS breaks them; sasonr wrote
-  them on one line).
+* The WHERE line of the "observations read" NOTE longer than LINESIZE
+  breaks before the word that does not fit, every line but the
+  last at most LINESIZE - 1 columns, continuation lines indented by 6, a
+  word too long for a line cut at LINESIZE - 6 (sasonr wrote it on one
+  line). A PUT line in the log longer than LINESIZE fails loud.
 * `sas_script()`: a step on whose lines the macro processor wrote a WARNING
   (an unresolved `&name`) is kept as SAS text in the trace, so running the
   script writes the WARNING again.
