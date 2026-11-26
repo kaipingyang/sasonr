@@ -128,7 +128,9 @@ univ_print_var <- function(x0, disp) {
   # count and percents of all observations and of the missing ones
   miss <- NULL
   if (length(x) < length(x0)) {
-    code <- sas_miss_code(x0[is.na(x0)])
+    code <- c("_", ".", LETTERS)[sas_miss_code(x0[is.na(x0)]) + 1L]
+    # the rows of special missing values are not measured
+    if (any(code != ".")) abort_unsupported("PROC UNIVARIATE printed output of a variable with special missing values")
     lev <- c("_", ".", LETTERS)
     cnts <- table(factor(code, levels = lev))
     cnts <- cnts[cnts > 0]
