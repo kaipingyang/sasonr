@@ -66,3 +66,15 @@ test_that("PROC PRINT outside the measured rules fails loud", {
   fails("data b; set have; label x='a b c d e f'; run; proc print data=b label; var x; run;")
   fails("proc print data=have double; run;")
 })
+
+test_that("a heading piece still longer than the column splits again at an underscore", {
+  r <- sas_run("options nocenter; data h; abcd_efgh_ijkl = 1; Var_Mean_Std_Dev = 1; run; proc print data=h; run;")
+  lst <- r$listing
+  expect_identical(lst[2:4], c("       abcd_", "       efgh_    Var_Mean_", "Obs     ijkl     Std_Dev"))
+})
+
+test_that("a name with one lowercase-uppercase change splits only when longer than 4 and its values", {
+  lst <- sas_run("options nocenter; data h; AbCd = 1; run; proc print data=h; run;")$listing
+  expect_true("Obs    AbCd" %in% lst)
+  expect_error(sas_run("data h; AbCdEf = 1; run; proc print data=h; run;"), class = "sasonr_unsupported")
+})

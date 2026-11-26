@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC PRINT headings from variable names: a name without a
+  lowercase-uppercase change whose piece is still longer than the column
+  splits again at an underscore (`abcd_efgh_ijkl` on three lines; it was
+  written on two). A name with one lowercase-uppercase change splits there
+  only when it is longer than its values and than 4 characters (`AbCd` was
+  split); a name with several such changes that is wider than its values
+  now fails loud (it was split at one place).
 * ODS RTF: a PROC PRINT table wider than the page is split into column
   groups, each a table of its own; the groups are balanced (each takes
   columns up to the average of the page width and the table width per

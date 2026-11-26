@@ -524,12 +524,33 @@ print_header_lines <- function(h, dw) {
   if (n > dw && length(cut) > 0 && grepl("_", h, fixed = TRUE)) {
     abort_unsupported(paste0("the heading of the variable ", h, " (an underscore and a lowercase-uppercase change, wider than its values)"))
   }
-  if (n > dw && length(cut) > 0 && !grepl("_", h, fixed = TRUE)) {
+  # one lowercase-uppercase change: split there when the name is longer than
+  # the values and than 4 (AbCd stays whole); more changes split at places
+  # not yet known [measured, names of 4 to 25 characters over columns of 1 to 8]
+  if (n > max(dw, 4L) && length(cut) > 1L && !grepl("_", h, fixed = TRUE)) {
+    abort_unsupported(paste0("the heading of the variable ", h, " (several lowercase-uppercase changes, wider than its values)"))
+  }
+  if (n > max(dw, 4L) && length(cut) > 0 && !grepl("_", h, fixed = TRUE)) {
     m <- vapply(cut, function(i) max(i, n - i), 1L)
     i <- cut[which.min(m)]
     return(list(lines = c(substr(h, 1L, i), substr(h, i + 1L, n)), width = max(dw, min(m))))
   }
-  sql_header_lines(h, max(dw, 8L))
+  w <- max(dw, 8L)
+  lines <- print_split_underscore(h, w)
+  if (length(lines) <= 2L) return(sql_header_lines(h, w))
+  if (dw > 8L) abort_unsupported(paste0("the heading of the variable ", h, " (more than two lines over a column wider than 8)"))
+  list(lines = lines, width = max(w, nchar(lines)))
+}
+
+# A name without a lowercase-uppercase change splits like a PROC SQL header
+# (sql_header_lines), and each piece longer than the column without its
+# trailing underscore splits again (abcd_efgh_ijkl: abcd_ / efgh_ / ijkl)
+# [measured, names of 4 to 16 characters over columns of 1 to 8].
+print_split_underscore <- function(h, w) {
+  if (nchar(sub("_+$", "", h)) <= w) return(h)
+  r <- sql_header_lines(h, 0L)
+  if (length(r$lines) < 2L) return(h)
+  c(print_split_underscore(r$lines[1], w), print_split_underscore(r$lines[2], w))
 }
 
 # PROC FORMAT ------------------------------------------------------------------------
