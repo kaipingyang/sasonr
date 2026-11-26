@@ -1335,8 +1335,9 @@ sas_f_inputc <- function(s, fmt, w = NULL) {
 
 # Dw.p over a table column: the values that are not written in the E form
 # share the fewest decimals any of them takes on its own (per value: fmt_d);
-# zero takes those decimals ("0" in a column of zeros); missing values are
-# "." [measured, PROC UNIVARIATE Basic Statistical Measures].
+# zero takes those decimals ("0" in a column of zeros); a missing value is
+# "." in the column of the decimal point [measured, PROC UNIVARIATE Basic
+# Statistical Measures].
 fmt_d_column <- function(v, w, p) {
   out <- rep(just_right(".", w), length(v))
   ok <- !is.na(v)
@@ -1357,5 +1358,6 @@ fmt_d_column <- function(v, w, p) {
     just_right(paste0(if (b$neg) "-", b$s), w)
   }, "")
   out[ok] <- txt
+  if (d > 0L) out[!ok] <- just_right(paste0(".", strrep(" ", d)), w)
   out
 }

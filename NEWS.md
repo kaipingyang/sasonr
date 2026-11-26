@@ -5,6 +5,14 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC UNIVARIATE writes its printed output (without NOPRINT): the Moments,
+  Basic Statistical Measures, Tests for Location, Quantiles and Extreme
+  Observations tables of each analysis variable, with the mode Note. BY,
+  CLASS, WEIGHT and OUTPUT with printed output, VARDEF= and PCTLDEF=,
+  labelled variables, variables with missing values, a quantile column that
+  needs the E form, skewness or kurtosis whose last digits depend on the
+  order of the sums, and printed output under OPTIONS CENTER fail loud.
+
 * A session now starts at OPTIONS CENTER, the SAS default (it started at
   NOCENTER): each title line, procedure title and table heading is centred on
   its own, each table as a whole, and BY lines are written between dashes.

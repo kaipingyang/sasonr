@@ -23,7 +23,7 @@ test_that("PROC UNIVARIATE writes no observations-read NOTE", {
 
 test_that("what U1 does not cover fails loud", {
   fails <- function(body) expect_error(sas_run(paste0(univ_data, body)), class = "sasonr_unsupported")
-  fails("proc univariate data=d; var v; run;")
+  fails("proc univariate data=d; by v; var v; run;")
   fails("proc univariate data=d noprint; var v; output out=s mean=m gini=g; run;")
   fails("proc univariate data=d noprint; freq v; var v; output out=s n=n; run;")
 })
@@ -63,4 +63,16 @@ test_that("PCTLPTS= with PCTLPRE= and PCTLNAME=: names, order and labels", {
   expect_identical(r$meta$o$labels[["a_2_5"]], "the   2.5000 percentile, a")
   r <- sas_run(paste0(d, "proc univariate data=d noprint; var a; output out=o pctlpts=10 90 pctlpre=p_ pctlname=lo hi; run;"))
   expect_identical(names(r$work$o), c("p_lo", "p_hi"))
+})
+
+test_that("the printed output writes the five tables of each variable", {
+  withr::local_options(sasonr.center = FALSE)
+  lst <- sas_run("data d; input x; datalines;\n1\n2.5\n1000.25\n123456.789\n;\nrun; proc univariate data=d; var x; run;")$listing
+  lst <- lst[nzchar(lst)]
+  expect_true("Mean               31115.1348    Sum Observations    124460.539" %in% lst)
+  expect_true("Median     501.38     Variance              3789990938" %in% lst)
+  expect_true("Student's t    t   1.01084    Pr > |t|    0.3865" %in% lst)
+  expect_true("75% Q3          62228.520" %in% lst)
+  expect_true(" 123456.79        4         123456.79        4" %in% lst)
+  expect_error(sas_run("data d; input x; datalines;\n1\n.\n3\n;\nrun; proc univariate data=d; var x; run;"), class = "sasonr_unsupported")
 })

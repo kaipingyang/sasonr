@@ -133,7 +133,7 @@ parse_univ_output <- function(p) {
 
 univ_step_spec <- function(step, meta, last) {
   o <- step$options
-  if (!isTRUE(o$noprint)) abort_unsupported("PROC UNIVARIATE printed output (supported: NOPRINT with OUTPUT OUT=)", step$line)
+  print <- !isTRUE(o$noprint)
   inp <- proc_input(step, meta, last)
   st <- inp$st
   proc_apply_attr_stmts(step$stmts, st)
@@ -196,10 +196,21 @@ univ_step_spec <- function(step, meta, last) {
     }
     list(name = tolower(s$out$name), cols = cols, line = s$line)
   })
-  if (!length(outputs)) abort_unsupported("PROC UNIVARIATE NOPRINT without an OUTPUT statement", step$line)
+  if (!length(outputs) && !print) abort_unsupported("PROC UNIVARIATE NOPRINT without an OUTPUT statement", step$line)
+  if (print) {
+    # printed output (proc_univariate_print.R): one analysis variable after
+    # another, without BY, CLASS, WEIGHT or OUTPUT (not measured with them)
+    if (length(outputs) || length(by) || length(class) || length(weight)) {
+      abort_unsupported("PROC UNIVARIATE printed output with BY, CLASS, WEIGHT or OUTPUT", step$line)
+    }
+    if (!identical(o$vardef %||% "df", "df") || !identical(as.integer(o$pctldef %||% 5L), 5L)) {
+      abort_unsupported("PROC UNIVARIATE printed output with VARDEF= or PCTLDEF=", step$line)
+    }
+    for (v in vars) if (!is.null(col_info(v)$label)) abort_unsupported("PROC UNIVARIATE printed output of a labelled variable", step$line)
+  }
   list(spec = list(vars = vars, disp = stats::setNames(lapply(vars, function(v) col_info(v)$disp), vars),
                    groups = lapply(c(by, class), col_info), by = by, class = class, weight = weight, outputs = outputs,
-                   vardef = o$vardef %||% "df", pctldef = o$pctldef %||% 5L, line = step$line),
+                   vardef = o$vardef %||% "df", pctldef = o$pctldef %||% 5L, line = step$line, print = print),
        inp = inp)
 }
 
@@ -211,6 +222,7 @@ translate_proc_univariate <- function(step, meta, last) {
     header,
     paste0(".d <- ", proc_source_code(b$inp)),
     paste0(".r <- sas_rt_proc(\"univariate\", .d, ", r_lit(spec), ")"),
+    if (isTRUE(spec$print)) ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   outs <- vapply(spec$outputs, `[[`, "", "name")
@@ -272,6 +284,13 @@ univ_weighted_moments <- function(x, w, vardef) {
 }
 
 univ_compute <- function(d, spec) {
+  if (isTRUE(spec$print)) {
+    lines <- unlist(lapply(spec$vars, function(v) univ_print_var(as.numeric(d[[v]]), spec$disp[[v]])), use.names = FALSE)
+    tb <- new_sasonr_ods_table(tibble::tibble(), name = "Univariate", label = "Univariate", path = "Univariate",
+                               proc = "Univariate", template = "base.univariate.lines")
+    attr(tb, "lines") <- lines
+    return(list(tables = list(tb), data = list(), events = character()))
+  }
   stats <- setdiff(unique(unlist(lapply(spec$outputs, function(o) vapply(o$cols, `[[`, "", "stat")))), "pctlpt")
   gv <- c(spec$by, spec$class)
   if (length(spec$by)) {
