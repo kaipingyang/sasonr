@@ -1244,11 +1244,19 @@ listing_base_summary <- function(tb, ls) {
   for (p in panels) {
     pcols <- c(fixed, scl[p$first:p$last])
     gaps <- c(rep.int(p$fixed_gap, length(fixed)), rep.int(p$gap, p$last - p$first))
-    if (!multi) {
-      av <- c(paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""), "")
-      out <- lst_c(out, if (mark) lst_lines(av) else av)
-    }
     tb_lines <- c(means_render(pcols, gaps), "")
+    if (!multi) {
+      # the heading is centred over the table, rounding down (over the table
+      # width less 2 for the panels of a class table split over several
+      # panels) at NOCENTER, and on its own
+      # under CENTER (a unit of its own: only its leading blanks differ)
+      # [measured, listings at NOCENTER and CENTER]
+      av <- sas_rtrim(paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""))
+      tw <- sum(vapply(pcols, function(c) vctrs::vec_cast(c$width, integer()), 1L)) + sum(gaps) -
+        if (length(fixed) > 0 && length(panels) > 1L) 2L else 0L
+      lead <- if (isTRUE(rt_center())) "" else strrep(" ", max(0L, (tw - nchar(av)) %/% 2L))
+      out <- lst_c(out, if (mark) lst_lines(c(paste0(lead, av), "")) else c(paste0(lead, av), ""))
+    }
     out <- lst_c(out, if (mark) lst_unit(tb_lines) else tb_lines)
   }
   out

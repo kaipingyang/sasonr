@@ -22,6 +22,8 @@ the development version provides.
   is laid out like a formatted one; the heading of a character column whose
   values are of uneven widths starts in the first position. Before, headings
   and fields could sit a position or more to the left or right of their place.
+* PROC MEANS: the "Analysis Variable" heading is centred over its table (it
+  started in the first position).
 * PROC CONTENTS: the headings "Variables in Creation Order", "Alphabetic List
   of Variables and Attributes" and "Sort Information" are centred over their
   table (they started in the first position).

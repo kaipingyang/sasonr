@@ -193,6 +193,7 @@ ct_diag <- function() .active$ct %||% new_ct_state()
 
 # The current LINESIZE (log and PUT line width); the SAS default outside a run.
 rt_linesize <- function() .active$session$options$linesize %||% 132L
+rt_center <- function() isTRUE(.active$session$options$center)
 
 # The current NOTES/NONOTES setting; NOTES outside a run.
 rt_notes_on <- function() {
