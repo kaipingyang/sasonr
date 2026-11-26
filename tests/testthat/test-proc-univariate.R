@@ -74,5 +74,7 @@ test_that("the printed output writes the five tables of each variable", {
   expect_true("Student's t    t   1.01084    Pr > |t|    0.3865" %in% lst)
   expect_true("75% Q3          62228.520" %in% lst)
   expect_true(" 123456.79        4         123456.79        4" %in% lst)
-  expect_error(sas_run("data d; input x; datalines;\n1\n.\n3\n;\nrun; proc univariate data=d; var x; run;"), class = "sasonr_unsupported")
+  lst <- sas_run("data d; input x; datalines;\n1\n2\n.\n.A\n.B\n3\n;\nrun; proc univariate data=d; var x; run;")$listing
+  expect_true("      A           1       16.67       33.33" %in% lst)
+  expect_true("  Total           3       50.00      100.00" %in% lst)
 })

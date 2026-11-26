@@ -11,7 +11,7 @@
 #   need once rounded to 6 significant digits (univ_r6_column()), the column
 #   one position wider than its widest value;
 # - a mode among several is the smallest, with a Note under the measures.
-# Missing values (their table), labels, the E form of a quantile column, more
+# Labels, the E form of a quantile column, more
 # than 20 nonzero differences in the signed rank test are not measured (fail
 # loud).
 
@@ -46,8 +46,11 @@ univ_titled <- function(title, lines) {
   c(paste0(strrep(" ", max(0L, (w - nchar(title)) %/% 2L)), title), "", lines)
 }
 
-univ_print_var <- function(x, disp) {
-  if (anyNA(x)) abort_unsupported("PROC UNIVARIATE printed output of a variable with missing values (the Missing Values table)")
+univ_print_var <- function(x0, disp) {
+  # the statistics of the nonmissing values; the observation numbers of the
+  # extreme values count every observation
+  keep <- which(!is.na(x0))
+  x <- x0[keep]
   n <- length(x)
   if (n == 0L) abort_unsupported("PROC UNIVARIATE printed output of a variable without values")
   sp <- list(vardef = "df", qntldef = 5L, alpha = 0.05, exclnpwgt = FALSE, freq = NULL)
@@ -102,12 +105,14 @@ univ_print_var <- function(x, disp) {
   # extreme observations: the lowest values (ties: the last observation
   # first), the highest (ties: the first observation first)
   k <- min(5L, n)
-  obs <- seq_len(n)
+  obs <- keep
   lo <- order(x, -obs)[seq_len(k)]
   hi <- utils::tail(order(x, obs), k)
   ev <- univ_r6_column(c(x[lo], x[hi]))
+  lo <- obs[lo]
+  hi <- obs[hi]
   vw <- max(5L, max(nchar(ev)) + 1L)
-  ow <- max(3L, nchar(as.character(n)))
+  ow <- max(3L, nchar(as.character(length(x0))))
   grp <- vw + 6L + ow
   dash <- function(t) {
     l <- (grp - nchar(t) + 1L) %/% 2L
@@ -119,13 +124,30 @@ univ_print_var <- function(x, disp) {
            paste0(formatC(ev[seq_len(k)], width = vw), "      ", formatC(as.character(lo), width = ow), "        ",
                   formatC(ev[k + seq_len(k)], width = vw), "      ", formatC(as.character(hi), width = ow)))
   ext <- univ_titled("Extreme Observations", ext)
+  # the Missing Values table: one row per missing value (._, ., .A-.Z), its
+  # count and percents of all observations and of the missing ones
+  miss <- NULL
+  if (length(x) < length(x0)) {
+    code <- sas_miss_code(x0[is.na(x0)])
+    lev <- c("_", ".", LETTERS)
+    cnts <- table(factor(code, levels = lev))
+    cnts <- cnts[cnts > 0]
+    tot <- length(x0)
+    nm <- sum(cnts)
+    row <- function(lab, c) paste0(formatC(lab, width = 7L), formatC(as.character(c), width = 12L),
+                                   formatC(display_fixed(c / tot * 100, 2L), width = 12L), formatC(display_fixed(c / nm * 100, 2L), width = 12L))
+    mt <- c(paste0(strrep(" ", 23L), "-----Percent Of-----"), "Missing                             Missing",
+            "  Value       Count     All Obs         Obs", "",
+            vapply(names(cnts), function(l) row(l, cnts[[l]]), "", USE.NAMES = FALSE), row("Total", nm))
+    miss <- c(paste0(strrep(" ", 15L), "Missing Values"), "", mt)
+  }
   # the quantile title wider than its table is a unit of its own
   qunits <- if (nchar(quant[1]) > max(nchar(quant[-1]))) lst_c(lst_lines(quant[1:2]), lst_unit(quant[-(1:2)])) else lst_unit(quant)
   # centring units (listing_center.R): the procedure and variable lines and
   # the Note on their own, each table with its title [measured, center_listing]
   lst_c(lst_lines(c("The UNIVARIATE Procedure", paste0("Variable:  ", disp), "")), lst_unit(univ_titled("Moments", moments)),
         lst_lines(c("", "")), lst_unit(basic), if (length(note)) lst_lines(note), lst_lines(c("", "")), lst_unit(tests),
-        lst_lines(c("", "")), qunits, lst_lines(c("", "")), lst_unit(ext))
+        lst_lines(c("", "")), qunits, lst_lines(c("", "")), lst_unit(ext), if (length(miss)) lst_c(lst_lines(c("", "")), lst_unit(miss)))
 }
 
 # Skewness and kurtosis from one-pass (updating) central moments, a check of
