@@ -286,3 +286,11 @@ test_that("Dw.p rounds to the decimals of the value's magnitude, right-aligned",
   expect_error(d(1.5, 8, 5L), class = "sasonr_unsupported")      # p outside the table
   expect_error(d(99.99996, 8), class = "sasonr_unsupported")     # rounds to the next magnitude
 })
+
+test_that("Dw.p over a column shares the fewest decimals of its values", {
+  col <- function(v, w, p) trimws(sasonr:::fmt_d_column(v, w, p))
+  expect_identical(col(c(31115.1348, 501.375, NA), 8, 6L), c("31115.13", "501.38", "."))
+  expect_identical(col(c(1.075, 0, NA), 8, 6L), c("1.075000", "0.000000", "."))
+  expect_identical(col(c(0, 0), 8, 6L), c("0", "0"))
+  expect_identical(col(c(0.000384595, 1.4791e-7, 0.000877), 10, 4L), c("0.0003846", "1.4791E-7", "0.0008770"))
+})

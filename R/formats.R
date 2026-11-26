@@ -695,7 +695,10 @@ fmt_d <- function(v, w, p) {
   if (a < 10^k) k <- k - 1
   if (a >= 10^(k + 1)) k <- k + 1
   tab <- d_decimals()
-  hit <- tab$d[tab$w == w & tab$p == p & tab$sign == (if (v < 0) "-" else "+") & tab$k == k]
+  # beyond the table the E form goes on when the table ends in it
+  kk <- if (k > 12 || k < -9) (if (k > 12) 12 else -9) else k
+  hit <- tab$d[tab$w == w & tab$p == p & tab$sign == (if (v < 0) "-" else "+") & tab$k == kk]
+  if (kk != k && length(hit) == 1L && !is.na(hit)) hit <- integer()
   if (length(hit) != 1L) abort_unsupported(what)
   if (is.na(hit)) {
     # the E form is the BESTw. text [measured, every E entry of the table]
@@ -1328,4 +1331,31 @@ sas_f_inputc <- function(s, fmt, w = NULL) {
     f$char <- TRUE
     sas_rtrim(sas_f_input(s[i], f))
   }, "")
+}
+
+# Dw.p over a table column: the values that are not written in the E form
+# share the fewest decimals any of them takes on its own (per value: fmt_d);
+# zero takes those decimals ("0" in a column of zeros); missing values are
+# "." [measured, PROC UNIVARIATE Basic Statistical Measures].
+fmt_d_column <- function(v, w, p) {
+  out <- rep(just_right(".", w), length(v))
+  ok <- !is.na(v)
+  if (!any(ok)) return(out)
+  each <- vapply(which(ok), function(i) fmt_d(v[i], w, p), "")
+  e_form <- grepl("E", each, fixed = TRUE)
+  nz <- v[ok] != 0 & !e_form
+  dec <- function(s) {
+    s <- trimws(s)
+    if (grepl(".", s, fixed = TRUE)) nchar(sub("^[^.]*\\.", "", s)) else 0L
+  }
+  d <- if (any(nz)) min(vapply(each[nz], dec, 1L)) else 0L
+  txt <- each
+  fix <- !e_form & (v[ok] != 0 | any(nz))
+  txt[fix] <- vapply(v[ok][fix], function(x) {
+    b <- fixed_body(x, d)
+    if (identical(b, NA_character_)) abort_unsupported(paste0("format D", w, ".", p, " of ", format(x, digits = 17), " in a column"))
+    just_right(paste0(if (b$neg) "-", b$s), w)
+  }, "")
+  out[ok] <- txt
+  out
 }
