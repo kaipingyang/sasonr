@@ -22,7 +22,8 @@ the development version provides.
   is laid out like a formatted one; the heading of a character column whose
   values are of uneven widths starts in the first position (columns up to 16
   wide; wider ones fail loud); a number under a user-defined format is laid
-  out as text; a missing value of an unformatted number sits in the decimal
+  out as text; character values are written without their leading blanks;
+  a missing value of an unformatted number sits in the decimal
   point column; headings of several lines follow the same rules. Before,
   headings and fields could sit a position or more to the left or right of
   their place.

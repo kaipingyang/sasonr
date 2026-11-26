@@ -42,7 +42,8 @@ print_compute <- function(d, spec) {
     x <- d[[s$name]]
     extra <- if (s$name %in% sums) c(sub_tot[[s$name]], grand[[s$name]]) else NULL
     all <- if (s$char) {
-      if (is.null(s$fmt)) sas_rtrim(x) else sas_rtrim(sas_format(x, s$fmt))
+      # character values are written left-justified (leading blanks dropped)
+      sub("^ +", "", if (is.null(s$fmt)) sas_rtrim(x) else sas_rtrim(sas_format(x, s$fmt)))
     } else {
       y <- c(x, extra)
       if (is.null(s$fmt)) print_num_column(y) else trimws(sas_format(y, s$fmt))
