@@ -15,6 +15,8 @@ the development version provides.
   starts sessions at NOCENTER. `sas_html()` centres the titles and the tables
   under CENTER and writes them on the left under NOCENTER (it used to centre
   the titles only).
+* PROC CONTENTS: the second column of the data set attributes is 57
+  characters wide (it was 56, so the third column started one position early).
 
 * PROC PRINT headings from variable names: a name without a
   lowercase-uppercase change whose piece is still longer than the column

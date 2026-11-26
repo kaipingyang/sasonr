@@ -123,7 +123,7 @@ sas_proc_contents <- function(work, name, m, sp) {
     # numeric variables come first; the record is padded to a multiple of 8
     # when it holds an 8-byte numeric (shorter numerics and characters are not aligned)
     obslen <- if (any(cv$type == "num" & cv$len == 8L)) vctrs::vec_cast(ceiling(np$obslen / 8) * 8, integer()) else np$obslen
-    two <- function(a, av, b, bv) sprintf("%-21s%-56s%-22s%s", a, av, b, bv)
+    two <- function(a, av, b, bv) sprintf("%-21s%-57s%-22s%s", a, av, b, bv)
     # centring units (listing_center.R): the procedure title, the attribute
     # table, each variable table and the sort information with their headings;
     # the SHORT list is not measured under CENTER (unmarked)
