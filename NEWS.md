@@ -8,9 +8,9 @@ the development version provides.
 * PROC UNIVARIATE writes its printed output (without NOPRINT): the Moments,
   Basic Statistical Measures, Tests for Location, Quantiles and Extreme
   Observations tables of each analysis variable, with the mode Note and the
-  Missing Values table, also under OPTIONS CENTER. BY, CLASS, WEIGHT and
-  OUTPUT with printed output, VARDEF= and PCTLDEF=, labelled variables, a
-  quantile column that
+  Missing Values table (special missing values included), the label of a
+  variable after its name, also under OPTIONS CENTER. BY, CLASS, WEIGHT and
+  OUTPUT with printed output, VARDEF= and PCTLDEF=, a quantile column that
   needs the E form, skewness or kurtosis whose last digits depend on the
   order of the sums fail loud.
 

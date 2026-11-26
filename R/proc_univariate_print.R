@@ -11,7 +11,7 @@
 #   need once rounded to 6 significant digits (univ_r6_column()), the column
 #   one position wider than its widest value;
 # - a mode among several is the smallest, with a Note under the measures.
-# Labels, the E form of a quantile column, more
+# The E form of a quantile column, more
 # than 20 nonzero differences in the signed rank test are not measured (fail
 # loud).
 
@@ -46,7 +46,7 @@ univ_titled <- function(title, lines) {
   c(paste0(strrep(" ", max(0L, (w - nchar(title)) %/% 2L)), title), "", lines)
 }
 
-univ_print_var <- function(x0, disp) {
+univ_print_var <- function(x0, disp, label = NULL) {
   # the statistics of the nonmissing values; the observation numbers of the
   # extreme values count every observation
   keep <- which(!is.na(x0))
@@ -124,14 +124,13 @@ univ_print_var <- function(x0, disp) {
            paste0(formatC(ev[seq_len(k)], width = vw), "      ", formatC(as.character(lo), width = ow), "        ",
                   formatC(ev[k + seq_len(k)], width = vw), "      ", formatC(as.character(hi), width = ow)))
   ext <- univ_titled("Extreme Observations", ext)
-  # the Missing Values table: one row per missing value (., A-Z), its count
-  # and percents of all observations and of the missing ones [measured,
-  # univariate_print p11]
+  # the Missing Values table: one row per missing value (_, ., A-Z, in this
+  # order), its count and percents of all observations and of the missing
+  # ones; a Total row under two or more kinds [measured, univariate_print p11,
+  # univariate_fmt q04]
   miss <- NULL
   if (length(x) < length(x0)) {
     code <- c("_", ".", LETTERS)[sas_miss_code(x0[is.na(x0)]) + 1L]
-    # the row of ._ is not measured
-    if (any(code == "_")) abort_unsupported("PROC UNIVARIATE printed output of a variable with the missing value ._")
     lev <- c("_", ".", LETTERS)
     cnts <- table(factor(code, levels = lev))
     cnts <- cnts[cnts > 0]
@@ -150,7 +149,13 @@ univ_print_var <- function(x0, disp) {
   qunits <- if (nchar(quant[1]) > max(nchar(quant[-1]))) lst_c(lst_lines(quant[1:2]), lst_unit(quant[-(1:2)])) else lst_unit(quant)
   # centring units (listing_center.R): the procedure and variable lines and
   # the Note on their own, each table with its title [measured, center_listing]
-  lst_c(lst_lines(c("The UNIVARIATE Procedure", paste0("Variable:  ", disp), "")), lst_unit(univ_titled("Moments", moments)),
+  # a label follows the name in parentheses, on the same line [measured,
+  # univariate_fmt q05]; a line wider than LINESIZE is not measured
+  # (an empty label written '' shows as (') in the listing: not supported)
+  if (length(label) && !nzchar(label)) abort_unsupported("PROC UNIVARIATE printed output of a variable with an empty label")
+  vline <- paste0("Variable:  ", disp, if (length(label)) paste0("  (", label, ")"))
+  if (nchar(vline) > rt_linesize()) abort_unsupported("a PROC UNIVARIATE variable line wider than LINESIZE")
+  lst_c(lst_lines(c("The UNIVARIATE Procedure", vline, "")), lst_unit(univ_titled("Moments", moments)),
         lst_lines(c("", "")), lst_unit(basic), if (length(note)) lst_lines(note), lst_lines(c("", "")), lst_unit(tests),
         lst_lines(c("", "")), qunits, lst_lines(c("", "")), lst_unit(ext), if (length(miss)) lst_c(lst_lines(c("", "")), lst_unit(miss)))
 }

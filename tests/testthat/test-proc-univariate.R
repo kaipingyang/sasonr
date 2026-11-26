@@ -80,4 +80,6 @@ test_that("the printed output writes the five tables of each variable", {
   lst <- sas_run("data d; input x; datalines;\n1\n.\n.A\n3\n;\nrun; proc univariate data=d; var x; run;")$listing
   expect_true("      A           1       25.00       50.00" %in% lst)
   expect_true("  Total           2       50.00      100.00" %in% lst)
+  lst <- sas_run("data d; input x; label x = 'Lab Value'; datalines;\n1\n2\n3\n;\nrun; proc univariate data=d; var x; run;")$listing
+  expect_true("Variable:  x  (Lab Value)" %in% lst)
 })

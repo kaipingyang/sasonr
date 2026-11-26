@@ -206,9 +206,9 @@ univ_step_spec <- function(step, meta, last) {
     if (!identical(o$vardef %||% "df", "df") || !identical(as.integer(o$pctldef %||% 5L), 5L)) {
       abort_unsupported("PROC UNIVARIATE printed output with VARDEF= or PCTLDEF=", step$line)
     }
-    for (v in vars) if (!is.null(col_info(v)$label)) abort_unsupported("PROC UNIVARIATE printed output of a labelled variable", step$line)
   }
   list(spec = list(vars = vars, disp = stats::setNames(lapply(vars, function(v) col_info(v)$disp), vars),
+                   labels = stats::setNames(lapply(vars, function(v) col_info(v)$label), vars),
                    groups = lapply(c(by, class), col_info), by = by, class = class, weight = weight, outputs = outputs,
                    vardef = o$vardef %||% "df", pctldef = o$pctldef %||% 5L, line = step$line, print = print),
        inp = inp)
@@ -289,7 +289,7 @@ univ_compute <- function(d, spec) {
     tabs <- lapply(spec$vars, function(v) {
       tb <- new_sasonr_ods_table(tibble::tibble(), name = "Univariate", label = "Univariate", path = "Univariate",
                                  proc = "Univariate", template = "base.univariate.lines")
-      attr(tb, "lines") <- univ_print_var(as.numeric(d[[v]]), spec$disp[[v]])
+      attr(tb, "lines") <- univ_print_var(as.numeric(d[[v]]), spec$disp[[v]], spec$labels[[v]])
       tb
     })
     return(list(tables = tabs, data = list(), events = character()))
