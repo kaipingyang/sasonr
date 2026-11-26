@@ -12,8 +12,8 @@
 #   one position wider than its widest value;
 # - a mode among several is the smallest, with a Note under the measures.
 # Missing values (their table), labels, the E form of a quantile column, more
-# than 20 nonzero differences in the signed rank test and the layout under
-# OPTIONS CENTER are not measured (fail loud).
+# than 20 nonzero differences in the signed rank test are not measured (fail
+# loud).
 
 univ_r6_dec <- function(x) {
   if (is.na(x) || x == 0) return(0L)
@@ -119,8 +119,13 @@ univ_print_var <- function(x, disp) {
            paste0(formatC(ev[seq_len(k)], width = vw), "      ", formatC(as.character(lo), width = ow), "        ",
                   formatC(ev[k + seq_len(k)], width = vw), "      ", formatC(as.character(hi), width = ow)))
   ext <- univ_titled("Extreme Observations", ext)
-  c("The UNIVARIATE Procedure", paste0("Variable:  ", disp), "", univ_titled("Moments", moments), "", "",
-    basic, note, "", "", tests, "", "", quant, "", "", ext)
+  # the quantile title wider than its table is a unit of its own
+  qunits <- if (nchar(quant[1]) > max(nchar(quant[-1]))) lst_c(lst_lines(quant[1:2]), lst_unit(quant[-(1:2)])) else lst_unit(quant)
+  # centring units (listing_center.R): the procedure and variable lines and
+  # the Note on their own, each table with its title [measured, center_listing]
+  lst_c(lst_lines(c("The UNIVARIATE Procedure", paste0("Variable:  ", disp), "")), lst_unit(univ_titled("Moments", moments)),
+        lst_lines(c("", "")), lst_unit(basic), if (length(note)) lst_lines(note), lst_lines(c("", "")), lst_unit(tests),
+        lst_lines(c("", "")), qunits, lst_lines(c("", "")), lst_unit(ext))
 }
 
 # Skewness and kurtosis from one-pass (updating) central moments, a check of

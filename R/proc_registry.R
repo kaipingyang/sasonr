@@ -19,9 +19,9 @@ proc_registry <- list(
   freq = list(compute = function(d, spec) freq_compute(d, spec), templates = c(Freq = "base.freq.lines"),
               listing = function(tables, ls) freq_listing_tables(tables)),
   # NOPRINT with OUTPUT OUT= only (block U1): no listing
-  # printed output: the lines of proc_univariate_print.R (not measured under CENTER: unmarked)
+  # printed output: the lines of proc_univariate_print.R (with their centring units)
   univariate = list(compute = function(d, spec) univ_compute(d, spec), templates = character(),
-                    proctitle = FALSE, listing = function(tables, ls) unlist(lapply(tables, function(t) attr(t, "lines", exact = TRUE)))),
+                    proctitle = FALSE, listing = function(tables, ls) do.call(lst_c, lapply(tables, function(t) attr(t, "lines", exact = TRUE)))),
   # one table per page (BY group); no procedure title
   print = list(compute = function(d, spec) print_compute(d, spec), templates = c(Print = "base.print"),
                proctitle = FALSE, listing = function(tables, ls) print_listing_tables(tables))

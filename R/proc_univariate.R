@@ -222,7 +222,7 @@ translate_proc_univariate <- function(step, meta, last) {
     header,
     paste0(".d <- ", proc_source_code(b$inp)),
     paste0(".r <- sas_rt_proc(\"univariate\", .d, ", r_lit(spec), ")"),
-    if (isTRUE(spec$print)) ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
+    if (isTRUE(spec$print)) ".lst <- sas_lst_c(.lst, sas_univ_titles(.titles, .r$tables))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   outs <- vapply(spec$outputs, `[[`, "", "name")
@@ -285,11 +285,14 @@ univ_weighted_moments <- function(x, w, vardef) {
 
 univ_compute <- function(d, spec) {
   if (isTRUE(spec$print)) {
-    lines <- unlist(lapply(spec$vars, function(v) univ_print_var(as.numeric(d[[v]]), spec$disp[[v]])), use.names = FALSE)
-    tb <- new_sasonr_ods_table(tibble::tibble(), name = "Univariate", label = "Univariate", path = "Univariate",
-                               proc = "Univariate", template = "base.univariate.lines")
-    attr(tb, "lines") <- lines
-    return(list(tables = list(tb), data = list(), events = character()))
+    # one page per analysis variable
+    tabs <- lapply(spec$vars, function(v) {
+      tb <- new_sasonr_ods_table(tibble::tibble(), name = "Univariate", label = "Univariate", path = "Univariate",
+                                 proc = "Univariate", template = "base.univariate.lines")
+      attr(tb, "lines") <- univ_print_var(as.numeric(d[[v]]), spec$disp[[v]])
+      tb
+    })
+    return(list(tables = tabs, data = list(), events = character()))
   }
   stats <- setdiff(unique(unlist(lapply(spec$outputs, function(o) vapply(o$cols, `[[`, "", "stat")))), "pctlpt")
   gv <- c(spec$by, spec$class)
@@ -382,4 +385,14 @@ univ_location_tests <- function(x, mu0 = 0) {
     out$p_s <- min(1, sum(dist[abs(vals - mid) >= dev - 1e-9]))
   }
   out
+}
+
+#' The printed output of PROC UNIVARIATE: the TITLE lines above the page of
+#' each analysis variable
+#' @param titles The TITLE lines.
+#' @param tables The tables of `sas_rt_proc()`.
+#' @export
+#' @keywords internal
+sas_univ_titles <- function(titles, tables) {
+  do.call(lst_c, lapply(tables, function(t) sas_titles_once(titles, attr(t, "lines", exact = TRUE))))
 }
