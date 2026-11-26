@@ -1246,13 +1246,13 @@ listing_base_summary <- function(tb, ls) {
     tb_lines <- c(means_render(pcols, gaps), "")
     if (!multi) {
       # the heading is centred over the table, rounding down (over the table
-      # width less 1 for the panels of a class table split over several
-      # panels), with the table one centring unit; a heading wider than its
+      # width less 1 when a class column is left-aligned), with the table one
+      # centring unit; a heading wider than its
       # table and the table are units of their own [measured, listings at
       # NOCENTER and CENTER]
       av <- sas_rtrim(paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""))
       tw <- sum(vapply(pcols, function(c) vctrs::vec_cast(c$width, integer()), 1L)) + sum(gaps) -
-        if (length(fixed) > 0 && length(panels) > 1L) 1L else 0L
+        if (any(vapply(fixed, function(c) !isTRUE(c$right), TRUE))) 1L else 0L
       if (nchar(av) <= tw) {
         # over the table: one centring unit with it
         out <- lst_c(out, lst_unit(c(paste0(strrep(" ", (tw - nchar(av)) %/% 2L), av), "", tb_lines)))

@@ -90,11 +90,16 @@ contents_var_table <- function(cv, idx, title) {
     list(parts = "#", width = max(1L, nchar(num)), right = FALSE, cells = num),
     list(parts = "Variable", width = max(8L, nchar(cv$disp[idx])), right = FALSE, cells = cv$disp[idx]),
     list(parts = "Type", width = 4L, right = FALSE, cells = ifelse(cv$type[idx] == "char", "Char", "Num")),
-    list(parts = "Len", width = 3L, right = TRUE, cells = as.character(cv$len[idx]))
+    list(parts = "Len", width = max(3L, nchar(as.character(cv$len[idx]))), right = TRUE, cells = as.character(cv$len[idx]))
   )
   if (any(nzchar(cv$fmt))) cols <- c(cols, list(list(parts = "Format", width = max(6L, nchar(cv$fmt[idx])), right = FALSE, cells = cv$fmt[idx])))
   if (any(nzchar(cv$infmt))) cols <- c(cols, list(list(parts = "Informat", width = max(8L, nchar(cv$infmt[idx])), right = FALSE, cells = cv$infmt[idx])))
   if (any(nzchar(cv$label))) cols <- c(cols, list(list(parts = "Label", width = max(5L, nchar(cv$label[idx])), right = FALSE, cells = cv$label[idx])))
+  # a table wider than the line: the gaps narrow and the labels wrap, by a
+  # rule not measured (fail loud)
+  if (table_width(cols, 4L) > rt_linesize()) {
+    abort_unsupported("a PROC CONTENTS variable table wider than LINESIZE (long labels or formats)")
+  }
   tb <- render_table(cols, gap = 4L, rule = FALSE)
   # the heading is centred over the table (rounding up), the table under a
   # wider heading starts in the first column; under CENTER a wider heading is

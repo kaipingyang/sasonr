@@ -27,7 +27,11 @@ the development version provides.
   headings and fields could sit a position or more to the left or right of
   their place.
 * PROC FREQ: in a crosstabulation the column variable heading starts at
-  least five blanks after the row variable heading.
+  least five blanks after the row variable heading; the values of a number
+  under a user-defined format are left-aligned in a one-way table (the
+  heading stays right-aligned).
+* PROC CONTENTS: the Len column widens for lengths of more than three
+  digits; a variable table wider than LINESIZE (long labels) fails loud.
 * PROC SQL: a column label with blanks wraps word by word at the width of the
   column or of its longest word (it was cut in two lines only); a report
   wider than LINESIZE fails loud (it was written wider than the line, where

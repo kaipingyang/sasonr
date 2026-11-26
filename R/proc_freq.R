@@ -1042,7 +1042,7 @@ freq_oneway <- function(tab, obs, l, vars, info, o, nmiss, neg, missprint) {
                              proc = "Freq", template = "base.freq.oneway",
                              cols = ods_cols(names(x), label = c(i$disp, names(x)[-1]), hidden = hidden,
                                              role = c("class", rep("stat", ncol(x) - 1L))))
-  attr(tb, "freq") <- list(disp = i$disp, char = i$char, text = l$text, test = test$kind, nmiss = nmiss)
+  attr(tb, "freq") <- list(disp = i$disp, char = i$char, right = proc_right_align(i), text = l$text, test = test$kind, nmiss = nmiss)
   # OUT= (missing levels keep their count with a missing PERCENT)
   out_cols <- list(freq_col_of(v, info), list(name = "count", disp = "COUNT", char = FALSE, len = 8L, label = "Frequency Count"),
                    list(name = "percent", disp = "PERCENT", char = FALSE, len = 8L, label = "Percent of Total Frequency"))
@@ -1078,11 +1078,13 @@ freq_oneway_listing <- function(tb) {
   n <- nrow(tb)
   nmiss <- a$nmiss
   vals <- a$text
-  right <- !i$char
+  # numbers right-aligned unless a user-defined format makes them labels
+  right <- a$right %||% !i$char
   W <- max(c(nchar(i$disp), nchar(vals)))
   pad <- function(x) formatC(x, width = if (right) W else -W)
   top <- strrep(" ", W)
-  head <- pad(i$disp)
+  # the heading of a number stays right-aligned
+  head <- formatC(i$disp, width = if (!isTRUE(i$char)) W else -W)
   width <- W
   if (!isTRUE(o$nofreq)) {
     head <- paste0(head, "    Frequency")
