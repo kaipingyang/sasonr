@@ -62,7 +62,7 @@ print_compute <- function(d, spec) {
                                                      grand = if (k == ng) text[[nm]]$grand))),
       sums = sums, sub_label = if (sub_rows) spec$by_info[[spec$by]]$disp else NULL,
       last = k == ng, n = if (isTRUE(spec$n)) length(g) else NULL, split = spec$split, first = k == 1L,
-      row_header = obs || !is.null(spec$id)
+      row_header = obs || !is.null(spec$id), id_n = spec$id_n %||% 0L
     )
     tb
   })

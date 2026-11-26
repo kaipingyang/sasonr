@@ -27,36 +27,41 @@
 # group up to W gives; each group then takes columns while its width stays
 # within (W + table width / k) / 2, and when that would need more than k
 # groups the groups filled up to W are kept.  A column is at most (W - 10) / 2
-# = 5748 wide (its text wraps) [measured, probes over 24 to 80 columns of six
-# widths; no other W fits them all].
-# Groups with the Obs or ID column, sum rows, the N line or BY groups are not
-# measured (fail loud).  The PROC TABULATE tables wider than 9322 twips are
+# = 5748 wide (its text wraps).  The Obs or ID column starts every group and
+# counts once per group in the table width (the 10 once) [measured, probes over 22 to 80
+# columns of six widths, with and without Obs / one ID variable; no other W
+# fits them all].  Groups with several ID variables, sum rows, the N line or
+# BY groups are not measured (fail loud).  The PROC TABULATE tables wider than 9322 twips are
 # not measured either (fail loud).
 rtf_one_group_max <- 9322
 rtf_page_body <- 11506
 
 # The column groups (lists of column numbers) of a PROC PRINT table whose
-# columns are `widths` wide (without the 10 of the first column).
-rtf_print_groups <- function(widths) {
+# columns are `widths` wide (without the 10 of the first column); the first
+# `nhead` columns (Obs or ID) start every group.
+rtf_print_groups <- function(widths, nhead = 0L) {
+  head <- seq_len(nhead)
+  start <- 10 + sum(widths[head])
+  body <- setdiff(seq_along(widths), head)
   fill <- function(limit) {
     out <- list()
     cur <- integer()
-    w <- 10
-    for (j in seq_along(widths)) {
+    w <- start
+    for (j in body) {
       if (length(cur) && w + widths[j] > limit) {
         out <- c(out, list(cur))
         cur <- integer()
-        w <- 10
+        w <- start
       }
       cur <- c(cur, j)
       w <- w + widths[j]
     }
-    c(out, list(cur))
+    lapply(c(out, list(cur)), function(g) c(head, g))
   }
   greedy <- fill(rtf_page_body)
   k <- length(greedy)
   if (k == 1L) return(greedy)
-  bal <- fill((rtf_page_body + (10 + sum(widths)) / k) / 2)
+  bal <- fill((rtf_page_body + (10 + k * sum(widths[head]) + sum(widths[body])) / k) / 2)
   if (length(bal) > k) greedy else bal
 }
 
@@ -180,9 +185,9 @@ rtf_print_table <- function(tb) {
     widths <- pmax(widths, need)
   }
   widths <- pmin(widths, (rtf_page_body - 10) / 2)
-  groups <- rtf_print_groups(widths)
+  groups <- rtf_print_groups(widths, if (any(role)) 1L else 0L)
   if (length(groups) > 1L) {
-    what <- if (any(role)) "the Obs or ID column" else if (length(sum_rows)) "sum rows" else if (!is.null(n_row)) "the N line" else if (!is.null(attr(tb, "by", exact = TRUE))) "BY groups"
+    what <- if ((a$id_n %||% 0L) > 1L) "several ID variables" else if (length(sum_rows)) "sum rows" else if (!is.null(n_row)) "the N line" else if (!is.null(attr(tb, "by", exact = TRUE))) "BY groups"
     if (!is.null(what)) abort_unsupported(paste0("an ODS RTF PROC PRINT table split into column groups, with ", what))
   }
   align <- vapply(a$cols, function(c) if (isTRUE(c$char)) "l" else "r", "")

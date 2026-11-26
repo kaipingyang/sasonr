@@ -76,8 +76,15 @@ test_that("each column group is a table of its own after an empty paragraph", {
   x <- readLines("rtf/out.rtf")
   expect_length(grep("\\trhdr", x, fixed = TRUE), 2L)
   expect_true("\\pard\\par" %in% x)
-  expect_error(sas_run(paste0("options ls=256; data a; length ", paste0("c", 1:28, collapse = " "), " $8; ",
-                              paste0("c", 1:28, "='i';", collapse = " "), " run;\n",
-                              "ods rtf file='rtf/out.rtf'; proc print data=a; run; ods rtf close;")),
-               class = "sasonr_unsupported")
+  sas_run(paste0("options ls=256; data a; length ", paste0("c", 1:28, collapse = " "), " $8; ",
+                 paste0("c", 1:28, "='i';", collapse = " "), " run;\n",
+                 "ods rtf file='rtf/out.rtf'; proc print data=a; run; ods rtf close;"))
+  x <- readLines("rtf/out.rtf")
+  expect_length(grep("{Obs\\cell}", x, fixed = TRUE), 2L)
+})
+
+test_that("the Obs or ID column starts every group and counts once per group", {
+  groups <- function(w, h) lengths(sasonr:::rtf_print_groups(w, h))
+  expect_identical(groups(c(512, rep(462, 24)), 1L), c(18L, 8L))
+  expect_identical(groups(c(247, rep(462, 28)), 1L), c(20L, 10L))
 })

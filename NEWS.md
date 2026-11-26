@@ -8,8 +8,9 @@ the development version provides.
 * ODS RTF: a PROC PRINT table wider than the page is split into column
   groups, each a table of its own; the groups are balanced (each takes
   columns up to the average of the page width and the table width per
-  group), and a column is at most half the page wide. A split table with the
-  Obs or ID column, sum rows, the N line or BY groups still fails loud.
+  group), and a column is at most half the page wide. The Obs column or a
+  single ID variable starts every group. A split table with several ID
+  variables, sum rows, the N line or BY groups still fails loud.
 * An ARRAY of existing character variables now keeps the length a LENGTH
   statement gave them: storing through an element reference (`c{j} = ...`)
   no longer cuts the value to 8 characters. An array of character variables

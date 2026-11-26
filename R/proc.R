@@ -425,7 +425,7 @@ translate_proc <- function(step, meta, last = NULL) {
   info <- lapply(by, function(v) list(disp = inp$st$info[[v]]$disp %||% v, fmt = inp$st$formats[[v]]))
   names(info) <- by
   spec <- list(
-    line = step$line, data = inp$ds$name, cols = lapply(pvars, col_spec), id = if (length(ids)) col_spec(ids) else NULL,
+    line = step$line, data = inp$ds$name, cols = lapply(pvars, col_spec), id = if (length(ids)) col_spec(ids) else NULL, id_n = length(ids),
     noobs = isTRUE(o[["noobs"]]), obs_label = o[["obs"]] %||% "Obs", n = isTRUE(o[["n"]]), split = o[["split"]],
     by = by, by_info = info, sums = sums
   )
