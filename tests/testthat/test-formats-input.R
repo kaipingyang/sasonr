@@ -270,3 +270,18 @@ test_that("PROC FORMAT DEFAULT= requires a numeric constant and truncates a frac
 data a; c = put(1, fb.); l = length(c); run;")
   expect_identical(r$work$a$c, "abc")
 })
+
+test_that("Dw.p rounds to the decimals of the value's magnitude, right-aligned", {
+  d <- function(v, w, p = NA_integer_) sasonr:::fmt_d(v, w, p)
+  expect_identical(d(0.52705, 8), "  0.5271")
+  expect_identical(d(50, 8), " 50.0000")
+  expect_identical(d(123.456, 8), "   123.5")
+  expect_identical(d(31115.1348, 8), " 31115.1")
+  expect_identical(d(123.456, 10), " 123.45600")
+  expect_identical(d(1.23456789e3, 10), "      1235")
+  expect_identical(d(-5.5, 8), " -5.5000")
+  expect_identical(d(0, 8), "       0")
+  expect_error(d(3789990938, 8), class = "sasonr_unsupported")   # E form
+  expect_error(d(1.5, 8, 5L), class = "sasonr_unsupported")      # p outside the table
+  expect_error(d(99.99996, 8), class = "sasonr_unsupported")     # rounds to the next magnitude
+})

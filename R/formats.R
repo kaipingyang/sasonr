@@ -36,7 +36,7 @@ sas_fmt_text <- function(text) {
 # Catalogue of built-in formats ---------------------------------------------
 
 num_fmt_defaults <- c(
-  best = 12, "f" = 12, "w" = 12, z = 1, comma = 6, commax = 6, dollar = 6, dollarx = 6,
+  best = 12, "f" = 12, "w" = 12, z = 1, d = 12, comma = 6, commax = 6, dollar = 6, dollarx = 6,
   percent = 6, negparen = 6, e = 12, pvalue = 6, date = 7, yymmdd = 8, mmddyy = 8,
   ddmmyy = 8, e8601da = 10, is8601da = 10, b8601da = 8, e8601dt = 19, is8601dt = 19,
   e8601tm = 8, is8601tm = 8, e8601dn = 10, datetime = 16, dtdate = 7, dtmonyy = 5, dtyear = 4,
@@ -65,7 +65,7 @@ fmt_base_name <- function(name) {
 char_fmt_names <- c("", "char", "upcase", "quote", "hex")
 
 num_fmt_width_range <- list(
-  best = c(1, 32), w = c(1, 32), f = c(1, 32), z = c(1, 32), comma = c(1, 32), commax = c(1, 32),
+  best = c(1, 32), w = c(1, 32), f = c(1, 32), z = c(1, 32), d = c(1, 32), comma = c(1, 32), commax = c(1, 32),
   dollar = c(2, 32), dollarx = c(2, 32), percent = c(4, 32), negparen = c(1, 32), e = c(7, 32),
   date = c(5, 11), yymmdd = c(2, 10), mmddyy = c(2, 10), ddmmyy = c(2, 10), e8601da = c(10, 10),
   is8601da = c(10, 10), e8601dt = c(16, 26), is8601dt = c(16, 26), time = c(2, 20),
@@ -650,6 +650,7 @@ sas_format <- function(x, fmt = NULL) {
       best = sas_fmt_best(v, w),
       w = fit_number(v, w, d),
       z = fit_number(v, w, d, zero = TRUE),
+      d = fmt_d(v, w, fmt$d),
       comma = fit_number(v, w, d, commas = TRUE),
       commax = fit_number(v, w, d, commas = TRUE, swap = TRUE),
       dollar = fit_number(v, w, d, commas = TRUE, dollar = TRUE),
@@ -662,6 +663,46 @@ sas_format <- function(x, fmt = NULL) {
       fmt_date_value(v, bn$base, w, bn$sep, fmt$d)
     )
   }, character(1), USE.NAMES = FALSE)
+}
+
+# Dw.p: the value rounded half away from zero to a number of decimals that
+# depends on the width, p (3 when omitted), the sign and the magnitude
+# 10^k <= |value| < 10^(k+1), right-aligned; values of one magnitude line up
+# on the decimal point.  The decimals come from a table over w = 6..14,
+# p = 1, 2, 3, 4, 6 and k = -9..12 (inst/formats/d_decimals.csv).  Other
+# widths, p values and magnitudes, the E form the table marks for some
+# magnitudes, and a rounding that reaches the next magnitude fail loud.
+d_decimals <- local({
+  tab <- NULL
+  function() {
+    if (is.null(tab)) {
+      f <- system.file("formats", "d_decimals.csv", package = "sasonr")
+      tab <<- utils::read.csv(f, colClasses = c("integer", "integer", "character", "integer", "integer"))
+    }
+    tab
+  }
+})
+
+fmt_d <- function(v, w, p) {
+  if (is.na(p)) p <- 3L
+  what <- paste0("format D", w, ".", p, " of ", format(v, digits = 17))
+  if (v == 0) {
+    if (1 / v < 0) abort_unsupported(paste0(what, " (negative zero)"))
+    return(just_right("0", w))
+  }
+  a <- abs(v)
+  k <- floor(log10(a))
+  if (a < 10^k) k <- k - 1
+  if (a >= 10^(k + 1)) k <- k + 1
+  tab <- d_decimals()
+  hit <- tab$d[tab$w == w & tab$p == p & tab$sign == (if (v < 0) "-" else "+") & tab$k == k]
+  if (length(hit) != 1L) abort_unsupported(what)
+  if (is.na(hit)) abort_unsupported(paste0(what, " (E form)"))
+  b <- fixed_body(v, hit)
+  if (identical(b, NA_character_) || as.numeric(b$s) >= 10^(k + 1)) abort_unsupported(paste0(what, " (rounding to the next magnitude)"))
+  s <- paste0(if (b$neg) "-", b$s)
+  if (nchar(s) > w) abort_unsupported(what)
+  just_right(s, w)
 }
 
 # $HEXw.: two hex digits per byte of the value padded with blanks to w/2 bytes

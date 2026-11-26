@@ -14,6 +14,12 @@ the development version provides.
   statement gave them: storing through an element reference (`c{j} = ...`)
   no longer cuts the value to 8 characters. An array of character variables
   of different lengths fails loud.
+* The Dw.p format: the value is rounded to a number of decimals that depends
+  on the width, p (3 when omitted), the sign and the magnitude of the value,
+  so that values of one magnitude line up on the decimal point. Widths 6 to
+  14 and p = 1, 2, 3, 4 or 6 are supported; other widths and p values, and
+  values that need the E form, fail loud. Until the format registry lists
+  it, the format runs with `options(sasonr.strict = FALSE)` only.
 
 * PROC PRINT LABEL: a label of three to five words that is wider than the
   column is written on at most three lines, at the narrowest width that
