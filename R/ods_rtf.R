@@ -30,8 +30,9 @@
 # = 5748 wide (its text wraps).  The Obs or ID column starts every group and
 # counts once per group in the table width (the 10 once) [measured, probes over 22 to 80
 # columns of six widths, with and without Obs / one ID variable; no other W
-# fits them all].  Groups with several ID variables, sum rows, the N line or
-# BY groups are not measured (fail loud).  The PROC TABULATE tables wider than 9322 twips are
+# fits them all].  Each group ends with its own N line; each BY group is split
+# on its own.  Groups with several ID variables or sum rows are not measured
+# (fail loud).  The PROC TABULATE tables wider than 9322 twips are
 # not measured either (fail loud).
 rtf_one_group_max <- 9322
 rtf_page_body <- 11506
@@ -187,7 +188,7 @@ rtf_print_table <- function(tb) {
   widths <- pmin(widths, (rtf_page_body - 10) / 2)
   groups <- rtf_print_groups(widths, if (any(role)) 1L else 0L)
   if (length(groups) > 1L) {
-    what <- if ((a$id_n %||% 0L) > 1L) "several ID variables" else if (length(sum_rows)) "sum rows" else if (!is.null(n_row)) "the N line" else if (!is.null(attr(tb, "by", exact = TRUE))) "BY groups"
+    what <- if ((a$id_n %||% 0L) > 1L) "several ID variables" else if (length(sum_rows)) "sum rows"
     if (!is.null(what)) abort_unsupported(paste0("an ODS RTF PROC PRINT table split into column groups, with ", what))
   }
   align <- vapply(a$cols, function(c) if (isTRUE(c$char)) "l" else "r", "")

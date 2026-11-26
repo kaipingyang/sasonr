@@ -88,3 +88,13 @@ test_that("the Obs or ID column starts every group and counts once per group", {
   expect_identical(groups(c(512, rep(462, 24)), 1L), c(18L, 8L))
   expect_identical(groups(c(247, rep(462, 28)), 1L), c(20L, 10L))
 })
+
+test_that("each column group ends with its own N line", {
+  withr::local_dir(withr::local_tempdir())
+  dir.create("rtf")
+  sas_run(paste0("options ls=256; data a; length ", paste0("c", 1:28, collapse = " "), " $8; ",
+                 paste0("c", 1:28, "='i';", collapse = " "), " run;\n",
+                 "ods rtf file='rtf/out.rtf'; proc print data=a noobs n; run; ods rtf close;"))
+  x <- readLines("rtf/out.rtf")
+  expect_length(grep("{N = 1\\cell}", x, fixed = TRUE), 2L)
+})
