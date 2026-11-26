@@ -48,7 +48,7 @@ print_compute <- function(d, spec) {
       if (is.null(s$fmt)) print_num_column(y) else trimws(sas_format(y, s$fmt))
     }
     list(values = all[seq_len(n)], sub = if (!is.null(extra)) all[n + seq_len(ng)], grand = if (!is.null(extra)) all[n + ng + 1L],
-         rounded = attr(all, "rounded", exact = TRUE))
+         rounded = attr(all, "rounded", exact = TRUE), dec = attr(all, "dec", exact = TRUE))
   })
   names(text) <- vapply(cols, `[[`, "", "name")
   sub_rows <- length(sums) > 0 && length(spec$by) > 0
@@ -64,10 +64,13 @@ print_compute <- function(d, spec) {
     attr(tb, "print") <- list(
       cols = c(if (obs) list(list(name = "Obs", head = spec$obs_label, char = FALSE)),
                lapply(cols, function(s) list(name = s$name, head = s$label %||% s$disp, label = !is.null(s$label), char = s$char,
-                                             fw = if (!s$char && !is.null(s$fmt)) fmt_width(s$fmt, FALSE)))),
+                                             fw = if (!s$char && !is.null(s$fmt)) fmt_width(s$fmt, FALSE),
+                                             # a number under a user-defined format is laid out as text
+                                             label_fmt = !s$char && !is.null(s$fmt) && !is.null(user_fmt(s$fmt$name, FALSE))))),
       text = c(if (obs) list(list(values = as.character(d$.obs[g]))),
                lapply(names(text), function(nm) list(values = text[[nm]]$values[g], sub = text[[nm]]$sub[k],
-                                                     grand = if (k == ng) text[[nm]]$grand, rounded = text[[nm]]$rounded))),
+                                                     grand = if (k == ng) text[[nm]]$grand, rounded = text[[nm]]$rounded,
+                                                     dec = text[[nm]]$dec))),
       sums = sums, sub_label = if (sub_rows) spec$by_info[[spec$by]]$disp else NULL,
       last = k == ng, n = if (isTRUE(spec$n)) length(g) else NULL, split = spec$split, first = k == 1L,
       row_header = obs || !is.null(spec$id), id_n = spec$id_n %||% 0L
@@ -134,32 +137,34 @@ listing_base_print <- function(tb) {
   # an unformatted column rounded to decimals held at 2 is laid out like a formatted one
   kind <- vapply(seq_len(nc), function(j) {
     c <- a$cols[[j]]
-    if (isTRUE(c$char)) "c" else if (!is.null(c$fw) || isTRUE(rounded[j])) "f" else "n"
+    if (isTRUE(c$char) || isTRUE(c$label_fmt)) "c" else if (!is.null(c$fw) || isTRUE(rounded[j])) "f" else "n"
   }, "")
-  off <- ifelse(multi | kind == "n", ceiling((widths - fws) / 2), floor((widths - fws) / 2))
-  # a one-line heading narrower than a character column whose non-blank
-  # values are uneven starts in the first position: when the shortest value
-  # is narrower than fw - floor(fw / 3) [measured with two values of widths
-  # 6 to 20]; with more values the rule is not known when the shortest value
-  # and the mean width disagree (fail loud)
+  off <- ifelse(kind == "n", ceiling((widths - fws) / 2), floor((widths - fws) / 2))
+  # a heading narrower than a character column whose non-blank values are
+  # uneven starts in the first position when the shortest value is more than
+  # D(fw) narrower than the widest; D by the widest value fw = 5..16 (wider
+  # columns of uneven values depend on the heading too: fail loud)
+  # [measured on columns of two to five values, headings of 2 to 7]
   char_left <- vapply(seq_len(nc), function(j) {
-    if (kind[j] != "c" || multi[j]) return(FALSE)
+    if (kind[j] != "c") return(FALSE)
     if (max(nchar(heads[[j]])) >= fws[j]) return(FALSE)
     v <- nchar(a$text[[j]]$values)
     v <- v[v > 0]
     if (length(v) < 2L) return(FALSE)
-    lim <- fws[j] - fws[j] %/% 3L
-    by_min <- min(v) < lim
-    by_mean <- mean(v) < (fws[j] + lim) / 2
-    if (length(unique(v)) > 2L && by_min != by_mean) {
-      abort_unsupported("the PROC PRINT heading of a character column with values of several widths")
+    if (min(v) == fws[j]) return(FALSE)
+    d <- c(2L, 2L, 2L, 2L, 2L, 3L, 3L, 3L, 4L, 4L, 4L, 5L)[fws[j] - 4L]
+    if (fws[j] < 5L || fws[j] > 16L) {
+      abort_unsupported(paste0("the PROC PRINT heading of a character column ", fws[j], " wide with values of several widths"))
     }
-    by_min
+    fws[j] - min(v) > d
   }, TRUE)
+  # a missing value of an unformatted number sits in the decimal point column
+  miss_pad <- vapply(a$text, function(t) as.integer(t$dec %||% 0L), 1L)
   cell <- function(j, s, field = TRUE) {
     if (is.na(s) || !nzchar(s)) return(strrep(" ", widths[j]))
     if (!field) return(formatC(s, width = -widths[j]))
-    f <- formatC(s, width = if (a$cols[[j]]$char) -fws[j] else fws[j])
+    if (miss_pad[j] > 0L && grepl("^(\\.[A-Z_]?|[A-Z_])$", s)) s <- paste0(s, strrep(" ", miss_pad[j]))
+    f <- formatC(s, width = if (kind[j] == "c") -fws[j] else fws[j])
     formatC(paste0(strrep(" ", off[j]), f), width = -widths[j])
   }
   line_of <- function(cells) sas_rtrim(paste(cells, collapse = "    "))
@@ -169,7 +174,10 @@ listing_base_print <- function(tb) {
       h <- c(rep("", nl - length(heads[[j]])), heads[[j]])[i]
       if (!nzchar(h)) return(strrep(" ", widths[j]))
       gap <- widths[j] - nchar(h)
-      pos <- if (multi[j] || kind[j] == "n") ceiling(gap / 2) else if (kind[j] == "f") gap else if (char_left[j]) 0L else floor(gap / 2)
+      # a formatted number: right-aligned, centred rounding down when its
+      # heading is wider than the field
+      pos <- if (kind[j] == "f") (if (max(nchar(heads[[j]])) > fws[j]) floor(gap / 2) else gap) else
+        if (kind[j] == "n") ceiling(gap / 2) else if (char_left[j]) 0L else floor(gap / 2)
       formatC(paste0(strrep(" ", pos), h), width = -widths[j])
     }, ""))
   }, "")

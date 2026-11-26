@@ -20,8 +20,14 @@ the development version provides.
   centred rounding up, a character column rounding down; an unformatted
   column whose values are rounded to two decimals because of their magnitude
   is laid out like a formatted one; the heading of a character column whose
-  values are of uneven widths starts in the first position. Before, headings
-  and fields could sit a position or more to the left or right of their place.
+  values are of uneven widths starts in the first position (columns up to 16
+  wide; wider ones fail loud); a number under a user-defined format is laid
+  out as text; a missing value of an unformatted number sits in the decimal
+  point column; headings of several lines follow the same rules. Before,
+  headings and fields could sit a position or more to the left or right of
+  their place.
+* PROC FREQ: in a crosstabulation the column variable heading starts at
+  least five blanks after the row variable heading.
 * PROC SQL: a column label with blanks wraps word by word at the width of the
   column or of its longest word (it was cut in two lines only); a report
   wider than LINESIZE fails loud (it was written wider than the line, where

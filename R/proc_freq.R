@@ -1292,7 +1292,8 @@ freq_crosstab_listing <- function(tb) {
   # (measured): five blanks between them on one line when the row heading is
   # longer than the row label column and both fit the table width
   one_line <- nchar(rh) + 5L + nchar(ch) <= R + 1L + (C + 1L) * nc + 7L
-  lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -(R + 1L)), ch) else if (one_line) paste0(rh, strrep(" ", 5L), ch) else
+  # the column heading at least five blanks after the row heading
+  lst <- c(lst, if (nchar(rh) <= R) paste0(formatC(rh, width = -max(R + 1L, nchar(rh) + 5L)), ch) else if (one_line) paste0(rh, strrep(" ", 5L), ch) else
     c(rh, paste0(strrep(" ", R + 1L), ch)))
   chead <- paste(vapply(a$chead, function(x) formatC(x, width = if (proc_right_align(ci)) C else -C), ""), collapse = "|")
   for (j in seq_along(labels)) {
