@@ -281,7 +281,8 @@ test_that("Dw.p rounds to the decimals of the value's magnitude, right-aligned",
   expect_identical(d(1.23456789e3, 10), "      1235")
   expect_identical(d(-5.5, 8), " -5.5000")
   expect_identical(d(0, 8), "       0")
-  expect_error(d(3789990938, 8), class = "sasonr_unsupported")   # E form
+  expect_identical(d(3789990938, 8), "  3.79E9")                 # E form: BEST8.
+  expect_identical(d(1.4791e-7, 10, 4L), " 1.4791E-7")
   expect_error(d(1.5, 8, 5L), class = "sasonr_unsupported")      # p outside the table
   expect_error(d(99.99996, 8), class = "sasonr_unsupported")     # rounds to the next magnitude
 })

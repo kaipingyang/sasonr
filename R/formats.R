@@ -669,8 +669,8 @@ sas_format <- function(x, fmt = NULL) {
 # depends on the width, p (3 when omitted), the sign and the magnitude
 # 10^k <= |value| < 10^(k+1), right-aligned; values of one magnitude line up
 # on the decimal point.  The decimals come from a table over w = 6..14,
-# p = 1, 2, 3, 4, 6 and k = -9..12 (inst/formats/d_decimals.csv).  Other
-# widths, p values and magnitudes, the E form the table marks for some
+# p = 1, 2, 3, 4, 6 and k = -9..12 (inst/formats/d_decimals.csv); where the
+# table marks the E form the text is BESTw.  Other widths, p values and
 # magnitudes, and a rounding that reaches the next magnitude fail loud.
 d_decimals <- local({
   tab <- NULL
@@ -697,7 +697,12 @@ fmt_d <- function(v, w, p) {
   tab <- d_decimals()
   hit <- tab$d[tab$w == w & tab$p == p & tab$sign == (if (v < 0) "-" else "+") & tab$k == k]
   if (length(hit) != 1L) abort_unsupported(what)
-  if (is.na(hit)) abort_unsupported(paste0(what, " (E form)"))
+  if (is.na(hit)) {
+    # the E form is the BESTw. text [measured, every E entry of the table]
+    e <- sas_fmt_best(v, w)
+    if (!grepl("E", e, fixed = TRUE)) abort_unsupported(paste0(what, " (E form)"))
+    return(e)
+  }
   b <- fixed_body(v, hit)
   if (identical(b, NA_character_) || as.numeric(b$s) >= 10^(k + 1)) abort_unsupported(paste0(what, " (rounding to the next magnitude)"))
   s <- paste0(if (b$neg) "-", b$s)
