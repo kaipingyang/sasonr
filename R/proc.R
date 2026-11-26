@@ -484,9 +484,17 @@ print_num_column <- function(x) {
   out[miss] <- miss_label(code[miss])
   v <- x[!miss]
   if (length(v) == 0) return(out)
+  # the field: the widest value without its sign, one position more when a
+  # value is negative (proc_print.R places the heading) [measured,
+  # print_layout p08-p10]
+  lay <- function(out, txt) {
+    attr(out, "sfw") <- max(nchar(sub("^-", "", txt))) + any(startsWith(txt, "-"))
+    attr(out, "hdec") <- any(grepl(".", txt, fixed = TRUE))
+    out
+  }
   if (all(v == trunc(v) & abs(v) < 1e12)) {
     out[!miss] <- sprintf("%.0f", v)
-    return(out)
+    return(lay(out, out[!miss]))
   }
   # ordinary magnitudes: a common number of decimals, as many as the values
   # need but no more than 6 minus the widest integer part, and at least 2
@@ -504,7 +512,7 @@ print_num_column <- function(x) {
     # the decimals held at 2 (more than 4 integer digits) and a value rounded
     # to them: the heading is laid out as over a formatted column
     # (listing_base_print())
-    return(structure(out, rounded = 6L - max(ip) < 2L && any(abs(v - round(v, d)) > 1e-9 * pmax(1, abs(v))), dec = d))
+    return(lay(structure(out, rounded = 6L - max(ip) < 2L && any(abs(v - round(v, d)) > 1e-9 * pmax(1, abs(v))), dec = d), out[!miss]))
   }
   s <- trimws(sas_fmt_best(abs(v), 7L))
   has_e <- grepl("E", s, fixed = TRUE)

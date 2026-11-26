@@ -124,13 +124,14 @@ univ_print_var <- function(x0, disp) {
            paste0(formatC(ev[seq_len(k)], width = vw), "      ", formatC(as.character(lo), width = ow), "        ",
                   formatC(ev[k + seq_len(k)], width = vw), "      ", formatC(as.character(hi), width = ow)))
   ext <- univ_titled("Extreme Observations", ext)
-  # the Missing Values table: one row per missing value (._, ., .A-.Z), its
-  # count and percents of all observations and of the missing ones
+  # the Missing Values table: one row per missing value (., A-Z), its count
+  # and percents of all observations and of the missing ones [measured,
+  # univariate_print p11]
   miss <- NULL
   if (length(x) < length(x0)) {
     code <- c("_", ".", LETTERS)[sas_miss_code(x0[is.na(x0)]) + 1L]
-    # the rows of special missing values are not measured
-    if (any(code != ".")) abort_unsupported("PROC UNIVARIATE printed output of a variable with special missing values")
+    # the row of ._ is not measured
+    if (any(code == "_")) abort_unsupported("PROC UNIVARIATE printed output of a variable with the missing value ._")
     lev <- c("_", ".", LETTERS)
     cnts <- table(factor(code, levels = lev))
     cnts <- cnts[cnts > 0]
@@ -140,7 +141,9 @@ univ_print_var <- function(x0, disp) {
                                    formatC(display_fixed(c / tot * 100, 2L), width = 12L), formatC(display_fixed(c / nm * 100, 2L), width = 12L))
     mt <- c(paste0(strrep(" ", 23L), "-----Percent Of-----"), "Missing                             Missing",
             "  Value       Count     All Obs         Obs", "",
-            vapply(names(cnts), function(l) row(l, cnts[[l]]), "", USE.NAMES = FALSE), row("Total", nm))
+            vapply(names(cnts), function(l) row(l, cnts[[l]]), "", USE.NAMES = FALSE),
+            # a Total row under two or more kinds of missing values
+            if (length(cnts) > 1L) row("Total", nm))
     miss <- c(paste0(strrep(" ", 15L), "Missing Values"), "", mt)
   }
   # the quantile title wider than its table is a unit of its own

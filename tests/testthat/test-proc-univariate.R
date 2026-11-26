@@ -76,6 +76,8 @@ test_that("the printed output writes the five tables of each variable", {
   expect_true(" 123456.79        4         123456.79        4" %in% lst)
   lst <- sas_run("data d; input x; datalines;\n1\n2\n.\n.\n3\n3\n;\nrun; proc univariate data=d; var x; run;")$listing
   expect_true("      .           2       33.33      100.00" %in% lst)
-  expect_true("  Total           2       33.33      100.00" %in% lst)
-  expect_error(sas_run("data d; input x; datalines;\n1\n.A\n3\n;\nrun; proc univariate data=d; var x; run;"), class = "sasonr_unsupported")
+  expect_false(any(grepl("Total", lst)))
+  lst <- sas_run("data d; input x; datalines;\n1\n.\n.A\n3\n;\nrun; proc univariate data=d; var x; run;")$listing
+  expect_true("      A           1       25.00       50.00" %in% lst)
+  expect_true("  Total           2       50.00      100.00" %in% lst)
 })

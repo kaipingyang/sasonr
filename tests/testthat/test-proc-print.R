@@ -86,3 +86,11 @@ test_that("column positions: formatted numbers right-align the heading, unformat
   expect_identical(lst("data a; abcd = 12; run; proc print data=a noobs; run;"), c("abcd", " 12"))
   expect_identical(lst("data a; length abcde $ 8; abcde = 'xy'; run; proc print data=a noobs; run;"), c("abcde", " xy"))
 })
+
+test_that("PRINT keeps a sign position in unformatted numeric fields and places narrow headings by the spread of the values", {
+  lst <- sas_run("data d; input a e; datalines;\n.\n.\n10 1.5\n20 -2\n-5 3\n;\nrun; proc print data=d noobs; run;")$listing
+  lst <- lst[nzchar(lst)]
+  expect_equal(lst, c("  a      e", "  .      .", " 10     1.5", " 20    -2.0", " -5     3.0"))
+  lst <- sas_run("data d; a = 123; run; proc print data=d noobs; run;")$listing
+  expect_equal(lst[nzchar(lst)], c(" a", "123"))
+})

@@ -50,7 +50,8 @@ print_compute <- function(d, spec) {
       if (is.null(s$fmt)) print_num_column(y) else sub("^ +", "", sas_format(y, s$fmt))
     }
     list(values = all[seq_len(n)], sub = if (!is.null(extra)) all[n + seq_len(ng)], grand = if (!is.null(extra)) all[n + ng + 1L],
-         rounded = attr(all, "rounded", exact = TRUE), dec = attr(all, "dec", exact = TRUE))
+         rounded = attr(all, "rounded", exact = TRUE), dec = attr(all, "dec", exact = TRUE),
+         sfw = attr(all, "sfw", exact = TRUE), hdec = attr(all, "hdec", exact = TRUE))
   })
   names(text) <- vapply(cols, `[[`, "", "name")
   sub_rows <- length(sums) > 0 && length(spec$by) > 0
@@ -72,7 +73,7 @@ print_compute <- function(d, spec) {
       text = c(if (obs) list(list(values = as.character(d$.obs[g]))),
                lapply(names(text), function(nm) list(values = text[[nm]]$values[g], sub = text[[nm]]$sub[k],
                                                      grand = if (k == ng) text[[nm]]$grand, rounded = text[[nm]]$rounded,
-                                                     dec = text[[nm]]$dec))),
+                                                     dec = text[[nm]]$dec, sfw = text[[nm]]$sfw, hdec = text[[nm]]$hdec))),
       sums = sums, sub_label = if (sub_rows) spec$by_info[[spec$by]]$disp else NULL,
       last = k == ng, n = if (isTRUE(spec$n)) length(g) else NULL, split = spec$split, first = k == 1L,
       row_header = obs || !is.null(spec$id), id_n = spec$id_n %||% 0L
@@ -121,7 +122,9 @@ listing_base_print <- function(tb) {
   fws <- vapply(seq_len(nc), function(j) {
     t <- a$text[[j]]
     e <- c(t$values, if (a$cols[[j]]$name %in% sums) c(t$sub, t$grand), if (label_first && j == 1L) a$sub_label)
-    max(0L, nchar(e), a$cols[[j]]$fw)
+    # an unformatted number: one more position when a value is negative
+    sw <- if (!is.null(t$sfw) && length(e)) max(nchar(sub("^-", "", e))) + any(startsWith(e, "-"), na.rm = TRUE) else 0L
+    max(0L, nchar(e), a$cols[[j]]$fw, sw)
   }, 1L)
   heads <- lapply(seq_len(nc), function(j) print_heading(a$cols[[j]], fws[j], a$split))
   widths <- pmax(fws, vapply(heads, function(h) max(nchar(h)), 1L))
@@ -160,6 +163,31 @@ listing_base_print <- function(tb) {
     }
     fws[j] - min(v) > d
   }, TRUE)
+  # a heading narrower than an unformatted numeric field [measured,
+  # print_layout p01, p02, p08-p10]: right-aligned over uneven
+  # values (the sums do not count): integers whose widths without the sign
+  # differ by 2 or more, decimals whose widths differ by 3 or more; otherwise
+  # centred rounding up, over integers without the sign position (hpos())
+  num_head <- lapply(seq_len(nc), function(j) {
+    t <- a$text[[j]]
+    if (is.null(t$sfw) || kind[j] != "n") return(NULL)
+    miss <- function(x) is.na(x) | grepl("^(\\.[A-Z_]?|[A-Z_])$", x)
+    v <- t$values[!miss(t$values)]
+    if (length(v) == 0L) return(NULL)
+    dec <- isTRUE(t$hdec)
+    w <- if (dec) nchar(v) else nchar(sub("^-", "", v))
+    e <- c(t$values, t$sub, t$grand)
+    e <- e[!miss(e)]
+    list(right = max(w) - min(w) >= (if (dec) 3L else 2L),
+         uw = if (dec) fws[j] else max(nchar(sub("^-", "", e))))
+  })
+  hpos <- function(j, h, gap) {
+    nh <- num_head[[j]]
+    if (is.null(nh) || max(nchar(heads[[j]])) >= fws[j]) return(ceiling(gap / 2))
+    if (nh$right) return(gap)
+    if (nchar(h) > nh$uw) return(ceiling(gap / 2))
+    (fws[j] - nh$uw) + ceiling((nh$uw - nchar(h)) / 2)
+  }
   # a missing value of an unformatted number sits in the decimal point column
   miss_pad <- vapply(a$text, function(t) as.integer(t$dec %||% 0L), 1L)
   cell <- function(j, s, field = TRUE) {
@@ -179,7 +207,7 @@ listing_base_print <- function(tb) {
       # a formatted number: right-aligned, centred rounding down when its
       # heading is wider than the field
       pos <- if (kind[j] == "f") (if (max(nchar(heads[[j]])) > fws[j]) floor(gap / 2) else gap) else
-        if (kind[j] == "n") ceiling(gap / 2) else if (char_left[j]) 0L else floor(gap / 2)
+        if (kind[j] == "n") hpos(j, h, gap) else if (char_left[j]) 0L else floor(gap / 2)
       formatC(paste0(strrep(" ", pos), h), width = -widths[j])
     }, ""))
   }, "")
