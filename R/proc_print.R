@@ -189,8 +189,8 @@ listing_base_print <- function(tb) {
   }
   by <- attr(tb, "by", exact = TRUE)
   top <- if (is.null(by)) lst_lines("") else lst_by_block(c(if (!a$first) c("", ""), ""), by$text)
-  # the N line under CENTER is not measured: unmarked (fails loud)
-  lst_c(top, lst_unit(c(head_lines, "", body, out)), if (!is.null(a$n)) c("", paste0("N = ", a$n)))
+  # the N line is centred on its own under CENTER [measured, center_listing]
+  lst_c(top, lst_unit(c(head_lines, "", body, out)), if (!is.null(a$n)) lst_lines(c("", paste0("N = ", a$n))))
 }
 
 print_listing_tables <- function(tables) {

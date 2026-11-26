@@ -8,9 +8,10 @@ the development version provides.
 * A session now starts at OPTIONS CENTER, the SAS default (it started at
   NOCENTER): each title line, procedure title and table heading is centred on
   its own, each table as a whole, and BY lines are written between dashes.
-  This covers PROC PRINT, PROC MEANS (one panel), the one-way and crosstab
-  tables of PROC FREQ, PROC TABULATE (one page), PROC CONTENTS (except
-  SHORT) and PROC SQL; other output under CENTER fails loud. The option
+  This covers PROC PRINT (with its N line), PROC MEANS (one panel), PROC
+  FREQ with its statistics tables, PROC TABULATE (with BY groups; a table of
+  several panels fails loud), PROC CONTENTS and PROC SQL; other output under
+  CENTER fails loud. The option
   `sasonr.center = FALSE` (or the environment variable `SASONR_CENTER=FALSE`)
   starts sessions at NOCENTER. `sas_html()` centres the titles and the tables
   under CENTER and writes them on the left under NOCENTER (it used to centre
@@ -38,6 +39,8 @@ the development version provides.
 * PROC CONTENTS: the headings "Variables in Creation Order", "Alphabetic List
   of Variables and Attributes" and "Sort Information" are centred over their
   table (they started in the first position).
+* PROC CONTENTS SHORT no longer writes the data set attributes (only the list
+  of variables).
 * PROC CONTENTS: the second column of the data set attributes is 57
   characters wide (it was 56, so the third column started one position early).
 

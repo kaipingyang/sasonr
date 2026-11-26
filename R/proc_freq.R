@@ -682,7 +682,29 @@ freq_center_units <- function(x, template) {
     if (is.na(i)) return(x)
     return(lst_c(lst_lines(x[seq_len(i)]), lst_unit(x[-seq_len(i)])))
   }
-  x
+  # statistics output [measured, cases center_listing]: a heading written by
+  # freq_head_over() is a unit of its own, centred on its own under CENTER
+  # (rounding up for the one-way chi-square test heading); the rest of a
+  # statistics table is one unit; in free lines each run of lines with a
+  # dashed rule is a table (one unit), other lines are units of their own
+  x <- as.character(x)
+  tr <- trimws(x)
+  head <- vapply(tr, function(t) nzchar(t) && exists(t, envir = freq_heads, inherits = FALSE), TRUE, USE.NAMES = FALSE)
+  up <- vapply(seq_along(tr), function(i) head[i] && isTRUE(get(tr[i], envir = freq_heads)), TRUE)
+  if (isTRUE(rt_center())) x[head] <- tr[head]
+  blank <- !nzchar(tr)
+  unit <- seq_along(x)
+  own <- grepl("^(Sample Size|Frequency Missing) = ", tr)
+  if (!identical(template, "base.freq.lines") && !is.null(template)) {
+    unit[!head & !blank & !own] <- length(x) + 1L
+  } else {
+    run <- cumsum(c(TRUE, blank[-1] | blank[-length(blank)] | head[-1] | head[-length(head)]))
+    for (r in unique(run[!head & !blank])) {
+      i <- which(run == r & !head & !blank)
+      if (any(grepl("^-+$", tr[i]))) unit[i] <- min(i)
+    }
+  }
+  structure(x, units = unit, up = up)
 }
 
 freq_listing_tables <- function(tables) {
@@ -2447,8 +2469,7 @@ freq_binomial_listing <- function(st, info) {
   w_prop <- if (exact && !is.null(st$bin_cl)) 29L else if (exact) 35L else if (!is.null(st$bin_cl)) 22L else 32L
   w_test <- if (exact) 35L else 32L
   out <- character()
-  out <- c(out, paste0(centre("Binomial Proportion", w_prop), "Binomial Proportion"),
-           paste0(centre(paste0(disp, " = ", lv), w_prop), disp, " = ", lv), "")
+  out <- c(out, freq_head_over("Binomial Proportion", w_prop), freq_head_over(paste0(disp, " = ", lv), w_prop), "")
   out <- c(out, line(if (exact) "Proportion (P)" else "Proportion", f4(st$bin), w_prop),
            line("ASE", f4(st$e_bin), w_prop))
   cl <- st$bin_cl
@@ -2475,9 +2496,8 @@ freq_binomial_listing <- function(st, info) {
     rows <- sort(nm[types])
     l0 <- max(nchar(rows)) + 4L
     width <- l0 + 21L
-    out <- c(out, paste0(centre("Confidence Limits for the Binomial Proportion", width),
-                         "Confidence Limits for the Binomial Proportion"),
-             paste0(centre(paste0("Proportion = ", f4(st$bin)), width), "Proportion = ", f4(st$bin)), "",
+    out <- c(out, freq_head_over("Confidence Limits for the Binomial Proportion", width),
+             freq_head_over(paste0("Proportion = ", f4(st$bin)), width), "",
              paste0(sprintf(paste0("%-", l0, "s"), "Type"), sprintf("%21s", paste0(conf_pct, "% Confidence Limits"))), "")
     for (r in rows) {
       key <- names(nm)[match(r, nm)]
@@ -2491,7 +2511,7 @@ freq_binomial_listing <- function(st, info) {
   h0 <- paste0("Test of H0: Proportion = ", freq_num(st$p0))
   # longer headings (P= with five or more decimals) have no measured layout
   if (nchar(h0) > 31L) abort_unsupported(paste0("BINOMIAL P=", freq_num(st$p0), " (heading layout)"))
-  out <- c(out, paste0(strrep(" ", max(0L, (w_test - nchar(h0)) %/% 2L)), h0), "")
+  out <- c(out, freq_head_over(h0, w_test), "")
   use_c <- isTRUE(st$correct)
   zt <- if (use_c) st$zc_bin else st$z_bin
   pone <- if (use_c) st$plc_bin else st$pl_bin
@@ -2533,12 +2553,12 @@ freq_cmh_summary <- function(st, vars, info, o) {
                          cols = ods_cols(names(x), role = role))
   }
   segs <- list(freq_lines_seg(c("The FREQ Procedure", "", paste("Summary Statistics for", rowd, "by", cold),
-                                paste("Controlling for", paste(strata_disp, collapse = " ")),
-                                freq_head_over(paste0("Cochran-Mantel-Haenszel Statistics (Based on ", scores_txt, ")"), 63L)), decor = TRUE))
+                                paste("Controlling for", paste(strata_disp, collapse = " "))), decor = TRUE))
   cm <- tibble::tibble(Statistic = 1:3, AltHyp = c("Nonzero Correlation", "Row Mean Scores Differ", "General Association"),
                        DF = c(st$df_cmhcor, st$df_cmhrms, st$df_cmhga), Value = c(st$cmhcor, st$cmhrms, st$cmhga),
                        Prob = c(st$p_cmhcor, st$p_cmhrms, st$p_cmhga))
   cmt <- tab(cm, "CMH", "Cochran-Mantel-Haenszel Statistics", "base.freq.cmh", c("label", "label", "stat", "stat", "stat"))
+  attr(cmt, "scores") <- scores_txt
   attr(cmt, "freq") <- list(scores = scores_txt)
   segs <- c(segs, list(cmt))
   cc <- st$cmh_common
@@ -2561,13 +2581,25 @@ freq_cmh_summary <- function(st, vars, info, o) {
 
 # A heading line centred over a table `w` wide, rounding down (in the first
 # position when it is wider) [measured, statistics tables of PROC FREQ].
-freq_head_over <- function(text, w) paste0(strrep(" ", max(0L, (w - nchar(text)) %/% 2L)), text)
+freq_head_over <- function(text, w, up = FALSE) {
+  assign(text, up, envir = freq_heads)
+  paste0(strrep(" ", max(0L, (w - nchar(text)) %/% 2L)), text)
+}
+# A heading centred over its table that stays with the table under CENTER.
+freq_pad_over <- function(text, w) paste0(strrep(" ", max(0L, (w - nchar(text)) %/% 2L)), text)
+
+# The heading texts written by freq_head_over(): under CENTER each is centred
+# on its own (freq_center_units()).
+freq_heads <- new.env(parent = emptyenv())
 
 # Listings of the multiway CMH summary tables.
 freq_cmh_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
-  c("Statistic    Alternative Hypothesis    DF       Value      Prob", strrep("-", 63),
+  # the heading centred over the table, with it one centring unit
+  h <- paste0("Cochran-Mantel-Haenszel Statistics (Based on ", attr(tb, "scores", exact = TRUE) %||% "Table Scores", ")")
+  c(paste0(strrep(" ", max(0L, (63L - nchar(h)) %/% 2L)), h),
+    "Statistic    Alternative Hypothesis    DF       Value      Prob", strrep("-", 63),
     vapply(seq_len(nrow(tb)), function(i) {
       paste0(formatC(as.character(tb$Statistic[i]), width = 5L), "        ", formatC(tb$AltHyp[i], width = -22L),
              formatC(sprintf("%.0f", tb$DF[i]), width = 6L), formatC(f4(tb$Value[i]), width = 12L), formatC(pv(tb$Prob[i]), width = 10L))
@@ -2576,7 +2608,8 @@ freq_cmh_listing <- function(tb) {
 freq_commonrr_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   lvl <- attr(tb, "freq", exact = TRUE)$level
-  c("", freq_head_over("Common Odds Ratio and Relative Risks", 85L),
+  # the heading centred over the table, with it one centring unit
+  c("", freq_pad_over("Common Odds Ratio and Relative Risks", 85L),
     paste0("Statistic                   Method                  Value       ", lvl, " Confidence Limits"),
     strrep("-", 85),
     vapply(seq_len(nrow(tb)), function(i) {
@@ -2588,7 +2621,7 @@ freq_commonrr_listing <- function(tb) {
 freq_breslow_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
-  c("", freq_head_over("Breslow-Day Test for", 26L), "Homogeneity of Odds Ratios", strrep("-", 26),
+  c("", freq_pad_over("Breslow-Day Test for", 26L), "Homogeneity of Odds Ratios", strrep("-", 26),
     paste0(formatC("Chi-Square", width = -10L), formatC(f4(tb$Value[1]), width = 16L)),
     paste0(formatC("DF", width = -10L), formatC(sprintf("%.0f", tb$Value[2]), width = 16L)),
     paste0(formatC("Pr > ChiSq", width = -10L), formatC(pv(tb$Value[3]), width = 16L)))
@@ -2642,7 +2675,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
     } else {
       "for Equal Proportions"
     }
-    out <- c(out, freq_head_over("Chi-Square Test", nchar(test_line)), test_line, "")
+    out <- c(out, freq_head_over("Chi-Square Test", nchar(test_line), up = TRUE), freq_head_over(test_line, 0L, up = TRUE), "")
     flush(decor = TRUE)
     push(new_sasonr_ods_table(tibble::tibble(Name = c("_PCHI_", "DF_PCHI", "P_PCHI"), Label = c("Chi-Square", "DF", "Pr > ChiSq"),
                                              Value = c(st$pchi, st$df_pchi, st$p_pchi)),

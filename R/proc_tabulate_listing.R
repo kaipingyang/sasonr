@@ -43,25 +43,37 @@ tab_listing_tables <- function(tables, ls) {
   # pages of the group (sas_tab_titles() puts the titles above it)
   groups <- list()
   group <- NULL
+  # centring units (listing_center.R): each page one unit, the BY line written
+  # between dashes; a table of several panels ("(Continued)") is not measured
+  # under CENTER (unmarked)
+  units <- integer()
+  byl <- logical()
+  multi <- FALSE
+  add <- function(lines, by_line = FALSE, own = FALSE) {
+    out <<- c(out, lines)
+    u <- if (own) max(c(0L, units)) + seq_along(lines) else rep(max(c(0L, units)) + 1L, length(lines))
+    units <<- c(units, u)
+    byl <<- c(byl, rep(by_line, length(lines)))
+  }
   for (tb in tables) {
     by <- attr(tb, "by", exact = TRUE)
     panels <- listing_base_tabulate(tb, ls)
+    if (length(panels) > 1L) multi <- TRUE
     for (k in seq_along(panels)) {
-      if (pages > 0L) out <- c(out, tab_page_break)
+      if (pages > 0L) add(tab_page_break, own = TRUE)
       if (k == 1L && !is.null(by) && !identical(by$group, group)) {
         groups[[length(groups) + 1L]] <- list(at = length(out) + 1L, values = by$values, info = by$info, pages = 0L)
-        out <- c(out, by$text, "")
+        add(by$text, by_line = TRUE)
+        add("", own = TRUE)
         group <- by$group
       }
       if (length(groups)) groups[[length(groups)]]$pages <- groups[[length(groups)]]$pages + 1L
-      out <- c(out, panels[[k]], if (k < length(panels)) c("", "(Continued)"))
+      add(c(panels[[k]], if (k < length(panels)) c("", "(Continued)")))
       pages <- pages + 1L
     }
   }
-  # one page without BY groups is one centring unit (listing_center.R); pages
-  # and BY groups under CENTER are not measured (unmarked)
   structure(out, pages = pages, groups = if (length(groups)) groups,
-            units = if (pages <= 1L && !length(groups)) rep(1L, length(out)))
+            units = if (!multi) units, by = if (!multi) byl)
 }
 
 # #BYVAL(var) in a title: the formatted BY value of the group; other #BY
@@ -88,7 +100,7 @@ tab_byval_title <- function(titles, values, info) {
 sas_tab_titles <- function(titles, r) {
   groups <- r$groups
   if (!is.null(groups)) {
-    if (length(titles) == 0L) return(as.character(r$listing))
+    if (length(titles) == 0L) return(r$listing)
 
     if (any(vapply(groups, `[[`, 1L, "pages") > 1L)) {
       abort_unsupported("TITLE lines above a PROC TABULATE BY group of more than one page")

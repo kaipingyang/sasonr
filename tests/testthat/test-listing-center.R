@@ -27,6 +27,13 @@ test_that("a BY line is written between dashes over the whole line", {
   expect_identical(lst[1], paste0(strrep("-", 62), " grp=ab ", strrep("-", 62)))
 })
 
+test_that("the N line of PROC PRINT is centred on its own", {
+  lst <- center_lst("data a; x = 1; run; proc print data=a n; run;")
+  expect_identical(lst[length(lst)], paste0(strrep(" ", 63), "N = 1"))
+})
+
 test_that("output whose centring is not implemented fails loud under CENTER", {
-  expect_error(center_lst("data a; x = 1; run; proc print data=a n; run;"), class = "sasonr_unsupported")
+  expect_error(center_lst(paste("data a; input g $ x; datalines;\na 1\na 2\nb 3\n;\nrun;",
+                                "proc means data=a n mean std stderr min max median q1 q3 sum var cv; class g; var x; run;")),
+               class = "sasonr_unsupported")
 })

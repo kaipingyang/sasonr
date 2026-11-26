@@ -130,10 +130,11 @@ sas_proc_contents <- function(work, name, m, sp) {
     obslen <- if (any(cv$type == "num" & cv$len == 8L)) vctrs::vec_cast(ceiling(np$obslen / 8) * 8, integer()) else np$obslen
     two <- function(a, av, b, bv) sprintf("%-21s%-57s%-22s%s", a, av, b, bv)
     # centring units (listing_center.R): the procedure title, the attribute
-    # table, each variable table and the sort information with their headings;
-    # the SHORT list is not measured under CENTER (unmarked)
+    # table, each variable table and the sort information with their headings,
+    # each line of the SHORT list
     lst <- lst_lines(c(paste0("The ", sp$proc %||% "CONTENTS", " Procedure"), ""))
-    lst <- lst_c(lst, lst_unit(c(
+    # SHORT writes no data set attributes
+    if (!isTRUE(sp$short)) lst <- lst_c(lst, lst_unit(c(
              two("Data Set Name", paste0("WORK.", toupper(name)), "Observations", nobs),
              two("Member Type", "DATA", "Variables", n),
              two("Engine", "V9", "Indexes", 0),
@@ -146,8 +147,8 @@ sas_proc_contents <- function(work, name, m, sp) {
              "Encoding             utf-8  Unicode (UTF-8)", "")))
     if (isTRUE(sp$short)) {
       idx <- if (isTRUE(sp$varnum) || identical(sp$order, "varnum")) seq_len(n) else contents_alpha_order(cv$disp, sp$order %||% "ascii")
-      lst <- c(lst, if (isTRUE(sp$varnum) || identical(sp$order, "varnum")) paste0("Variables in Creation Order") else
-        paste0("Alphabetic List of Variables for WORK.", toupper(name)), "", paste(cv$disp[idx], collapse = " "), "")
+      lst <- lst_c(lst, lst_lines(c(if (isTRUE(sp$varnum) || identical(sp$order, "varnum")) paste0("Variables in Creation Order") else
+        paste0("Alphabetic List of Variables for WORK.", toupper(name)), "", paste(cv$disp[idx], collapse = " "), "")))
     } else {
       if (isTRUE(sp$varnum) || identical(sp$order, "varnum")) {
         lst <- lst_c(lst, contents_var_table(cv, seq_len(n), "Variables in Creation Order"))
