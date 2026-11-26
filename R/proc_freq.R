@@ -1136,7 +1136,8 @@ freq_oneway_listing <- function(tb) {
     sas_rtrim(s)
   }, "")
   lst <- c(if (show_cum) sas_rtrim(top), head, strrep("-", width), body)
-  if (nmiss > 0) lst <- c(lst, "", paste0(strrep(" ", max(0L, (width - 21L) %/% 2L)), "Frequency Missing = ", freq_num(nmiss)))
+  # centred under the table, rounding up
+  if (nmiss > 0) lst <- c(lst, "", freq_center_up(paste0("Frequency Missing = ", freq_num(nmiss)), width))
   lst <- c(lst, "")
   lst
 }
@@ -1473,7 +1474,7 @@ freq_list_listing <- function(tb) {
     sas_rtrim(s)
   }, "")
   lst <- c(if (show_cum) sas_rtrim(top), head, strrep("-", width), body)
-  if (a$nmiss > 0) lst <- c(lst, "", paste0(strrep(" ", max(0L, (width - 21L) %/% 2L)), "Frequency Missing = ", freq_num(a$nmiss)))
+  if (a$nmiss > 0) lst <- c(lst, "", freq_center_up(paste0("Frequency Missing = ", freq_num(a$nmiss)), width))
   c(lst, "")
 }
 
@@ -2590,6 +2591,7 @@ freq_head_over <- function(text, w, up = FALSE) {
 }
 # A heading centred over its table that stays with the table under CENTER.
 freq_pad_over <- function(text, w) paste0(strrep(" ", max(0L, (w - nchar(text)) %/% 2L)), text)
+freq_center_up <- function(text, w) paste0(strrep(" ", max(0L, ceiling((w - nchar(text)) / 2))), text)
 
 # The heading texts written by freq_head_over(): under CENTER each is centred
 # on its own (freq_center_units()).

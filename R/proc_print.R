@@ -46,7 +46,8 @@ print_compute <- function(d, spec) {
       sub("^ +", "", if (is.null(s$fmt)) sas_rtrim(x) else sas_rtrim(sas_format(x, s$fmt)))
     } else {
       y <- c(x, extra)
-      if (is.null(s$fmt)) print_num_column(y) else trimws(sas_format(y, s$fmt))
+      # a formatted number keeps the blanks its format writes after the value
+      if (is.null(s$fmt)) print_num_column(y) else sub("^ +", "", sas_format(y, s$fmt))
     }
     list(values = all[seq_len(n)], sub = if (!is.null(extra)) all[n + seq_len(ng)], grand = if (!is.null(extra)) all[n + ng + 1L],
          rounded = attr(all, "rounded", exact = TRUE), dec = attr(all, "dec", exact = TRUE))

@@ -22,7 +22,8 @@ the development version provides.
   is laid out like a formatted one; the heading of a character column whose
   values are of uneven widths starts in the first position (columns up to 16
   wide; wider ones fail loud); a number under a user-defined format is laid
-  out as text; character values are written without their leading blanks;
+  out as text; character values are written without their leading blanks; a
+  formatted number keeps the blanks its format writes after it (PERCENT.);
   a missing value of an unformatted number sits in the decimal
   point column; headings of several lines follow the same rules. Before,
   headings and fields could sit a position or more to the left or right of
@@ -30,7 +31,8 @@ the development version provides.
 * PROC FREQ: in a crosstabulation the column variable heading starts at
   least five blanks after the row variable heading; the values of a number
   under a user-defined format are left-aligned in a one-way table (the
-  heading stays right-aligned).
+  heading stays right-aligned); the "Frequency Missing" line is centred under
+  the table rounding up.
 * PROC CONTENTS: the Len column widens for lengths of more than three
   digits; a variable table wider than LINESIZE (long labels) fails loud.
 * PROC SQL: a column label with blanks wraps word by word at the width of the
