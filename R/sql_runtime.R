@@ -319,10 +319,10 @@ sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
     cells <- c(list(formatC(as.character(seq_len(nrow(d))), width = rw)), cells)
     widths <- c(rw, widths)
   }
-  out <- character()
-  if (length(titles) > 0) out <- c(out, titles, "")
-  out <- c(out, vapply(head, function(h) sas_rtrim(paste(h, collapse = "  ")), ""),
+  # centring units: each TITLE line, the table
+  top <- if (length(titles) > 0) lst_lines(c(titles, "")) else NULL
+  out <- c(vapply(head, function(h) sas_rtrim(paste(h, collapse = "  ")), ""),
            strrep("-", sum(widths) + 2L * (length(widths) - 1L)))
   if (nrow(d) > 0) out <- c(out, sas_rtrim(rlang::exec(paste, !!!unname(cells), sep = "  ")))
-  c(out, "")
+  lst_c(top, lst_unit(c(out, "")))
 }

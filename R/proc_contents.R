@@ -96,7 +96,7 @@ contents_var_table <- function(cv, idx, title) {
   if (any(nzchar(cv$infmt))) cols <- c(cols, list(list(parts = "Informat", width = max(8L, nchar(cv$infmt[idx])), right = FALSE, cells = cv$infmt[idx])))
   if (any(nzchar(cv$label))) cols <- c(cols, list(list(parts = "Label", width = max(5L, nchar(cv$label[idx])), right = FALSE, cells = cv$label[idx])))
   tb <- render_table(cols, gap = 4L, rule = FALSE)
-  c(title, "", tb, "")
+  lst_c(lst_lines(c(title, "")), lst_unit(c(tb, "")))
 }
 
 #' PROC CONTENTS listing and OUT= data set
@@ -124,7 +124,11 @@ sas_proc_contents <- function(work, name, m, sp) {
     # when it holds an 8-byte numeric (shorter numerics and characters are not aligned)
     obslen <- if (any(cv$type == "num" & cv$len == 8L)) vctrs::vec_cast(ceiling(np$obslen / 8) * 8, integer()) else np$obslen
     two <- function(a, av, b, bv) sprintf("%-21s%-56s%-22s%s", a, av, b, bv)
-    lst <- c(paste0("The ", sp$proc %||% "CONTENTS", " Procedure"), "",
+    # centring units (listing_center.R): the procedure title, the attribute
+    # table, each variable table and the sort information with their headings;
+    # the SHORT list is not measured under CENTER (unmarked)
+    lst <- lst_lines(c(paste0("The ", sp$proc %||% "CONTENTS", " Procedure"), ""))
+    lst <- lst_c(lst, lst_unit(c(
              two("Data Set Name", paste0("WORK.", toupper(name)), "Observations", nobs),
              two("Member Type", "DATA", "Variables", n),
              two("Engine", "V9", "Indexes", 0),
@@ -134,23 +138,24 @@ sas_proc_contents <- function(work, name, m, sp) {
              two("Data Set Type", m$typemem %||% "", "Sorted", sorted),
              two("Label", m$memlabel %||% "", "", ""),
              "Data Representation  SOLARIS_X86_64, LINUX_X86_64, ALPHA_TRU64, LINUX_IA64",
-             "Encoding             utf-8  Unicode (UTF-8)", "")
+             "Encoding             utf-8  Unicode (UTF-8)", "")))
     if (isTRUE(sp$short)) {
       idx <- if (isTRUE(sp$varnum) || identical(sp$order, "varnum")) seq_len(n) else contents_alpha_order(cv$disp, sp$order %||% "ascii")
       lst <- c(lst, if (isTRUE(sp$varnum) || identical(sp$order, "varnum")) paste0("Variables in Creation Order") else
         paste0("Alphabetic List of Variables for WORK.", toupper(name)), "", paste(cv$disp[idx], collapse = " "), "")
     } else {
       if (isTRUE(sp$varnum) || identical(sp$order, "varnum")) {
-        lst <- c(lst, contents_var_table(cv, seq_len(n), "Variables in Creation Order"))
+        lst <- lst_c(lst, contents_var_table(cv, seq_len(n), "Variables in Creation Order"))
       } else {
-        lst <- c(lst, contents_var_table(cv, contents_alpha_order(cv$disp, sp$order %||% "ascii"), "Alphabetic List of Variables and Attributes"))
-        if (isTRUE(sp$position)) lst <- c(lst, contents_var_table(cv, seq_len(n), "Variables in Creation Order"))
+        lst <- lst_c(lst, contents_var_table(cv, contents_alpha_order(cv$disp, sp$order %||% "ascii"), "Alphabetic List of Variables and Attributes"))
+        if (isTRUE(sp$position)) lst <- lst_c(lst, contents_var_table(cv, seq_len(n), "Variables in Creation Order"))
       }
     }
     if (!is.null(m$sortedby)) {
       if (isTRUE(m$sortedby$noduprec)) abort_unsupported("PROC CONTENTS of a data set sorted with NODUPREC (its sort option line is not measured)")
-      lst <- c(lst, "Sort Information", "", paste0("Sortedby       ", paste(ifelse(m$sortedby$descending, paste("DESCENDING", m$sortedby$vars), m$sortedby$vars), collapse = " ")),
-               "Validated      YES", "Character Set  ASCII", if (isTRUE(m$sortedby$nodupkey)) "Sort Option    NODUPKEY", "")
+      lst <- lst_c(lst, lst_lines(c("Sort Information", "")),
+                   lst_unit(c(paste0("Sortedby       ", paste(ifelse(m$sortedby$descending, paste("DESCENDING", m$sortedby$vars), m$sortedby$vars), collapse = " ")),
+                              "Validated      YES", "Character Set  ASCII", if (isTRUE(m$sortedby$nodupkey)) "Sort Option    NODUPKEY", "")))
     }
   }
   out <- list()
@@ -232,7 +237,7 @@ translate_proc_contents <- function(step, meta, last) {
   sp <- Filter(Negate(is.null), sp)
   code <- c(sprintf("# ---- PROC CONTENTS (SAS line %d)", as.integer(step$line)),
             sprintf(".r <- sas_proc_contents(work, %s, %s, %s)", r_str(ref$name), r_lit(m), r_lit(sp)),
-            ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+            ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
             ".meta <- c(.meta, sas_proc_store(work, .r$out))")
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC CONTENTS", line = step$line,
        outputs = if (!is.null(o$out)) o$out$name else character(), meta = list())

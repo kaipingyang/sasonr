@@ -124,9 +124,12 @@ SasSession <- R6::R6Class("SasSession",
 )
 
 # System options of a session, set by OPTIONS statements (engine_global()).
-# The listing layout starts at NOCENTER NODATE NONUMBER FORMDLIM=' '
-# PAGESIZE=MAX, the only layout implemented; other values fail loud when a
-# procedure writes output under them (engine_add_listing()).  Options whose
+# The listing layout starts at CENTER (the SAS default; the R option
+# sasonr.center = FALSE or the environment variable SASONR_CENTER=FALSE start
+# at NOCENTER) NODATE NONUMBER FORMDLIM=' '
+# PAGESIZE=MAX; DATE, NUMBER, another FORMDLIM= or PAGESIZE= fail loud when a
+# procedure writes output under them, as does CENTER for output whose
+# centring is not implemented (engine_add_listing(), listing_center.R).  Options whose
 # only implemented value is the SAS default are not session fields: other
 # values fail loud in the OPTIONS statement (YEARCUTOFF=1940, ERRORS=20,
 # MISSING=.).  The session encoding is not implemented: fixed values are used
@@ -137,7 +140,7 @@ new_session_options <- function() {
   o$linesize <- 132L
   o$notes <- TRUE
   o$nosyntaxcheck <- FALSE
-  o$center <- FALSE
+  o$center <- !isFALSE(getOption("sasonr.center", !identical(toupper(Sys.getenv("SASONR_CENTER")), "FALSE")))
   o$date <- FALSE
   o$number <- FALSE
   o$pagesize <- Inf

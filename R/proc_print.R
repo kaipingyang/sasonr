@@ -149,10 +149,11 @@ listing_base_print <- function(tb) {
     if (a$last) out <- c(out, rule("=", FALSE), totals("grand", NULL))
   }
   by <- attr(tb, "by", exact = TRUE)
-  top <- if (is.null(by)) "" else c(if (!a$first) c("", ""), "", by$text, "")
-  c(top, head_lines, "", body, out, if (!is.null(a$n)) c("", paste0("N = ", a$n)))
+  top <- if (is.null(by)) lst_lines("") else lst_by_block(c(if (!a$first) c("", ""), ""), by$text)
+  # the N line under CENTER is not measured: unmarked (fails loud)
+  lst_c(top, lst_unit(c(head_lines, "", body, out)), if (!is.null(a$n)) c("", paste0("N = ", a$n)))
 }
 
 print_listing_tables <- function(tables) {
-  unlist(lapply(tables, listing_base_print), use.names = FALSE)
+  do.call(lst_c, lapply(tables, listing_base_print))
 }

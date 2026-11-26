@@ -408,9 +408,11 @@ html_proctitle <- function(proc) {
 }
 
 # One procedure output: the titles and the procedure title once, per BY group
-# its byline and tables, then the footnotes.
+# its byline and tables, then the footnotes.  Under OPTIONS CENTER the titles
+# and the tables are centred, under NOCENTER on the left (as the ODS HTML
+# destination writes align="center" / align="left").
 render_html_output <- function(o) {
-  out <- c('<div class="sas-proc">',
+  out <- c(paste0('<div class="sas-proc ', if (isFALSE(o$center)) "sas-left" else "sas-center", '">'),
            if (length(o$titles)) paste0('<div class="sas-title">', html_escape(o$titles), "</div>"),
            if (html_proctitle(o$proc)) paste0('<div class="sas-proctitle">The ', html_escape(toupper(o$proc)), " Procedure</div>"))
   group <- NULL

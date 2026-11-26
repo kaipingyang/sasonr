@@ -6,3 +6,6 @@
 # (sas_run(on_error = "abort")); the batch-mode error handling (on_error =
 # "sas", the default) is tested in test-on-error.R.
 withr::local_options(sasonr.step_notes = FALSE, sasonr.on_error = "abort", .local_envir = testthat::teardown_env())
+# Listing tests compare the NOCENTER layout; the CENTER layout (the default of
+# a session) is tested in test-listing-center.R.
+withr::local_options(sasonr.center = FALSE, .local_envir = testthat::teardown_env())

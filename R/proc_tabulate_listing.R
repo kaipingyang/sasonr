@@ -58,7 +58,10 @@ tab_listing_tables <- function(tables, ls) {
       pages <- pages + 1L
     }
   }
-  structure(out, pages = pages, groups = if (length(groups)) groups)
+  # one page without BY groups is one centring unit (listing_center.R); pages
+  # and BY groups under CENTER are not measured (unmarked)
+  structure(out, pages = pages, groups = if (length(groups)) groups,
+            units = if (pages <= 1L && !length(groups)) rep(1L, length(out)))
 }
 
 # #BYVAL(var) in a title: the formatted BY value of the group; other #BY

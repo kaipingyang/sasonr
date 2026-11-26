@@ -21,8 +21,10 @@
 .sasonr-output { background-color: #fafbfe; color: #000000; font-family: Arial, Helvetica, sans-serif; font-size: x-small; padding: 7px; }
 .sasonr-output .sas-proc { margin: 0 0 1.5em 0; }
 .sasonr-output .sas-title, .sasonr-output .sas-proctitle, .sasonr-output .sas-byline { color: #112277; font-weight: bold; margin: 0.5em 0; }
-.sasonr-output .sas-title { text-align: center; }
-.sasonr-output .sas-proctitle { text-align: center; font-style: italic; }
+.sasonr-output .sas-proctitle { font-style: italic; }
+.sasonr-output .sas-center .sas-title, .sasonr-output .sas-center .sas-proctitle, .sasonr-output .sas-center .sas-byline, .sasonr-output .sas-center .sas-footnote { text-align: center; }
+.sasonr-output .sas-left .sas-title, .sasonr-output .sas-left .sas-proctitle, .sasonr-output .sas-left .sas-byline, .sasonr-output .sas-left .sas-footnote { text-align: left; }
+.sasonr-output .sas-center table.sas-table { margin-left: auto; margin-right: auto; }
 .sasonr-output .sas-footnote { color: #112277; margin: 0.5em 0; }
 .sasonr-output .sas-note-text { margin: 0.25em 0; }
 .sasonr-output table.sas-table { border-collapse: separate; border-spacing: 1px; background-color: #fafbfe; border: 1px solid #c1c1c1; margin: 0.5em 0; }

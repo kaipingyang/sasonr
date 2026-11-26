@@ -573,7 +573,7 @@ translate_proc_freq <- function(step, meta, last) {
     header,
     paste0(".d <- ", proc_source_code(inp)),
     paste0(".r <- sas_rt_proc(\"freq\", .d, ", r_lit(spec), ")"),
-    ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+    ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
     ".ods <- c(.ods, Filter(function(tb) !identical(attr(tb, \"template\", exact = TRUE), \"base.freq.lines\"), .r$tables))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
@@ -672,6 +672,19 @@ freq_table_lines <- function(lines, k, by) {
 
 # Listing of the FREQ tables: the procedure title once at the top, or after
 # the BY line of every BY group (each group starts its own page).
+# Centring units (listing_center.R): the BY line, the procedure title, the
+# table heading lines of a crosstabulation (also "Controlling for"), each
+# table; the statistics tables are not measured (unmarked).
+freq_center_units <- function(x, template) {
+  if (identical(template, "base.freq.oneway")) return(lst_unit(x))
+  if (identical(template, "base.freq.crosstab")) {
+    i <- match("", x)
+    if (is.na(i)) return(x)
+    return(lst_c(lst_lines(x[seq_len(i)]), lst_unit(x[-seq_len(i)])))
+  }
+  x
+}
+
 freq_listing_tables <- function(tables) {
   lst <- character()
   last <- 0L
@@ -679,10 +692,11 @@ freq_listing_tables <- function(tables) {
     k <- attr(tb, "freq_group", exact = TRUE)
     by <- attr(tb, "by", exact = TRUE)
     if (k != last) {
-      lst <- c(lst, if (!is.null(by)) c("", by$text, "", "The FREQ Procedure", "") else if (last == 0L) c("The FREQ Procedure", ""))
+      lst <- lst_c(lst, if (!is.null(by)) lst_c(lst_by_block("", by$text), lst_lines(c("The FREQ Procedure", ""))) else if (last == 0L) lst_lines(c("The FREQ Procedure", "")))
       last <- k
     }
-    lst <- c(lst, switch(attr(tb, "template", exact = TRUE),
+    tpl <- attr(tb, "template", exact = TRUE)
+    lst <- lst_c(lst, freq_center_units(switch(tpl,
       base.freq.oneway = freq_oneway_listing(tb),
       base.freq.crosstab = freq_crosstab_listing(tb),
       base.freq.list = freq_list_listing(tb),
@@ -695,7 +709,7 @@ freq_listing_tables <- function(tables) {
       base.freq.riskdiff = , base.freq.riskdiffcl = freq_riskdiff_listing(tb),
       base.freq.onewaychisq = freq_onewaychisq_listing(tb),
       base.freq.nlevels = freq_nlevels_listing(tb),
-      attr(tb, "lines", exact = TRUE)))
+      attr(tb, "lines", exact = TRUE)), tpl))
   }
   lst
 }

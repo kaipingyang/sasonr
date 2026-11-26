@@ -435,7 +435,7 @@ translate_proc <- function(step, meta, last = NULL) {
     paste0(".d <- ", proc_source_code(inp, obs_col = TRUE)),
     if (length(vars) > 0) c(
       paste0(".r <- sas_rt_proc(\"print\", .d, ", r_lit(spec), ")"),
-      ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+      ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
       ".ods <- c(.ods, .r$tables)"
     )
   )

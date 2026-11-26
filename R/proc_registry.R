@@ -70,7 +70,7 @@ sas_rt_proc <- function(name, d, spec) {
   } else {
     e$listing(res$tables, rt_linesize())
   }
-  list(listing = as.character(listing), out = res$data, tables = res$tables, pages = attr(listing, "pages", exact = TRUE),
+  list(listing = listing, out = res$data, tables = res$tables, pages = attr(listing, "pages", exact = TRUE),
        groups = attr(listing, "groups", exact = TRUE))
 }
 
@@ -78,7 +78,7 @@ sas_rt_proc <- function(name, d, spec) {
 
 listing_templates <- list(
   base.summary = function(tb, ls, ps) listing_base_summary(tb, ls),
-  base.tabulate = function(tb, ls, ps) as.character(tab_listing_tables(list(tb), ls)),
+  base.tabulate = function(tb, ls, ps) tab_listing_tables(list(tb), ls),
   base.print = function(tb, ls, ps) listing_base_print(tb)
 )
 
@@ -100,14 +100,14 @@ render_listing_tables <- function(tables, title, ls, ps = NULL) {
   for (tb in tables) {
     by <- attr(tb, "by", exact = TRUE)
     if (!is.null(by) && !identical(by$group, group)) {
-      out <- c(out, "", by$text, "")
+      out <- lst_c(out, lst_by_block("", by$text))
       group <- by$group
     }
     if (!titled) {
-      out <- c(out, title, "")
+      out <- lst_c(out, lst_lines(c(title, "")))
       titled <- TRUE
     }
-    out <- c(out, render_listing(tb, ls, ps))
+    out <- lst_c(out, render_listing(tb, ls, ps))
   }
   out
 }

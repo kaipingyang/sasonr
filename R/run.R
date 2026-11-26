@@ -338,7 +338,7 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (length(html_tables) > 0 && isTRUE(eng$session$ods_html)) {
       eng$html <- c(eng$html, list(list(proc = step$name, line = step$line, titles = env$.titles, footnotes = eng$session$footnotes,
-                                          tables = html_tables)))
+                                          tables = html_tables, center = isTRUE(eng$session$options$center))))
     }
     if (length(env$.ods) > 0 && !is.null(eng$session$ods_rtf)) {
       eng$session$ods_rtf$outputs <- c(eng$session$ods_rtf$outputs,
@@ -1058,15 +1058,17 @@ engine_run_partial <- function(code) {
 engine_add_listing <- function(eng, lst, line = NULL) {
   if (length(lst) == 0) return(invisible())
   o <- eng$session$options
-  bad <- c(if (isTRUE(o$center)) "CENTER", if (isTRUE(o$date)) "DATE", if (isTRUE(o$number)) "NUMBER",
+  bad <- c(if (isTRUE(o$center) && !lst_marked(lst)) "CENTER", if (isTRUE(o$date)) "DATE", if (isTRUE(o$number)) "NUMBER",
            if (!identical(o$formdlim, " ") && length(eng$session$listing) + length(eng$listing) > 0)
              "FORMDLIM= other than ' '",
            if (length(lst) + 3L > o$pagesize) paste0("PAGESIZE=", o$pagesize, " (output longer than one page)"))
   if (length(bad)) {
     abort_unsupported(paste0("procedure output under OPTIONS ", paste(bad, collapse = ", "),
-                             " (only the NOCENTER NODATE NONUMBER FORMDLIM=' ' PAGESIZE=MAX listing is supported)"), line)
+                             " (only the NODATE NONUMBER FORMDLIM=' ' PAGESIZE=MAX listing is supported, under CENTER for the",
+                             " outputs whose centring is implemented)"), line)
   }
-  eng$listing <- c(eng$listing, lst)
+  if (isTRUE(o$center)) lst <- lst_center(lst, o$linesize)
+  eng$listing <- c(eng$listing, as.character(lst))
   invisible()
 }
 

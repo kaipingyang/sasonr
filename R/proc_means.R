@@ -292,7 +292,7 @@ translate_proc_means <- function(step, meta, last) {
     header,
     paste0(".d <- ", proc_source_code(b$inp)),
     paste0(".r <- sas_rt_proc(\"", pname, "\", .d, ", r_lit(spec), ")"),
-    ".lst <- c(.lst, sas_titles_once(.titles, .r$listing))",
+    ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
     ".ods <- c(.ods, .r$tables)",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
@@ -480,7 +480,7 @@ means_stat_gate <- function(spec, line) {
 #' @keywords internal
 sas_titles_once <- function(titles, lst) {
   if (length(lst) == 0) return(character())
-  c(titles, if (length(titles) > 0) "", lst)
+  lst_c(lst_lines(c(titles, if (length(titles) > 0) "")), lst)
 }
 
 # Quantile of sorted values `x` (frequencies already expanded) by QNTLDEF.
@@ -1238,13 +1238,18 @@ listing_base_summary <- function(tb, ls) {
     # implemented.
     abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not supported)")
   }
+  # centring units: the "Analysis Variable" line, the table; the panels of a
+  # table split over several panels are not measured under CENTER (unmarked)
+  mark <- length(panels) == 1L
   for (p in panels) {
     pcols <- c(fixed, scl[p$first:p$last])
     gaps <- c(rep.int(p$fixed_gap, length(fixed)), rep.int(p$gap, p$last - p$first))
     if (!multi) {
-      out <- c(out, paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""), "")
+      av <- c(paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""), "")
+      out <- lst_c(out, if (mark) lst_lines(av) else av)
     }
-    out <- c(out, means_render(pcols, gaps), "")
+    tb_lines <- c(means_render(pcols, gaps), "")
+    out <- lst_c(out, if (mark) lst_unit(tb_lines) else tb_lines)
   }
   out
 }

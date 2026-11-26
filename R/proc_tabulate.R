@@ -661,7 +661,7 @@ translate_proc_tabulate <- function(step, meta, last) {
       paste0(".cd <- sas_ds(work, ", r_str(spec$classdata), ") |> sas_note_read(", r_str(spec$classdata), ")"),
       paste0(".r <- sas_rt_proc(\"tabulate\", .d, c(", r_lit(spec), ", list(classdata_rows = .cd)))")
     ),
-    ".lst <- c(.lst, sas_tab_titles(.titles, .r))",
+    ".lst <- sas_lst_c(.lst, sas_tab_titles(.titles, .r))",
     ".ods <- c(.ods, .r$tables)",
     # the ODS OUTPUT data sets (ods_output.R)
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
