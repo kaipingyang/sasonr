@@ -31,8 +31,3 @@ test_that("the N line of PROC PRINT is centred on its own", {
   lst <- center_lst("data a; x = 1; run; proc print data=a n; run;")
   expect_identical(lst[length(lst)], paste0(strrep(" ", 63), "N = 1"))
 })
-
-test_that("output whose centring is not implemented fails loud under CENTER", {
-  expect_error(center_lst("data a; x = 1; run; proc datasets lib=work nolist; contents data=a; quit;"),
-               class = "sasonr_unsupported")
-})

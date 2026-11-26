@@ -597,7 +597,10 @@ engine_datasets <- function(eng, step) {
         sp <- Filter(Negate(is.null), o[c("noprint", "varnum", "short", "position", "order", "out")])
         sp$proc <- "DATASETS"
         r <- sas_proc_contents(eng$session$work, ref$name, m, sp)
-        if (length(r$listing) > 0) lst <- c(lst, if (length(lst) == 0) eng$session$titles, if (length(lst) == 0 && length(eng$session$titles)) "", r$listing)
+        if (length(r$listing) > 0) {
+          tl <- if (length(lst) == 0) c(eng$session$titles, if (length(eng$session$titles)) "")
+          lst <- lst_c(lst, if (length(tl)) lst_lines(tl), r$listing)
+        }
         eng$session$meta[names(r$out)] <- sas_proc_store(eng$session$work, r$out)
         if (length(r$out)) {
           mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),

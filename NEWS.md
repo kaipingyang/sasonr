@@ -9,8 +9,8 @@ the development version provides.
   NOCENTER): each title line, procedure title and table heading is centred on
   its own, each table as a whole, and BY lines are written between dashes.
   This covers PROC PRINT (with its N line), PROC MEANS, PROC FREQ with its
-  statistics tables, PROC TABULATE, PROC CONTENTS and PROC SQL; other output
-  under CENTER (the CONTENTS statement of PROC DATASETS) fails loud. The option
+  statistics tables, PROC TABULATE, PROC CONTENTS (also the CONTENTS
+  statement of PROC DATASETS) and PROC SQL. The option
   `sasonr.center = FALSE` (or the environment variable `SASONR_CENTER=FALSE`)
   starts sessions at NOCENTER. `sas_html()` centres the titles and the tables
   under CENTER and writes them on the left under NOCENTER (it used to centre
