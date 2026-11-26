@@ -5,6 +5,16 @@ the development version provides.
 
 ## Running SAS programs
 
+* ODS RTF: a PROC PRINT table wider than the page is split into column
+  groups, each a table of its own; the groups are balanced (each takes
+  columns up to the average of the page width and the table width per
+  group), and a column is at most half the page wide. A split table with the
+  Obs or ID column, sum rows, the N line or BY groups still fails loud.
+* An ARRAY of existing character variables now keeps the length a LENGTH
+  statement gave them: storing through an element reference (`c{j} = ...`)
+  no longer cuts the value to 8 characters. An array of character variables
+  of different lengths fails loud.
+
 * PROC PRINT LABEL: a label of three to five words that is wider than the
   column is written on at most three lines, at the narrowest width that
   allows it (a longer label still fails loud). A variable name with an

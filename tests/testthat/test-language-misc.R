@@ -87,3 +87,9 @@ test_that("IN binds tighter than the other comparison operators", {
   expect_identical(r$work$t$z, 0)
   expect_error(sas_run("data t; a = 0; c = 1; x = a in (0, 1) + c; run;"), class = "sasonr_syntax_error")
 })
+
+test_that("an ARRAY of character variables keeps the length LENGTH gave them", {
+  r <- sas_run("data a; length c1-c3 $16; array c{3} $ c1-c3; do j = 1 to 3; c{j} = repeat('i', 15); end; run;")
+  expect_identical(nchar(r$work$a$c1), 16L)
+  expect_error(sas_run("data a; length c1 $4 c2 $6; array c{2} $ c1-c2; run;"), class = "sasonr_unsupported")
+})

@@ -55,3 +55,29 @@ test_that("a class heading row inside the row dimension merges the data cells be
   expect_true(any(grepl("\\clvmgf", x[row_start:g], fixed = TRUE)))
   expect_true(any(grepl("{grp\\cell}", x, fixed = TRUE)))
 })
+
+test_that("a PROC PRINT table wider than the page splits into balanced column groups", {
+  groups <- function(w) lengths(sasonr:::rtf_print_groups(w))
+  expect_identical(groups(rep(462, 24)), 24L)
+  expect_identical(groups(rep(462, 25)), c(18L, 7L))
+  expect_identical(groups(rep(462, 52)), c(21L, 21L, 10L))
+  expect_identical(groups(rep(987, 23)), c(9L, 9L, 5L))
+  # balanced groups that would need one more group: filled up to the page
+  expect_identical(groups(rep(810, 40)), c(14L, 14L, 12L))
+  expect_identical(groups(rep(5748, 4)), c(2L, 2L))
+})
+
+test_that("each column group is a table of its own after an empty paragraph", {
+  withr::local_dir(withr::local_tempdir())
+  dir.create("rtf")
+  sas_run(paste0("options ls=256; data a; length ", paste0("c", 1:28, collapse = " "), " $8; ",
+                 paste0("c", 1:28, "='i';", collapse = " "), " run;\n",
+                 "ods rtf file='rtf/out.rtf'; proc print data=a noobs; run; ods rtf close;"))
+  x <- readLines("rtf/out.rtf")
+  expect_length(grep("\\trhdr", x, fixed = TRUE), 2L)
+  expect_true("\\pard\\par" %in% x)
+  expect_error(sas_run(paste0("options ls=256; data a; length ", paste0("c", 1:28, collapse = " "), " $8; ",
+                              paste0("c", 1:28, "='i';", collapse = " "), " run;\n",
+                              "ods rtf file='rtf/out.rtf'; proc print data=a; run; ods rtf close;")),
+               class = "sasonr_unsupported")
+})

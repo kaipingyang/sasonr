@@ -21,13 +21,44 @@
 #   blanks, so its widest word counts; the first column adds 10.
 # Characters without a measured advance fail loud.
 
-# A wide table is split into column groups (each repeats the row-header
-# columns), but the split point is not the page width (11520 twips): a group
-# of 17 columns of 582 twips (9904) is already split while 21 columns of 506
-# (10636) are not [measured, probes over 40 character and numeric columns].
-# The widest single group observed for every column pattern is 9322 twips;
-# wider tables fail loud until the rule is measured.
+# A PROC PRINT table wider than W = 11506 twips (the table width being 10
+# plus the column widths) is split into column groups, each a table of its
+# own after an empty paragraph.  The number of groups k is what filling each
+# group up to W gives; each group then takes columns while its width stays
+# within (W + table width / k) / 2, and when that would need more than k
+# groups the groups filled up to W are kept.  A column is at most (W - 10) / 2
+# = 5748 wide (its text wraps) [measured, probes over 24 to 80 columns of six
+# widths; no other W fits them all].
+# Groups with the Obs or ID column, sum rows, the N line or BY groups are not
+# measured (fail loud).  The PROC TABULATE tables wider than 9322 twips are
+# not measured either (fail loud).
 rtf_one_group_max <- 9322
+rtf_page_body <- 11506
+
+# The column groups (lists of column numbers) of a PROC PRINT table whose
+# columns are `widths` wide (without the 10 of the first column).
+rtf_print_groups <- function(widths) {
+  fill <- function(limit) {
+    out <- list()
+    cur <- integer()
+    w <- 10
+    for (j in seq_along(widths)) {
+      if (length(cur) && w + widths[j] > limit) {
+        out <- c(out, list(cur))
+        cur <- integer()
+        w <- 10
+      }
+      cur <- c(cur, j)
+      w <- w + widths[j]
+    }
+    c(out, list(cur))
+  }
+  greedy <- fill(rtf_page_body)
+  k <- length(greedy)
+  if (k == 1L) return(greedy)
+  bal <- fill((rtf_page_body + (10 + sum(widths)) / k) / 2)
+  if (length(bal) > k) greedy else bal
+}
 
 rtf_char_widths <- local({
   tab <- NULL
@@ -138,43 +169,54 @@ rtf_print_table <- function(tb) {
     sums_j <- vapply(sum_rows, function(r) r[j], "")
     sw <- vapply(sums_j, rtf_text_width, 0, bold = TRUE)
     w <- max(hw, vw, sw, 0)
-    125 + w + if (j == 1L) 10 else 0
+    125 + w
   }, 0)
   n_row <- if (!is.null(a$n)) paste0("N = ", a$n)
   # the N line spans the columns like a heading over several columns: each
   # column is at least 125 + floor(N line width / number of columns), +10 on
   # the first [measured: two to four columns, with and without Obs]
   if (!is.null(n_row)) {
-    need <- 125 + floor(rtf_text_width(n_row, bold = FALSE) / nc) + c(10, rep(0, nc - 1L))
+    need <- 125 + floor(rtf_text_width(n_row, bold = FALSE) / nc)
     widths <- pmax(widths, need)
   }
-  if (sum(widths) > rtf_one_group_max) abort_unsupported("an ODS RTF PROC PRINT table that may be split into column groups")
-  xs <- cumsum(widths)
+  widths <- pmin(widths, (rtf_page_body - 10) / 2)
+  groups <- rtf_print_groups(widths)
+  if (length(groups) > 1L) {
+    what <- if (any(role)) "the Obs or ID column" else if (length(sum_rows)) "sum rows" else if (!is.null(n_row)) "the N line" else if (!is.null(attr(tb, "by", exact = TRUE))) "BY groups"
+    if (!is.null(what)) abort_unsupported(paste0("an ODS RTF PROC PRINT table split into column groups, with ", what))
+  }
   align <- vapply(a$cols, function(c) if (isTRUE(c$char)) "l" else "r", "")
   total <- 1L + nr + length(sum_rows) + if (!is.null(n_row)) 1L else 0L
   out <- character()
-  row_k <- 0L
-  emit_row <- function(texts, header = FALSE, bold_row = FALSE) {
-    row_k <<- row_k + 1L
-    last <- row_k == total
-    keepn <- header || row_k == total - 1L
-    defs <- vapply(seq_len(nc), function(j) {
-      rtf_cell_def(xs[j], j == 1L, j == nc, header, if (last) 15 else 5, if (header) "b" else "t",
-                   if (header || bold_row || role[j]) 17 else 8)
-    }, "")
-    pars <- vapply(seq_len(nc), function(j) {
-      t <- if (header) paste(vapply(texts[[j]], rtf_escape, ""), collapse = "{\\line}\n") else rtf_escape(texts[[j]])
-      rtf_cell_par(t, keepn, header || bold_row || role[j], align[j])
-    }, "")
-    out <<- c(out, paste0("\\trowd\\trkeep", if (header) "\\trhdr", "\\trql"), defs, pars, "{\\row}")
-  }
-  emit_row(heads, header = TRUE)
-  for (i in seq_len(nr)) emit_row(lapply(a$text, function(t) t$values[i]))
-  for (r in sum_rows) emit_row(as.list(r), bold_row = TRUE)
-  if (!is.null(n_row)) {
-    row_k <- row_k + 1L
-    out <- c(out, "\\trowd\\trkeep\\trql", rtf_cell_def(xs[nc], TRUE, TRUE, FALSE, 15, "t", 8),
-             rtf_cell_par(rtf_escape(n_row), FALSE, FALSE, "l"), "{\\row}")
+  for (g in seq_along(groups)) {
+    cols <- groups[[g]]
+    gc <- length(cols)
+    xs <- 10 + cumsum(widths[cols])
+    if (g > 1L) out <- c(out, "\\pard\\par")
+    row_k <- 0L
+    emit_row <- function(texts, header = FALSE, bold_row = FALSE) {
+      row_k <<- row_k + 1L
+      last <- row_k == total
+      keepn <- header || row_k == total - 1L
+      defs <- vapply(seq_len(gc), function(i) {
+        j <- cols[i]
+        rtf_cell_def(xs[i], i == 1L, i == gc, header, if (last) 15 else 5, if (header) "b" else "t",
+                     if (header || bold_row || role[j]) 17 else 8)
+      }, "")
+      pars <- vapply(cols, function(j) {
+        t <- if (header) paste(vapply(texts[[j]], rtf_escape, ""), collapse = "{\\line}\n") else rtf_escape(texts[[j]])
+        rtf_cell_par(t, keepn, header || bold_row || role[j], align[j])
+      }, "")
+      out <<- c(out, paste0("\\trowd\\trkeep", if (header) "\\trhdr", "\\trql"), defs, pars, "{\\row}")
+    }
+    emit_row(heads, header = TRUE)
+    for (i in seq_len(nr)) emit_row(lapply(a$text, function(t) t$values[i]))
+    for (r in sum_rows) emit_row(as.list(r), bold_row = TRUE)
+    if (!is.null(n_row)) {
+      row_k <- row_k + 1L
+      out <- c(out, "\\trowd\\trkeep\\trql", rtf_cell_def(xs[gc], TRUE, TRUE, FALSE, 15, "t", 8),
+               rtf_cell_par(rtf_escape(n_row), FALSE, FALSE, "l"), "{\\row}")
+    }
   }
   out
 }

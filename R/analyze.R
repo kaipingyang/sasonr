@@ -956,6 +956,13 @@ an_array <- function(s, st) {
             disp = (attr(elems, "disp") %||% character())[elems[k]] %|NA|% elems[k])
     if (st$info[[elems[k]]]$type != type) abort_syntax(paste("array", s$name, "mixes types"), line)
   }
+  # the elements keep the length they already have (LENGTH before ARRAY):
+  # an element reference stores with that length
+  if (type == "char" && length(elems) > 0) {
+    lens <- unique(vapply(elems, function(v) as.integer(st$info[[v]]$len %||% NA_integer_), 1L))
+    if (length(lens) > 1L || anyNA(lens)) abort_unsupported(paste("array", s$name, "of character variables of different lengths"), line)
+    len <- lens
+  }
   st$arrays[[s$name]] <- list(
     name = s$name, elems = elems, temporary = s$temporary, dim = dim, lo = s$lo,
     type = type, len = len, init = init
