@@ -1069,8 +1069,9 @@ freq_oneway_listing <- function(tb) {
   }
   if (!is.null(test) && identical(test$kind, "f")) {
     # the Test Frequency column sits between Frequency and Percent
+    # "Test" centred over "Frequency" rounding up: 4 + 3 blanks, 2 after
     head <- paste0(head, "    Frequency")
-    top <- paste0(top, "                Test")
+    top <- paste0(top, "       Test  ")
     width <- width + 13L
   }
   if (show_pct) {
@@ -1080,8 +1081,9 @@ freq_oneway_listing <- function(tb) {
   }
   if (!is.null(test) && identical(test$kind, "p")) {
     # the Test Percent column sits after Percent
+    # "Test" centred over "Percent" rounding up: 5 + 2 blanks, 1 after
     head <- paste0(head, "     Percent")
-    top <- paste0(top, "        Test")
+    top <- paste0(top, "       Test ")
     width <- width + 12L
   }
   if (show_cum) {
@@ -2440,7 +2442,9 @@ freq_binomial_listing <- function(st, info) {
     paste0(sprintf(paste0("%-", n, "s"), lab), val)
   }
   exact <- isTRUE(st$bin_exact)
-  w_prop <- if (exact) 35L else if (!is.null(st$bin_cl)) 22L else 32L
+  # the width of the proportion table: its widest row (the exact limits
+  # without CL=, or "Proportion (P)" with both)
+  w_prop <- if (exact && !is.null(st$bin_cl)) 29L else if (exact) 35L else if (!is.null(st$bin_cl)) 22L else 32L
   w_test <- if (exact) 35L else 32L
   out <- character()
   out <- c(out, paste0(centre("Binomial Proportion", w_prop), "Binomial Proportion"),
@@ -2482,12 +2486,12 @@ freq_binomial_listing <- function(st, info) {
     }
     out <- c(out, "")
   }
-  # centred over the 32 columns of the test table, rounded down: P= 0.5 -> 2
-  # spaces, 0.25 / 0.125 / 0.95 -> 1, 0.1234 -> 0 (heading lengths 28..31)
+  # centred over the test table (32 columns, 35 with the exact test), rounded
+  # down: P= 0.5 -> 2 spaces, 0.25 / 0.125 / 0.95 -> 1, 0.1234 -> 0
   h0 <- paste0("Test of H0: Proportion = ", freq_num(st$p0))
   # longer headings (P= with five or more decimals) have no measured layout
   if (nchar(h0) > 31L) abort_unsupported(paste0("BINOMIAL P=", freq_num(st$p0), " (heading layout)"))
-  out <- c(out, paste0(strrep(" ", max(0L, (32L - nchar(h0)) %/% 2L)), h0), "")
+  out <- c(out, paste0(strrep(" ", max(0L, (w_test - nchar(h0)) %/% 2L)), h0), "")
   use_c <- isTRUE(st$correct)
   zt <- if (use_c) st$zc_bin else st$z_bin
   pone <- if (use_c) st$plc_bin else st$pl_bin
@@ -2530,7 +2534,7 @@ freq_cmh_summary <- function(st, vars, info, o) {
   }
   segs <- list(freq_lines_seg(c("The FREQ Procedure", "", paste("Summary Statistics for", rowd, "by", cold),
                                 paste("Controlling for", paste(strata_disp, collapse = " ")),
-                                paste0("Cochran-Mantel-Haenszel Statistics (Based on ", scores_txt, ")")), decor = TRUE))
+                                freq_head_over(paste0("Cochran-Mantel-Haenszel Statistics (Based on ", scores_txt, ")"), 63L)), decor = TRUE))
   cm <- tibble::tibble(Statistic = 1:3, AltHyp = c("Nonzero Correlation", "Row Mean Scores Differ", "General Association"),
                        DF = c(st$df_cmhcor, st$df_cmhrms, st$df_cmhga), Value = c(st$cmhcor, st$cmhrms, st$cmhga),
                        Prob = c(st$p_cmhcor, st$p_cmhrms, st$p_cmhga))
@@ -2555,25 +2559,39 @@ freq_cmh_summary <- function(st, vars, info, o) {
   c(segs, list(freq_lines_seg(c("", paste("Total Sample Size =", freq_num(st$n)), ""), decor = TRUE)))
 }
 
+# A heading line centred over a table `w` wide, rounding down (in the first
+# position when it is wider) [measured, statistics tables of PROC FREQ].
+freq_head_over <- function(text, w) paste0(strrep(" ", max(0L, (w - nchar(text)) %/% 2L)), text)
+
 # Listings of the multiway CMH summary tables.
 freq_cmh_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
-  c("Statistic Alternative Hypothesis DF Value Prob", strrep("-", 63),
-    vapply(seq_len(nrow(tb)), function(i) paste(tb$Statistic[i], tb$AltHyp[i], sprintf("%.0f", tb$DF[i]), f4(tb$Value[i]), pv(tb$Prob[i])), ""))
+  c("Statistic    Alternative Hypothesis    DF       Value      Prob", strrep("-", 63),
+    vapply(seq_len(nrow(tb)), function(i) {
+      paste0(formatC(as.character(tb$Statistic[i]), width = 5L), "        ", formatC(tb$AltHyp[i], width = -22L),
+             formatC(sprintf("%.0f", tb$DF[i]), width = 6L), formatC(f4(tb$Value[i]), width = 12L), formatC(pv(tb$Prob[i]), width = 10L))
+    }, ""))
 }
 freq_commonrr_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
-  c("", "Common Odds Ratio and Relative Risks", paste("Statistic Method Value", attr(tb, "freq", exact = TRUE)$level, "Confidence Limits"),
+  lvl <- attr(tb, "freq", exact = TRUE)$level
+  c("", freq_head_over("Common Odds Ratio and Relative Risks", 85L),
+    paste0("Statistic                   Method                  Value       ", lvl, " Confidence Limits"),
     strrep("-", 85),
-    vapply(seq_len(nrow(tb)), function(i) paste(c(if (identical(tb$Method[i], "Mantel-Haenszel")) tb$Statistic[i], tb$Method[i],
-                                                  f4(tb$Value[i]), f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), collapse = " "), ""))
+    vapply(seq_len(nrow(tb)), function(i) {
+      paste0(formatC(if (identical(tb$Method[i], "Mantel-Haenszel")) tb$Statistic[i] else "", width = -28L),
+             formatC(tb$Method[i], width = -15L), formatC(f4(tb$Value[i]), width = 14L),
+             formatC(f4(tb$LowerCL[i]), width = 14L), formatC(f4(tb$UpperCL[i]), width = 14L))
+    }, ""))
 }
 freq_breslow_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   pv <- function(v) if (is.na(v)) "." else trimws(fmt_pvalue(v, 6L, 4L))
-  c("", "Breslow-Day Test for", "Homogeneity of Odds Ratios", strrep("-", 26),
-    paste("Chi-Square", f4(tb$Value[1])), paste("DF", sprintf("%.0f", tb$Value[2])), paste("Pr > ChiSq", pv(tb$Value[3])))
+  c("", freq_head_over("Breslow-Day Test for", 26L), "Homogeneity of Odds Ratios", strrep("-", 26),
+    paste0(formatC("Chi-Square", width = -10L), formatC(f4(tb$Value[1]), width = 16L)),
+    paste0(formatC("DF", width = -10L), formatC(sprintf("%.0f", tb$Value[2]), width = 16L)),
+    paste0(formatC("Pr > ChiSq", width = -10L), formatC(pv(tb$Value[3]), width = 16L)))
 }
 
 # The statistics output of one table request: a list of segments, each a
@@ -2624,7 +2642,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
     } else {
       "for Equal Proportions"
     }
-    out <- c(out, "   Chi-Square Test", test_line, "")
+    out <- c(out, freq_head_over("Chi-Square Test", nchar(test_line)), test_line, "")
     flush(decor = TRUE)
     push(new_sasonr_ods_table(tibble::tibble(Name = c("_PCHI_", "DF_PCHI", "P_PCHI"), Label = c("Chi-Square", "DF", "Pr > ChiSq"),
                                              Value = c(st$pchi, st$df_pchi, st$p_pchi)),
@@ -2666,12 +2684,14 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
       # EXACT CHISQ: one block per chi-square test with its exact conditional
       # p-value
       ex <- st$exact_chisq
+      # 34 positions wide, the values right-aligned [measured, statistics tables of PROC FREQ]
+      lv <- function(l, v) paste0(l, formatC(v, width = 34L - nchar(l)))
       blk <- function(lab, val, df, pval, pexact) {
-        c(lab, strrep("-", 34),
-          paste("Chi-Square", f4(val)),
-          paste("DF", sprintf("%.0f", as.numeric(df))),
-          paste("Asymptotic Pr > ChiSq", pv(pval)),
-          paste("Exact Pr >= ChiSq", pv(pexact)))
+        c(freq_head_over(lab, 34L), strrep("-", 34),
+          lv("Chi-Square", f4(val)),
+          lv("DF", sprintf("%.0f", as.numeric(df))),
+          lv("Asymptotic Pr >  ChiSq", pv(pval)),
+          lv("Exact      Pr >= ChiSq", pv(pexact)))
       }
       out <- c(out,
                blk("Pearson Chi-Square Test", st$pchi, st$df_pchi, st$p_pchi, ex[["pearson"]]),
@@ -2718,7 +2738,7 @@ freq_stats_listing <- function(st, tab, vars, info, o, sp, title = NULL, stratum
              paste0("Sample Size = ", freq_num(st$n)), "")
   }
   if (!is.null(st$cmhcor)) {
-    out <- c(out, "Cochran-Mantel-Haenszel Statistics (Based on Table Scores)", "",
+    out <- c(out, freq_head_over("Cochran-Mantel-Haenszel Statistics (Based on Table Scores)", 63L), "",
              "Statistic    Alternative Hypothesis    DF       Value      Prob", strrep("-", 62),
              paste0("    1        Nonzero Correlation", formatC("1", width = 10L), formatC(f4(st$cmhcor), width = 12L), formatC(pv(st$p_cmhcor), width = 10L)),
              paste0("    2        Row Mean Scores Differ", formatC(sprintf("%.0f", st$df_cmhrms), width = 7L), formatC(f4(st$cmhrms), width = 12L), formatC(pv(st$p_cmhrms), width = 10L)),
@@ -2837,19 +2857,33 @@ freq_riskdiff_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   a <- attr(tb, "freq", exact = TRUE)
   if (identical(attr(tb, "template", exact = TRUE), "base.freq.riskdiffcl")) {
-    return(c("", "Confidence Limits for the Risk Difference", paste("Risk Difference =", f4(a$diff)), "",
-             paste("Type", a$level, "Confidence Limits"), "",
-             vapply(seq_len(nrow(tb)), function(i) paste(tb$Type[i], f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), ""),
-             "", a$column, ""))
+    return(c("", freq_cl_listing("Confidence Limits for the Risk Difference", paste("Risk Difference =", f4(a$diff)),
+                                 a$level, tb$Type, vapply(tb$LowerCL, f4, ""), vapply(tb$UpperCL, f4, ""), a$column)))
   }
-  row <- function(i) paste(tb$Row[i], f4(tb$Risk[i]), f4(tb$ASE[i]), f4(tb$LowerCL[i]), f4(tb$UpperCL[i]), f4(tb$ExactLowerCL[i]), f4(tb$ExactUpperCL[i]))
-  dline <- paste("Difference", f4(tb$Risk[4]), f4(tb$ASE[4]), f4(tb$LowerCL[4]), f4(tb$UpperCL[4]))
-  if (a$exact) dline <- paste(dline, f4(tb$ExactLowerCL[4]), f4(tb$ExactUpperCL[4]))
-  out <- c(paste0("Column ", a$column, " Risk Estimates"), "", paste(a$level, "Exact", a$level),
-           "Risk ASE Confidence Limits Confidence Limits", strrep("-", 77), row(1), row(2), row(3), "",
-           dline, "", "Difference is (Row 1 - Row 2)",
+  # the label in 11 positions, each statistic right-aligned in 11
+  num <- function(v) formatC(f4(v), width = 11L)
+  row <- function(lab, i, k) paste0(formatC(lab, width = -11L), paste(vapply(c(tb$Risk[i], tb$ASE[i], tb$LowerCL[i], tb$UpperCL[i],
+                                                                              tb$ExactLowerCL[i], tb$ExactUpperCL[i])[seq_len(k)], num, ""), collapse = ""))
+  head2 <- function(txt) formatC(paste0(strrep(" ", (17L - nchar(txt)) %/% 2L), txt), width = -17L)
+  out <- c(freq_head_over(paste0("Column ", a$column, " Risk Estimates"), 77L), "",
+           sas_rtrim(paste0(strrep(" ", 38L), head2(a$level), strrep(" ", 5L), head2(paste("Exact", a$level)))),
+           "                  Risk        ASE     Confidence Limits     Confidence Limits", strrep("-", 77),
+           row(tb$Row[1], 1L, 6L), row(tb$Row[2], 2L, 6L), row(tb$Row[3], 3L, 6L), "",
+           row("Difference", 4L, if (a$exact) 6L else 4L), "", freq_head_over("Difference is (Row 1 - Row 2)", 77L),
            if (a$exact) "Exact confidence limits for the risk difference are based on a score statistic.")
   c(out, if (!a$has_cl) "")
+}
+
+# A confidence-limits table (RELRISK / RISKDIFF CL=): the title, the estimate
+# centred over the table, the types in the width of the longest one plus 4,
+# the limits right-aligned in 7 and 14; the column line centred under it
+# [measured, statistics tables of PROC FREQ].
+freq_cl_listing <- function(title, est, level, types, lo, hi, column) {
+  tw <- max(nchar(types)) + 4L
+  head <- paste0(formatC("Type", width = -tw), level, " Confidence Limits")
+  w <- nchar(head)
+  rows <- paste0(formatC(types, width = -tw), formatC(lo, width = 7L), formatC(hi, width = 14L))
+  c(freq_head_over(title, w), freq_head_over(est, w), "", head, "", rows, "", freq_head_over(column, w), "")
 }
 
 # RELRISK: the RelativeRisks table (odds ratio and the column relative risks
@@ -2883,15 +2917,17 @@ freq_relrisk_listing <- function(tb) {
   f4 <- function(v) if (is.na(v)) "." else display_fixed(v, 4L)
   a <- attr(tb, "freq", exact = TRUE)
   if (identical(attr(tb, "template", exact = TRUE), "base.freq.relrisk")) {
-    rows <- vapply(seq_len(nrow(tb)), function(i) paste(tb$Statistic[i], f4(tb$Value[i]), f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), "")
-    out <- c("Odds Ratio and Relative Risks", "", paste("Statistic Value", a$level, "Confidence Limits"), strrep("-", 66), rows)
-    if (length(rows) < 3L) out <- c(out, "", "One or more statistics not computed -- zero cell.")
+    rows <- vapply(seq_len(nrow(tb)), function(i) {
+      paste0(formatC(tb$Statistic[i], width = -28L), formatC(f4(tb$Value[i]), width = 10L), formatC(f4(tb$LowerCL[i]), width = 14L),
+             formatC(f4(tb$UpperCL[i]), width = 14L))
+    }, "")
+    out <- c(freq_head_over("Odds Ratio and Relative Risks", 66L), "",
+             paste0("Statistic                        Value       ", a$level, " Confidence Limits"), strrep("-", 66), rows)
+    if (length(rows) < 3L) out <- c(out, "", freq_head_over("One or more statistics not computed -- zero cell.", 66L))
     return(c(out, ""))
   }
-  out <- c("Confidence Limits for the Relative Risk", paste("Relative Risk =", f4(a$rr)), "",
-           paste("Type", a$level, "Confidence Limits"), "",
-           vapply(seq_len(nrow(tb)), function(i) paste(tb$Type[i], f4(tb$LowerCL[i]), f4(tb$UpperCL[i])), ""))
-  c(out, "", a$column, "")
+  freq_cl_listing("Confidence Limits for the Relative Risk", paste("Relative Risk =", f4(a$rr)), a$level, tb$Type,
+                  vapply(tb$LowerCL, f4, ""), vapply(tb$UpperCL, f4, ""), a$column)
 }
 
 # "Sample Size = n" after the statistics of a table, with the missing count

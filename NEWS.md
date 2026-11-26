@@ -24,6 +24,13 @@ the development version provides.
   and fields could sit a position or more to the left or right of their place.
 * PROC MEANS: the "Analysis Variable" heading is centred over its table (it
   started in the first position).
+* PROC FREQ statistics tables are laid out column for column: the CMH
+  summary, the common odds ratio and relative risks, the Breslow-Day test,
+  the risk estimates, the odds ratio and relative risks, the confidence
+  limits of RELRISK / RISKDIFF CL= and the exact chi-square tests had their
+  columns separated by single blanks; their headings, the "Chi-Square Test"
+  heading of a one-way table and the binomial headings are centred over their
+  tables, and the "Test" heading of TESTP= / TESTF= sits over its column.
 * PROC CONTENTS: the headings "Variables in Creation Order", "Alphabetic List
   of Variables and Attributes" and "Sort Information" are centred over their
   table (they started in the first position).
