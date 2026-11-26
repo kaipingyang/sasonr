@@ -22,6 +22,10 @@ the development version provides.
   is laid out like a formatted one; the heading of a character column whose
   values are of uneven widths starts in the first position. Before, headings
   and fields could sit a position or more to the left or right of their place.
+* PROC SQL: a column label with blanks wraps word by word at the width of the
+  column or of its longest word (it was cut in two lines only); a report
+  wider than LINESIZE fails loud (it was written wider than the line, where
+  the columns are narrowed).
 * PROC MEANS: the "Analysis Variable" heading is centred over its table (it
   started in the first position).
 * PROC FREQ statistics tables are laid out column for column: the CMH

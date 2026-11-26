@@ -268,6 +268,24 @@ sql_col_width <- function(c) {
 sql_header_lines <- function(h, width) {
   n <- nchar(h)
   if (n <= width) return(list(lines = h, width = width))
+  # a label with blanks wraps word by word at the width of the column or of
+  # its longest word ("Number of Physical Observations" over 12: three
+  # lines) [measured, DICTIONARY.TABLES labels]
+  if (grepl(" ", h, fixed = TRUE) && !grepl("_", h, fixed = TRUE) && width > 0L) {
+    w <- strsplit(h, " ", fixed = TRUE)[[1]]
+    if (any(!nzchar(w))) abort_unsupported(paste0("the PROC SQL heading '", h, "' (several blanks in a row)"))
+    lim <- max(width, nchar(w))
+    lines <- character()
+    cur <- ""
+    for (x in w) {
+      if (!nzchar(cur)) cur <- x else if (nchar(cur) + 1L + nchar(x) <= lim) cur <- paste(cur, x) else {
+        lines <- c(lines, cur)
+        cur <- x
+      }
+    }
+    lines <- c(lines, cur)
+    return(list(lines = lines, width = lim))
+  }
   ch <- strsplit(h, "")[[1]]
   best <- NULL
   for (i in seq_len(n - 1L)) {
@@ -318,6 +336,11 @@ sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
     head <- lapply(seq_len(nlines), function(j) c(formatC(if (j == nlines) "Row" else "", width = rw), head[[j]]))
     cells <- c(list(formatC(as.character(seq_len(nrow(d))), width = rw)), cells)
     widths <- c(rw, widths)
+  }
+  # a report wider than the line: the character columns are narrowed by a
+  # rule not measured (fail loud)
+  if (sum(widths) + 2L * (length(widths) - 1L) > rt_linesize()) {
+    abort_unsupported("a PROC SQL report wider than LINESIZE (the narrowing of its columns is not implemented)")
   }
   # centring units: each TITLE line, the table
   top <- if (length(titles) > 0) lst_lines(c(titles, "")) else NULL
