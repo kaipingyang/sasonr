@@ -78,3 +78,11 @@ test_that("a name with one lowercase-uppercase change splits only when longer th
   expect_true("Obs    AbCd" %in% lst)
   expect_error(sas_run("data h; AbCdEf = 1; run; proc print data=h; run;"), class = "sasonr_unsupported")
 })
+
+test_that("column positions: formatted numbers right-align the heading, unformatted ones centre rounding up, characters rounding down", {
+  lst <- function(code) { x <- sas_run(paste("options nocenter;", code))$listing; x[nzchar(x)] }
+  expect_identical(lst("data a; a = 1.5; format a 6.2; run; proc print data=a noobs; run;"), c("     a", "  1.50"))
+  expect_identical(lst("data a; abc = 1234; run; proc print data=a noobs; run;"), c(" abc", "1234"))
+  expect_identical(lst("data a; abcd = 12; run; proc print data=a noobs; run;"), c("abcd", " 12"))
+  expect_identical(lst("data a; length abcde $ 8; abcde = 'xy'; run; proc print data=a noobs; run;"), c("abcde", " xy"))
+})

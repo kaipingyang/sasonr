@@ -501,7 +501,10 @@ print_num_column <- function(x) {
     }, 1L)
     d <- max(need)
     out[!miss] <- vapply(v, display_fixed, "", d = d)
-    return(out)
+    # the decimals held at 2 (more than 4 integer digits) and a value rounded
+    # to them: the heading is laid out as over a formatted column
+    # (listing_base_print())
+    return(structure(out, rounded = 6L - max(ip) < 2L && any(abs(v - round(v, d)) > 1e-9 * pmax(1, abs(v)))))
   }
   s <- trimws(sas_fmt_best(abs(v), 7L))
   has_e <- grepl("E", s, fixed = TRUE)
@@ -509,7 +512,8 @@ print_num_column <- function(x) {
   d <- max(dec)
   if (d > 0 && !any(has_e)) s <- vapply(abs(v), display_fixed, "", d = d)
   out[!miss] <- paste0(ifelse(v < 0, "-", ""), s)
-  out
+  # (not measured: the layout of a rounded column of large magnitudes)
+  structure(out, rounded = NA)
 }
 
 # PROC PRINT splits a mixed-case variable name that is wider than its data at

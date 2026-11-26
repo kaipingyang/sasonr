@@ -15,6 +15,12 @@ the development version provides.
   starts sessions at NOCENTER. `sas_html()` centres the titles and the tables
   under CENTER and writes them on the left under NOCENTER (it used to centre
   the titles only).
+* PROC PRINT column positions: a formatted number's field is the format
+  width and its heading is right-aligned; an unformatted number (and Obs) is
+  centred rounding up, a character column rounding down; an unformatted
+  column whose values are rounded to two decimals because of their magnitude
+  is laid out like a formatted one. Before, headings and fields could sit a
+  position or more to the left or right of their place.
 * PROC CONTENTS: the second column of the data set attributes is 57
   characters wide (it was 56, so the third column started one position early).
 

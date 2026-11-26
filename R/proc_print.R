@@ -7,10 +7,16 @@
 #   fw  widest entry of the column on the page (values, subtotal, grand total
 #       on the last page, the BY label of a subtotal in the first column);
 #   W   max(fw, widest heading line); columns are 4 blanks apart;
-#   the field starts at floor((W - fw) / 2), ceiling(...) when the heading of
-#   the column has more than one line; numbers are right-aligned in the
-#   field, character values left-aligned; heading lines are centred with
-#   ceiling((W - width) / 2) and stacked at the bottom.
+#   a formatted number's field is at least the format width;
+#   the field starts at floor((W - fw) / 2) for a character column and a
+#   formatted number, ceiling(...) for an unformatted number (and Obs) and
+#   when the heading has more than one line; numbers are right-aligned in the
+#   field, character values left-aligned; a one-line heading starts at
+#   floor((W - width) / 2) over a character column, ceiling(...) over an
+#   unformatted number, W - width (right-aligned) over a formatted number;
+#   heading lines of several lines are centred with ceiling(...) and stacked
+#   at the bottom [column positions measured on a grid of 120 columns,
+#   print_layout].
 
 print_compute <- function(d, spec) {
   # an empty data set prints nothing
@@ -41,7 +47,8 @@ print_compute <- function(d, spec) {
       y <- c(x, extra)
       if (is.null(s$fmt)) print_num_column(y) else trimws(sas_format(y, s$fmt))
     }
-    list(values = all[seq_len(n)], sub = if (!is.null(extra)) all[n + seq_len(ng)], grand = if (!is.null(extra)) all[n + ng + 1L])
+    list(values = all[seq_len(n)], sub = if (!is.null(extra)) all[n + seq_len(ng)], grand = if (!is.null(extra)) all[n + ng + 1L],
+         rounded = attr(all, "rounded", exact = TRUE))
   })
   names(text) <- vapply(cols, `[[`, "", "name")
   sub_rows <- length(sums) > 0 && length(spec$by) > 0
@@ -56,10 +63,11 @@ print_compute <- function(d, spec) {
                             cols = ods_cols(names(x), role = "var"))
     attr(tb, "print") <- list(
       cols = c(if (obs) list(list(name = "Obs", head = spec$obs_label, char = FALSE)),
-               lapply(cols, function(s) list(name = s$name, head = s$label %||% s$disp, label = !is.null(s$label), char = s$char))),
+               lapply(cols, function(s) list(name = s$name, head = s$label %||% s$disp, label = !is.null(s$label), char = s$char,
+                                             fw = if (!s$char && !is.null(s$fmt)) fmt_width(s$fmt, FALSE)))),
       text = c(if (obs) list(list(values = as.character(d$.obs[g]))),
                lapply(names(text), function(nm) list(values = text[[nm]]$values[g], sub = text[[nm]]$sub[k],
-                                                     grand = if (k == ng) text[[nm]]$grand))),
+                                                     grand = if (k == ng) text[[nm]]$grand, rounded = text[[nm]]$rounded))),
       sums = sums, sub_label = if (sub_rows) spec$by_info[[spec$by]]$disp else NULL,
       last = k == ng, n = if (isTRUE(spec$n)) length(g) else NULL, split = spec$split, first = k == 1L,
       row_header = obs || !is.null(spec$id), id_n = spec$id_n %||% 0L
@@ -108,7 +116,7 @@ listing_base_print <- function(tb) {
   fws <- vapply(seq_len(nc), function(j) {
     t <- a$text[[j]]
     e <- c(t$values, if (a$cols[[j]]$name %in% sums) c(t$sub, t$grand), if (label_first && j == 1L) a$sub_label)
-    max(0L, nchar(e))
+    max(0L, nchar(e), a$cols[[j]]$fw)
   }, 1L)
   heads <- lapply(seq_len(nc), function(j) print_heading(a$cols[[j]], fws[j], a$split))
   widths <- pmax(fws, vapply(heads, function(h) max(nchar(h)), 1L))
@@ -118,7 +126,17 @@ listing_base_print <- function(tb) {
     abort_unsupported("a PROC PRINT table wider than LINESIZE (vertical headings and column panels are not implemented)")
   }
   multi <- vapply(heads, length, 1L) > 1L
-  off <- ifelse(multi, ceiling((widths - fws) / 2), floor((widths - fws) / 2))
+  # c: character, f: formatted number (the field is the format width), n: unformatted number or Obs
+  rounded <- vapply(a$text, function(t) t$rounded %||% FALSE, NA)
+  if (anyNA(rounded) && any(vapply(heads, function(h) max(nchar(h)), 1L)[is.na(rounded)] < fws[is.na(rounded)])) {
+    abort_unsupported("the PROC PRINT heading of an unformatted numeric column of large magnitudes")
+  }
+  # an unformatted column rounded to decimals held at 2 is laid out like a formatted one
+  kind <- vapply(seq_len(nc), function(j) {
+    c <- a$cols[[j]]
+    if (isTRUE(c$char)) "c" else if (!is.null(c$fw) || isTRUE(rounded[j])) "f" else "n"
+  }, "")
+  off <- ifelse(multi | kind == "n", ceiling((widths - fws) / 2), floor((widths - fws) / 2))
   cell <- function(j, s, field = TRUE) {
     if (is.na(s) || !nzchar(s)) return(strrep(" ", widths[j]))
     if (!field) return(formatC(s, width = -widths[j]))
@@ -131,7 +149,9 @@ listing_base_print <- function(tb) {
     line_of(vapply(seq_len(nc), function(j) {
       h <- c(rep("", nl - length(heads[[j]])), heads[[j]])[i]
       if (!nzchar(h)) return(strrep(" ", widths[j]))
-      formatC(paste0(strrep(" ", ceiling((widths[j] - nchar(h)) / 2)), h), width = -widths[j])
+      gap <- widths[j] - nchar(h)
+      pos <- if (multi[j] || kind[j] == "n") ceiling(gap / 2) else if (kind[j] == "f") gap else floor(gap / 2)
+      formatC(paste0(strrep(" ", pos), h), width = -widths[j])
     }, ""))
   }, "")
   nr <- length(a$text[[1]]$values)
