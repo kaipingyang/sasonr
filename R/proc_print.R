@@ -137,6 +137,25 @@ listing_base_print <- function(tb) {
     if (isTRUE(c$char)) "c" else if (!is.null(c$fw) || isTRUE(rounded[j])) "f" else "n"
   }, "")
   off <- ifelse(multi | kind == "n", ceiling((widths - fws) / 2), floor((widths - fws) / 2))
+  # a one-line heading narrower than a character column whose non-blank
+  # values are uneven starts in the first position: when the shortest value
+  # is narrower than fw - floor(fw / 3) [measured with two values of widths
+  # 6 to 20]; with more values the rule is not known when the shortest value
+  # and the mean width disagree (fail loud)
+  char_left <- vapply(seq_len(nc), function(j) {
+    if (kind[j] != "c" || multi[j]) return(FALSE)
+    if (max(nchar(heads[[j]])) >= fws[j]) return(FALSE)
+    v <- nchar(a$text[[j]]$values)
+    v <- v[v > 0]
+    if (length(v) < 2L) return(FALSE)
+    lim <- fws[j] - fws[j] %/% 3L
+    by_min <- min(v) < lim
+    by_mean <- mean(v) < (fws[j] + lim) / 2
+    if (length(unique(v)) > 2L && by_min != by_mean) {
+      abort_unsupported("the PROC PRINT heading of a character column with values of several widths")
+    }
+    by_min
+  }, TRUE)
   cell <- function(j, s, field = TRUE) {
     if (is.na(s) || !nzchar(s)) return(strrep(" ", widths[j]))
     if (!field) return(formatC(s, width = -widths[j]))
@@ -150,7 +169,7 @@ listing_base_print <- function(tb) {
       h <- c(rep("", nl - length(heads[[j]])), heads[[j]])[i]
       if (!nzchar(h)) return(strrep(" ", widths[j]))
       gap <- widths[j] - nchar(h)
-      pos <- if (multi[j] || kind[j] == "n") ceiling(gap / 2) else if (kind[j] == "f") gap else floor(gap / 2)
+      pos <- if (multi[j] || kind[j] == "n") ceiling(gap / 2) else if (kind[j] == "f") gap else if (char_left[j]) 0L else floor(gap / 2)
       formatC(paste0(strrep(" ", pos), h), width = -widths[j])
     }, ""))
   }, "")

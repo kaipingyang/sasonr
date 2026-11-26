@@ -19,8 +19,12 @@ the development version provides.
   width and its heading is right-aligned; an unformatted number (and Obs) is
   centred rounding up, a character column rounding down; an unformatted
   column whose values are rounded to two decimals because of their magnitude
-  is laid out like a formatted one. Before, headings and fields could sit a
-  position or more to the left or right of their place.
+  is laid out like a formatted one; the heading of a character column whose
+  values are of uneven widths starts in the first position. Before, headings
+  and fields could sit a position or more to the left or right of their place.
+* PROC CONTENTS: the headings "Variables in Creation Order", "Alphabetic List
+  of Variables and Attributes" and "Sort Information" are centred over their
+  table (they started in the first position).
 * PROC CONTENTS: the second column of the data set attributes is 57
   characters wide (it was 56, so the third column started one position early).
 

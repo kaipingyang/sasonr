@@ -27,11 +27,16 @@ lst_by_block <- function(blank_before, text) lst_c(lst_lines(blank_before), lst_
 # A BY line: under CENTER it is written between dashes over the whole line.
 lst_by <- function(text) structure(as.character(text), units = 1L, by = TRUE)
 
+# Lines centred on their own with floor rounded up: (LINESIZE - w + 1) %/% 2
+# (a PROC CONTENTS heading wider than its table).
+lst_lines_up <- function(lines) structure(as.character(lines), units = seq_along(lines), up = rep(TRUE, length(lines)))
+
 lst_c <- function(...) {
   parts <- list(...)
   out <- character()
   units <- integer()
   by <- logical()
+  up <- logical()
   top <- 0L
   for (p in parts) {
     if (is.null(p) || !length(p)) next
@@ -40,9 +45,10 @@ lst_c <- function(...) {
     out <- c(out, as.character(p))
     units <- c(units, u + top)
     by <- c(by, attr(p, "by", exact = TRUE) %||% rep(FALSE, length(p)))
+    up <- c(up, attr(p, "up", exact = TRUE) %||% rep(FALSE, length(p)))
     top <- top + max(c(0L, u))
   }
-  structure(out, units = units, by = by)
+  structure(out, units = units, by = by, up = up)
 }
 
 lst_marked <- function(lst) length(lst) == 0L || !is.null(attr(lst, "units", exact = TRUE))
@@ -61,7 +67,7 @@ lst_center <- function(lst, ls) {
     i <- which(u == k & nzchar(trimws(out)))
     if (!length(i)) next
     w <- max(nchar(sas_rtrim(out[i])))
-    off <- max(0L, (ls - w) %/% 2L)
+    off <- max(0L, (ls - w + if (isTRUE((attr(lst, "up", exact = TRUE) %||% FALSE)[i[1]])) 1L else 0L) %/% 2L)
     if (off > 0L) out[i] <- paste0(strrep(" ", off), out[i])
   }
   out

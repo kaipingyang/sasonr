@@ -96,7 +96,12 @@ contents_var_table <- function(cv, idx, title) {
   if (any(nzchar(cv$infmt))) cols <- c(cols, list(list(parts = "Informat", width = max(8L, nchar(cv$infmt[idx])), right = FALSE, cells = cv$infmt[idx])))
   if (any(nzchar(cv$label))) cols <- c(cols, list(list(parts = "Label", width = max(5L, nchar(cv$label[idx])), right = FALSE, cells = cv$label[idx])))
   tb <- render_table(cols, gap = 4L, rule = FALSE)
-  lst_c(lst_lines(c(title, "")), lst_unit(c(tb, "")))
+  # the heading is centred over the table (rounding up), the table under a
+  # wider heading starts in the first column; under CENTER a wider heading is
+  # centred on its own (rounding up) [measured, cases center_listing]
+  w <- table_width(cols, 4L)
+  if (nchar(title) > w) return(lst_c(lst_lines_up(c(title, "")), lst_unit(c(tb, ""))))
+  lst_unit(c(paste0(strrep(" ", ceiling((w - nchar(title)) / 2)), title), "", tb, ""))
 }
 
 #' PROC CONTENTS listing and OUT= data set
@@ -153,9 +158,10 @@ sas_proc_contents <- function(work, name, m, sp) {
     }
     if (!is.null(m$sortedby)) {
       if (isTRUE(m$sortedby$noduprec)) abort_unsupported("PROC CONTENTS of a data set sorted with NODUPREC (its sort option line is not measured)")
-      lst <- lst_c(lst, lst_lines(c("Sort Information", "")),
-                   lst_unit(c(paste0("Sortedby       ", paste(ifelse(m$sortedby$descending, paste("DESCENDING", m$sortedby$vars), m$sortedby$vars), collapse = " ")),
-                              "Validated      YES", "Character Set  ASCII", if (isTRUE(m$sortedby$nodupkey)) "Sort Option    NODUPKEY", "")))
+      st <- c(paste0("Sortedby       ", paste(ifelse(m$sortedby$descending, paste("DESCENDING", m$sortedby$vars), m$sortedby$vars), collapse = " ")),
+              "Validated      YES", "Character Set  ASCII", if (isTRUE(m$sortedby$nodupkey)) "Sort Option    NODUPKEY")
+      # the heading centred over the table, rounding down
+      lst <- lst_c(lst, lst_unit(c(paste0(strrep(" ", max(0L, (max(nchar(st)) - 16L) %/% 2L)), "Sort Information"), "", st, "")))
     }
   }
   out <- list()
