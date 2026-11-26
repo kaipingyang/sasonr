@@ -43,12 +43,10 @@ tab_listing_tables <- function(tables, ls) {
   # pages of the group (sas_tab_titles() puts the titles above it)
   groups <- list()
   group <- NULL
-  # centring units (listing_center.R): each page one unit, the BY line written
-  # between dashes; a table of several panels ("(Continued)") is not measured
-  # under CENTER (unmarked)
+  # centring units (listing_center.R): each page one unit (with its
+  # "(Continued)" line), the BY line written between dashes
   units <- integer()
   byl <- logical()
-  multi <- FALSE
   add <- function(lines, by_line = FALSE, own = FALSE) {
     out <<- c(out, lines)
     u <- if (own) max(c(0L, units)) + seq_along(lines) else rep(max(c(0L, units)) + 1L, length(lines))
@@ -58,7 +56,6 @@ tab_listing_tables <- function(tables, ls) {
   for (tb in tables) {
     by <- attr(tb, "by", exact = TRUE)
     panels <- listing_base_tabulate(tb, ls)
-    if (length(panels) > 1L) multi <- TRUE
     for (k in seq_along(panels)) {
       if (pages > 0L) add(tab_page_break, own = TRUE)
       if (k == 1L && !is.null(by) && !identical(by$group, group)) {
@@ -73,7 +70,7 @@ tab_listing_tables <- function(tables, ls) {
     }
   }
   structure(out, pages = pages, groups = if (length(groups)) groups,
-            units = if (!multi) units, by = if (!multi) byl)
+            units = units, by = byl)
 }
 
 # #BYVAL(var) in a title: the formatted BY value of the group; other #BY

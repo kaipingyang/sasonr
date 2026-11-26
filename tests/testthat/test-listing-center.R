@@ -33,7 +33,6 @@ test_that("the N line of PROC PRINT is centred on its own", {
 })
 
 test_that("output whose centring is not implemented fails loud under CENTER", {
-  expect_error(center_lst(paste("data a; input g $ x; datalines;\na 1\na 2\nb 3\n;\nrun;",
-                                "proc means data=a n mean std stderr min max median q1 q3 sum var cv; class g; var x; run;")),
+  expect_error(center_lst("data a; x = 1; run; proc datasets lib=work nolist; contents data=a; quit;"),
                class = "sasonr_unsupported")
 })

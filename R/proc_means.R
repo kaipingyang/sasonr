@@ -1238,24 +1238,27 @@ listing_base_summary <- function(tb, ls) {
     # implemented.
     abort_unsupported("PROC MEANS class table with three or more panels or LINESIZE= below 120 (fixed-column layout not supported)")
   }
-  # centring units: the "Analysis Variable" line, the table; the panels of a
-  # table split over several panels are not measured under CENTER (unmarked)
-  mark <- length(panels) == 1L
+  # centring units: the "Analysis Variable" line, each panel of the table
+  mark <- TRUE
   for (p in panels) {
     pcols <- c(fixed, scl[p$first:p$last])
     gaps <- c(rep.int(p$fixed_gap, length(fixed)), rep.int(p$gap, p$last - p$first))
     tb_lines <- c(means_render(pcols, gaps), "")
     if (!multi) {
       # the heading is centred over the table, rounding down (over the table
-      # width less 2 for the panels of a class table split over several
-      # panels) at NOCENTER, and on its own
-      # under CENTER (a unit of its own: only its leading blanks differ)
-      # [measured, listings at NOCENTER and CENTER]
+      # width less 1 for the panels of a class table split over several
+      # panels), with the table one centring unit; a heading wider than its
+      # table and the table are units of their own [measured, listings at
+      # NOCENTER and CENTER]
       av <- sas_rtrim(paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""))
       tw <- sum(vapply(pcols, function(c) vctrs::vec_cast(c$width, integer()), 1L)) + sum(gaps) -
-        if (length(fixed) > 0 && length(panels) > 1L) 2L else 0L
-      lead <- if (isTRUE(rt_center())) "" else strrep(" ", max(0L, (tw - nchar(av)) %/% 2L))
-      out <- lst_c(out, if (mark) lst_lines(c(paste0(lead, av), "")) else c(paste0(lead, av), ""))
+        if (length(fixed) > 0 && length(panels) > 1L) 1L else 0L
+      if (nchar(av) <= tw) {
+        # over the table: one centring unit with it
+        out <- lst_c(out, lst_unit(c(paste0(strrep(" ", (tw - nchar(av)) %/% 2L), av), "", tb_lines)))
+        next
+      }
+      out <- lst_c(out, lst_lines(c(av, "")))
     }
     out <- lst_c(out, if (mark) lst_unit(tb_lines) else tb_lines)
   }
