@@ -49,6 +49,9 @@ new_engine <- function(session, level, execute) {
     # ran; the step's own text on that line is not changed by it
     eng$session$rt$macro_lines <- ses$macro_lines
     eng$chunk_no <- (eng$chunk_no %||% 0L) + 1L
+    # the source of each character (macro.R code_sink(); err_macro_echo())
+    eng$chunk_text <- text
+    eng$chunk_prov <- ses$exec_prov
     engine_exec(eng, text, line)
   }
   ses$on_step_options <- function(text, line) engine_step_options(eng, text, line)
@@ -861,6 +864,7 @@ engine_program <- function(eng, code) {
   text <- src$text
   log_program(eng, text)
   if (any(src$level > 0L)) log_source_skip(eng, which(src$level > 0L))
+  eng$include_level <- src$level
   sink <- code_sink(eng$session$macro)
   mp_scan(mp_src(src$run, line_of = TRUE), eng$session$macro, sink, mode = "code")
   sink$finish()

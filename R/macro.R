@@ -304,6 +304,12 @@ code_sink <- function(ses) {
   s <- new.env(parent = emptyenv())
   s$compiler <- TRUE
   s$acc <- ""
+  # the source of each character of `acc` (spec 09 contract 2): the macro call
+  # that generated it (`pcall`, NA: the program) and its place in the text of
+  # that call (`poff`); `ctext`: the text of each call, line breaks as blanks
+  s$pcall <- integer()
+  s$poff <- integer()
+  s$ctext <- list()
   s$state <- "code"
   s$qchar <- 0L
   s$qret <- "code"
@@ -325,8 +331,13 @@ code_sink <- function(ses) {
   flush_upto <- function(p) {
     text <- substr(s$acc, 1L, p)
     s$acc <- substr(s$acc, p + 1L, nchar(s$acc))
+    keep <- seq_len(min(p, length(s$pcall)))
+    prov <- list(call = s$pcall[keep], off = s$poff[keep], ctext = s$ctext)
+    s$pcall <- s$pcall[-keep]
+    s$poff <- s$poff[-keep]
     line <- s$acc_line
     s$acc_line <- if (nzchar(s$acc)) line + mp_count_nl(text) else NA_integer_
+    ses$exec_prov <- prov
     if (nzchar(trimws(text))) ses$exec(text, if (is.na(line)) 1L else line)
   }
   step_done <- function() {
@@ -420,6 +431,21 @@ code_sink <- function(ses) {
     base <- nchar(s$acc)
     nl <- !mapped && !s$dl && grepl("\n", text, fixed = TRUE)
     s$acc <- paste0(s$acc, if (nl) gsub("\n", " ", text, fixed = TRUE) else text)
+    n_add <- nchar(text)
+    fr <- if (!mapped && length(ses$frames)) ses$frames[[length(ses$frames)]]
+    if (!is.null(fr$call_id)) {
+      id <- as.character(fr$call_id)
+      ct <- s$ctext[[id]] %||% list(name = fr$name, cp = rep(32L, max(0L, fr$lead %||% 0L)))
+      off0 <- length(ct$cp)
+      cpt <- utf8ToInt(text)
+      ct$cp <- c(ct$cp, ifelse(cpt == 10L, 32L, cpt))
+      s$ctext[[id]] <- ct
+      s$pcall <- c(s$pcall, rep(fr$call_id, n_add))
+      s$poff <- c(s$poff, off0 + seq_len(n_add))
+    } else {
+      s$pcall <- c(s$pcall, rep(NA_integer_, n_add))
+      s$poff <- c(s$poff, rep(NA_integer_, n_add))
+    }
     if (s$dl) return(invisible())
     cps <- utf8ToInt(text)
     cur_line <- ses$line
@@ -489,6 +515,8 @@ code_sink <- function(ses) {
   s$comment <- function(text) {
     if (!nzchar(s$acc)) s$acc_line <- ses$line
     s$acc <- paste0(s$acc, text)
+    s$pcall <- c(s$pcall, rep(NA_integer_, nchar(text)))
+    s$poff <- c(s$poff, rep(NA_integer_, nchar(text)))
   }
   s$end_datalines <- function() {
     s$dl <- FALSE

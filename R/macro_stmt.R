@@ -452,7 +452,10 @@ mp_define <- function(src, ses) {
   ses$macros[[name]] <- list(
     name = name, params = params, parmbuff = parmbuff,
     # Line breaks are not part of generated text; leading/trailing blanks of the body are dropped.
-    body = mq_strip(chartr("\n\t", "  ", src_text(src, body_a, e$end - 1L)))
+    body = mq_strip(chartr("\n\t", "  ", src_text(src, body_a, e$end - 1L))),
+    # (the dropped leading blanks still start the line of generated text a
+    # numbered ERROR echoes [measured]; err_macro_echo())
+    lead = attr(regexpr("^[[:space:]]*", src_text(src, body_a, e$end - 1L)), "match.length")
   )
   invisible()
 }
@@ -513,7 +516,9 @@ mp_call <- function(def, src, ses, sink) {
   # outer call
   call_line <- src_line(src, src$i - 1L)
   if (!is.null(call_line)) ses$line <- call_line
-  frame <- list(name = def$name, vars = new.env(parent = emptyenv()))
+  # (`call_id`: the source of the text the call generates, code_sink())
+  ses$call_seq <- (ses$call_seq %||% 0L) + 1L
+  frame <- list(name = def$name, vars = new.env(parent = emptyenv()), call_id = ses$call_seq, lead = def$lead %||% 0L)
   for (nm in names(vals)) assign(nm, vals[[nm]], envir = frame$vars)
   if (def$parmbuff) assign("syspbuff", buff, envir = frame$vars)
   ses$frames[[length(ses$frames) + 1L]] <- frame

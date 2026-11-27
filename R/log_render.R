@@ -219,6 +219,13 @@ log_sub_items <- function(e, p, sub, echo) {
       if (echo && e$kind[i] == "warning" && log_warning_numbered(e$text[[i]])) {
         log_echo_unknown("a numbered WARNING")
       }
+      # an echoed line with an ERROR marker that is not a program line
+      # (macro-generated text, a line of an included file; err_emit_error())
+      # is a marker item; without the source echo it is left out
+      if (e$kind[i] == "put" && isTRUE(e$args[[i]]$gen_echo)) {
+        if (echo) add("marker", e$step[i], sub, e$text[[i]])
+        next
+      }
       add(e$kind[i], e$step[i], sub, e$text[[i]])
       if (echo && e$kind[i] == "error" && log_error_blank(e$text[[i]], st$label[st$step == e$step[i]])) {
         add("echo", e$step[i], sub, "")
