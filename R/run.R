@@ -856,10 +856,13 @@ sas_untranslated <- function(what, line) {
 }
 
 engine_program <- function(eng, code) {
-  text <- paste(code, collapse = "\n")
+  # %INCLUDE files inlined; their lines are not echoed (source_map.R)
+  src <- src_include_expand(paste(code, collapse = "\n"))
+  text <- src$text
   log_program(eng, text)
+  if (any(src$level > 0L)) log_source_skip(eng, which(src$level > 0L))
   sink <- code_sink(eng$session$macro)
-  mp_scan(mp_src(text, line_of = TRUE), eng$session$macro, sink, mode = "code")
+  mp_scan(mp_src(src$run, line_of = TRUE), eng$session$macro, sink, mode = "code")
   sink$finish()
   if (!isTRUE(eng$deferred)) script_open_code(eng, "", length(eng$program$lines) + 1L, end = TRUE)
   # (measured: after ERROR 180-322 in open code a program may end there)

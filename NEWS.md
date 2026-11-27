@@ -553,6 +553,12 @@ the development version provides.
 
 ## Macro language
 
+* `%INCLUDE 'path';` alone on its line reads the file as if its lines
+  followed the statement, also in a step and nested: they take the next line
+  numbers and are not echoed (NOSOURCE2). A %INCLUDE in a program with macro
+  definitions or open-code %IF/%DO, with a fileref or options, of a missing
+  file, or under OPTIONS SOURCE2 fails loud.
+
 * OPTIONS MPRINT writes the text each macro call generates, up to each
   semicolon and after the last one, as `MPRINT(NAME):   text` (NAME: the macro
   whose body wrote it), with its blanks and line breaks collapsed to one blank

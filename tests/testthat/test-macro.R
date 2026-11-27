@@ -327,3 +327,16 @@ test_that("OPTIONS MPRINT writes the statements a macro generates, under the inn
   l <- as.character(sas_log(r))
   expect_identical(l[startsWith(l, "MPRINT")], c("MPRINT(M):   x=1;", "MPRINT(TWO):   2", "MPRINT(TWO):   2"))
 })
+
+test_that("%INCLUDE reads a file as the lines after the statement, not echoed", {
+  d <- withr::local_tempdir()
+  writeLines(c("data inc;", "  v = 1;", "run;"), file.path(d, "inc.sas"))
+  withr::local_dir(d)
+  r <- sas_run("data a; x = 1; run;\n%include 'inc.sas';\ndata b; set inc; run;")
+  expect_identical(r$work$b, tibble::tibble(v = 1))
+  l <- as.character(sas_log(r))
+  expect_true(any(startsWith(l, "6          data b; set inc; run;")))
+  expect_false(any(grepl("v = 1", l, fixed = TRUE)))
+  expect_error(sas_run("%include 'nosuch.sas';"), class = "sasonr_unsupported")
+  expect_error(sas_run("data a; x = 1; %include 'inc.sas'; run;"), class = "sasonr_unsupported")
+})

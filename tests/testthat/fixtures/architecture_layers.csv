@@ -24,6 +24,7 @@ operators.R,values
 fn_policy.R,values
 lex.R,lex
 lex_lossless.R,lex
+source_map.R,lex
 macro.R,macro
 macro_eval.R,macro
 macro_funcs.R,macro
