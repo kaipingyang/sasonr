@@ -2087,7 +2087,7 @@ sas_set_next <- function(r, pdv) {
 #' Execute a SET statement with POINT=: observation `k` into the PDV
 #'
 #' An invalid observation number (missing, not an integer, out of range)
-#' sets `_ERROR_` and leaves the PDV [measured]. A POINT= reader writes no
+#' sets `_ERROR_` and leaves the PDV (measured). A POINT= reader writes no
 #' NOTE about the observations it read.
 #' @export
 #' @keywords internal
@@ -2206,7 +2206,7 @@ sas_iter_done <- function(st, status, why = NULL) {
 #' Per BY group, the first master observation with the transaction
 #' observations of the group applied in order, then the group's other master
 #' observations unchanged; a BY group only in the transaction data set starts
-#' from missing values [measured]. A missing value in a transaction does not
+#' from missing values (measured). A missing value in a transaction does not
 #' replace a value (`missing = TRUE`: UPDATEMODE=NOMISSINGCHECK, it does);
 #' the special missing values .A-.Z do; `._` is not supported.
 #' @export

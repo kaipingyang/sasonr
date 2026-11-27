@@ -8,7 +8,7 @@ sas_set_point(r, pdv, k)
 }
 \description{
 An invalid observation number (missing, not an integer, out of range)
-sets \verb{_ERROR_} and leaves the PDV \link{measured}. A POINT= reader writes no
+sets \verb{_ERROR_} and leaves the PDV (measured). A POINT= reader writes no
 NOTE about the observations it read.
 }
 \keyword{internal}
