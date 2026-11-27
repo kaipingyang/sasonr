@@ -145,8 +145,8 @@ sas_note_read <- function(d, name, where = NULL) {
 #' default); `ahead`: a reader that reads one observation ahead (SET with BY
 #' of one data set). A reader that never executed and reads nothing ahead has
 #' no NOTE.
-#' @export
 #' @keywords internal
+#' @noRd
 sas_reads_consumed <- function(p, at = NULL, ahead = FALSE) {
   rt <- rt_diag()
   # a SET statement with BY reads one observation ahead (for LAST.), also
@@ -165,8 +165,8 @@ sas_reads_consumed <- function(p, at = NULL, ahead = FALSE) {
 #'
 #' The observation counts of a MERGE that stopped before its last
 #' observation, or never executed, are not known: fail loud.
-#' @export
 #' @keywords internal
+#' @noRd
 sas_merge_consumed <- function(p, n, line = NULL) {
   if (p < n) abort_unsupported("a MERGE statement that did not read all its observations (the counts of its read NOTEs)", line)
   invisible()

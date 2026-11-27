@@ -370,7 +370,7 @@ script_node_sql <- function(stext, first, last, mode) {
 script_why_data <- function(tr, level) {
   nm <- all.names(as.call(c(quote(`{`), as.list(cg_exec(tr$exprs)))))
   # MERGE has only a row-by-row form
-  if ("sas_merge_read" %in% nm) return("a MERGE step (MERGE runs row by row, L3)")
+  if ("sas_merge_reader" %in% nm) return("a MERGE step (MERGE runs row by row, L3)")
   if (!is.null(level) || !tr$level %in% c("L1", "L2")) return("a row-by-row (L3) step")
   if (any(c(".log", ".lst") %in% nm)) return("the step writes to the log or the listing (PUT, INFILE ...)")
   if (any(c(".symtab", ".titles", ".meta") %in% nm)) return("the step uses macro variables, titles or run-time attributes")

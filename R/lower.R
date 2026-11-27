@@ -248,7 +248,7 @@ dsir_lower <- function(an) {
   loop_temp <- function(k, name) list(node = "loop_temp", loop = k, name = name)
 
   # a read or INPUT that finds the input exhausted stops the step
-  # (`if (.p > .n_in) sas_stop_step()`): the block ends in a branch on `eof`
+  # (sas_set_next() at the end of its rows): the block ends in a branch on `eof`
   end_of_input <- function(s, ctx) {
     loop <- cur_loop(ctx)
     stop_b <- new_block(loop)

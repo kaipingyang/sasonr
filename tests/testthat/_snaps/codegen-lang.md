@@ -48,56 +48,32 @@
       # ---- DATA B (SAS line 1) -- level L3
       # L3: iterative DO loop; LEAVE/CONTINUE; explicit OUTPUT
       pdv <- list(i = NA_real_, x = NA_real_, `_error_` = 0, `_n_` = NA_real_)
-      .proto <- pdv
-      .dump <- sas_dump_spec(c("i", "x"), c("i", "x"), list())
-      .reset <- pdv[c("i", "x")]
-      .out1 <- list()
-      .vars1 <- c("i", "x")
-      .n_iter <- 0L
+      .st <- sas_step_state(
+        pdv,
+        reset = c("i", "x"),
+        outputs = list(c("i", "x")),
+        dump = sas_dump_spec(c("i", "x"), c("i", "x"), list())
+      )
       repeat {
-        .n_iter <- .n_iter + 1L
-        pdv[names(.reset)] <- .reset
-        pdv$`_n_` <- .n_iter
-        pdv$`_error_` <- 0
-        .status <- tryCatch(
-          {
-            .from2 <- 1
-            .to2 <- 3
-            .by2 <- 1
-            pdv$i <- .from2
-            .first2 <- TRUE
+        pdv <- sas_iter_begin(.st, pdv)
+        .status <- sas_iter_run({
+          pdv$i <- 1
+          while (sas_do_test(pdv$i, 3, 1)) {
             repeat {
-              if (!.first2) {
-                pdv$i <- pdv$i + .by2
-              }
-              .first2 <- FALSE
-              if (!sas_do_test(pdv$i, .to2, .by2)) {
+              .s1 <- pdv$i
+              if (sas_true(sas_in(.s1, list(2)))) {
                 break
               }
-              repeat {
-                .s1 <- pdv$i
-                if (sas_true(sas_in(.s1, list(2)))) {
-                  break
-                } else {
-                }
-                break
-              }
-              pdv$x <- sas_div(pdv$i, 3, .at = c(1L, 74L))
-              pdv <- sas_err_sync(pdv)
-              .out1[[length(.out1) + 1L]] <- pdv[.vars1]
+              break
             }
-            "ok"
-          },
-          sasonr_delete = function(e) "delete",
-          sasonr_stop = function(e) "stop",
-          sasonr_return = function(e) "ok"
-        )
+            pdv$x <- sas_div(pdv$i, 3, .at = c(1L, 74L))
+            sas_write_pdv(.st, pdv)
+            pdv$i <- pdv$i + 1
+          }
+        })
         pdv <- sas_err_sync(pdv)
-        .log <- c(.log, sas_iter_dump(pdv, .dump))
-        if (.status == "stop") {
-          break
-        }
-        break
+        .log <- c(.log, sas_iter_dump(pdv, .st))
+        if (sas_iter_done(.st, .status)) break
       }
-      work$b <- sas_rows_to_tibble(.out1, .proto[.vars1])
+      work$b <- sas_step_output(.st, 1L)
 

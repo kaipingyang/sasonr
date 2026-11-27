@@ -127,6 +127,14 @@ cg_format <- function(e, col = 0L, tail = 0L, base = 0L) {
     return(out)
   }
   if (fn == "repeat") return(cg_prefix("repeat ", cg_format(e[[2]], col + 7L, tail, base)))
+  if (fn == "while" && length(e) == 3L) {
+    head <- paste0("while (", cg_flat(e[[2]]), ") ")
+    return(cg_prefix(head, cg_format(e[[3]], col + nchar(head), tail, base)))
+  }
+  if (fn == "for" && length(e) == 4L) {
+    head <- paste0("for (", cg_flat(e[[2]]), " in ", cg_flat(e[[3]]), ") ")
+    return(cg_prefix(head, cg_format(e[[4]], col + nchar(head), tail, base)))
+  }
   if (fn %in% cg_binary_ops && length(e) == 3L) {
     ops <- cg_chain(e, fn)
     out <- character()
@@ -156,6 +164,22 @@ cg_format <- function(e, col = 0L, tail = 0L, base = 0L) {
   args <- as.list(e)[-1]
   nm <- names(args) %||% rep("", length(args))
   if (!length(args)) return(paste0(head, ")"))
+  # a last argument in braces hugs the call when the arguments before it fit
+  # on the line: `f(a, {` ... `})`
+  last <- args[[length(args)]]
+  if (is.call(last) && identical(last[[1]], as.name("{")) && !nzchar(nm[length(args)])) {
+    before <- vapply(seq_len(length(args) - 1L), function(k) {
+      fl <- cg_flat(args[[k]])
+      if (is.na(fl)) NA_character_ else paste0(if (nzchar(nm[k])) paste0(cg_name(nm[k]), " = ") else "", fl, ", ")
+    }, "")
+    open <- paste0(head, paste(before, collapse = ""))
+    if (!anyNA(before) && col + nchar(open) + 1L <= cg_state$width) {
+      lines <- cg_format(last, base, 0L, base)
+      lines[1] <- paste0(open, lines[1])
+      lines[length(lines)] <- paste0(lines[length(lines)], ")")
+      return(lines)
+    }
+  }
   body <- character()
   for (k in seq_along(args)) {
     pre <- if (nzchar(nm[k])) paste0(cg_name(nm[k]), " = ") else ""

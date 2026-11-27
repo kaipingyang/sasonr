@@ -175,6 +175,8 @@ dump_value <- function(v, fmt) {
 #' @export
 #' @keywords internal
 sas_iter_dump <- function(pdv, spec, inf = NULL) {
+  # the state of a row-by-row step holds its dump spec
+  if (is.environment(spec) && !is.null(spec$dump)) spec <- spec$dump
   err <- pdv[["_error_"]]
   if (is.null(err) || !sas_true(err)) return(character())
   spec$count <- spec$count + 1L

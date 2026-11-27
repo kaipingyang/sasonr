@@ -5,6 +5,15 @@ the development version provides.
 
 ## Running SAS programs
 
+* The row-by-row (L3) code of a DATA step shows the step's statements: the
+  per-step state (the PDV prototype, reset values, OUTPUT buffers, error
+  dump) is one object made by `sas_step_state()`, each SET or MERGE
+  statement reads with `pdv <- sas_set_next(.r, pdv)` or `sas_merge_next()`,
+  an iteration runs in `sas_iter_run({ ... })` and ends with
+  `if (sas_iter_done(.st, .status)) break`. DO loops with constant bounds are
+  `while` loops, DO UNTIL without CONTINUE tests after the body, an empty
+  OTHERWISE writes no empty `else`, and `_ERROR_` is synced once per
+  iteration when the step neither reads it nor writes lines of its own.
 * Each SET and MERGE statement of a DATA step reads with its own reader:
   several SET statements (the step stops at the first end of file), SET or
   MERGE in an IF branch, `if 0 then set ds;` (the variables without a read)

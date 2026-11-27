@@ -1952,3 +1952,174 @@ sas_put_layout <- function(pieces, .ls = rt_linesize(), .line = NULL, .file = FA
   for (i in which(run)) out[i] <- row(i)
   if (is.null(.guard)) out[!is.na(out)] else out
 }
+
+# The state of an L3 DATA step (row by row): the PDV prototype, the values
+# that each iteration resets, the observations written to each output data
+# set and the error-dump settings. The generated loop calls the helpers
+# below, so it shows only the step's own statements.
+
+#' Start the state of a row-by-row DATA step
+#'
+#' `pdv`: the initial program data vector; `reset`: the variables set to
+#' their initial value at the start of each iteration; `outputs`: the
+#' variables written to each output data set; `dump`: the error dump spec
+#' ([sas_dump_spec()]); `readers`: the reader objects of its SET, MERGE and
+#' INPUT statements.
+#' @export
+#' @keywords internal
+sas_step_state <- function(pdv, reset = character(), outputs = list(), dump = NULL, readers = list()) {
+  st <- new.env(parent = emptyenv())
+  st$readers <- readers
+  st$proto <- pdv
+  st$reset <- pdv[reset]
+  st$vars <- outputs
+  for (k in seq_along(outputs)) st[[paste0("out", k)]] <- list()
+  st$n <- 0L
+  st$dump <- dump
+  st
+}
+
+#' Begin an iteration: reset values, `_N_` and `_ERROR_`
+#' @export
+#' @keywords internal
+sas_iter_begin <- function(st, pdv) {
+  st$n <- st$n + 1L
+  for (r in st$readers) r$read <- FALSE
+  if (length(st$reset)) pdv[names(st$reset)] <- st$reset
+  pdv$`_n_` <- st$n
+  pdv$`_error_` <- 0
+  pdv
+}
+
+#' Run the statements of an iteration
+#'
+#' `expr` is evaluated in the caller's environment (where the PDV is). The
+#' result is how the iteration ended: "ok" (also after RETURN), "delete" or
+#' "stop".
+#' @export
+#' @keywords internal
+sas_iter_run <- function(expr) {
+  tryCatch({
+    expr
+    "ok"
+  }, sasonr_delete = function(e) "delete", sasonr_stop = function(e) "stop", sasonr_return = function(e) "ok")
+}
+
+#' Write the PDV to output data sets `k` (OUTPUT)
+#' @export
+#' @keywords internal
+sas_write_pdv <- function(st, pdv, k = seq_along(st$vars)) {
+  for (j in k) {
+    nm <- paste0("out", j)
+    st[[nm]][[length(st[[nm]]) + 1L]] <- pdv[st$vars[[j]]]
+  }
+  invisible()
+}
+
+#' The observations written to output data set `k`, as a tibble
+#' @export
+#' @keywords internal
+sas_step_output <- function(st, k) {
+  sas_rows_to_tibble(st[[paste0("out", k)]], st$proto[st$vars[[k]]])
+}
+
+# Readers of a row-by-row step (spec 01 §4.3): one per SET or MERGE
+# statement, an environment with the observations, the position and whether
+# the reader ran in the current iteration (`read`; the INFILE stream of INPUT
+# has the same flag).
+
+#' A SET statement's reader over the observations of `d`
+#'
+#' `notes`: the read NOTE entries of its data sets (all of them by default);
+#' `ahead`: the reader reads one observation ahead (SET with BY).
+#' @export
+#' @keywords internal
+sas_set_reader <- function(d, notes = NULL, ahead = FALSE) {
+  r <- new.env(parent = emptyenv())
+  r$kind <- "set"
+  r$rows <- sas_rows(d)
+  r$n <- length(r$rows)
+  r$p <- 0L
+  r$notes <- notes
+  r$ahead <- ahead
+  r$read <- FALSE
+  r
+}
+
+#' Execute a SET statement: the next observation into the PDV (the step
+#' stops after the last one)
+#' @export
+#' @keywords internal
+sas_set_next <- function(r, pdv) {
+  r$p <- r$p + 1L
+  if (r$p > r$n) sas_stop_step()
+  pdv <- sas_read_row(pdv, r$rows, r$p)
+  r$read <- TRUE
+  pdv
+}
+
+#' A MERGE statement's reader: the match-merge plan of the data sets `dfs`
+#'
+#' `reset`: the values its variables take at the start of a BY group;
+#' `check`: the line of a MERGE that may stop before its last observation
+#' (its read counts are known only when it read all of them).
+#' @export
+#' @keywords internal
+sas_merge_reader <- function(dfs, by, descending, reset, in_vars = rep(NA_character_, length(dfs)), check = NULL) {
+  r <- new.env(parent = emptyenv())
+  r$kind <- "merge"
+  r$rows <- lapply(dfs, sas_rows)
+  r$plan <- sas_merge_plan(dfs, by, descending)
+  r$n <- nrow(r$plan)
+  r$p <- 0L
+  r$by <- by
+  r$reset <- reset
+  r$in_vars <- in_vars
+  r$check <- check
+  r$read <- FALSE
+  r
+}
+
+#' Execute a MERGE statement (`end`: its END= variable)
+#' @export
+#' @keywords internal
+sas_merge_next <- function(r, pdv, end = NULL) {
+  r$p <- r$p + 1L
+  if (r$p > r$n) sas_stop_step()
+  pdv <- sas_merge_read(pdv, r$rows, r$plan, r$p, r$reset, r$in_vars, r$by)
+  if (!is.null(end)) pdv[[end]] <- as.numeric(r$p == r$n)
+  r$read <- TRUE
+  pdv
+}
+
+#' Did a reader of the step run in this iteration?
+#' @export
+#' @keywords internal
+sas_iter_read <- function(st) {
+  any(vapply(st$readers, function(r) isTRUE(r$read), NA))
+}
+
+#' End a row-by-row step: the read NOTE counts of its readers
+#' @export
+#' @keywords internal
+sas_step_end <- function(st) {
+  for (r in st$readers) {
+    if (identical(r$kind, "set")) sas_reads_consumed(r$p, r$notes, r$ahead)
+    if (identical(r$kind, "merge") && !is.null(r$check)) sas_merge_consumed(r$p, r$n, r$check)
+  }
+  invisible()
+}
+
+#' Does the step end after this iteration?
+#'
+#' After a STOP (or the end of a reader's input), after the one iteration of
+#' a step without readers, and after an iteration that ran no reader (the
+#' looping NOTE; `why`: the reason this case is not supported, if it is not).
+#' @export
+#' @keywords internal
+sas_iter_done <- function(st, status, why = NULL) {
+  if (identical(status, "stop") || !length(st$readers)) return(TRUE)
+  if (sas_iter_read(st)) return(FALSE)
+  sas_loop_unread(why)
+  TRUE
+}

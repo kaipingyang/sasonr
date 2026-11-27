@@ -256,6 +256,7 @@ ptr_value <- function(v, pdv) {
 #' @export
 #' @keywords internal
 sas_input_stmt <- function(inf, pdv, spec) {
+  inf$read <- TRUE
   inf$pdv <- NULL
   inf$pdv_partial <- NULL
   input_begin(inf)
