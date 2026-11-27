@@ -554,9 +554,14 @@ log_places_reset <- function(st, init = list()) {
 log_order_places <- function(keys, rule) {
   switch(rule,
     line_col = sorted_places(keys),
+    # by line, then column; on a line of macro-generated text the column
+    # compared as text (one case: 143 195 25 79), elsewhere as a number
+    # (9 16) [measured]
     line_coltext = {
       ln <- as.integer(sub(":.*$", "", keys))
-      keys[order(ln, sub("^.*:", "", keys), method = "radix")]
+      cl <- sub("^.*:", "", keys)
+      gen <- ln %in% (rt_diag()$macro_lines %||% integer())
+      keys[order(ln, ifelse(gen, cl, formatC(as.integer(cl), width = 9, flag = "0")), method = "radix")]
     },
     rlang::abort(paste0("unknown place order `", rule, "`."), .internal = TRUE)
   )

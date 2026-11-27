@@ -430,15 +430,25 @@ an_call <- function(e, st) {
 }
 
 # A numeric operand of || in a DATA step is converted to character text: the
-# conversion NOTE gives the place of the operand.  Only a variable operand has
-# a known place; a numeric constant or expression operand fails loud.
+# conversion NOTE gives the place of the operand: a variable at its name, an
+# arithmetic expression at its operator (binary: the operator between its
+# operands; prefix -, + or NOT: that operator) [measured].  Other operands
+# (constants, function calls, comparisons, parentheses) fail loud.
 an_concat_n2c <- function(e, st) {
   for (a in list(e$lhs, e$rhs)) {
     if (expr_type(a, st)$type == "char") next
-    if (!identical(a$node, "var") || is.null(a$line) || is.null(a$col)) {
-      abort_unsupported("a numeric constant or expression as an operand of || (only a numeric variable)", a$line %||% e$line)
+    place <- switch(a$node %||% "",
+      var = c(a$line, a$col),
+      binary = if (!is.null(a$col)) c(a$line, a$col),
+      # (a prefix + on a character value: not measured)
+      unary = if (length(a$span) && !(identical(a$op, "+") && expr_type(a$arg, st)$type == "char")) c(a$span[["line"]], a$span[["col"]]),
+      NULL
+    )
+    if (length(place) != 2L) {
+      abort_unsupported("a numeric constant, function call or comparison as an operand of || (supported: a variable or an arithmetic expression)",
+                        a$line %||% e$line)
     }
-    log_place("conv.n2c", a$line, a$col)
+    log_place("conv.n2c", place[1], place[2])
   }
   invisible()
 }

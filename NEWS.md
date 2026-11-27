@@ -479,6 +479,12 @@ the development version provides.
 
 ## DATA step
 
+* A numeric arithmetic expression as an operand of `||` is converted to
+  character text, the conversion NOTE giving the place of its operator (a
+  prefix `-`, `+` or NOT at that operator). The places of one line are listed
+  in column order. A constant, function call or comparison operand still
+  fails loud.
+
 * Lengths and other integer tokens: ATTRIB LENGTH= no longer reads `$8.5`
   as 85 (a fractional length is truncated, `$8.5` is 8); a numeric length
   is range-checked on the value as written (`8.5` is an error, `3.5` is 3),

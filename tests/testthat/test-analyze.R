@@ -80,3 +80,12 @@ test_that("carry-forward shapes that depend on state stay L3", {
     expect_equal(auto$work, sas_run(code, adlb, level = "L3")$work, info = code)
   }
 })
+
+test_that("a numeric expression operand of || is converted at its operator, places in column order", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  r <- sas_run("data x;\n  a=0; b=0; c=0;\n  r = a + b || c;\n  s = - a || b;\nrun;", on_error = "sas")
+  l <- as.character(sas_log(r))
+  k <- grep("^NOTE: Numeric values have been converted to character values", l)
+  expect_match(l[k + 1L], "3:9 +3:16 +4:7 +4:14")
+  expect_error(sas_run("data x; r = 1 || 'a'; run;"), class = "sasonr_unsupported")
+})
