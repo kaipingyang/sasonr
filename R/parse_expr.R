@@ -169,8 +169,22 @@ peek_infix <- function(p) {
   )
 }
 
+# The source span of an expression node (spec 09 contract 3): the first and
+# last token of the node in the parser's token table, with their positions.
+# Every node that parse_expr() returns carries one, with the class
+# c("sas_<node>", "sas_node").
+node_span <- function(p, node, start) {
+  if (!is.list(node) || !is.character(node$node)) return(node)
+  last <- max(start, p$pos - 1L)
+  node$span <- c(tok = start, tok_end = last, line = p$line[start], col = p$col[start],
+                 end_line = p$line[last], end_col = p$col[last])
+  class(node) <- c(paste0("sas_", node$node), "sas_node")
+  node
+}
+
 parse_expr <- function(p, min_bp = 1L) {
-  lhs <- parse_prefix(p, min_bp)
+  start <- p$pos
+  lhs <- node_span(p, parse_prefix(p, min_bp), start)
   last_cmp <- FALSE
   st <- list(cond_bp = NA_integer_, used = "")
   repeat {
@@ -183,8 +197,8 @@ parse_expr <- function(p, min_bp = 1L) {
 
     if (info$kind == "cmp") {
       rhs <- parse_expr(p, info$bp + 1L)
-      lhs <- sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp,
-                            expr_ctx(p))
+      lhs <- node_span(p, sas_op_compare(lhs, sub(":", "", info$op, fixed = TRUE), endsWith(info$op, ":"), rhs, line, last_cmp,
+                                         expr_ctx(p)), start)
       last_cmp <- TRUE
       st <- sas_op_after(info)
       next
@@ -217,6 +231,7 @@ parse_expr <- function(p, min_bp = 1L) {
         list(node = "is_missing", lhs = lhs, negate = negate, line = line)
       }
     )
+    lhs <- node_span(p, lhs, start)
     st <- sas_op_after(info)
   }
   lhs

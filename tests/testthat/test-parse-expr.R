@@ -200,3 +200,14 @@ test_that("a WHERE expression with an error leaves the parser in the DATA step r
   advance(p)
   expect_equal(expr_to_sexpr(parse_expr(p)), "(neg (+ 1))")
 })
+
+test_that("expression nodes carry their source span and an S3 class (spec 09 contract 3)", {
+  s <- sas_parse("data out; set a; if x > 1 then y = x + 2*z; run;")$steps[[1]]$stmts[[2]]
+  expect_s3_class(s$cond, c("sas_compare", "sas_node"), exact = TRUE)
+  expect_identical(s$cond$span[c("line", "col", "end_line", "end_col")], c(line = 1L, col = 21L, end_line = 1L, end_col = 25L))
+  v <- s$then$value
+  expect_s3_class(v, "sas_binary")
+  expect_identical(unname(v$span[c("col", "end_col")]), c(36L, 42L))
+  expect_identical(unname(v$rhs$span[c("col", "end_col")]), c(40L, 42L))
+  expect_true(v$lhs$span[["tok"]] <= v$lhs$span[["tok_end"]])
+})
