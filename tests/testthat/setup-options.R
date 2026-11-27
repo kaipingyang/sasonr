@@ -9,3 +9,6 @@ withr::local_options(sasonr.step_notes = FALSE, sasonr.on_error = "abort", .loca
 # Listing tests compare the NOCENTER layout; the CENTER layout (the default of
 # a session) is tested in test-listing-center.R.
 withr::local_options(sasonr.center = FALSE, .local_envir = testthat::teardown_env())
+# Every program the tests parse is checked for well-formed AST nodes
+# (validate_sas_node(), spec 09 L3d).
+withr::local_options(sasonr.validate_ast = TRUE, .local_envir = testthat::teardown_env())

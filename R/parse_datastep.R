@@ -77,7 +77,10 @@ sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
     steps <- c(steps, list(parse_global_stmt(p, open_code = TRUE)))
   }
   if (length(steps) > n0) steps <- step_span(p, steps, n0, from)
-  structure(list(steps = steps), class = "sasonr_program", sql_open = sql_open)
+  out <- structure(list(steps = steps), class = "sasonr_program", sql_open = sql_open)
+  # the node checks of the tests (ast_validate.R)
+  if (isTRUE(getOption("sasonr.validate_ast"))) validate_sas_node(out)
+  out
 }
 
 # The source span of the steps `n0 + 1` ... that one pass of sas_parse()

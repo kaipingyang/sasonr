@@ -48,6 +48,7 @@ script.R,api
 script_comments.R,codegen
 input.R,values
 proc.R,engine
+ast_validate.R,parse
 proc_contents.R,engine
 proc_freq.R,engine
 proc_means.R,engine

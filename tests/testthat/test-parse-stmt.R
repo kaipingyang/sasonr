@@ -135,3 +135,17 @@ test_that("an AST node prints as an indented tree with its spans (spec 09 L3d)",
   expect_true(any(grepl("^ +var name=\"y\"", out)))
   expect_output(print(st$cond), "^compare")
 })
+
+test_that("validate_sas_node() checks the class, the span and the fields of every node (spec 09 L3d)", {
+  a <- sas_parse("data out; set a; if x in (1, 2) then y = sum(x, 2*z); else y = .; run;")
+  expect_identical(ast_problems(a), character())
+  expect_invisible(validate_sas_node(a))
+  bad <- a$steps[[1]]$stmts[[2]]
+  bad$cond$lhs <- NULL
+  bad$then$span <- NULL
+  p <- ast_problems(bad)
+  expect_length(p, 2L)
+  expect_match(p[1], "no field lhs")
+  expect_match(p[2], "span")
+  expect_error(validate_sas_node(bad), class = "sasonr_internal_error")
+})
