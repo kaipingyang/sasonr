@@ -992,10 +992,14 @@ gen_row_step <- function(an) {
   }
 
   pdv_order <- union(an$order, c("_error_", "_n_"))
+  # END= and IN= variables start at 0, FIRST. and LAST. at 1 (seen before the
+  # first read: statements before SET, the DOW loop) [measured]
+  zero_auto <- unlist(lapply(an$readers, function(r) c(r$end, unlist(lapply(r$datasets, function(d) d$options$in_var)))))
   pdv_vals <- lapply(pdv_order, function(v) {
     inf <- an$info[[v]]
-    # FIRST./LAST. start at 1 (seen before the first read of a DOW loop)
-    if (is.null(inf) || inf$kind == "auto") return(if (v == "_error_") 0 else if (grepl("^(first|last)[.]", v)) 1 else NA_real_)
+    if (is.null(inf) || inf$kind == "auto") {
+      return(if (v == "_error_" || v %in% zero_auto) 0 else if (grepl("^(first|last)[.]", v)) 1 else NA_real_)
+    }
     proto_lang(inf, use_init = isTRUE(inf$retained))
   })
   add(cgi(rlang::call2("<-", rlang::sym("pdv"), cg_call("list", stats::setNames(pdv_vals, pdv_order))),

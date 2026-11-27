@@ -294,3 +294,10 @@ test_that("MERGE without BY pairs observations; a SET value takes the PDV length
   expect_identical(r$work$b$t, "abc       X")
   expect_identical(r$work$c$s, "ab")
 })
+
+test_that("END= and IN= start at 0, FIRST. and LAST. at 1, before the first read", {
+  r <- sas_run("data a; g = 'x'; output; g = 'y'; output; run; data o; z = e + 1; pf = first.g; pi = ina; set a(in = ina) end = e; by g; run;")
+  expect_identical(r$work$o$z, c(1, 1))
+  expect_identical(r$work$o$pf, c(1, 1))
+  expect_identical(r$work$o$pi, c(0, 1))
+})

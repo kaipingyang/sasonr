@@ -38,7 +38,8 @@ the development version provides.
   MERGE in an IF branch, `if 0 then set ds;` (the variables without a read)
   and DOW loops (`do until (last.id); set ds; by id; ... end;`, also DO
   WHILE). A BY statement belongs to the SET or MERGE statement before it,
-  also inside a DO loop; FIRST. and LAST. variables start at 1. A SET with BY
+  also inside a DO loop; FIRST. and LAST. variables start at 1, END= and IN=
+  variables at 0. A SET with BY
   reads one observation ahead, which the observations-read NOTE counts; a
   SET that never ran writes no such NOTE. BY statements in IF or SELECT
   blocks, BY statements with different variables in one step, several MERGE
