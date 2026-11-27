@@ -321,5 +321,9 @@ test_that("OPTIONS MPRINT writes the statements a macro generates, under the inn
   l <- as.character(sas_log(r))
   expect_identical(l[startsWith(l, "MPRINT")], c("MPRINT(INNER):   p = 1;", "MPRINT(OUTER):   q = 2;"))
   expect_identical(r$work$a, tibble::tibble(p = 1, q = 2))
-  expect_error(sas_run("options mprint;\n%macro m;\n  x=1;\n%mend;\ndata a;\n  %m\nrun;"), class = "sasonr_unsupported")
+  # the text as generated (no blanks added), and the text of each call up to
+  # its end when no semicolon ends it
+  r <- sas_run("options mprint;\n%macro m;\n  x=1;\n%mend;\n%macro two;\n  2\n%mend;\ndata a;\n  %m\n  y = %two + %two;\nrun;")
+  l <- as.character(sas_log(r))
+  expect_identical(l[startsWith(l, "MPRINT")], c("MPRINT(M):   x=1;", "MPRINT(TWO):   2", "MPRINT(TWO):   2"))
 })

@@ -308,8 +308,7 @@ code_sink <- function(ses) {
   s$qchar <- 0L
   s$qret <- "code"
   s$stmt <- integer()
-  s$stmt_macs <- character()
-  s$stmt_src <- FALSE
+  s$mp <- list()
   s$stmt_begin <- NA_integer_
   s$stmt_line <- 1L
   # the program line on which the text in `acc` starts (NA: `acc` is empty);
@@ -336,15 +335,6 @@ code_sink <- function(ses) {
   }
 
   stmt_end <- function(pos) {
-    # OPTIONS MPRINT: a statement a macro generated (log_mprint())
-    if (length(s$stmt_macs) && is.function(ses$on_mprint)) {
-      st <- intToUtf8(s$stmt)
-      tok <- sas_lex(st, lossless = TRUE)
-      attr(st, "words") <- tok$text[!tok$kind %in% c("ws", "newline", "comment")]
-      ses$on_mprint(st, s$stmt_macs, isTRUE(s$stmt_src), s$stmt_line)
-    }
-    s$stmt_macs <- character()
-    s$stmt_src <- FALSE
     txt <- tolower(trimws(intToUtf8(s$stmt)))
     cp <- utf8ToInt(txt)
     k <- 1L
@@ -409,6 +399,20 @@ code_sink <- function(ses) {
   # text (a macro body, a macro variable's value) is generated at the line of
   # the invocation, so its line breaks are blanks there and do not count as
   # program lines (statement lines, OPTIONS SOURCE / LINESIZE in the echo)
+  # the MPRINT line of the text kept for the macro call at `depth`
+  mprint_flush <- function(depth) {
+    b <- if (depth <= length(s$mp)) s$mp[[depth]]
+    if (is.null(b)) return(invisible())
+    s$mp[[depth]] <- list(name = b$name, cp = integer())
+    txt <- intToUtf8(b$cp)
+    if (grepl("\\S", txt) && is.function(ses$on_mprint)) ses$on_mprint(txt, b$name, ses$line)
+    invisible()
+  }
+  s$mprint_end <- function(depth) {
+    mprint_flush(depth)
+    if (depth <= length(s$mp)) s$mp[[depth]] <- list(name = "", cp = integer())
+    invisible()
+  }
   s$add <- function(text, mapped = FALSE) {
     text <- mq_unmask(text)
     if (!nzchar(text)) return(invisible())
@@ -419,14 +423,17 @@ code_sink <- function(ses) {
     if (s$dl) return(invisible())
     cps <- utf8ToInt(text)
     cur_line <- ses$line
-    # where the statement's characters come from (OPTIONS MPRINT): the
-    # innermost macro of generated text, or the program
-    mac <- if (!mapped && length(ses$frames)) ses$frames[[length(ses$frames)]]$name else NA_character_
-    from <- function(c) {
-      if (is_ws_cp(c)) return()
-      if (is.na(mac)) s$stmt_src <- TRUE else s$stmt_macs <- union(s$stmt_macs, mac)
+    # OPTIONS MPRINT: the text a macro generates, kept per macro call until
+    # its semicolon or the end of the call (mprint_flush())
+    depth <- length(ses$frames)
+    mac <- !mapped && depth > 0L
+    if (mac) {
+      b <- if (depth <= length(s$mp)) s$mp[[depth]]
+      if (is.null(b) || !identical(b$name, ses$frames[[depth]]$name)) b <- list(name = ses$frames[[depth]]$name, cp = integer())
+      s$mp[[depth]] <- b
     }
     for (k in seq_along(cps)) {
+      if (mac) s$mp[[depth]]$cp <- c(s$mp[[depth]]$cp, cps[k])
       c <- cps[k]
       st <- s$state
       if (nl && c == 10L) {
@@ -438,6 +445,7 @@ code_sink <- function(ses) {
         if (is_ws_cp(c)) {
           if (length(s$stmt) > 0) s$stmt[length(s$stmt) + 1L] <- 32L
         } else if (c == 59L) {
+          if (mac) mprint_flush(depth)
           base <- base - stmt_end(base + k)
         } else if (length(s$stmt) == 0 && c == 42L) {
           s$state <- "star"
@@ -446,7 +454,6 @@ code_sink <- function(ses) {
             s$stmt_begin <- base + k
             s$stmt_line <- cur_line
           }
-          from(c)
           s$stmt[length(s$stmt) + 1L] <- c
           if (c == 34L || c == 39L) {
             s$state <- "q"
@@ -455,10 +462,7 @@ code_sink <- function(ses) {
           }
         }
       } else if (st == "q") {
-        if (s$qret == "code") {
-          from(c)
-          s$stmt[length(s$stmt) + 1L] <- c
-        }
+        if (s$qret == "code") s$stmt[length(s$stmt) + 1L] <- c
         if (c == s$qchar) s$state <- s$qret
       } else if (st == "star") {
         if (c == 59L) s$state <- "code"

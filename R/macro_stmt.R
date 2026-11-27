@@ -527,5 +527,7 @@ mp_call <- function(def, src, ses, sink) {
   })
   body <- mp_src(def$body)
   mp_scan(body, ses, sink, mode = "code")
+  # OPTIONS MPRINT: the text the macro generated after its last semicolon
+  if (is.function(sink$mprint_end)) sink$mprint_end(depth)
   invisible()
 }

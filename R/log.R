@@ -330,36 +330,34 @@ log_bind_callbacks <- function(eng, rt, ses) {
     log_emit(eng, "put", text = line, src = src())
     script_record_put(eng, ses, line, src())
   }
-  ses$on_mprint <- function(text, macros, from_source, line) log_mprint(eng, text, macros, from_source, line)
+  ses$on_mprint <- function(text, macro, line) log_mprint(eng, text, macro, line)
   invisible()
 }
 
-# OPTIONS MPRINT: a statement that a macro generated, as the line
-# `MPRINT(NAME):   statement;` (NAME: the innermost macro), its tokens joined
-# by one blank and wrapped at LINESIZE between tokens; a token longer than
+# OPTIONS MPRINT: the text a macro call generates, up to each semicolon and
+# after the last one, as `MPRINT(NAME):   text` (NAME: the macro whose body
+# wrote it; a nested call writes its own lines), its blanks and line breaks
+# collapsed to one blank and wrapped at LINESIZE at a blank; a word longer than
 # the line is cut at LINESIZE; the lines after the first start in column 1
-# [measured, macro_positions m04-m06, m08, m09].
-log_mprint <- function(eng, text, macros, from_source, line) {
+# [measured, macro_positions m04-m06, m08-m11].
+log_mprint <- function(eng, text, macro, line) {
   if (!isTRUE(eng$session$options$mprint)) return(invisible())
-  if (from_source || length(macros) != 1L) {
-    abort_unsupported("MPRINT of a statement that is generated partly by several macros or partly written in the program", line)
+  # (blanks inside a quoted string: not measured)
+  quoted <- unlist(regmatches(text, gregexpr("'[^']*'|\"[^\"]*\"", text)))
+  if (any(grepl("[[:space:]]{2,}|[\t\n]", quoted))) {
+    abort_unsupported("MPRINT of macro text with several blanks or a line break inside a quoted string", line)
   }
-  words <- attr(text, "words")
-  text <- as.character(text)
-  joined <- paste(words, collapse = " ")
-  collapsed <- gsub("[[:space:]]+", " ", trimws(text))
-  # where the two differ (tokens written without blanks between them, a
-  # quoted string with blanks in it) the layout is not measured
-  if (!identical(joined, collapsed) || any(grepl(" ", words, fixed = TRUE))) {
-    abort_unsupported("MPRINT of a statement whose tokens are written without blanks between them or hold blanks", line)
-  }
+  words <- strsplit(gsub("[[:space:]]+", " ", trimws(text)), " ", fixed = TRUE)[[1]]
   ls <- rt_linesize()
   lines <- character()
-  cur <- paste0("MPRINT(", toupper(macros), "):  ")
-  for (w in c(words[-length(words)], paste0(words[length(words)], ";"))) {
+  cur <- paste0("MPRINT(", toupper(macro), "):  ")
+  for (w in words) {
     if (nchar(cur) + 1L + nchar(w) <= ls) {
       cur <- paste0(cur, " ", w)
       next
+    }
+    if (any(grepl(" ", quoted, fixed = TRUE))) {
+      abort_unsupported("MPRINT of a line wrapped where the macro text holds a quoted string with blanks", line)
     }
     lines <- c(lines, cur)
     while (nchar(w) > ls) {

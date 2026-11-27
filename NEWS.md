@@ -553,11 +553,11 @@ the development version provides.
 
 ## Macro language
 
-* OPTIONS MPRINT writes each statement a macro generates as
-  `MPRINT(NAME):   statement;` (NAME: the innermost macro), its tokens joined by
-  one blank and wrapped at LINESIZE. A statement generated partly by the
-  program or by several macros, or with tokens written without blanks between
-  them, fails loud.
+* OPTIONS MPRINT writes the text each macro call generates, up to each
+  semicolon and after the last one, as `MPRINT(NAME):   text` (NAME: the macro
+  whose body wrote it), with its blanks and line breaks collapsed to one blank
+  and wrapped at LINESIZE. Several blanks or a line break inside a quoted
+  string fail loud.
 
 * The macro processor interleaves with step execution: a step runs as soon
   as it is complete, so values created with `CALL SYMPUT(X)` and PROC SQL
