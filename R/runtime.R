@@ -2065,11 +2065,15 @@ sas_set_next <- function(r, pdv) {
 #' (its read counts are known only when it read all of them).
 #' @export
 #' @keywords internal
-sas_merge_reader <- function(dfs, by, descending, reset, in_vars = rep(NA_character_, length(dfs)), check = NULL) {
+sas_merge_reader <- function(dfs, by, descending, reset, in_vars = rep(NA_character_, length(dfs)), check = NULL, notes = NULL) {
   r <- new.env(parent = emptyenv())
   r$kind <- "merge"
   r$rows <- lapply(dfs, sas_rows)
-  r$plan <- sas_merge_plan(dfs, by, descending)
+  # without BY: one-to-one, the n-th observation of each data set
+  r$noby <- !length(by)
+  r$vars <- lapply(dfs, function(d) setdiff(names(d), ".obs"))
+  r$notes <- notes
+  r$plan <- if (r$noby) merge_plan_noby(dfs) else sas_merge_plan(dfs, by, descending)
   r$n <- nrow(r$plan)
   r$p <- 0L
   r$by <- by
@@ -2080,6 +2084,20 @@ sas_merge_reader <- function(dfs, by, descending, reset, in_vars = rep(NA_charac
   r
 }
 
+# The observation plan of a one-to-one MERGE (no BY): row p takes the p-th
+# observation of each data set that has one.
+merge_plan_noby <- function(dfs) {
+  n <- vapply(dfs, nrow, 1L)
+  m <- max(c(0L, n))
+  p <- seq_len(m)
+  plan <- list(.new = p == 1L)
+  for (j in seq_along(dfs)) {
+    plan[[paste0(".r", j)]] <- ifelse(p <= n[j], p, NA_integer_)
+    plan[[paste0(".in", j)]] <- as.numeric(p <= n[j])
+  }
+  tibble::as_tibble(plan)
+}
+
 #' Execute a MERGE statement (`end`: its END= variable)
 #' @export
 #' @keywords internal
@@ -2087,6 +2105,15 @@ sas_merge_next <- function(r, pdv, end = NULL) {
   r$p <- r$p + 1L
   if (r$p > r$n) sas_stop_step()
   pdv <- sas_merge_read(pdv, r$rows, r$plan, r$p, r$reset, r$in_vars, r$by)
+  if (r$noby) {
+    # a data set whose observations are all read: its variables are missing
+    gone <- which(is.na(unlist(r$plan[r$p, paste0(".r", seq_along(r$rows))])))
+    for (j in gone) {
+      shared <- intersect(r$vars[[j]], unlist(r$vars[-gone]))
+      if (length(shared)) abort_unsupported(paste0("a MERGE without BY where the variable ", toupper(shared[1]), " of a data set whose observations are all read is also in another one"), r$check)
+      pdv[r$vars[[j]]] <- r$reset[r$vars[[j]]]
+    }
+  }
   if (!is.null(end)) pdv[[end]] <- as.numeric(r$p == r$n)
   r$read <- TRUE
   pdv
@@ -2105,7 +2132,12 @@ sas_iter_read <- function(st) {
 sas_step_end <- function(st) {
   for (r in st$readers) {
     if (identical(r$kind, "set")) sas_reads_consumed(r$p, r$notes, r$ahead)
-    if (identical(r$kind, "merge") && !is.null(r$check)) sas_merge_consumed(r$p, r$n, r$check)
+    if (identical(r$kind, "merge") && !is.null(r$check)) {
+      # a one-to-one MERGE of one data set that stopped early has read one
+      # observation ahead [measured]
+      if (isTRUE(r$noby) && length(r$rows) == 1L && r$p < r$n) sas_reads_consumed(r$p, r$notes, ahead = TRUE)
+      else sas_merge_consumed(r$p, r$n, r$check)
+    }
   }
   invisible()
 }

@@ -286,3 +286,11 @@ test_that("each SET statement has its own reader: IF 0 THEN SET, conditional SET
                                   "NOTE: There were 1 observations read from the data set WORK.H.",
                                   "NOTE: The data set WORK.W has 1 observations and 2 variables."))
 })
+
+test_that("MERGE without BY pairs observations; a SET value takes the PDV length", {
+  r <- sas_run("data a; x = 1; output; x = 2; output; x = 3; output; run; data b; y = 10; output; y = 20; output; run; data m; merge a b; run;")
+  expect_identical(r$work$m$y, c(10, 20, NA))
+  r <- sas_run("data a; length s $3; s = 'abc'; run; data b; length s $10; set a; t = s || 'X'; run; data c; length s $2; set a; run;")
+  expect_identical(r$work$b$t, "abc       X")
+  expect_identical(r$work$c$s, "ab")
+})

@@ -410,6 +410,27 @@ ds_code <- function(d, an, obs_col = FALSE, where = NULL) {
   ds_opts_apply(ds_opts_record(d), an, obs_col = obs_col, where = where)
 }
 
+# A data set that SET or MERGE reads: its character variables take the
+# length they have in the PDV (a LENGTH statement before the SET or MERGE
+# statement), padded or truncated.
+ds_read_code <- function(d, an, where = NULL) {
+  x <- ds_code(d, an, where = where)
+  m <- an$meta[[d$name]]
+  fix <- list()
+  for (j in seq_along(d$vars)) {
+    v <- d$vars[j]
+    o <- d$out_names[j]
+    if (!identical(m$type[[v]], "char")) next
+    lp <- an$info[[o]]$len
+    ld <- m$len[[v]]
+    if (!is.null(lp) && !is.na(lp) && !is.null(ld) && !identical(as.integer(lp), as.integer(ld))) {
+      fix[[o]] <- rlang::call2("sas_char", rlang::sym(o), as.integer(lp))
+    }
+  }
+  if (length(fix)) x <- cgi_pipe(x, rlang::call2(quote(dplyr::mutate), !!!fix))
+  x
+}
+
 # One INPUT statement as a run-time spec for sas_input_stmt().
 input_spec_lang <- function(rd, an) {
   rcx <- new_cx("row", an)
@@ -476,7 +497,7 @@ source_item <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] els
                sprintf("sas_read_input(%s, %s%s)", cg_text(inf), input_spec_code(rd, an),
                        if (is.null(end)) "" else paste0(", end_var = ", cg_text(end_var)))))
   }
-  srcs <- lapply(rd$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
+  srcs <- lapply(rd$datasets, ds_read_code, an = an, where = an$dsir$slots$where$effective)
   in_vars <- vapply(rd$datasets, function(d) d$options$in_var %||% NA_character_, "")
   if (rd$stmt == "merge") {
     # match-merge: the input table of the observation plan (FIRST./LAST. included)
@@ -941,7 +962,7 @@ gen_row_step <- function(an) {
       ahead <- if (!is.null(r$by_spec) && length(r$datasets) == 1L) list(ahead = TRUE)
       rd_objs <- c(rd_objs, list(rlang::call2("<-", rs(".r"), rlang::call2("sas_set_reader", rs(".in"), !!!c(notes, ahead)))))
     } else {
-      srcs <- lapply(r$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
+      srcs <- lapply(r$datasets, ds_read_code, an = an, where = an$dsir$slots$where$effective)
       merged_vars <- unique(vctrs::list_unchop(lapply(r$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()))
       add(cgi(rlang::call2("<-", rs(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang")))))
       in_vars <- vapply(r$datasets, function(d) d$options$in_var %||% NA_character_, "")
@@ -952,7 +973,7 @@ gen_row_step <- function(an) {
       rd_objs <- c(rd_objs, list(rlang::call2("<-", rs(".m"), rlang::call2("sas_merge_reader", rs(".m_in"),
         by = cg_val(r$by_spec$vars), descending = cg_val(r$by_spec$descending),
         reset = rlang::call2("[", quote(pdv), cg_val(merged_vars)),
-        !!!c(if (!all(is.na(in_vars))) list(in_vars = cg_val(in_vars)), check)))))
+        !!!c(if (!all(is.na(in_vars))) list(in_vars = cg_val(in_vars)), check, notes)))))
     }
     n_notes <- n_notes + length(r$datasets)
   }

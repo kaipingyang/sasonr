@@ -284,7 +284,7 @@ dsir_level <- function(facts, an) {
       ptr <- vctrs::list_unchop(lapply(Filter(function(it) !is.null(it$v), rd$items), function(it) expr_reads(it$v)), ptype = character(), name_spec = rlang::zap())
       if (length(setdiff(ptr, in_vars))) l3 <- c(l3, "INPUT pointer depends on non-INPUT variables")
     }
-    if (rd$stmt == "merge") l3 <- c(l3, merge_row_reasons(an))
+    if (rd$stmt == "merge") l3 <- c(l3, if (is.null(rd$by_spec)) "MERGE without BY (one-to-one, row by row)", merge_row_reasons(an))
     if (!is.null(rd$nobs)) l3 <- c(l3, "NOBS= variable")
     if (!is.null(rd$end)) l2 <- c(l2, "END= variable")
     if (rd$stmt == "set" && length(rd$datasets) > 1 && !is.null(an$by)) l2 <- c(l2, "interleaving SET with BY")

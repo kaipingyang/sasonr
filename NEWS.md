@@ -5,6 +5,11 @@ the development version provides.
 
 ## Running SAS programs
 
+* MERGE without BY (one-to-one): the n-th observation of each data set;
+  the variables of a data set whose observations are all read are missing.
+* A character variable read by SET or MERGE takes the length it has in the
+  step (a LENGTH statement before the SET or MERGE), padded or truncated
+  (it kept the data set's length before).
 * DATA step hash objects: `DECLARE HASH` (also `DCL`) with `dataset:`,
   `ordered:` and `hashexp:`, the methods DEFINEKEY, DEFINEDATA, DEFINEDONE,
   ADD, FIND, CHECK, REPLACE and REMOVE (also with `key:` and `data:`

@@ -203,9 +203,6 @@ classify_step <- function(an) {
     if (length(merges) > 1) abort_unsupported("more than one MERGE statement in a step", merges[[2]]$line)
     if (!is.null(an$dsir$slots$where$effective)) abort_unsupported("a WHERE statement in a step with several SET or MERGE statements", ds_rd[[2]]$line)
   }
-  for (r in readers) {
-    if (r$stmt == "merge" && is.null(r$by_spec)) abort_unsupported("MERGE without BY (one-to-one merge)", r$line)
-  }
   if (length(readers) >= 1) {
     rd <- readers[[1]]
     if (any(vapply(readers, function(r) r$stmt == "input", logical(1))) && is.null(an$datalines) && is.null(an$infile)) {
@@ -217,6 +214,7 @@ classify_step <- function(an) {
       if (length(setdiff(ptr_reads, in_vars)) > 0) add3("INPUT pointer depends on non-INPUT variables")
     }
     if (rd$stmt == "merge") {
+      if (is.null(rd$by_spec)) add3("MERGE without BY (one-to-one, row by row)")
       for (r in merge_row_reasons(an)) add3(r)
     }
     exec_idx <- which(!vapply(stmts, is_decl, logical(1)))
