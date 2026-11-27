@@ -41,6 +41,7 @@ ds_options.R,analyze
 where_types.R,analyze
 proc_stats_registry.R,analyze
 check.R,api
+codegen_format.R,codegen
 codegen_lang.R,codegen
 codegen_passes.R,codegen
 codegen_tidy.R,codegen
