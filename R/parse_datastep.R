@@ -342,7 +342,8 @@ parse_statement_body <- function(p) {
     declare = ,
     dcl = parse_declare(p),
     set = ,
-    merge = parse_set(p, low),
+    merge = ,
+    update = parse_set(p, low),
     by = parse_by(p),
     retain = parse_retain(p),
     length = parse_length(p),
@@ -656,12 +657,12 @@ parse_set <- function(p, kind) {
       opt <- tk_low(p)
       oline <- tk_line(p)
       advance(p, 2L)
-      set_opts <- c("end", "nobs", "point", "key", "indsname", "curobs", "open", "keyreset")
+      set_opts <- c("end", "nobs", "point", "key", "indsname", "curobs", "open", "keyreset", if (kind == "update") "updatemode")
       if (!opt %in% set_opts) {
         # not an option of the SET/MERGE statement: syntax ERROR 22-322
         abort_syntax(paste0("expected a data set name or a ", toupper(kind), " statement option but found ", toupper(opt), "="), oline)
       }
-      if (!opt %in% c("end", "nobs", "point") || (kind == "merge" && opt %in% c("nobs", "point"))) {
+      if (!opt %in% c("end", "nobs", "point", "updatemode") || (kind %in% c("merge", "update") && opt %in% c("nobs", "point"))) {
         abort_unsupported(paste0(toupper(kind), " statement option ", toupper(opt), "="), oline)
       }
       opts[[opt]] <- tk_low(p)
@@ -697,7 +698,11 @@ parse_set <- function(p, kind) {
   }
   advance(p)
   if (length(datasets) == 0) abort_unsupported(paste(toupper(kind), "without a data set (_LAST_)"), line)
-  list(stmt = kind, datasets = datasets, end = opts$end, nobs = opts$nobs, point = opts$point, line = line)
+  if (!is.null(opts$updatemode) && !opts$updatemode %in% c("missingcheck", "nomissingcheck")) {
+    abort_syntax(paste0("UPDATEMODE=", toupper(opts$updatemode), " is not MISSINGCHECK or NOMISSINGCHECK"), line)
+  }
+  list(stmt = kind, datasets = datasets, end = opts$end, nobs = opts$nobs, point = opts$point,
+       updatemode = opts$updatemode, line = line)
 }
 
 parse_by <- function(p) {

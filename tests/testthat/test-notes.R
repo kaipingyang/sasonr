@@ -314,3 +314,23 @@ data b; do i = 1 to 5; set d point=i; if _error_ then stop; output; end; stop; r
   # the step would not end without STOP
   expect_error(sas_run("data d; x = 1; run; data b; p = 1; set d point=p; run;"), class = "sasonr_unsupported")
 })
+
+test_that("UPDATE applies the transactions of a BY group; missing values do not replace, .A-.Z do", {
+  r <- sas_run("data master; input id x y; datalines;
+1 10 100
+2 20 200
+;
+data trans; input id x y; datalines;
+1 . 111
+1 15 .
+3 30 .A
+;
+data out; update master trans; by id; run;
+data out2; update master trans updatemode=nomissingcheck; by id; run;")
+  expect_identical(r$work$out$id, c(1, 2, 3))
+  expect_identical(r$work$out$x, c(15, 20, 30))
+  expect_identical(r$work$out$y[1:2], c(111, 200))
+  expect_identical(sasonr:::sas_miss_code(r$work$out$y[3]), 2L)
+  expect_identical(r$work$out2$y[1], NA_real_)
+  expect_error(sas_run("data m; id = 1; run; data t; id = 1; run; data o; update m t; run;"), class = "sasonr_unsupported")
+})

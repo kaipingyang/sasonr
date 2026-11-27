@@ -5,6 +5,12 @@ the development version provides.
 
 ## Running SAS programs
 
+* UPDATE master transaction; with BY: per BY group the first master
+  observation with the transactions applied in order (missing values do not
+  replace values, the special missing values .A-.Z do; UPDATEMODE=
+  NOMISSINGCHECK replaces with missing values too), the group's other master
+  observations unchanged, new BY groups from the transactions. UPDATE without
+  BY, with IN= and `._` in a transaction fail loud.
 * SET with POINT=: direct access by observation number (also over several
   data sets); an invalid number sets `_ERROR_` and leaves the PDV; the POINT=
   variable starts at 0 and is not written to output data sets; no

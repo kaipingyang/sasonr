@@ -2175,6 +2175,8 @@ sas_iter_read <- function(st) {
 sas_step_end <- function(st) {
   for (r in st$readers) {
     if (identical(r$kind, "set")) sas_reads_consumed(if (isTRUE(r$point)) 0 else r$p, r$notes, r$ahead)
+    # an UPDATE reads all its observations when the step reaches its end
+    if (identical(r$kind, "update") && r$p < r$n) abort_unsupported("an UPDATE step that stops before its last observation (the counts of its read NOTEs)", r$line)
     if (identical(r$kind, "merge") && !is.null(r$check)) {
       # a one-to-one MERGE of one data set that stopped early has read one
       # observation ahead [measured]
@@ -2198,3 +2200,63 @@ sas_iter_done <- function(st, status, why = NULL) {
   sas_loop_unread(why)
   TRUE
 }
+
+#' An UPDATE statement's reader: the observations of the step
+#'
+#' Per BY group, the first master observation with the transaction
+#' observations of the group applied in order, then the group's other master
+#' observations unchanged; a BY group only in the transaction data set starts
+#' from missing values [measured]. A missing value in a transaction does not
+#' replace a value (`missing = TRUE`: UPDATEMODE=NOMISSINGCHECK, it does);
+#' the special missing values .A-.Z do; `._` is not supported.
+#' @export
+#' @keywords internal
+sas_update_reader <- function(dfs, by, descending, missing = FALSE, line = NULL) {
+  plan <- sas_merge_plan(dfs, by, descending)
+  rows_m <- sas_rows(dfs[[1]])
+  rows_t <- sas_rows(dfs[[2]])
+  vars <- setdiff(union(names(dfs[[1]]), names(dfs[[2]])), ".obs")
+  proto <- lapply(stats::setNames(vars, vars), function(v) {
+    x <- if (v %in% names(dfs[[1]])) dfs[[1]][[v]] else dfs[[2]][[v]]
+    if (is.character(x)) strrep(" ", max(1L, nchar(x[1] %||% " ", "bytes"))) else NA_real_
+  })
+  apply_trans <- function(cur, t) {
+    for (v in names(t)) {
+      x <- t[[v]]
+      if (!missing) {
+        if (is.character(x) && !nzchar(trimws(x))) next
+        if (is.numeric(x) && is.na(x)) {
+          code <- sas_miss_code(x)
+          if (identical(code, 1L)) next
+          if (identical(code, 0L)) abort_unsupported("UPDATE with the special missing value ._ in a transaction", line)
+        }
+      }
+      cur[[v]] <- x
+    }
+    cur
+  }
+  grp <- cumsum(plan$.new)
+  out <- list()
+  for (g in unique(grp)) {
+    sub <- plan[grp == g, ]
+    mi <- stats::na.omit(sub$.r1)
+    ti <- stats::na.omit(sub$.r2)
+    first <- if (length(mi)) utils::modifyList(proto, rows_m[[mi[1]]]) else proto
+    for (j in ti) first <- apply_trans(first, rows_t[[j]])
+    out[[length(out) + 1L]] <- first
+    for (j in mi[-1]) out[[length(out) + 1L]] <- utils::modifyList(proto, rows_m[[j]])
+  }
+  r <- new.env(parent = emptyenv())
+  r$kind <- "update"
+  r$rows <- out
+  r$n <- length(out)
+  r$p <- 0L
+  r$read <- FALSE
+  r$line <- line
+  r
+}
+
+#' The END= value of an UPDATE reader: its last observation was read
+#' @export
+#' @keywords internal
+sas_update_at_end <- function(r) as.numeric(r$p == r$n)

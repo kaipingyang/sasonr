@@ -933,7 +933,7 @@ has_stmt <- function(stmts, kind) {
 # Returns NULL for a known shape, otherwise what is not supported (failed
 # loud only when such an iteration happens).
 loop_read_why <- function(stmts) {
-  readers <- c("set", "merge", "input")
+  readers <- c("set", "merge", "update", "input")
   if (has_stmt(stmts, "return")) return("a RETURN statement in a DATA step with an iteration that executed no SET, MERGE or INPUT statement")
   known <- function(s) {
     if (s$stmt %in% readers || !has_stmt(list(s), readers)) return(TRUE)
@@ -958,7 +958,7 @@ gen_row_step <- function(an) {
   # each SET or MERGE statement owns a reader (`.r`, `.r2` ... for SET, `.m`
   # ... for MERGE; sas_set_reader(), sas_merge_reader()): its input here, the
   # reader object after the PDV
-  ds_readers <- Filter(function(r) r$stmt %in% c("set", "merge"), an$readers)
+  ds_readers <- Filter(function(r) r$stmt %in% c("set", "merge", "update"), an$readers)
   n_notes <- 0L
   rd_objs <- list()
   for (r in ds_readers) {
@@ -970,6 +970,14 @@ gen_row_step <- function(an) {
       add(render_pipeline(rd_name(".in", r), source_item(an, r), pcx$stages))
       ahead <- if (!is.null(r$by_spec) && length(r$datasets) == 1L) list(ahead = TRUE)
       rd_objs <- c(rd_objs, list(rlang::call2("<-", rs(".r"), rlang::call2("sas_set_reader", rs(".in"), !!!c(notes, ahead)))))
+    } else if (r$stmt == "update") {
+      # UPDATE: the observations of the step, each master observation with the
+      # transactions of its BY group applied (sas_update_reader())
+      srcs <- lapply(r$datasets, ds_read_code, an = an, where = an$dsir$slots$where$effective)
+      add(cgi(rlang::call2("<-", rs(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang")))))
+      rd_objs <- c(rd_objs, list(rlang::call2("<-", rs(".u"), rlang::call2("sas_update_reader", rs(".m_in"),
+        by = cg_val(r$by_spec$vars), descending = cg_val(r$by_spec$descending),
+        !!!c(if (identical(r$updatemode, "nomissingcheck")) list(missing = TRUE), list(line = as.integer(r$line)))))))
     } else {
       srcs <- lapply(r$datasets, ds_read_code, an = an, where = an$dsir$slots$where$effective)
       merged_vars <- unique(vctrs::list_unchop(lapply(r$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()))
@@ -1041,7 +1049,7 @@ gen_row_step <- function(an) {
   # iteration resets, the variables of each output data set, the error dump,
   # the readers (an iteration that ran none of them ends the step)
   outputs <- lapply(an$dsir$slots$outputs, function(o) cg_val(o$vars))
-  rd_syms <- c(lapply(ds_readers, function(r) rlang::sym(rd_name(if (r$stmt == "set") ".r" else ".m", r))),
+  rd_syms <- c(lapply(ds_readers, function(r) rlang::sym(rd_name(switch(r$stmt, set = ".r", update = ".u", ".m"), r))),
                if (has_input) list(quote(.inf)))
   add(rlang::call2("<-", rlang::sym(".st"), rlang::call2("sas_step_state", quote(pdv),
     !!!c(if (length(reset_vars)) list(reset = cg_val(reset_vars)),
@@ -1236,6 +1244,10 @@ gen_row_stmt1 <- function(s, cx) {
     input = c(
       list(assign_lang(rlang::sym("pdv"), rlang::expr(sas_input_stmt(.inf, pdv, !!input_spec_lang(s, an))))),
       if (!is.null(an$infile$opts$end)) list(assign_lang(pdv_ref(an$infile$opts$end), quote(sas_input_at_end(.inf))))
+    ),
+    update = c(
+      list(rlang::call2("<-", quote(pdv), rlang::call2("sas_set_next", rlang::sym(rd_name(".u", s)), quote(pdv)))),
+      if (!is.null(s$end)) list(assign_lang(pdv_ref(s$end), rlang::call2("sas_update_at_end", rlang::sym(rd_name(".u", s)))))
     ),
     merge = list(rlang::call2("<-", quote(pdv), rlang::call2("sas_merge_next", rlang::sym(rd_name(".m", s)), quote(pdv),
                                                      !!!if (!is.null(s$end)) list(end = s$end)))),

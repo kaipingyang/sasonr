@@ -62,6 +62,7 @@ ast_stmt_fields <- list(
   leave = c("line"),
   length = c("line", "specs"),
   merge = c("datasets", "end", "line", "nobs"),
+  update = c("datasets", "end", "line", "nobs"),
   method = c("call", "line"),
   null = c("line"),
   output = c("line"),

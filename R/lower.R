@@ -61,7 +61,7 @@ dsir_slots <- function(an) {
   n_reader <- 0L
   visit <- function(s, in_block) {
     k <- s$stmt
-    if (k %in% c("set", "merge", "input")) {
+    if (k %in% c("set", "merge", "update", "input")) {
       n_reader <<- n_reader + 1L
       dss <- if (k == "input") list() else lapply(s$datasets, function(d) {
         list(name = d$name, options = d$options, vars = d$vars, out_names = d$out_names,
@@ -268,7 +268,8 @@ dsir_lower <- function(an) {
                            substr = TRUE, pos = s$pos, len = s$len),
       sum = emit("sum", s, target = s$target, expr = s$value),
       set = ,
-      merge = {
+      merge = ,
+      update = {
         g$reader <- g$reader + 1L
         emit("read", s, reader = g$reader, kind = s$stmt)
         end_of_input(s, ctx)

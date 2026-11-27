@@ -346,6 +346,8 @@ internal sas_tab_titles
 internal sas_true
 internal sas_trunc_chars
 internal sas_univ_titles
+internal sas_update_at_end
+internal sas_update_reader
 internal sas_where_cond
 internal sas_titles_once
 internal sas_untranslated

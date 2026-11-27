@@ -801,6 +801,13 @@ an_stmt <- function(s, st) {
     continue = if (st$loop_depth == 0) abort_syntax(paste(toupper(s$stmt), "outside an iterative DO loop"), line),
     set = ,
     merge = s <- an_reader(s, st),
+    update = {
+      # UPDATE master transaction; BY ...;
+      if (length(s$datasets) != 2L) abort_syntax("UPDATE needs a master and a transaction data set", line)
+      if (any(vapply(s$datasets, function(d) !is.null(d$options$in_var), NA))) abort_unsupported("UPDATE with IN=", line)
+      s <- an_reader(s, st)
+      if (is.null(s$by_spec)) abort_unsupported("UPDATE without BY", line)
+    },
     input = {
       s$items <- lapply(s$items, function(it) {
         if (it$k != "var") {
@@ -1318,7 +1325,7 @@ reader_by_specs <- function(stmts) {
   walk <- function(ss, cond = FALSE) {
     for (s in ss) {
       if (cond && identical(s$stmt, "by")) abort_unsupported("a BY statement inside a block of an IF or SELECT statement", s$line)
-      if (s$stmt %in% c("set", "merge")) {
+      if (s$stmt %in% c("set", "merge", "update")) {
         n <<- n + 1L
         n_ds <<- n_ds + 1L
       } else if (identical(s$stmt, "by")) {

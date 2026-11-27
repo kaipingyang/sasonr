@@ -197,18 +197,18 @@ classify_step <- function(an) {
     add3("SET with POINT=")
     # without STOP (and without a reader that reaches the end of its input)
     # the step does not end
-    seq_read <- any(vapply(readers, function(r) r$stmt %in% c("set", "merge", "input") && is.null(r$point), NA))
+    seq_read <- any(vapply(readers, function(r) r$stmt %in% c("set", "merge", "update", "input") && is.null(r$point), NA))
     has_stop <- function(ss) any(vapply(ss, function(x) identical(x$stmt, "stop") || has_stop(stmt_children(x)), NA))
     if (!seq_read && !has_stop(an$stmts)) abort_unsupported("SET with POINT= in a step without a STOP statement (it would not end)", an$step$line)
   }
   if (any(c("_error_") %in% an$uses)) add3("_ERROR_ is referenced")
   if (!is.null(an$infile) && !is.null(an$infile$opts$end)) add3("INFILE END= variable")
-  n_ds <- sum(vapply(readers, function(r) r$stmt %in% c("set", "merge"), logical(1)))
+  n_ds <- sum(vapply(readers, function(r) r$stmt %in% c("set", "merge", "update"), logical(1)))
   if (n_ds > 1) {
     # each SET or MERGE statement has its own reader (row by row)
-    ds_rd <- Filter(function(r) r$stmt %in% c("set", "merge"), readers)
-    merges <- Filter(function(r) r$stmt == "merge", ds_rd)
-    if (length(merges) > 1) abort_unsupported("more than one MERGE statement in a step", merges[[2]]$line)
+    ds_rd <- Filter(function(r) r$stmt %in% c("set", "merge", "update"), readers)
+    merges <- Filter(function(r) r$stmt %in% c("merge", "update"), ds_rd)
+    if (length(merges) > 1) abort_unsupported("more than one MERGE or UPDATE statement in a step", merges[[2]]$line)
     if (!is.null(an$dsir$slots$where$effective)) abort_unsupported("a WHERE statement in a step with several SET or MERGE statements", ds_rd[[2]]$line)
   }
   if (length(readers) >= 1) {
@@ -221,12 +221,13 @@ classify_step <- function(an) {
       ptr_reads <- vctrs::list_unchop(lapply(Filter(function(it) !is.null(it$v), rd$items), function(it) expr_reads(it$v)), ptype = character(), name_spec = rlang::zap())
       if (length(setdiff(ptr_reads, in_vars)) > 0) add3("INPUT pointer depends on non-INPUT variables")
     }
-    if (rd$stmt == "merge") {
+    if (rd$stmt == "update") add3("UPDATE (row by row)")
+    if (rd$stmt %in% c("merge", "update")) {
       if (is.null(rd$by_spec)) add3("MERGE without BY (one-to-one, row by row)")
       for (r in merge_row_reasons(an)) add3(r)
     }
     exec_idx <- which(!vapply(stmts, is_decl, logical(1)))
-    rdr_idx <- which(vapply(stmts, function(s) s$stmt %in% c("set", "merge", "input"), logical(1)))
+    rdr_idx <- which(vapply(stmts, function(s) s$stmt %in% c("set", "merge", "update", "input"), logical(1)))
     if (length(rdr_idx) == 0) {
       add3("SET/INPUT inside a block")
     } else if (rdr_idx[1] != exec_idx[1]) {
@@ -354,7 +355,7 @@ merge_row_reasons <- function(an) {
 # be), `why` what blocks the move (NULL when nothing does).
 before_read_move <- function(an) {
   stmts <- an$stmts
-  rdr <- which(vapply(stmts, function(s) s$stmt %in% c("set", "merge", "input"), logical(1)))
+  rdr <- which(vapply(stmts, function(s) s$stmt %in% c("set", "merge", "update", "input"), logical(1)))
   if (length(rdr) == 0) return(list(stmts = NULL, why = NULL))
   r <- rdr[1]
   pre <- which(!vapply(stmts[seq_len(r - 1L)], is_decl, logical(1)))
