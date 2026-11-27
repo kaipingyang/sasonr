@@ -19,8 +19,9 @@
 # generated code that carries the SAS position of the statement (the
 # `.at = c(line, col)` arguments of L3 statements and mutate() arguments);
 # when no such line exists it goes above the step and records why.  The tidy
-# form has no `.at` arguments: the node keeps the line of the step code of each
-# line of its tidy code (`tidy_map`), and the comment goes above that line.  The
+# form has no `.at` arguments: the node keeps the SAS position of each mutate()
+# column and its line in the tidy code (`tidy_anchors`), and the comment goes
+# above that line.  The
 # comments change only the text: the code parses to the same objects.
 
 # The comments of `tok` with the statement each one belongs to.  `starts`:
@@ -186,11 +187,11 @@ script_comments_render <- function(nd) {
     new_text <- if (any(ok)) script_insert_comments(tl, ifelse(ok, at + 1L, NA_integer_), cms[body]) else NULL
     tidy <- nd$tidy
     new_tidy <- if (!is.null(new_text) && !is.null(tidy)) {
-      # the lines of the tidy code map to lines of the step code (tidy_map)
+      # the line of the tidy code of each statement: the mutate() column
+      # with its SAS position (tidy_anchors)
       tdl <- strsplit(tidy, "\n", fixed = TRUE)[[1]]
-      map <- nd$tidy_map %||% seq_along(tdl)
-      at_t <- match(at, map)
-      if (length(map) == length(tdl) && !any(ok & is.na(at_t))) {
+      at_t <- vapply(cms[body], function(c) script_tidy_anchor(nd$tidy_anchors, c$stmt), 1L)
+      if (!any(ok & is.na(at_t))) {
         script_insert_comments(tdl, ifelse(ok, at_t, NA_integer_), cms[body])
       }
     }
@@ -210,4 +211,13 @@ script_comments_render <- function(nd) {
   if (!is.null(nd$tidy) && length(below)) nd$tidy <- paste(c(nd$tidy, below), collapse = "\n")
   nd$comments <- cms
   nd
+}
+
+# The line of the tidy code that holds statement `stmt` (NA: none).
+script_tidy_anchor <- function(anchors, stmt) {
+  for (a in anchors) {
+    p <- a[["line"]] * 1e6 + a[["col"]]
+    if (p >= stmt[["line"]] * 1e6 + stmt[["col"]] && p <= stmt[["end_line"]] * 1e6 + stmt[["end_col"]]) return(as.integer(a[["at"]]))
+  }
+  NA_integer_
 }

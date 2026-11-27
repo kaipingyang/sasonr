@@ -558,12 +558,7 @@ render_pipeline <- function(target, src, stages) {
       filter = rlang::call2(quote(dplyr::filter), s$code),
       raw = s$code
     )
-    y <- cgi_pipe(x, st, sep = " |>\n  ")
-    if (s$kind == "mutate") {
-      y$text <- paste0(x$text, " |>\n  dplyr::mutate(\n",
-                       paste0("    ", r_name(names(s$code)), " = ", vapply(s$code, mutate_value_text, ""), collapse = ",\n"), "\n  )")
-    }
-    x <- y
+    x <- cgi_pipe(x, st)
   }
   cgi_assign(target, x)
 }
@@ -689,7 +684,7 @@ vec_output_item <- function(an) {
 # `work$name <- x`
 work_assign <- function(name, x) {
   target <- rlang::call2("$", rlang::sym("work"), rlang::sym(name))
-  cgi(rlang::call2("<-", target, x$lang), paste0(cg_text(target), " <- ", x$text))
+  cgi_assign(target, x)
 }
 
 gen_vec_block <- function(stmts, guard, cx, top = FALSE) {
@@ -1279,7 +1274,9 @@ translate_step <- function(step, meta, level = "auto") {
                                              vapply(uninit, function(v) an$info[[v]]$disp %||% v, "")))
   list(
     # `exprs`: the language objects that run; `code`: their display
-    code = paste(c(header, vapply(body, `[[`, "", "text")), collapse = "\n"), exprs = lapply(body, `[[`, "lang"),
+    code = paste(c(header, vapply(body, cgi_text, "")), collapse = "\n"), exprs = lapply(body, cgi_run),
+    # the structures the display is rendered from (the tidy form of sas_script())
+    disp = lapply(body, cgi_disp),
     level = an$level, reasons = an$reasons,
     line = step$line, outputs = vapply(an$dsir$slots$outputs, `[[`, "", "name"), meta = out_meta(an),
     compile_notes = notes

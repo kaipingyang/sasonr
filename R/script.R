@@ -322,10 +322,10 @@ script_node <- function(nd, mode) {
                    paste0("  ", strsplit(code, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n}, sas = ", r_raw(stext),
                    ", line = ", line, "L", if (!is.null(level)) ", level = \"L3\"", ")")
     why <- script_why_data(tr, level)
-    td <- if (is.null(why)) script_tidy_code(code) else NULL
+    td <- if (is.null(why)) script_tidy_code(tr) else NULL
     if (is.null(why) && is.null(td)) why <- "the step reads or writes WORK in a way the tidy form does not cover"
     node <- new_script_node("data", lang, text, stext, lines, kind, outs, why, td$code)
-    node$tidy_map <- td$map
+    node$tidy_anchors <- td$anchors
     return(node)
   }
   name <- nd$name %||% ""
@@ -377,61 +377,131 @@ script_why_data <- function(tr, level) {
   NULL
 }
 
-# The tidy form of the code of a step: WORK reads and writes become R
-# variables (`sas_ds(work, "a", keep = ...)` -> `a |> sas_ds(keep = ...)`),
-# what only serves the log goes (sas_note_read() calls, the `.at = c(line,
-# col)` positions of the log NOTEs), dplyr verbs lose their prefix (so that
-# tidylog can report them) and the step pipeline `.d <- src |> ...` with its
-# output `out <- .d |> select(...)` becomes one pipeline.  Returns `code` and
-# `map` (for each line of the tidy code, its line in `code`), NULL when the
-# result still refers to WORK or does not parse.
-script_tidy_code <- function(code) {
-  str <- "\"(?:[^\"\\\\]|\\\\.)*\""
-  x <- gsub(paste0(" [|]> sas_note_read\\(", str, "(?:, where = ", str, ")?\\)"), "", code, perl = TRUE)
-  x <- gsub(", \\.at = c\\(-?[0-9]+L, (?:-?[0-9]+L|NA(?:_integer_)?)\\)", "", x, perl = TRUE)
-  nm <- "([A-Za-z_][A-Za-z0-9_]*)"
-  # replace each match of `pattern` by f(<its first group>)
-  sub_fn <- function(pattern, x, f) {
-    m <- gregexpr(pattern, x, perl = TRUE)
-    regmatches(x, m) <- lapply(regmatches(x, m), function(h) {
-      vapply(h, function(one) f(regmatches(one, regexec(pattern, one, perl = TRUE))[[1]][2]), "", USE.NAMES = FALSE)
-    })
-    x
+# The tidy form of the code of a step, rewritten from the structures the
+# display is rendered from (`tr$disp`, codegen_format.R) and laid out by
+# cg_format(): WORK reads and writes become R variables (`sas_ds(work, "a",
+# keep = ...)` -> `a |> sas_ds(keep = ...)`, `work$a <-` -> `a <-`), what only
+# serves the log goes (sas_note_read() stages, the `.at = c(line, col)`
+# positions of the log NOTEs), dplyr verbs lose their prefix (so that tidylog
+# can report them) and the step pipeline `.d <- src |> ...` with its output
+# `out <- .d |> select(...)` becomes one pipeline.  Returns `code` and
+# `anchors` (the SAS position of each mutate() column and its line in `code`,
+# for the comments), NULL when the result still refers to WORK.
+script_tidy_code <- function(tr) {
+  items <- lapply(tr$disp, tidy_rw)
+  items <- tidy_merge(items)
+  run <- lapply(items, cg_lang)
+  nm <- all.names(as.call(c(quote(`{`), run)))
+  if (any(c("work", ".log", ".lst", ".meta", ".symtab", ".titles") %in% nm)) return(NULL)
+  lines <- character()
+  anchors <- list()
+  for (it in items) {
+    txt <- cg_format(cg_normalize(it))
+    for (a in tidy_mutate_at(it, tr$disp)) {
+      k <- grep(paste0("^ +", a$name, " = "), txt)
+      if (!length(k) && length(txt) == 1L) k <- 1L
+      if (length(k)) anchors[[length(anchors) + 1L]] <- c(line = a$line, col = a$col, at = length(lines) + k[1])
+    }
+    lines <- c(lines, txt)
   }
-  x <- sub_fn(paste0("sas_ds\\(work, \"", nm, "\"\\)"), x, r_name)
-  x <- sub_fn(paste0("sas_ds\\(work, \"", nm, "\", "), x, function(n) paste0(r_name(n), " |> sas_ds("))
-  x <- sub_fn(paste0("(?m)^work\\$`?", nm, "`? <- "), x, function(n) paste0(r_name(n), " <- "))
-  verbs <- c("mutate", "select", "filter", "arrange", "rename", "summarise", "summarize", "group_by", "ungroup",
-             "distinct", "transmute", "relocate", "left_join", "right_join", "inner_join", "full_join",
-             "anti_join", "semi_join", "count", "slice")
-  x <- gsub(paste0("dplyr::(", paste(verbs, collapse = "|"), ")\\("), "\\1(", x)
-  ex <- tryCatch(parse(text = x, keep.source = FALSE), error = function(e) NULL)
-  if (is.null(ex) || any(c("work", ".log", ".lst", ".meta", ".symtab", ".titles") %in% all.names(ex))) return(NULL)
-  lines <- strsplit(x, "\n", fixed = TRUE)[[1]]
-  script_tidy_merge(lines, ex)
+  list(code = paste(lines, collapse = "\n"), anchors = anchors)
 }
 
-# One pipeline for `.d <- src |> stages` followed by `out <- .d |> select()`
-# when `.d` is used nowhere else (no PUT reads it).
-script_tidy_merge <- function(lines, ex) {
-  keep <- list(code = paste(lines, collapse = "\n"), map = seq_along(lines))
-  nm <- all.names(as.call(c(quote(`{`), as.list(ex))))
-  if (sum(nm == ".d") != 2L) return(keep)
-  pd <- utils::getParseData(parse(text = lines, keep.source = TRUE))
-  top <- pd[pd$parent == 0L & pd$token == "expr", ]
-  top <- top[order(top$line1), ]
-  a <- which(startsWith(lines[top$line1], ".d <- "))
-  if (length(a) != 1L || a == nrow(top)) return(keep)
-  b1 <- top$line1[a + 1L]
-  m <- regmatches(lines[b1], regexec("^([^ ]+) <- \\.d( [|]>)?$", lines[b1]))[[1]]
-  if (!length(m) || b1 != top$line2[a] + 1L) return(keep)
-  a1 <- top$line1[a]
-  a2 <- top$line2[a]
-  lines[a1] <- paste0(m[2], " <- ", substring(lines[a1], 7L))
-  if (nzchar(m[3])) lines[a2] <- paste0(lines[a2], " |>")
-  out <- lines[-b1]
-  if (is.null(tryCatch(parse(text = out, keep.source = FALSE), error = function(e) NULL))) return(keep)
-  list(code = paste(out, collapse = "\n"), map = seq_along(lines)[-b1])
+tidy_dplyr_verbs <- c("mutate", "select", "filter", "arrange", "rename", "summarise", "summarize", "group_by", "ungroup",
+                      "distinct", "transmute", "relocate", "left_join", "right_join", "inner_join", "full_join",
+                      "anti_join", "semi_join", "count", "slice")
+
+tidy_is_work <- function(x) is.call(x) && identical(x[[1]], as.name("$")) && identical(x[[2]], as.name("work"))
+
+# One display structure in the tidy form; a pipeline stays a cg_pipe.
+tidy_rw <- function(e) {
+  if (inherits(e, "cg_pipe")) {
+    st <- Filter(function(s) !(is.call(s) && identical(s[[1]], as.name("sas_note_read"))), e$stages)
+    st <- lapply(st, function(s) cg_lang(tidy_rw(s)))
+    src <- tidy_rw(e$src)
+    if (inherits(src, "cg_pipe")) {
+      st <- c(src$stages, st)
+      src <- src$src
+    }
+    tgt <- e$target
+    if (tidy_is_work(tgt)) tgt <- as.character(tgt[[3]])
+    if (!length(st)) return(if (is.null(tgt)) src else call("<-", cg_target(tgt), src))
+    return(cg_pipe(src, st, tgt))
+  }
+  if (!is.call(e)) return(e)
+  if (identical(e[[1]], as.name("sas_ds")) && length(e) >= 3L && identical(e[[2]], as.name("work")) && is.character(e[[3]])) {
+    a <- rlang::sym(e[[3]])
+    rest <- as.list(e)[-(1:3)]
+    if (!length(rest)) return(a)
+    return(cg_pipe(a, list(as.call(c(list(as.name("sas_ds")), lapply(rest, function(x) cg_lang(tidy_rw(x))))))))
+  }
+  if (identical(e[[1]], as.name("<-")) && length(e) == 3L) {
+    lhs <- if (tidy_is_work(e[[2]])) as.character(e[[2]][[3]]) else e[[2]]
+    rhs <- tidy_rw(e[[3]])
+    if (inherits(rhs, "cg_pipe") && is.null(rhs$target)) return(cg_pipe(rhs$src, rhs$stages, lhs))
+    return(call("<-", cg_target(lhs), cg_lang(rhs)))
+  }
+  args <- as.list(e)
+  if (!is.null(names(args))) args <- args[names(args) != ".at"]
+  f <- args[[1]]
+  if (cg_is_ns(f) && identical(f[[2]], as.name("dplyr")) && as.character(f[[3]]) %in% tidy_dplyr_verbs) args[[1]] <- f[[3]]
+  for (k in seq_along(args)[-1]) {
+    if (!identical(args[[k]], quote(expr = )) && !is.null(args[[k]])) args[[k]] <- cg_lang(tidy_rw(args[[k]]))
+  }
+  as.call(args)
+}
+
+# `.d <- src |> stages` followed by `out <- .d |> more`: one pipeline, when
+# `.d` is used nowhere else (no PUT reads it).
+tidy_merge <- function(items) {
+  run <- lapply(items, cg_lang)
+  if (sum(all.names(as.call(c(quote(`{`), run))) == ".d") != 2L) return(items)
+  target <- function(x) if (inherits(x, "cg_pipe")) x$target else if (is.call(x) && identical(x[[1]], as.name("<-"))) x[[2]]
+  for (k in seq_len(length(items) - 1L)) {
+    a <- items[[k]]
+    b <- items[[k + 1L]]
+    if (!identical(cg_target(target(a) %||% ""), as.name(".d"))) next
+    src <- if (inherits(a, "cg_pipe")) list(a$src, a$stages) else list(a[[3]], list())
+    if (inherits(b, "cg_pipe") && identical(b$src, as.name(".d"))) {
+      items[[k]] <- cg_pipe(src[[1]], c(src[[2]], b$stages), b$target)
+    } else if (is.call(b) && identical(b[[1]], as.name("<-")) && identical(b[[3]], as.name(".d"))) {
+      items[[k]] <- if (length(src[[2]])) cg_pipe(src[[1]], src[[2]], b[[2]]) else call("<-", b[[2]], src[[1]])
+    } else {
+      next
+    }
+    items[[k + 1L]] <- NULL
+    break
+  }
+  items
+}
+
+# The mutate() columns of a tidy item that carry SAS positions: list of
+# (name, line, col) from the `.at` arguments of the display structures.
+tidy_mutate_at <- function(it, disp) {
+  if (!inherits(it, "cg_pipe")) return(list())
+  cols <- unlist(lapply(it$stages, function(s) if (is.call(s) && identical(s[[1]], as.name("mutate"))) names(as.list(s))[-1]))
+  if (!length(cols)) return(list())
+  out <- list()
+  walk <- function(x, col) {
+    if (inherits(x, "cg_pipe")) {
+      walk(x$src, col)
+      for (s in x$stages) walk(s, col)
+      return()
+    }
+    if (!is.call(x)) return()
+    a <- as.list(x)
+    nm <- names(a) %||% rep("", length(a))
+    mut <- (cg_is_ns(a[[1]]) || is.name(a[[1]])) && identical(sub("^dplyr::", "", paste(deparse(a[[1]]), collapse = "")), "mutate")
+    for (k in seq_along(a)[-1]) {
+      c2 <- if (mut && nzchar(nm[k])) nm[k] else col
+      if (nm[k] == ".at" && is.call(a[[k]]) && !is.null(col) && col %in% cols) {
+        v <- as.integer(as.list(a[[k]])[-1])
+        if (length(v) == 2L && !anyNA(v)) out[[length(out) + 1L]] <<- list(name = col, line = v[1], col = v[2])
+      } else if (!identical(a[[k]], quote(expr = ))) walk(a[[k]], c2)
+    }
+  }
+  for (d in disp) walk(d, NULL)
+  out
 }
 
 # The statements of SAS text (split at the semicolon tokens): `key` (the

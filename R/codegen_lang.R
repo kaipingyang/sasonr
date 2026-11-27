@@ -26,7 +26,7 @@ cg_pipe <- function(src, stages = list(), target = NULL) {
 cg_lang <- function(x) {
   if (!inherits(x, "cg_pipe")) return(x)
   val <- Reduce(function(acc, st) rlang::call2(st[[1]], acc, !!!as.list(st)[-1]), x$stages, x$src)
-  if (is.null(x$target)) val else rlang::call2("<-", rlang::sym(x$target), val)
+  if (is.null(x$target)) val else rlang::call2("<-", cg_target(x$target), val)
 }
 
 #' The expression vector that runs the elements
@@ -133,12 +133,25 @@ cg_fn <- function(args, body) rlang::call2("function", as.pairlist(args), body, 
 
 # A piece of generated code: the language object that runs and its display
 # text (built from the deparsed parts in the generated layout).
-cgi <- function(lang, text = cg_text(lang)) list(lang = lang, text = text)
+# `lang` runs; `disp` (a cg_pipe, or NULL for `lang` itself) is what the
+# display shows, laid out by cg_format() (codegen_format.R).
+cgi <- function(lang, text = NULL, disp = NULL) list(lang = lang, disp = disp)
+
+# The display lines of an item, and the code that runs (the same object).
+cgi_disp <- function(x) cg_normalize(x$disp %||% x$lang)
+cgi_text <- function(x) paste(cg_format(cgi_disp(x)), collapse = "\n")
+cgi_run <- function(x) cg_lang(cgi_disp(x))
 
 # `x |> stage`: the stage call gets `x` as its first argument.
-cgi_pipe <- function(x, stage, sep = " |> ") {
-  cgi(rlang::call2(stage[[1]], x$lang, !!!as.list(stage)[-1]), paste0(x$text, sep, cg_text(stage)))
+cgi_pipe <- function(x, stage, sep = NULL) {
+  src <- x$disp %||% x$lang
+  disp <- if (inherits(src, "cg_pipe") && is.null(src$target)) cg_pipe(src$src, c(src$stages, list(stage))) else cg_pipe(src, list(stage))
+  cgi(rlang::call2(stage[[1]], x$lang, !!!as.list(stage)[-1]), disp = disp)
 }
 
 # `name <- x`
-cgi_assign <- function(name, x) cgi(rlang::call2("<-", rlang::sym(name), x$lang), paste0(name, " <- ", x$text))
+cgi_assign <- function(name, x) {
+  src <- x$disp
+  disp <- if (inherits(src, "cg_pipe") && is.null(src$target)) cg_pipe(src$src, src$stages, target = name) else NULL
+  cgi(rlang::call2("<-", cg_target(name), x$lang), disp = disp)
+}

@@ -13,17 +13,34 @@
 
 cg_width <- 80L
 
+# A mutate() of two or more columns puts one column per line, like the SAS
+# statements it comes from (air keeps a call broken after its opening
+# parenthesis, so the layout is stable under air).
+cg_force_break <- function(e) {
+  if (!is.call(e)) return(FALSE)
+  f <- e[[1]]
+  is_mut <- identical(f, as.name("mutate")) || (cg_is_ns(f) && identical(f[[3]], as.name("mutate")))
+  is_mut && sum(nzchar(names(e)[-1] %||% character())) >= 2L
+}
+
 # One line of `e`, or NA when it does not fit on one line by construction (braces).
 cg_flat <- function(e) {
   if (inherits(e, "cg_pipe")) {
     parts <- c(cg_flat(e$src), vapply(e$stages, cg_flat, ""))
     if (anyNA(parts)) return(NA_character_)
     txt <- paste(parts, collapse = " |> ")
-    return(if (is.null(e$target)) txt else paste(cg_flat(rlang::sym(e$target)), "<-", txt))
+    return(if (is.null(e$target)) txt else paste(cg_flat(cg_target(e$target)), "<-", txt))
   }
-  if (cg_has_brace(e)) return(NA_character_)
+  if (cg_has_brace(e) || cg_has_forced(e)) return(NA_character_)
   txt <- cg_deparse(e, width = 500L, collapse = NULL)
   if (length(txt) != 1L) NA_character_ else txt
+}
+
+cg_has_forced <- function(e) {
+  if (!is.call(e)) return(FALSE)
+  if (cg_force_break(e)) return(TRUE)
+  for (a in as.list(e)) if (!missing(a) && cg_has_forced(a)) return(TRUE)
+  FALSE
 }
 
 cg_has_brace <- function(e) {
@@ -48,11 +65,11 @@ cg_chain <- function(e, op) {
 #'   returned relative to it (the caller indents them).
 #' @noRd
 cg_format <- function(e, col = 0L, tail = 0L, base = 0L) {
-  flat <- cg_flat(e)
+  flat <- if (cg_force_break(e)) NA_character_ else cg_flat(e)
   if (!is.na(flat) && col + nchar(flat) + tail <= cg_width) return(flat)
   pad <- function(lines) c(lines[1], if (length(lines) > 1L) paste0("  ", lines[-1]))
   if (inherits(e, "cg_pipe") && !is.null(e$target)) {
-    lhs <- paste0(cg_flat(rlang::sym(e$target)), " <- ")
+    lhs <- paste0(cg_flat(cg_target(e$target)), " <- ")
     return(cg_prefix(lhs, cg_format(cg_pipe(e$src, e$stages), col + nchar(lhs), tail, base)))
   }
   if (inherits(e, "cg_pipe")) {
@@ -161,3 +178,6 @@ cg_normalize <- function(e) {
   }
   e
 }
+
+# The target of a pipeline: a name, or an expression such as work$ex.
+cg_target <- function(t) if (is.character(t)) rlang::sym(t) else t
