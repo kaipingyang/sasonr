@@ -62,7 +62,7 @@ test_that("IN= is kept per data set of a MERGE", {
 test_that("the reading code applies the options in order", {
   an <- dso_an("data c; set a(keep = g v rename = (v = vv) where = (vv > 1) firstobs = 2 obs = 3); run;")
   x <- ds_opts_apply(an$dsir$slots$source[[1]]$datasets[[1]]$opts, an)
-  code <- x$text
+  code <- cgi_text(x)
   # the text displays the call that runs
   expect_identical(str2lang(code), x$lang)
   pos <- vapply(c("sas_ds(", "rename = ", "dplyr::filter(", "sas_obs_window(2, 3)", "sas_note_read("),
@@ -76,20 +76,20 @@ test_that("the WHERE statement applies only without WHERE=", {
   an <- dso_an("data c; set a(where = (v > 1)) b; where g = 'A'; run;")
   ds <- an$readers[[1]]$datasets
   w <- an$dsir$slots$where$effective
-  ca <- ds_code(ds[[1]], an, where = w)$text
-  cb <- ds_code(ds[[2]], an, where = w)$text
+  ca <- cgi_text(ds_code(ds[[1]], an, where = w))
+  cb <- cgi_text(ds_code(ds[[2]], an, where = w))
   expect_equal(lengths(regmatches(ca, gregexpr("dplyr::filter(", ca, fixed = TRUE))), 1L)
   expect_match(ca, "sas_gt(v, 1)", fixed = TRUE)
   expect_match(cb, "sas_eq(g, \"A\")", fixed = TRUE)
   # ds_code is the component applied to the record of the data set
-  expect_identical(ca, ds_opts_apply(ds_opts_record(ds[[1]]), an, where = w)$text)
+  expect_identical(ca, cgi_text(ds_opts_apply(ds_opts_record(ds[[1]]), an, where = w)))
 })
 
 test_that("PROC DATA= reads through the same component", {
   step <- sas_parse("proc print data = a(keep = g v firstobs = 2); where v > 1; run;")$steps[[1]]
   inp <- proc_input(step, dso_meta, NULL)
   expect_identical(proc_source_code(inp, obs_col = TRUE),
-                   ds_opts_apply(ds_opts_record(inp$ds), list(arrays = list()), obs_col = TRUE, where = inp$where)$text)
+                   cgi_text(ds_opts_apply(ds_opts_record(inp$ds), list(arrays = list()), obs_col = TRUE, where = inp$where)))
   expect_match(proc_source_code(inp), "sas_obs_window(2, NULL)", fixed = TRUE)
 })
 

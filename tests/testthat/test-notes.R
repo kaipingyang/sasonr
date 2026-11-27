@@ -244,9 +244,45 @@ test_that("an iteration that reads nothing: any read condition, OUTPUT, DELETE, 
 
 test_that("an iteration that reads nothing fails loud for the shapes not known", {
   dl <- function(...) c("  datalines;", ..., ";", "run;")
-  for (body in c("  if _n_ = 1 then do i = 1 to 1; input x; end;",
-                 "  select; when (_n_ = 1) input x; otherwise; end;",
+  # a reading statement in a DO loop: the same rule
+  r <- run_notes(c("data a;", "  if _n_ = 1 then do i = 1 to 1; input x; end;", dl("1", "2", "3")))
+  expect_identical(msgs(r), c("NOTE: DATA STEP stopped due to looping.",
+                              "NOTE: The data set WORK.A has 2 observations and 2 variables."))
+  expect_identical(r$work$a$x, c(1, NA))
+  for (body in c("  select; when (_n_ = 1) input x; otherwise; end;",
                  "  if _n_ = 1 then input x; if _n_ = 2 then return;")) {
     expect_error(run_notes(c("data a;", body, dl("1", "2", "3"))), class = "sasonr_unsupported")
   }
+})
+
+test_that("each SET statement has its own reader: IF 0 THEN SET, conditional SET, two SET statements, DOW loop", {
+  src <- "data s; length name $8; name = 'alpha'; v = 10; output; name = 'beta'; v = 20; output; run;"
+  # never executed: the variables only, no read NOTE
+  r <- run_notes(c(src, "data o; if 0 then set s; x = 1; run;"))
+  expect_identical(msgs(r)[-1], c("NOTE: DATA STEP stopped due to looping.",
+                                  "NOTE: The data set WORK.O has 1 observations and 3 variables."))
+  expect_identical(r$work$o$v, NA_real_)
+  # executed once: the values read are retained
+  r <- run_notes(c(src, "data o; if _n_ = 1 then set s; x = _n_; run;"))
+  expect_identical(r$work$o$name, c("alpha", "alpha"))
+  expect_identical(msgs(r)[3], "NOTE: There were 1 observations read from the data set WORK.S.")
+  # two SET statements read in parallel; the step stops at the first end
+  r <- run_notes(c("data a; x = 1; output; x = 2; output; run;",
+                   "data b; x = 3; output; x = 4; output; x = 5; output; run;",
+                   "data c; set a; set b; run;"))
+  expect_identical(r$work$c$x, c(3, 4))
+  expect_identical(msgs(r)[3:5], c("NOTE: There were 2 observations read from the data set WORK.A.",
+                                   "NOTE: There were 2 observations read from the data set WORK.B.",
+                                   "NOTE: The data set WORK.C has 2 observations and 1 variables."))
+  # DOW loop: BY in the DO loop, LAST. tested before the first read
+  r <- run_notes(c("data h; g = 'a'; v = 1; output; v = 2; output; g = 'b'; v = 10; output; run;",
+                   "data w; do until (last.g); set h; by g; t = sum(t, v); end; run;"))
+  expect_identical(r$work$w$t, c(3, 10))
+  # DO WHILE (NOT LAST.): LAST. starts at 1, the loop never runs; the BY
+  # reader has read one observation ahead
+  r <- run_notes(c("data h; g = 'a'; v = 1; output; run;",
+                   "data w; do while (not last.g); set h; by g; end; run;"))
+  expect_identical(msgs(r)[-1], c("NOTE: DATA STEP stopped due to looping.",
+                                  "NOTE: There were 1 observations read from the data set WORK.H.",
+                                  "NOTE: The data set WORK.W has 1 observations and 2 variables."))
 })

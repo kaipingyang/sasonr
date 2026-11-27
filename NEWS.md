@@ -5,6 +5,21 @@ the development version provides.
 
 ## Running SAS programs
 
+* Each SET and MERGE statement of a DATA step reads with its own reader:
+  several SET statements (the step stops at the first end of file), SET or
+  MERGE in an IF branch, `if 0 then set ds;` (the variables without a read)
+  and DOW loops (`do until (last.id); set ds; by id; ... end;`, also DO
+  WHILE). A BY statement belongs to the SET or MERGE statement before it,
+  also inside a DO loop; FIRST. and LAST. variables start at 1. A SET with BY
+  reads one observation ahead, which the observations-read NOTE counts; a
+  SET that never ran writes no such NOTE. BY statements in IF or SELECT
+  blocks, BY statements with different variables in one step, several MERGE
+  statements and a WHERE statement with several readers fail loud.
+* The line a macro generates is echoed under its NOTE without the leading
+  blanks of the macro text, also when the macro generates a whole step.
+* INPUT: invalid data on a line of a record that the error lines do not show
+  adds the two NOTEs about errors outside the printed range.
+
 * The R code of `sas_translate()` and `sas_script()` (also the tidy form) is
   laid out like the air formatter writes it: an expression that fits in 80
   columns stays on one line; a longer call puts one argument per line, a

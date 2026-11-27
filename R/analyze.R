@@ -232,7 +232,9 @@ an_expr <- function(e, st) {
       if (e$name %in% c("_n_", "_error_")) {
         reg_var(st, e$name, "num", kind = "auto", disp = toupper(e$name))
       } else if (startsWith(e$name, "first.") || startsWith(e$name, "last.")) {
-        if (is.null(st$info[[e$name]])) abort_unsupported(paste0(toupper(e$name), " without a BY statement at the top level of the step (a BY inside a DO loop, the DOW pattern, is not supported)"), e$line)
+        # a flag used before its SET or MERGE statement (DO UNTIL (LAST.x) of the DOW pattern)
+        if (is.null(st$info[[e$name]]) && sub("^[^.]*[.]", "", e$name) %in% st$by$vars) register_by_flags(st)
+        if (is.null(st$info[[e$name]])) abort_unsupported(paste0(toupper(e$name), " without a BY statement for a SET or MERGE statement before it"), e$line)
       } else if (is.null(st$info[[e$name]])) {
         reg_var(st, e$name, disp = e$text %||% e$name)
       }
@@ -1029,7 +1031,10 @@ an_reader <- function(s, st) {
     reg_var(st, a, "num", kind = "auto", retained = TRUE)
     st$info[[a]]$kind <- "auto"
   }
-  register_by_flags(st)
+  st$n_ds <- (st$n_ds %||% 0L) + 1L
+  s$ds_k <- st$n_ds
+  s$by_spec <- if (length(st$by_of) >= s$ds_k) st$by_of[[s$ds_k]]
+  register_by_flags(st, s$by_spec)
   st$readers <- c(st$readers, list(s))
   s
 }
@@ -1068,19 +1073,15 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   st <- new_state(meta)
   st$extra_args <- isTRUE(step$extra_args)
   # BY first: FIRST./LAST. variables may be referenced anywhere in the step.
-  by <- Filter(function(s) s$stmt == "by", step$stmts)
-  if (length(by) > 1) abort_unsupported("more than one BY statement", by[[2]]$line)
+  # Each BY statement belongs to the SET or MERGE statement before it (DO
+  # loops and IF branches included, the DOW pattern).
   stmts <- step$stmts
-  if (length(by) == 1) st$by <- by[[1]]
+  by <- reader_by_specs(stmts)
+  st$by_of <- by$of
+  if (length(by$all)) st$by <- by$all[[1]]
   st$file <- file_target(stmts)
   # Arrays are declared before use; declare them in order while annotating.
   stmts <- an_stmts(stmts, st)
-  if (!is.null(st$by)) {
-    readers <- st$readers
-    if (length(readers) == 0 || !readers[[1]]$stmt %in% c("set", "merge")) {
-      abort_syntax("BY statement requires SET or MERGE", st$by$line)
-    }
-  }
   for (v in st$order) {
     if (isTRUE(st$info[[v]]$label_only) && !v %in% st$uses) {
       st$order <- setdiff(st$order, v)
@@ -1158,11 +1159,54 @@ sas_analyze <- function(step, meta = list(), level = "auto") {
   an
 }
 
-# Pre-register FIRST./LAST. vars right after the reader is annotated.
-# (Called from an_stmt via the BY statement being present in st$by.)
-register_by_flags <- function(st) {
-  if (is.null(st$by)) return(invisible())
-  for (v in st$by$vars) {
+# The BY statements of a step: `of[[k]]` the one of the k-th SET or MERGE
+# statement in program order (NULL without one), `all` all of them. A BY
+# statement before the first SET or MERGE belongs to it when the step has only
+# one. Several BY statements must name the same variables, and a BY statement
+# in an IF or SELECT statement is not supported (fail loud).
+reader_by_specs <- function(stmts) {
+  of <- list()
+  all <- list()
+  n <- 0L
+  n_ds <- 0L
+  early <- NULL
+  walk <- function(ss, cond = FALSE) {
+    for (s in ss) {
+      if (cond && identical(s$stmt, "by")) abort_unsupported("a BY statement inside a block of an IF or SELECT statement", s$line)
+      if (s$stmt %in% c("set", "merge")) {
+        n <<- n + 1L
+        n_ds <<- n_ds + 1L
+      } else if (identical(s$stmt, "by")) {
+        all[[length(all) + 1L]] <<- s
+        if (n == 0L) {
+          early <<- s
+        } else {
+          if (length(of) >= n && !is.null(of[[n]])) abort_unsupported("more than one BY statement for one SET or MERGE statement", s$line)
+          of[n] <<- list(s)
+        }
+      }
+      walk(stmt_children(s), cond || s$stmt %in% c("if", "select"))
+    }
+  }
+  walk(stmts)
+  if (!is.null(early)) {
+    if (n_ds == 0L) abort_syntax("BY statement requires SET or MERGE", early$line)
+    if (n_ds > 1L) abort_unsupported("a BY statement before the first of several SET or MERGE statements", early$line)
+    if (length(of) >= 1L && !is.null(of[[1]])) abort_unsupported("more than one BY statement for one SET or MERGE statement", all[[2]]$line)
+    of[1] <- list(early)
+  }
+  if (length(all) > 1L) {
+    same <- vapply(all[-1], function(b) identical(b$vars, all[[1]]$vars) && identical(b$descending, all[[1]]$descending), NA)
+    if (!all(same)) abort_unsupported("BY statements with different variables in one step", all[[which(!same)[1] + 1L]]$line)
+  }
+  list(of = of, all = all)
+}
+
+# Pre-register FIRST./LAST. vars right after the reader is annotated, from the
+# BY statement of that reader (`by`).
+register_by_flags <- function(st, by = st$by) {
+  if (is.null(by)) return(invisible())
+  for (v in by$vars) {
     reg_var(st, paste0("first.", v), "num", kind = "auto", retained = TRUE)
     reg_var(st, paste0("last.", v), "num", kind = "auto", retained = TRUE)
   }

@@ -648,6 +648,7 @@ log_emit_reads <- function(eng, tr) {
   if (identical(tr$reasons, "PROC UNIVARIATE")) rt$reads <- list()
   print <- identical(tr$reasons, "PROC PRINT")
   for (r in rt$reads) {
+    if (isTRUE(r$skip)) next
     nm <- toupper(r$name)
     if (print && r$n == 0) {
       log_emit(eng, id = "ds.no_obs", name = nm, phase = "step_end")

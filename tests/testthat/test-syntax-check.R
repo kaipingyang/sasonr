@@ -284,8 +284,9 @@ test_that("an invalid DATA step statement is ERROR 180-322 and leaves a 0-observ
   expect_identical(se_dim(r, "out"), c(0L, 4L))
   expect_identical(se_dim(r, "after"), c(0L, 3L))
   expect_identical(se_put(r), c("@@ e2 syserr=3000 syscc=3000", "@@ e3 syserr=3 syscc=3000"))
-  # a new variable named in the invalid statement: what it adds is not supported
-  expect_error(se_run("data out; set have; foo newvar; run;"), class = "sasonr_unsupported")
+  # a new variable named in the invalid statement is not added
+  r <- se_run("data out; set have; foo newvar; run;")
+  expect_false("newvar" %in% names(r$work$out))
   # a statement word that sasonr does not implement still fails loud
   expect_error(se_run("data out; set have; describe x; run;"), class = "sasonr_unsupported")
 })

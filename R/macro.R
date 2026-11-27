@@ -722,7 +722,8 @@ mp_copy_datalines <- function(src, i, ses, sink) {
   four <- sink$dl4
   e <- i
   while (e <= n && src$cp[e] != 10L) e <- e + 1L
-  sink$add(src_text(src, i, e), mapped = !is.null(src$line_of))
+  # (the last line of the text may have no line break: up to its end)
+  sink$add(src_text(src, i, min(e, n)), mapped = !is.null(src$line_of))
   i <- e + 1L
   while (i <= n) {
     e <- i
@@ -743,7 +744,7 @@ mp_copy_datalines <- function(src, i, ses, sink) {
       }
     }
     if (!is.null(src$line_of)) ses$line <- src$line_of[i]
-    sink$add(src_text(src, i, e), mapped = !is.null(src$line_of))
+    sink$add(src_text(src, i, min(e, n)), mapped = !is.null(src$line_of))
     i <- e + 1L
   }
   sink$end_datalines()

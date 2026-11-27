@@ -210,6 +210,7 @@ read_fixed_text <- function(inf, a, b) {
 invalid_data <- function(inf, item, c1, c2) {
   if (identical(item$qq, "??")) return(invisible())
   note <- if (identical(item$qq, "?")) NULL else {
+    inf$bad_r <- c(inf$bad_r, inf$r)
     sprintf("NOTE: Invalid data for %s in line %d %d-%d.", item$disp %||% item$name,
             as.integer(inf$line_no[inf$r]), as.integer(c1), as.integer(c2))
   }
@@ -338,6 +339,7 @@ input_items <- function(inf, pdv, spec) {
 #' @export
 #' @keywords internal
 sas_input_iter_end <- function(inf) {
+  inf$bad_r <- NULL
   if (identical(inf$hold, "@")) inf$hold <- ""
   invisible()
 }
@@ -368,6 +370,13 @@ input_buffer_lines <- function(inf) {
       out <- c(out, paste0(formatC(as.character(inf$line_no[r]), width = -10L), " ", inf$raw[r]))
     }
   }
+  # invalid data on a line of the record that is not shown (one buffer line)
+  if (any(!inf$bad_r %in% rs)) {
+    if (!inf$instream) abort_unsupported("invalid data on an INFILE record line outside the printed lines")
+    out <- c(out, "NOTE: Invalid data errors for file CARDS occurred outside the printed range.",
+             "NOTE: Increase available buffer lines with the INFILE n= option.")
+  }
+  inf$bad_r <- NULL
   out
 }
 

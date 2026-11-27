@@ -475,15 +475,15 @@ source_item <- function(an, rd = if (length(an$readers) > 0) an$readers[[1]] els
   in_vars <- vapply(rd$datasets, function(d) d$options$in_var %||% NA_character_, "")
   if (rd$stmt == "merge") {
     # match-merge: the input table of the observation plan (FIRST./LAST. included)
-    args <- list(cg_call("list", lapply(srcs, `[[`, "lang")), by = cg_val(an$by$vars),
-                 descending = cg_val(an$by$descending), in_vars = cg_val(in_vars))
+    args <- list(cg_call("list", lapply(srcs, `[[`, "lang")), by = cg_val(rd$by_spec$vars),
+                 descending = cg_val(rd$by_spec$descending), in_vars = cg_val(in_vars))
     return(cgi(cg_call("sas_merge_input", args),
                sprintf("sas_merge_input(\n  list(\n    %s\n  ),\n  %s\n)",
                        paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n    "),
                        paste0(names(args)[-1], " = ", vapply(args[-1], cg_text, ""), collapse = ", "))))
   }
   if (length(srcs) == 1 && all(is.na(in_vars))) return(srcs[[1]])
-  by <- if (!is.null(an$by) && length(srcs) > 1) list(by = cg_val(an$by$vars), descending = cg_val(an$by$descending))
+  by <- if (!is.null(rd$by_spec) && length(srcs) > 1) list(by = cg_val(rd$by_spec$vars), descending = cg_val(rd$by_spec$descending))
   args <- c(list(cg_call("list", lapply(srcs, `[[`, "lang")), in_vars = cg_val(in_vars)), by)
   cgi(cg_call("sas_set_input", args),
       sprintf("sas_set_input(list(%s), %s)", paste(vapply(srcs, `[[`, "", "text"), collapse = ", "),
@@ -499,19 +499,19 @@ input_columns <- function(an) {
 }
 
 # Stages common to L1/L2/L3 input preparation: WHERE, _N_, END=, FIRST./LAST.
-add_input_stages <- function(cx, include_n = TRUE) {
+add_input_stages <- function(cx, include_n = TRUE, rd = if (length(cx$an$readers) > 0) cx$an$readers[[1]] else NULL) {
   an <- cx$an
-  rd <- if (length(an$readers) > 0) an$readers[[1]] else NULL
   if (include_n && "_n_" %in% an$order) add_stage(cx, "mutate", list(`_n_` = quote(as.numeric(dplyr::row_number()))))
   if (!is.null(rd) && !is.null(rd$end) && rd$stmt %in% c("set", "merge")) {
     add_stage(cx, "mutate", stats::setNames(list(quote(as.numeric(dplyr::row_number() == dplyr::n()))), rd$end))
   }
-  if (!is.null(an$by) && !is.null(rd) && rd$stmt == "set") {
-    add_stage(cx, "raw", rlang::call2("sas_check_sorted", cg_val(an$by$vars), cg_val(an$by$descending)))
+  by <- rd$by_spec
+  if (!is.null(by) && !is.null(rd) && rd$stmt == "set") {
+    add_stage(cx, "raw", rlang::call2("sas_check_sorted", cg_val(by$vars), cg_val(by$descending)))
     flags <- list()
-    for (k in seq_along(an$by$vars)) {
-      keys <- rlang::syms(an$by$vars[seq_len(k)])
-      v <- an$by$vars[k]
+    for (k in seq_along(by$vars)) {
+      keys <- rlang::syms(by$vars[seq_len(k)])
+      v <- by$vars[k]
       flags[[paste0("first.", v)]] <- cg_call("sas_first", keys)
       flags[[paste0("last.", v)]] <- cg_call("sas_last", keys)
     }
@@ -892,8 +892,9 @@ has_stmt <- function(stmts, kind) {
 # (sas_loop_unread()), whatever the condition that skipped the read; its
 # explicit OUTPUT statements run and DELETE (or a subsetting IF) only drops
 # its observation.  A STOP statement ends the step before (no NOTE).  Known
-# shapes: every reading statement runs at the top level of the step or in the
-# branches of IF statements and DO; END; blocks; no RETURN statement.
+# shapes: every reading statement runs at the top level of the step, in the
+# branches of IF statements or in DO blocks and loops (an iteration that does
+# not run a DO WHILE body reads nothing, the DOW pattern); no RETURN statement.
 # Returns NULL for a known shape, otherwise what is not supported (failed
 # loud only when such an iteration happens).
 loop_read_why <- function(stmts) {
@@ -901,13 +902,11 @@ loop_read_why <- function(stmts) {
   if (has_stmt(stmts, "return")) return("a RETURN statement in a DATA step with an iteration that executed no SET, MERGE or INPUT statement")
   known <- function(s) {
     if (s$stmt %in% readers || !has_stmt(list(s), readers)) return(TRUE)
-    if (identical(s$stmt, "if") || (identical(s$stmt, "do") && identical(s$kind, "block"))) {
-      return(all(vapply(stmt_children(s), known, logical(1))))
-    }
+    if (s$stmt %in% c("if", "do")) return(all(vapply(stmt_children(s), known, logical(1))))
     FALSE
   }
   if (!all(vapply(stmts, known, logical(1)))) {
-    return("a DATA step iteration that executed no SET, MERGE or INPUT statement when a reading statement is in a DO loop or a SELECT group")
+    return("a DATA step iteration that executed no SET, MERGE or INPUT statement when a reading statement is in a SELECT group")
   }
   NULL
 }
@@ -921,22 +920,41 @@ gen_row_step <- function(an) {
 
   has_input <- any(vapply(an$readers, function(r) r$stmt == "input", logical(1)))
   if (has_input) add(cgi_assign(".inf", cgi(infile_open_lang(an))))
-  set_rd <- Find(function(r) r$stmt == "set", an$readers)
-  if (!is.null(set_rd)) {
-    pcx <- new_cx("vec", an)
-    if (identical(rd, set_rd)) add_input_stages(pcx, include_n = FALSE)
-    add(render_pipeline(".in", source_item(an, set_rd), pcx$stages),
-        quote(.rows <- sas_rows(.in)), quote(.n_in <- length(.rows)), quote(.p <- 0L))
-  }
-  if (!is.null(rd) && rd$stmt == "merge") {
-    srcs <- lapply(rd$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
-    merged_vars <- unique(vctrs::list_unchop(lapply(rd$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()))
-    add(cgi(rlang::call2("<-", rlang::sym(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang"))),
-            paste0(".m_in <- list(\n  ", paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n  "), "\n)")),
-        quote(.m <- lapply(.m_in, sas_rows)),
-        rlang::expr(.plan <- sas_merge_plan(.m_in, !!cg_val(an$by$vars), !!cg_val(an$by$descending))),
-        quote(.n_in <- nrow(.plan)), quote(.p <- 0L))
-    cx$merge_reset <- merged_vars
+  # each SET or MERGE statement owns a reader: its rows `.rows<k>` (or the
+  # match-merge plan), their number `.n_in<k>` and its position `.p<k>`
+  ds_readers <- Filter(function(r) r$stmt %in% c("set", "merge"), an$readers)
+  n_notes <- 0L
+  consumed <- list()
+  for (r in ds_readers) {
+    rs <- function(base) rlang::sym(rd_name(base, r))
+    if (r$stmt == "set") {
+      pcx <- new_cx("vec", an)
+      if (rd$stmt != "input") add_input_stages(pcx, include_n = FALSE, rd = r)
+      add(render_pipeline(rd_name(".in", r), source_item(an, r), pcx$stages),
+          rlang::call2("<-", rs(".rows"), rlang::call2("sas_rows", rs(".in"))),
+          rlang::call2("<-", rs(".n_in"), rlang::call2("length", rs(".rows"))),
+          rlang::call2("<-", rs(".p"), 0L))
+      ahead <- if (!is.null(r$by_spec) && length(r$datasets) == 1L) list(ahead = TRUE)
+      consumed <- c(consumed, list(rlang::call2("sas_reads_consumed", rs(".p"),
+                                                !!!c(if (length(ds_readers) > 1L) list(n_notes + seq_along(r$datasets)), ahead))))
+    } else {
+      srcs <- lapply(r$datasets, ds_code, an = an, where = an$dsir$slots$where$effective)
+      merged_vars <- unique(vctrs::list_unchop(lapply(r$datasets, `[[`, "out_names"), ptype = character(), name_spec = rlang::zap()))
+      add(cgi(rlang::call2("<-", rs(".m_in"), cg_call("list", lapply(srcs, `[[`, "lang"))),
+              paste0(rd_name(".m_in", r), " <- list(\n  ", paste(vapply(srcs, `[[`, "", "text"), collapse = ",\n  "), "\n)")),
+          rlang::call2("<-", rs(".m"), rlang::call2("lapply", rs(".m_in"), quote(sas_rows))),
+          rlang::call2("<-", rs(".plan"), rlang::call2("sas_merge_plan", rs(".m_in"), cg_val(r$by_spec$vars), cg_val(r$by_spec$descending))),
+          rlang::call2("<-", rs(".n_in"), rlang::call2("nrow", rs(".plan"))),
+          rlang::call2("<-", rs(".p"), 0L))
+      cx$merge_reset <- merged_vars
+      # a MERGE that is not the step's only reader at its top level may stop
+      # before its last observation: the read counts are known only when it
+      # read all of them
+      if (length(ds_readers) > 1L || !any(vapply(an$stmts, identical, NA, r))) {
+        consumed <- c(consumed, list(rlang::call2("sas_merge_consumed", rs(".p"), rs(".n_in"), r$line)))
+      }
+    }
+    n_notes <- n_notes + length(r$datasets)
   }
   for (arr in an$arrays) {
     if (arr$temporary) {
@@ -955,7 +973,8 @@ gen_row_step <- function(an) {
   pdv_order <- union(an$order, c("_error_", "_n_"))
   pdv_vals <- lapply(pdv_order, function(v) {
     inf <- an$info[[v]]
-    if (is.null(inf) || inf$kind == "auto") return(if (v == "_error_") 0 else NA_real_)
+    # FIRST./LAST. start at 1 (seen before the first read of a DOW loop)
+    if (is.null(inf) || inf$kind == "auto") return(if (v == "_error_") 0 else if (grepl("^(first|last)[.]", v)) 1 else NA_real_)
     proto_lang(inf, use_init = isTRUE(inf$retained))
   })
   add(cgi(rlang::call2("<-", rlang::sym("pdv"), cg_call("list", stats::setNames(pdv_vals, pdv_order))),
@@ -973,11 +992,12 @@ gen_row_step <- function(an) {
       rlang::call2("<-", rlang::sym(".dump"), rlang::call2("sas_dump_spec", cg_val(dump_vars), cg_val(dump_names),
                                      if (length(dump_fmts) == 0) quote(list())
                                      else cg_val(lapply(dump_fmts, function(f) f[c("name", "w", "d", "char", "text")])))))
-  if (!is.null(rd) && !is.null(rd$nobs)) {
-    nobs <- Reduce(function(a, b) rlang::call2("+", a, b), lapply(vapply(rd$datasets, `[[`, "", "name"), function(nm) {
+  for (r in ds_readers) {
+    if (is.null(r$nobs)) next
+    nobs <- Reduce(function(a, b) rlang::call2("+", a, b), lapply(vapply(r$datasets, `[[`, "", "name"), function(nm) {
       rlang::expr(nrow(work[[!!nm]]))
     }))
-    add(rlang::call2("<-", pdv_ref(rd$nobs), nobs))
+    add(rlang::call2("<-", pdv_ref(r$nobs), nobs))
   }
   reset_vars <- Filter(function(v) an$info[[v]]$kind == "data" && !isTRUE(an$info[[v]]$retained), an$order)
   if (length(reset_vars) > 0) add(rlang::expr(.reset <- pdv[!!cg_val(reset_vars)]))
@@ -1030,7 +1050,7 @@ gen_row_step <- function(an) {
     paste0("  ", cg_text(x))
   }))
   add(quote(.n_iter <- 0L), cgi(rlang::call2("repeat", brace(loop)), paste(c("repeat {", loop_text, "}"), collapse = "\n")))
-  if (!is.null(set_rd)) add(quote(sas_reads_consumed(.p)))
+  for (x in consumed) add(x)
   for (k in seq_along(an$dsir$slots$outputs)) {
     o <- an$dsir$slots$outputs[[k]]
     x <- cgi(rlang::call2("sas_rows_to_tibble", rlang::sym(paste0(".out", k)), rlang::call2("[", rlang::sym(".proto"), rlang::sym(paste0(".vars", k)))))
@@ -1041,6 +1061,10 @@ gen_row_step <- function(an) {
 }
 
 # The L3 statement emitters return lists of language objects.
+
+# The name of a reader's run-time object: `.p` for the first SET or MERGE
+# statement of the step, `.p2` for the second one ...
+rd_name <- function(base, r) if (identical(r$ds_k, 1L) || is.null(r$ds_k)) base else paste0(base, r$ds_k)
 
 pdv_ref <- function(v) rlang::call2("$", rlang::sym("pdv"), rlang::sym(v))
 assign_lang <- function(target, value) rlang::call2("<-", target, value)
@@ -1110,24 +1134,31 @@ gen_row_stmt <- function(s, cx) {
     continue = list(quote(next)),
     do = gen_row_do(s, cx),
     select = gen_row_select(s, cx),
-    set = list(
-      quote(.p <- .p + 1L),
-      quote(if (.p > .n_in) sas_stop_step()),
-      quote(pdv <- sas_read_row(pdv, .rows, .p)),
-      quote(.read <- TRUE)
-    ),
+    set = {
+      p <- rlang::sym(rd_name(".p", s))
+      list(
+        rlang::call2("<-", p, rlang::call2("+", p, 1L)),
+        rlang::call2("if", rlang::call2(">", p, rlang::sym(rd_name(".n_in", s))), quote(sas_stop_step())),
+        rlang::call2("<-", quote(pdv), rlang::call2("sas_read_row", quote(pdv), rlang::sym(rd_name(".rows", s)), p)),
+        quote(.read <- TRUE)
+      )
+    },
     input = c(
       list(assign_lang(rlang::sym("pdv"), rlang::expr(sas_input_stmt(.inf, pdv, !!input_spec_lang(s, an)))), quote(.read <- TRUE)),
       if (!is.null(an$infile$opts$end)) list(assign_lang(pdv_ref(an$infile$opts$end), quote(sas_input_at_end(.inf))))
     ),
-    merge = c(
-      list(quote(.p <- .p + 1L), quote(if (.p > .n_in) sas_stop_step()),
-           assign_lang(rlang::sym("pdv"), rlang::call2("sas_merge_read", rlang::sym("pdv"), rlang::sym(".m"), rlang::sym(".plan"), rlang::sym(".p"), rlang::sym(".m_reset"),
-                                         cg_val(vapply(s$datasets, function(d) d$options$in_var %||% NA_character_, "")),
-                                         cg_val(an$by$vars)))),
-      if (!is.null(s$end)) list(assign_lang(pdv_ref(s$end), quote(as.numeric(.p == .n_in)))),
-      list(quote(.read <- TRUE))
-    ),
+    merge = {
+      p <- rlang::sym(rd_name(".p", s))
+      n_in <- rlang::sym(rd_name(".n_in", s))
+      c(
+        list(rlang::call2("<-", p, rlang::call2("+", p, 1L)), rlang::call2("if", rlang::call2(">", p, n_in), quote(sas_stop_step())),
+             assign_lang(rlang::sym("pdv"), rlang::call2("sas_merge_read", rlang::sym("pdv"), rlang::sym(rd_name(".m", s)), rlang::sym(rd_name(".plan", s)), p, rlang::sym(".m_reset"),
+                                           cg_val(vapply(s$datasets, function(d) d$options$in_var %||% NA_character_, "")),
+                                           cg_val(s$by_spec$vars)))),
+        if (!is.null(s$end)) list(assign_lang(pdv_ref(s$end), rlang::call2("as.numeric", rlang::call2("==", p, n_in)))),
+        list(quote(.read <- TRUE))
+      )
+    },
     output = {
       targets <- if (length(s$targets) == 0) seq_along(an$dsir$slots$outputs) else {
         k <- match(s$targets, vapply(an$dsir$slots$outputs, `[[`, "", "name"))

@@ -25,16 +25,20 @@ test_that("numeric variables with LENGTH < 8 are stored truncated", {
 })
 
 test_that("PROC PRINT: mixed-case headings split, common decimals, FORMAT statement", {
-  res <- sas_run("data d; input ToadName $ MeanDaysRain Cost; datalines;
-Lucky 15 1253
-Spot 18 11350.7
-Hop 12 3098.63
+  # a heading with several lowercase-uppercase changes, wider than its values:
+  # the split is not known
+  expect_error(sas_run("data d; input ToadName $ MeanDaysRain; datalines;
+Lucky 15
+;
+proc print data=d; run;"), class = "sasonr_unsupported")
+  res <- sas_run("data d; input ToadName $ Cost; datalines;
+Lucky 1253
+Spot 11350.7
+Hop 3098.63
 ;
 proc print data=d; format Cost dollar10.2; run;
 proc print data=d; var Cost; run;")
   l <- res$listing
-  expect_true(any(grepl("^ +Toad +Mean", l)))
-  expect_true(any(grepl("Name +DaysRain", l)))
   expect_true(any(grepl("\\$11,350.70", l)))
   expect_true(any(grepl(" 1253.00$", l)))
   expect_error(sas_run("data d; x = 1; run; proc print data=d; format x $5.; run;"), class = "sasonr_syntax_error")

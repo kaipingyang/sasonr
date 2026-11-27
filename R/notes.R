@@ -139,16 +139,36 @@ sas_note_read <- function(d, name, where = NULL) {
 }
 
 #' Set the observation counts of the SET data sets to the rows consumed
+#'
+#' `p`: the position of the reader (the rows it consumed, one more after its
+#' end-of-file read); `at`: the read entries of its data sets (all of them by
+#' default); `ahead`: a reader that reads one observation ahead (SET with BY
+#' of one data set). A reader that never executed and reads nothing ahead has
+#' no NOTE.
 #' @export
 #' @keywords internal
-sas_reads_consumed <- function(p) {
+sas_reads_consumed <- function(p, at = NULL, ahead = FALSE) {
   rt <- rt_diag()
-  left <- p
-  for (k in seq_along(rt$reads)) {
+  # a SET statement with BY reads one observation ahead (for LAST.), also
+  # before its first execution
+  left <- if (ahead) p + 1 else p
+  for (k in at %||% seq_along(rt$reads)) {
     n <- rt$reads[[k]]$n
     rt$reads[[k]]$n <- min(n, max(0, left))
+    if (left == 0) rt$reads[[k]]$skip <- TRUE
     left <- left - n
   }
+  invisible()
+}
+
+#' Check that a MERGE reader read all its observations
+#'
+#' The observation counts of a MERGE that stopped before its last
+#' observation, or never executed, are not known: fail loud.
+#' @export
+#' @keywords internal
+sas_merge_consumed <- function(p, n, line = NULL) {
+  if (p < n) abort_unsupported("a MERGE statement that did not read all its observations (the counts of its read NOTEs)", line)
   invisible()
 }
 

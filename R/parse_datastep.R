@@ -488,9 +488,6 @@ parse_if <- function(p) {
 parse_branch <- function(p) {
   s <- parse_statement(p)
   if (s$stmt == "end") abort_syntax("END without a matching DO", s$line)
-  if (s$stmt %in% c("datalines", "set", "merge", "by", "array", "length", "retain")) {
-    if (s$stmt %in% c("set", "merge")) abort_unsupported("conditional SET/MERGE", s$line)
-  }
   s
 }
 

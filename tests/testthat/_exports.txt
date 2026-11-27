@@ -280,8 +280,10 @@ internal sas_last
 internal sas_loop_unread
 internal sas_le
 internal sas_log_view
+internal sas_lst_c
 internal sas_lt
 internal sas_max_op
+internal sas_merge_consumed
 internal sas_merge_input
 internal sas_merge_plan
 internal sas_merge_read
@@ -325,6 +327,7 @@ internal sas_symput
 internal sas_tab_titles
 internal sas_true
 internal sas_trunc_chars
+internal sas_univ_titles
 internal sas_where_cond
 internal sas_titles_once
 internal sas_untranslated

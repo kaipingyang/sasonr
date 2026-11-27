@@ -72,8 +72,8 @@ dsir_slots <- function(an) {
         end = s$end, nobs = s$nobs, stmt = s
       )))
     } else if (k == "by") {
-      # only a BY statement at the top level of the step is hoisted
-      if (in_block) abort_unsupported("a BY statement inside a block", s$line)
+      # a BY statement belongs to its SET or MERGE statement (the analysis
+      # attaches it), wherever it stands
     } else if (k == "where") {
       acc$where <- c(acc$where, list(list(expr = s$cond, line = s$line, in_block = in_block)))
     } else if (k %in% c("keep", "drop", "rename")) {

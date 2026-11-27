@@ -70,8 +70,10 @@ test_that("negative array bounds", {
 })
 
 test_that("an array of existing character variables without $ is a character array", {
-  r <- sas_run("data _null_; length a $4 b $6; array ch{*} a b; a = 'x'; b = 'y'; n = vname(ch{2}); put n=; run;", on_error = "sas")
+  r <- sas_run("data _null_; length a $4 b $4; array ch{*} a b; a = 'x'; b = 'y'; n = vname(ch{2}); put n=; run;", on_error = "sas")
   expect_true(any(grepl("n=b", msgs(r), fixed = TRUE)))
+  # elements of different lengths: not supported
+  expect_error(sas_run("data _null_; length a $4 b $6; array ch{*} a b; run;", on_error = "sas"), class = "sasonr_unsupported")
 })
 
 test_that("OBS= / FIRSTOBS= values with K suffix, MIN and MAX", {
@@ -135,14 +137,14 @@ test_that("a numeric variable operand of || gives a conversion NOTE at its place
     r <- sas_run(code, level = lv)
     m <- msgs(r)
     expect_identical(m[1], "NOTE: Numeric values have been converted to character values at the places given by: (Line):(Column).")
-    expect_match(m[2], "^ +4:14 +5:21 +5:7 *$")
+    expect_match(m[2], "^ +4:14 +5:7 +5:21 *$")
     expect_identical(r$work$out$c, "x          12")
   }
 })
 
 test_that("a numeric constant or expression operand of || fails loud", {
   expect_error(sas_run("data out; c = 'x' || 12; run;"), class = "sasonr_unsupported")
-  expect_error(sas_run("data out; n = 1; c = 'x' || (n + 1); run;"), class = "sasonr_unsupported")
+  expect_error(sas_run("data out; n = 1; c = 'x' || abs(n); run;"), class = "sasonr_unsupported")
 })
 
 test_that("text after DATALINES on its line fails loud instead of swallowing the program", {

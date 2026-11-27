@@ -122,7 +122,7 @@ proc print data=e; run;
 
 test_that("unsupported PROCs, options and statements fail loud", {
   d <- "data a; x = 1; run;"
-  expect_error(sas_run(paste(d, "proc univariate data=a; run;")), class = "sasonr_unsupported")
+  expect_error(sas_run(paste(d, "proc gplot data=a; plot x*x; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc print data=a; by descending x; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc print data=a double; run;")), class = "sasonr_unsupported")
   expect_error(sas_run(paste(d, "proc sort data=a dupout=b; by x; run;")), class = "sasonr_unsupported")
@@ -152,7 +152,7 @@ test_that("listing layout options fail loud only when procedure output is writte
   r <- sas_run(paste("options nocenter nodate nonumber pageno = 1 ps = max formdlim = ' ';", prt))
   expect_identical(r$status, "ok")
   expect_identical(sas_run("options center date number ps = 15 formdlim = '-'; data a; x = 1; run;")$status, "ok")
-  for (o in c("center", "date", "number")) {
+  for (o in c("date", "number")) {
     expect_error(sas_run(paste0("options ", o, ";", prt)), class = "sasonr_unsupported")
   }
   # PAGESIZE: an output that fits on one page runs, a longer one fails loud
@@ -164,8 +164,8 @@ test_that("listing layout options fail loud only when procedure output is writte
   # the settings persist in a session
   s <- sas_session()
   on.exit(sas_session_close(s))
-  sas_run("options center;", session = s)
+  sas_run("options date;", session = s)
   expect_error(sas_run(prt, session = s), class = "sasonr_unsupported")
-  sas_run("options nocenter;", session = s)
+  sas_run("options nodate;", session = s)
   expect_identical(sas_run(prt, session = s)$status, "ok")
 })

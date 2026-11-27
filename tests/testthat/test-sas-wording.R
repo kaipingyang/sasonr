@@ -13,7 +13,8 @@ sas_wording_allowed <- data.frame(
     "of the SAS program",
     "# SAS character values",
     "The SAS text must be",
-    "the SAS position of the statement"
+    "the SAS position of the statement",
+    "no SAS statements were generated"
   ),
   reason = c(
     "the line of the user's SAS program (messages, generated-code headers)",
@@ -26,7 +27,8 @@ sas_wording_allowed <- data.frame(
     "the user's SAS program (header of a script written by sas_script())",
     "comment in a script: the data set keeps the attributes of character values in the program",
     "the SAS program text given to sas_script() (an argument error)",
-    "the line and column of the statement in the user's SAS program"
+    "the line and column of the statement in the user's SAS program",
+    "statements of the SAS language, which CALL EXECUTE generates (a NOTE of the program)"
   )
 )
 
@@ -63,7 +65,9 @@ test_that("every SAS in a string literal is an allowed use", {
 
 test_that("the catalogue templates name sasonr where the original wording names itself", {
   tpl <- unlist(lapply(sasonr:::log_catalog, function(m) c(m$template, m$wrapped)))
-  hits <- tpl[grepl("\\bSAS\\b", tpl, perl = TRUE)]
+  rest <- tpl
+  for (a in sas_wording_allowed$text) rest <- gsub(a, "", rest, fixed = TRUE)
+  hits <- tpl[grepl("\\bSAS\\b", rest, perl = TRUE)]
   expect_identical(unname(hits), character())
   # a neutral entry has a neutral line somewhere in its template; no other
   # entry has one (except the messages only sasonr writes, ids "sasonr.*")

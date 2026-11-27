@@ -596,7 +596,7 @@ err_emit_error <- function(eng, e) {
              phase = "compile")
     code <- regmatches(text[1], regexec("^ERROR ([0-9]+)-[0-9]+:", text[1]))[[1]][2]
     pos <- 11L + gen$col - 1L
-    log_emit(eng, "put", text = c(paste0(formatC(line, width = -11), gen$text), paste0(strrep(" ", pos), strrep("_", nchar(e$sas_token))),
+    log_emit(eng, "put", text = c(paste0(formatC(line, width = -10), " ", gen$text), paste0(strrep(" ", pos), strrep("_", nchar(e$sas_token))),
                                   paste0(strrep(" ", pos), code)), src = line, phase = "compile", split = FALSE, gen_echo = TRUE)
     at <- NULL
     if (length(e$sas_also)) abort_unsupported("several numbered ERRORs at a token in macro-generated text", line)
@@ -646,9 +646,14 @@ err_macro_echo <- function(eng, line, col, token) {
   ct <- prov$ctext[[as.character(ids[1])]]
   # (the whole text of the call, also several statements [measured])
   gtxt <- sub("[[:space:]]+$", "", intToUtf8(ct$cp))
-  # a call whose text starts a step: its leading blanks in the echo differ
-  # from those of a call inside a step and are not measured (the echo is left
-  # out, log_echo_omit())
-  if (grepl("^[[:space:]]*(data|proc)\\b", gtxt, ignore.case = TRUE)) return(NULL)
-  list(name = toupper(ct$name), text = gtxt, col = prov$off[i])
+  # the leading blanks of the macro text are dropped and the line starts with
+  # one blank, with three when the text had some, the call is inside a step
+  # and it is alone on its program line, not followed by a semicolon
+  # [measured]
+  core <- sub("^[[:space:]]+", "", gtxt)
+  n_lead <- nchar(gtxt) - nchar(core)
+  alone <- grepl("^[[:space:]]*%[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(\\(.*\\))?[[:space:]]*$", eng$program$lines[line] %||% "")
+  starts_step <- grepl("^(data|proc)\\b", core, ignore.case = TRUE)
+  pad <- if (n_lead > 0L && alone && !starts_step) "   " else " "
+  list(name = toupper(ct$name), text = paste0(pad, core), col = prov$off[i] - n_lead + nchar(pad))
 }

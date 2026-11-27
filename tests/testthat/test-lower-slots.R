@@ -116,10 +116,11 @@ test_that("slot_where_effective: the last WHERE wins", {
   expect_equal(slot_where_effective(list("a", "b", "c")), "c")
 })
 
-test_that("a BY statement inside a block fails loud", {
+test_that("a BY statement inside an IF or SELECT block fails loud; in a DO loop it belongs to its SET", {
+  an <- sas_analyze(sas_parse("data c; do until (e); set a end = e; by g; end; run;")$steps[[1]], slot_meta)
+  expect_identical(an$readers[[1]]$by_spec$vars, "g")
   for (code in c(
     "data c; set a; if v > 1 then do; by g; end; run;",
-    "data c; do until (e); set a end = e; by g; end; run;",
     "data c; set a; select (g); when ('A') by g; otherwise; end; run;"
   )) {
     expect_error(sas_analyze(sas_parse(code)$steps[[1]], slot_meta), "a BY statement inside a block",

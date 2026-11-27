@@ -192,7 +192,16 @@ classify_step <- function(an) {
   if (any(c("_error_") %in% an$uses)) add3("_ERROR_ is referenced")
   if (!is.null(an$infile) && !is.null(an$infile$opts$end)) add3("INFILE END= variable")
   n_ds <- sum(vapply(readers, function(r) r$stmt %in% c("set", "merge"), logical(1)))
-  if (n_ds > 1) abort_unsupported("more than one SET/MERGE statement in a step", readers[[2]]$line)
+  if (n_ds > 1) {
+    # each SET or MERGE statement has its own reader (row by row)
+    ds_rd <- Filter(function(r) r$stmt %in% c("set", "merge"), readers)
+    merges <- Filter(function(r) r$stmt == "merge", ds_rd)
+    if (length(merges) > 1) abort_unsupported("more than one MERGE statement in a step", merges[[2]]$line)
+    if (!is.null(an$dsir$slots$where$effective)) abort_unsupported("a WHERE statement in a step with several SET or MERGE statements", ds_rd[[2]]$line)
+  }
+  for (r in readers) {
+    if (r$stmt == "merge" && is.null(r$by_spec)) abort_unsupported("MERGE without BY (one-to-one merge)", r$line)
+  }
   if (length(readers) >= 1) {
     rd <- readers[[1]]
     if (any(vapply(readers, function(r) r$stmt == "input", logical(1))) && is.null(an$datalines) && is.null(an$infile)) {
@@ -204,7 +213,6 @@ classify_step <- function(an) {
       if (length(setdiff(ptr_reads, in_vars)) > 0) add3("INPUT pointer depends on non-INPUT variables")
     }
     if (rd$stmt == "merge") {
-      if (is.null(an$by)) abort_unsupported("MERGE without BY (one-to-one merge)", rd$line)
       for (r in merge_row_reasons(an)) add3(r)
     }
     exec_idx <- which(!vapply(stmts, is_decl, logical(1)))
