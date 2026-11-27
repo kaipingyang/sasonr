@@ -661,7 +661,7 @@ parse_set <- function(p, kind) {
         # not an option of the SET/MERGE statement: syntax ERROR 22-322
         abort_syntax(paste0("expected a data set name or a ", toupper(kind), " statement option but found ", toupper(opt), "="), oline)
       }
-      if (!opt %in% c("end", "nobs") || (kind == "merge" && opt == "nobs")) {
+      if (!opt %in% c("end", "nobs", "point") || (kind == "merge" && opt %in% c("nobs", "point"))) {
         abort_unsupported(paste0(toupper(kind), " statement option ", toupper(opt), "="), oline)
       }
       opts[[opt]] <- tk_low(p)
@@ -697,7 +697,7 @@ parse_set <- function(p, kind) {
   }
   advance(p)
   if (length(datasets) == 0) abort_unsupported(paste(toupper(kind), "without a data set (_LAST_)"), line)
-  list(stmt = kind, datasets = datasets, end = opts$end, nobs = opts$nobs, line = line)
+  list(stmt = kind, datasets = datasets, end = opts$end, nobs = opts$nobs, point = opts$point, line = line)
 }
 
 parse_by <- function(p) {

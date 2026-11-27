@@ -193,6 +193,14 @@ classify_step <- function(an) {
   readers <- an$readers
   if (length(readers) > 1) add3("more than one SET/MERGE/INPUT statement")
   if (length(an$objects)) add3("component objects (DECLARE HASH)")
+  if (isTRUE(an$has_point)) {
+    add3("SET with POINT=")
+    # without STOP (and without a reader that reaches the end of its input)
+    # the step does not end
+    seq_read <- any(vapply(readers, function(r) r$stmt %in% c("set", "merge", "input") && is.null(r$point), NA))
+    has_stop <- function(ss) any(vapply(ss, function(x) identical(x$stmt, "stop") || has_stop(stmt_children(x)), NA))
+    if (!seq_read && !has_stop(an$stmts)) abort_unsupported("SET with POINT= in a step without a STOP statement (it would not end)", an$step$line)
+  }
   if (any(c("_error_") %in% an$uses)) add3("_ERROR_ is referenced")
   if (!is.null(an$infile) && !is.null(an$infile$opts$end)) add3("INFILE END= variable")
   n_ds <- sum(vapply(readers, function(r) r$stmt %in% c("set", "merge"), logical(1)))

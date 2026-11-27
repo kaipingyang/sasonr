@@ -2084,6 +2084,23 @@ sas_set_next <- function(r, pdv) {
   pdv
 }
 
+#' Execute a SET statement with POINT=: observation `k` into the PDV
+#'
+#' An invalid observation number (missing, not an integer, out of range)
+#' sets `_ERROR_` and leaves the PDV [measured]. A POINT= reader writes no
+#' NOTE about the observations it read.
+#' @export
+#' @keywords internal
+sas_set_point <- function(r, pdv, k) {
+  r$point <- TRUE
+  r$read <- TRUE
+  if (length(k) != 1L || is.na(k) || k != trunc(k) || k < 1 || k > r$n) {
+    rt_error()
+    return(pdv)
+  }
+  sas_read_row(pdv, r$rows, as.integer(k))
+}
+
 #' A MERGE statement's reader: the match-merge plan of the data sets `dfs`
 #'
 #' `reset`: the values its variables take at the start of a BY group;
@@ -2157,7 +2174,7 @@ sas_iter_read <- function(st) {
 #' @keywords internal
 sas_step_end <- function(st) {
   for (r in st$readers) {
-    if (identical(r$kind, "set")) sas_reads_consumed(r$p, r$notes, r$ahead)
+    if (identical(r$kind, "set")) sas_reads_consumed(if (isTRUE(r$point)) 0 else r$p, r$notes, r$ahead)
     if (identical(r$kind, "merge") && !is.null(r$check)) {
       # a one-to-one MERGE of one data set that stopped early has read one
       # observation ahead [measured]

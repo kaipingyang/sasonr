@@ -345,6 +345,8 @@ expr_may_error <- function(e) {
 
 stmt_may_error <- function(s) {
   if (s$stmt %in% c("input", "substr_assign")) return(TRUE)
+  # an invalid POINT= observation number sets _ERROR_
+  if (identical(s$stmt, "set") && !is.null(s$point)) return(TRUE)
   any(vapply(Filter(Negate(is.null), stmt_exprs(s)), expr_may_error, logical(1)))
 }
 
@@ -964,7 +966,7 @@ gen_row_step <- function(an) {
     notes <- if (length(ds_readers) > 1L) list(notes = cg_val(n_notes + seq_along(r$datasets)))
     if (r$stmt == "set") {
       pcx <- new_cx("vec", an)
-      if (rd$stmt != "input") add_input_stages(pcx, include_n = FALSE, rd = r)
+      if (rd$stmt != "input" && is.null(r$point)) add_input_stages(pcx, include_n = FALSE, rd = r)
       add(render_pipeline(rd_name(".in", r), source_item(an, r), pcx$stages))
       ahead <- if (!is.null(r$by_spec) && length(r$datasets) == 1L) list(ahead = TRUE)
       rd_objs <- c(rd_objs, list(rlang::call2("<-", rs(".r"), rlang::call2("sas_set_reader", rs(".in"), !!!c(notes, ahead)))))
@@ -999,9 +1001,9 @@ gen_row_step <- function(an) {
   }
 
   pdv_order <- union(an$order, c("_error_", "_n_"))
-  # END= and IN= variables start at 0, FIRST. and LAST. at 1 (seen before the
+  # END=, IN= and POINT= variables start at 0, FIRST. and LAST. at 1 (seen before the
   # first read: statements before SET, the DOW loop) [measured]
-  zero_auto <- unlist(lapply(an$readers, function(r) c(r$end, unlist(lapply(r$datasets, function(d) d$options$in_var)))))
+  zero_auto <- unlist(lapply(an$readers, function(r) c(r$end, r$point, unlist(lapply(r$datasets, function(d) d$options$in_var)))))
   pdv_vals <- lapply(pdv_order, function(v) {
     inf <- an$info[[v]]
     if (is.null(inf) || inf$kind == "auto") {
@@ -1226,7 +1228,11 @@ gen_row_stmt1 <- function(s, cx) {
     continue = list(quote(next)),
     do = gen_row_do(s, cx),
     select = gen_row_select(s, cx),
-    set = list(rlang::call2("<-", quote(pdv), rlang::call2("sas_set_next", rlang::sym(rd_name(".r", s)), quote(pdv)))),
+    set = if (!is.null(s$point)) {
+      list(rlang::call2("<-", quote(pdv), rlang::call2("sas_set_point", rlang::sym(rd_name(".r", s)), quote(pdv), pdv_ref(s$point))))
+    } else {
+      list(rlang::call2("<-", quote(pdv), rlang::call2("sas_set_next", rlang::sym(rd_name(".r", s)), quote(pdv))))
+    },
     input = c(
       list(assign_lang(rlang::sym("pdv"), rlang::expr(sas_input_stmt(.inf, pdv, !!input_spec_lang(s, an))))),
       if (!is.null(an$infile$opts$end)) list(assign_lang(pdv_ref(an$infile$opts$end), quote(sas_input_at_end(.inf))))

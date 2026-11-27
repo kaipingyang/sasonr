@@ -153,12 +153,13 @@ sas_reads_consumed <- function(p, at = NULL, ahead = FALSE) {
   # a SET statement with BY reads one observation ahead (for LAST.), also
   # before its first execution
   left <- if (ahead) p + 1 else p
+  none <- left == 0
   # (the read entries of the step's SET data sets: not those of hash objects)
   own <- which(!vapply(rt$reads, function(r) isTRUE(r$hash), NA))
   for (k in own[at %||% seq_along(own)]) {
     n <- rt$reads[[k]]$n
     rt$reads[[k]]$n <- min(n, max(0, left))
-    if (left == 0) rt$reads[[k]]$skip <- TRUE
+    if (none) rt$reads[[k]]$skip <- TRUE
     left <- left - n
   }
   invisible()

@@ -332,6 +332,7 @@ internal sas_rtrim
 internal sas_select_error
 internal sas_set_input
 internal sas_set_next
+internal sas_set_point
 internal sas_set_reader
 internal sas_sort_df
 internal sas_sort_values

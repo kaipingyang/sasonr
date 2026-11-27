@@ -1158,6 +1158,20 @@ an_reader <- function(s, st) {
     }
     s$datasets[[k]]$options$where <- an_where(w, st)
   }
+  # POINT=: direct access by observation number. The variable is not written
+  # to output data sets; END= is never set; data set options that select
+  # observations, a WHERE statement or BY are not supported with it.
+  if (!is.null(s$point)) {
+    if (!is.null(st$by)) abort_unsupported("SET with POINT= and BY", line)
+    for (d in s$datasets) {
+      if (any(c("where", "firstobs", "obs") %in% names(d$options))) abort_unsupported("SET with POINT= and WHERE=, FIRSTOBS= or OBS=", line)
+    }
+    reg_var(st, s$point, "num", disp = s$point)
+    if (!identical(st$info[[s$point]]$type, "num")) abort_syntax(paste0("the POINT= variable ", toupper(s$point), " is not numeric"), line)
+    st$info[[s$point]]$kind <- "auto"
+    st$info[[s$point]]$retained <- TRUE
+    st$has_point <- TRUE
+  }
   for (a in c(s$end, s$nobs)) {
     reg_var(st, a, "num", kind = "auto", retained = TRUE)
     st$info[[a]]$kind <- "auto"

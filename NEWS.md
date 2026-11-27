@@ -5,6 +5,12 @@ the development version provides.
 
 ## Running SAS programs
 
+* SET with POINT=: direct access by observation number (also over several
+  data sets); an invalid number sets `_ERROR_` and leaves the PDV; the POINT=
+  variable starts at 0 and is not written to output data sets; no
+  observations-read NOTE. A step whose only readers use POINT= and that has
+  no STOP statement, POINT= with BY or with data set options that select
+  observations fail loud.
 * Multi-dimensional arrays (`array m[2,3]`, bounds per dimension), with
   `DIM`/`LBOUND`/`HBOUND` of a dimension (`DIM2(m)`, `DIM(m, 2)`); DO OVER
   of an implicitly subscripted array (`array v v1-v4;`, index `_I_`); a sum

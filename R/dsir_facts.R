@@ -276,6 +276,7 @@ dsir_level <- function(facts, an) {
   if (length(ir$slots$outputs) > 1) l3 <- c(l3, "multiple output data sets")
   if (length(readers) > 1) l3 <- c(l3, "more than one SET/MERGE/INPUT statement")
   if (length(an$objects)) l3 <- c(l3, "component objects (DECLARE HASH)")
+  if (isTRUE(an$has_point)) l3 <- c(l3, "SET with POINT=")
   if ("_error_" %in% an$uses) l3 <- c(l3, "_ERROR_ is referenced")
   if (!is.null(an$infile) && !is.null(an$infile$opts$end)) l3 <- c(l3, "INFILE END= variable")
   if (!is.null(rd)) {

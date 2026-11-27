@@ -301,3 +301,16 @@ test_that("END= and IN= start at 0, FIRST. and LAST. at 1, before the first read
   expect_identical(r$work$o$pf, c(1, 1))
   expect_identical(r$work$o$pi, c(0, 1))
 })
+
+test_that("SET with POINT=: direct access, invalid numbers set _ERROR_, no read NOTE, the variable is not written", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  r <- sas_run("data d; x = 10; output; x = 20; output; x = 30; output; run;
+data b; do i = 1 to 5; set d point=i; if _error_ then stop; output; end; stop; run;")
+  expect_identical(r$work$b$x, c(10, 20, 30))
+  expect_false("i" %in% names(r$work$b))
+  m <- as.character(sas_log(r, echo = FALSE))
+  expect_true("i=4 x=30 _ERROR_=1 _N_=1" %in% m)
+  expect_false(any(grepl("read from the data set WORK.D", m, fixed = TRUE)))
+  # the step would not end without STOP
+  expect_error(sas_run("data d; x = 1; run; data b; p = 1; set d point=p; run;"), class = "sasonr_unsupported")
+})
