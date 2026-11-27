@@ -185,6 +185,8 @@ parse_global_stmt <- function(p, open_code = FALSE) {
     if (tk_type(p) != "semi") abort_unsupported("LIBNAME options other than ACCESS=READONLY", line)
     advance(p)
     if (ref %in% c("work", "sashelp", "sasuser", "dictionary")) abort_unsupported(paste0("LIBNAME ", toupper(ref)), line)
+    # a libref has at most 8 characters (a longer one is an ERROR of the statement)
+    if (nchar(ref) > 8L) abort_unsupported(paste0("the ERROR of LIBNAME ", toupper(ref), " (a libref longer than 8 characters)"), line)
     return(list(type = "global", kind = "libname", ref = ref, engine = engine, path = path, line = line))
   }
   # a word that starts no statement SAS knows (measured in open code)

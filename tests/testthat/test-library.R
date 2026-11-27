@@ -28,3 +28,7 @@ test_that("writing to a library, unknown engines and missing paths fail loud", {
   d <- withr::local_tempdir()
   expect_error(sas_run(paste0("libname ro '", d, "'; data ro.new; x = 1; run;")), class = "sasonr_unsupported")
 })
+
+test_that("a libref longer than 8 characters fails loud", {
+  expect_error(sas_run("libname trialdata 'x';"), class = "sasonr_unsupported")
+})
