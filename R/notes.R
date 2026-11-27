@@ -187,7 +187,7 @@ uninit_vars <- function(an) {
   }), ptype = character(), name_spec = rlang::zap())
   in_arrays <- vctrs::list_unchop(lapply(an$arrays, `[[`, "elems"), ptype = character(), name_spec = rlang::zap())
   inits <- Filter(function(v) !is.null(an$info[[v]]$init), data_vars)
-  setdiff(data_vars, c(assigned, inputs, in_arrays, inits, names(an$sum_plan)))
+  setdiff(data_vars, c(assigned, inputs, in_arrays, inits, names(an$sum_plan), an$method_arg_vars))
 }
 
 # Like stmt_assigns(), but also counts CALL routine arguments and sum targets

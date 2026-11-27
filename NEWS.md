@@ -21,7 +21,10 @@ the development version provides.
   OUTPUT(DATASET:) of an object with `ordered: 'a'` or `'d'` writes its data
   variables in key order (the keys without DEFINEDATA; `definedata(all:
   'yes')` with DATASET:). A DECLARE that runs again makes a new, empty
-  object. OUTPUT without ORDERED:, iterators (DECLARE HITER), SUMINC:, a
+  object. DECLARE HITER over an ordered object: FIRST, LAST, NEXT and PREV
+  copy the data variables of the entry; NEXT before FIRST starts at the
+  first entry, past the last one the call returns 160038 and the next NEXT
+  starts over. OUTPUT or an iterator without ORDERED:, SUMINC:, a
   failing method call statement and a method call in an expression that also
   reads variables fail loud.
 * The row-by-row (L3) code of a DATA step shows the step's statements: the

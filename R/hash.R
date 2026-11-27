@@ -72,6 +72,11 @@ sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
   args <- list(...)
   stmt <- .stmt
   line <- h$line
+  if (identical(h$kind, "hiter")) {
+    pdv <- hiter_call(h, method, pdv, args)
+    if (stmt && h$rc != 0) abort_unsupported(paste0("a ", toupper(method), " method call statement that fails (an ERROR)"), line)
+    return(pdv)
+  }
   # the arguments as `list(tag, value)`
   tags <- names(args) %||% rep("", length(args))
   args <- lapply(seq_along(args), function(k) list(tag = if (nzchar(tags[k])) tags[k], value = args[[k]]))
@@ -159,6 +164,8 @@ sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
     remove = {
       defined()
       code <- hash_key_code(key_vals())
+      # an iterator on an entry locks the object: an ERROR [measured]
+      if (any(vapply(h$iters, function(it) !is.null(it$cur), NA))) abort_unsupported("REMOVE from a hash object that an iterator has locked (an ERROR)", line)
       if (is.null(h$entries[[code]])) h$rc <- hash_rc_remove_missing else h$entries[[code]] <- NULL
     },
     abort_unsupported(paste0("the hash object method ", toupper(method)), line)
@@ -204,6 +211,59 @@ hash_load <- function(h, pdv, line) {
   rt <- rt_diag()
   rt$reads[[length(rt$reads)]]$hash <- TRUE
   invisible()
+}
+
+#' Create a hash iterator object (DECLARE HITER) over hash object `h`
+#' @export
+#' @keywords internal
+sas_hiter_new <- function(h, .line = NULL) {
+  it <- new.env(parent = emptyenv())
+  it$kind <- "hiter"
+  it$hash <- h
+  it$cur <- NULL
+  it$rc <- 0
+  it$line <- .line
+  h$iters <- c(h$iters, list(it))
+  it
+}
+
+# The entries of a hash object in its order (ORDERED: 'a' or 'd'): the key
+# codes.
+hash_ordered_codes <- function(h, line) {
+  if (h$ordered == "no") abort_unsupported("a hash iterator over a hash object without ORDERED: (the internal order of its entries)", line)
+  ents <- h$entries
+  if (!length(ents)) return(character())
+  keys <- do.call(rbind, lapply(unname(ents), function(e) as.data.frame(e$key, stringsAsFactors = FALSE)))
+  names(ents)[sas_order(keys, names(keys), rep(h$ordered == "d", ncol(keys)))]
+}
+
+# FIRST, LAST, NEXT and PREV of a hash iterator: the data variables of the
+# entry into the PDV [measured]. NEXT before FIRST is FIRST, PREV before LAST
+# is LAST; past the last (first) entry the call returns 160038, leaves the
+# PDV and starts over (the next NEXT is FIRST); an empty hash object returns
+# 160038.
+hiter_call <- function(it, method, pdv, args) {
+  line <- it$line
+  if (length(args)) abort_unsupported(paste0("arguments of the hash iterator method ", toupper(method)), line)
+  if (!method %in% c("first", "last", "next", "prev")) abort_unsupported(paste0("the hash iterator method ", toupper(method)), line)
+  h <- it$hash
+  if (!h$done) abort_unsupported(paste0("the ", toupper(method), " method of an iterator before DEFINEDONE of its hash object"), line)
+  codes <- hash_ordered_codes(h, line)
+  it$rc <- 0
+  if (is.null(it$cur) && method == "next") method <- "first"
+  if (is.null(it$cur) && method == "prev") method <- "last"
+  k <- if (is.null(it$cur)) NA_integer_ else match(it$cur, codes)
+  if (!is.null(it$cur) && is.na(k)) abort_unsupported("a hash iterator whose current entry is no longer in its hash object", line)
+  pos <- switch(method, first = 1L, last = length(codes), "next" = k + 1L, prev = k - 1L)
+  if (!length(codes) || pos < 1L || pos > length(codes)) {
+    it$rc <- hash_rc_missing_key
+    it$cur <- NULL
+    return(pdv)
+  }
+  it$cur <- codes[pos]
+  e <- h$entries[[it$cur]]
+  pdv[h$data] <- e$data[h$data]
+  pdv
 }
 
 #' The data set a hash object's OUTPUT method wrote (`name`), as a tibble

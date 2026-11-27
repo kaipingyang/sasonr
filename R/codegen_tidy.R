@@ -1146,7 +1146,7 @@ method_call_lang <- function(e, cx, stmt = FALSE) {
   names(args) <- vapply(e$args, function(a) a$tag %||% "", "")
   if (all(!nzchar(names(args)))) names(args) <- NULL
   # (a statement whose call can fail: .stmt)
-  fails <- stmt && e$method %in% c("add", "find", "check", "replace", "remove")
+  fails <- stmt && e$method %in% c("add", "find", "check", "replace", "remove", "first", "last", "next", "prev")
   call_args <- c(list(obj_sym(e$obj), e$method, quote(pdv)), args, if (fails) list(.stmt = TRUE))
   assign_lang(quote(pdv), rlang::call2("sas_hash_call", !!!call_args))
 }
@@ -1178,7 +1178,9 @@ gen_row_stmt1 <- function(s, cx) {
   an <- cx$an
   g <- function(e) gen_lang(e, cx)
   switch(s$stmt,
-    declare = {
+    declare = if (s$class == "hiter") {
+      list(assign_lang(obj_sym(s$name), rlang::call2("sas_hiter_new", obj_sym(s$hash), .line = as.integer(s$line))))
+    } else {
       args <- lapply(s$args, function(a) g(a$value))
       names(args) <- vapply(s$args, function(a) a$tag %||% "", "")
       if (length(args) && any(!nzchar(names(args)))) abort_unsupported("a DECLARE HASH argument without its tag", s$line)

@@ -93,3 +93,17 @@ run;")
   expect_error(sas_run("data _null_; length k 8; declare hash h(); h.definekey('k'); h.definedone(); k = 1; rc = h.add(); h.output(dataset: 'o'); run;"),
                class = "sasonr_unsupported")
 })
+
+test_that("a hash iterator walks an ordered hash object; past the end it returns 160038 and starts over", {
+  r <- sas_run("data _null_; length k $4 v 8;
+  declare hash h(ordered: 'a'); h.definekey('k'); h.definedata('v'); h.definedone();
+  k = 'b'; v = 2; h.add(); k = 'a'; v = 1; h.add(); k = 'c'; v = 3; h.add();
+  declare hiter hi('h');
+  rc = hi.next(); put 'n1=' rc v=;
+  rc = hi.next(); rc = hi.next(); rc = hi.next(); put 'past=' rc v=;
+  rc = hi.next(); put 'again=' rc v=;
+  rc = hi.prev(); put 'p=' rc v=;
+run;")
+  m <- as.character(sas_log(r, echo = FALSE))
+  expect_true(all(c("n1=0 v=1", "past=160038 v=3", "again=0 v=1", "p=160038 v=1") %in% m))
+})

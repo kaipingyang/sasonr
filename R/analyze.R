@@ -237,8 +237,14 @@ an_expr <- function(e, st) {
     method = ,
     obj_attr = {
       if (is.null(st$objects[[e$obj]])) abort_unsupported(paste0(toupper(e$obj), " is not an object declared before this reference"), e$line)
-      if (e$node == "obj_attr" && e$attr != "num_items") abort_unsupported(paste0("the attribute ", toupper(e$attr)), e$line)
+      if (e$node == "obj_attr" && (e$attr != "num_items" || st$objects[[e$obj]] != "hash")) abort_unsupported(paste0("the attribute ", toupper(e$attr)), e$line)
+      if (e$node == "method" && st$objects[[e$obj]] == "hiter" && !e$method %in% c("first", "last", "next", "prev")) {
+        abort_unsupported(paste0("the hash iterator method ", toupper(e$method)), e$line)
+      }
       if (e$node == "method") {
+        # a variable named only in method arguments gets no uninitialized
+        # NOTE [measured]
+        for (k in seq_along(e$args)) st$method_arg_vars <- c(st$method_arg_vars, expr_var_names(e$args[[k]]$value))
         for (k in seq_along(e$args)) e$args[[k]]$value <- an_expr(e$args[[k]]$value, st)
         an_hash_method(e, st)
       }
@@ -602,7 +608,14 @@ an_stmt <- function(s, st) {
   line <- s$line
   switch(s$stmt,
     declare = {
-      if (s$class != "hash") abort_unsupported("DECLARE HITER (hash iterator objects)", line)
+      if (s$class == "hiter") {
+        a <- s$args
+        if (length(a) != 1L || !is.null(a[[1]]$tag) || !identical(a[[1]]$value$node, "str") ||
+            !identical(st$objects[[tolower(trimws(a[[1]]$value$value))]], "hash")) {
+          abort_unsupported("DECLARE HITER other than over a hash object declared before it, named in quotes", line)
+        }
+        s$hash <- tolower(trimws(a[[1]]$value$value))
+      }
       ds <- Find(function(a) identical(a$tag, "dataset"), s$args)
       st$obj_def[[s$name]] <- list(keys = character(), data = character(),
                                    dataset = if (!is.null(ds) && identical(ds$value$node, "str")) tolower(trimws(ds$value$value)))

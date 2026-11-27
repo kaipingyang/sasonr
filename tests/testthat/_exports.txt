@@ -272,6 +272,7 @@ internal sas_hash_new
 internal sas_hash_num_items
 internal sas_hash_rc
 internal sas_hash_written
+internal sas_hiter_new
 internal sas_idx
 internal sas_in
 internal sas_infile_open
