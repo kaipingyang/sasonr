@@ -126,3 +126,12 @@ test_that("statement nodes carry their source span up to the semicolon (spec 09 
   expect_identical(unname(st[[2]]$span[c("line", "col", "end_line", "end_col")]), c(3L, 3L, 4L, 10L))
   expect_identical(unname(st[[2]]$then$span[c("line", "col", "end_col")]), c(4L, 5L, 10L))
 })
+
+test_that("an AST node prints as an indented tree with its spans (spec 09 L3d)", {
+  st <- sas_parse("data out;\n  set a;\n  if x > 1 then y = 2*z;\nrun;")$steps[[1]]$stmts[[2]]
+  out <- format(st)
+  expect_identical(out[1], "stmt if <3:3-3:24>")
+  expect_true("    compare op=\">\" colon=FALSE <3:6-3:10>" %in% out)
+  expect_true(any(grepl("^ +var name=\"y\"", out)))
+  expect_output(print(st$cond), "^compare")
+})

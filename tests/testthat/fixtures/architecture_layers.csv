@@ -29,6 +29,7 @@ macro_eval.R,macro
 macro_funcs.R,macro
 macro_quote.R,macro
 macro_stmt.R,macro
+ast_print.R,parse
 parse_expr.R,parse
 parse_datastep.R,parse
 sql_parse.R,parse
