@@ -123,3 +123,68 @@ test_that("one function builds the columns of the TABULATE output data set", {
   expect_identical(hits, "tab_output_data")
   expect_true(is.function(get("tab_output_data", envir = env)))
 })
+
+# Layers (spec 09 section 1) ----------------------------------------------------
+
+arch_layer_order <- c("base", "state", "values", "lex", "macro", "parse", "analyze", "codegen", "engine", "api")
+
+arch_read_csv <- function(name) {
+  utils::read.csv(testthat::test_path("fixtures", name), comment.char = "#", stringsAsFactors = FALSE)
+}
+
+# The calls between files of R/: for each top-level function definition
+# (`name <- function`), the package functions it calls by name. The graph is
+# static (R's parser), so calls through do.call(), match.fun() or a function
+# held in a variable are not seen.
+arch_call_edges <- function(rdir) {
+  files <- list.files(rdir, pattern = "[.]R$", full.names = TRUE)
+  files <- files[!grepl("^doc_", basename(files))]
+  defs <- list()
+  bodies <- list()
+  for (f in files) {
+    for (e in parse(f, keep.source = FALSE)) {
+      if (is.call(e) && (identical(e[[1]], as.name("<-")) || identical(e[[1]], as.name("="))) && is.name(e[[2]]) &&
+          is.call(e[[3]]) && identical(e[[3]][[1]], as.name("function"))) {
+        nm <- as.character(e[[2]])
+        defs[[nm]] <- basename(f)
+        bodies[[length(bodies) + 1L]] <- list(fn = nm, file = basename(f), body = e[[3]])
+      }
+    }
+  }
+  called <- function(x) {
+    out <- character()
+    walk <- function(x) {
+      if (!is.call(x)) return()
+      if (is.name(x[[1]])) out <<- c(out, as.character(x[[1]])) else walk(x[[1]])
+      for (a in as.list(x)[-1]) if (!missing(a)) walk(a)
+    }
+    walk(x)
+    unique(out)
+  }
+  rows <- lapply(bodies, function(b) {
+    to <- intersect(called(b$body), names(defs))
+    if (!length(to)) return(NULL)
+    data.frame(from_file = b$file, from_fn = b$fn, to_file = unlist(defs[to]), to_fn = to, stringsAsFactors = FALSE)
+  })
+  e <- do.call(rbind, rows)
+  e[e$from_file != e$to_file, , drop = FALSE]
+}
+
+test_that("every file of R/ has a layer, and calls run from higher layers to lower ones", {
+  rdir <- pkg_r_dir()
+  layers <- arch_read_csv("architecture_layers.csv")
+  expect_true(all(layers$layer %in% arch_layer_order))
+  files <- list.files(rdir, pattern = "[.]R$")
+  files <- files[!grepl("^doc_", files)]
+  expect_identical(setdiff(files, layers$file), character())
+  rank <- stats::setNames(match(layers$layer, arch_layer_order), layers$file)
+  e <- arch_call_edges(rdir)
+  up <- e[rank[e$to_file] > rank[e$from_file], , drop = FALSE]
+  found <- unique(paste(up$from_file, up$from_fn, "->", up$to_file, up$to_fn))
+  acc <- arch_read_csv("architecture_accepted.csv")
+  accepted <- paste(acc$from_file, acc$from_fn, "->", acc$to_file, acc$to_fn)
+  # a new call against the order fails; an accepted call that is gone must be
+  # removed from the list
+  expect_identical(setdiff(found, accepted), character())
+  expect_identical(setdiff(accepted, found), character())
+})
