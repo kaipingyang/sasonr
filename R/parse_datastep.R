@@ -1018,7 +1018,30 @@ parse_put <- function(p) {
         text <- name
         advance(p, 2L)
       }
-      if (name %in% c("_all_", "_infile_", "_page_")) abort_unsupported(paste("PUT", toupper(name)), line)
+      # PUT _ALL_; alone
+      if (name == "_all_" && !length(items) && tk_type(p, 1L) == "semi") {
+        advance(p, 2L)
+        return(list(stmt = "put", items = list(list(kind = "all")), line = line))
+      }
+      if (name %in% c("_all_", "_infile_", "_page_", "_character_", "_numeric_", "_char_")) abort_unsupported(paste("PUT", toupper(name)), line)
+      # an array element (a[2], a{i}) or all elements (a[*])
+      if (name %in% p$arrays && tk_type(p, 1L) %in% c("lbrace", "lparen")) {
+        if (is_op(p, "*", 2L)) {
+          advance(p, 4L)
+          if (is_op(p, "=") || is_format_ahead(p)) abort_unsupported(paste0("PUT ", toupper(name), "{*} with = or a format"), line)
+          items <- c(items, list(list(kind = "array_all", name = name, text = text)))
+          next
+        }
+        ref <- parse_array_ref(p)
+        kind <- "value"
+        if (is_op(p, "=")) {
+          kind <- "named"
+          advance(p)
+        }
+        if (is_format_ahead(p)) abort_unsupported(paste0("PUT of an array element with a format"), line)
+        items <- c(items, list(list(kind = kind, name = name, text = text, ref = ref)))
+        next
+      }
       advance(p)
       kind <- "value"
       if (is_op(p, "=")) {
@@ -1059,6 +1082,8 @@ parse_put <- function(p) {
 # start, at the end or after another `/`, or between pointers only) are not
 # implemented yet: they fail loud.
 put_check_empty_lines <- function(items, line) {
+  # `PUT;` (when its empty line is written: not before the step's NOTEs) is
+  # not implemented
   if (!length(items)) abort_unsupported("PUT with no items", line)
   seg <- cumsum(vapply(items, function(it) it$kind == "ptr" && it$k == "next", logical(1)))
   text <- vapply(items, function(it) it$kind != "ptr", logical(1))

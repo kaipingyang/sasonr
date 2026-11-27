@@ -167,6 +167,20 @@ dump_value <- function(v, fmt) {
   trimws(sas_format(v, fmt))
 }
 
+#' The lines of PUT _ALL_: every variable of the PDV as `name=value`, then
+#' `_ERROR_` and `_N_`, as in the error dump (measured)
+#' @export
+#' @keywords internal
+sas_put_all <- function(pdv, st) {
+  spec <- st$dump
+  vals <- vapply(seq_along(spec$vars), function(k) {
+    v <- spec$vars[k]
+    paste0(spec$names[k], "=", dump_value(pdv[[v]], spec$fmts[[v]]))
+  }, "")
+  items <- c(vals, paste0("_ERROR_=", dump_value(pdv[["_error_"]], NULL)), paste0("_N_=", dump_value(pdv[["_n_"]], NULL)))
+  dump_wrap(items, rt_linesize())
+}
+
 #' End-of-iteration PDV dump when `_ERROR_` is set
 #'
 #' Returns the log lines: the input buffer (with the RULE line the first time

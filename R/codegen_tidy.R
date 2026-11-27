@@ -376,6 +376,15 @@ proto_lang <- function(inf, use_init = TRUE) {
 # The value of a PUT item: sas_put_named(), sas_put_fvalue() (an explicit
 # format) or sas_put_value().
 put_item_lang <- function(it, cx) {
+  # an array element: its value; named, the element variable's name
+  if (!is.null(it$ref)) {
+    arr <- cx$an$arrays[[it$name]]
+    v <- gen_array_lang(it$ref, cx)
+    if (it$kind != "named") return(cg_call("sas_put_value", list(v)))
+    disps <- vapply(arr$elems, function(e) cx$an$info[[e]]$disp %||% e, "", USE.NAMES = FALSE)
+    nm <- rlang::call2("[", cg_val(disps), v[[3]][[3]])
+    return(cg_call("sas_put_named", list(nm, v)))
+  }
   fmt <- it$fmt %||% cx$an$formats[[it$name]]
   args <- c(list(var_lang(it$name, cx)), if (!is.null(fmt)) list(fmt_lang(fmt)))
   if (it$kind == "named") return(cg_call("sas_put_named", c(list(cx$an$info[[it$name]]$disp %||% it$name), args)))
@@ -1259,7 +1268,11 @@ gen_row_stmt1 <- function(s, cx) {
       }
       output_langs(targets)
     },
-    put = list(assign_lang(rlang::sym(cx$sink), rlang::call2("c", rlang::sym(cx$sink), put_line_lang(s, cx)))),
+    put = if (length(s$items) == 1L && identical(s$items[[1]]$kind, "all")) {
+      list(assign_lang(rlang::sym(cx$sink), rlang::call2("c", rlang::sym(cx$sink), rlang::call2("sas_put_all", quote(pdv), quote(.st)))))
+    } else {
+      list(assign_lang(rlang::sym(cx$sink), rlang::call2("c", rlang::sym(cx$sink), put_line_lang(s, cx))))
+    },
     call = if (s$routine %in% c("missing", "sortn", "sortc")) gen_row_call_vars(s, cx) else if (s$routine == "execute") {
       # the %PUT lines of its macro code go to the log between the PUT lines
       list(assign_lang(rlang::sym(".log"), rlang::call2("c", rlang::sym(".log"),

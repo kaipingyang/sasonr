@@ -312,6 +312,7 @@ internal sas_obs_window
 internal sas_or
 internal sas_pow
 internal sas_proc_contents
+internal sas_put_all
 internal sas_rt_freq
 internal sas_proc_store
 internal sas_rt_proc

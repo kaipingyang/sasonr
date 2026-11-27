@@ -5,6 +5,10 @@ the development version provides.
 
 ## Running SAS programs
 
+* PUT of array elements (`put a[2]=` writes the element's name, `a[i]`,
+  `a[*]` the values of all elements) and `PUT _ALL_;` (every variable as
+  `name=value`, then `_ERROR_` and `_N_`). `PUT _CHARACTER_`/`_NUMERIC_` and
+  `PUT;` fail loud.
 * UPDATE master transaction; with BY: per BY group the first master
   observation with the transactions applied in order (missing values do not
   replace values, the special missing values .A-.Z do; UPDATEMODE=

@@ -970,8 +970,29 @@ an_stmt <- function(s, st) {
     keep = , drop = , rename = NULL,
     array = an_array(s, st),
     put = {
+      # a[*]: the values of all elements
+      if (any(vapply(s$items, function(it) identical(it$kind, "array_all"), NA))) {
+        s$items <- unlist(lapply(s$items, function(it) {
+          if (!identical(it$kind, "array_all")) return(list(it))
+          arr <- st$arrays[[it$name]]
+          if (is.null(arr) || arr$temporary) abort_unsupported(paste0("PUT ", toupper(it$name), "{*} of a _TEMPORARY_ array"), line)
+          lapply(arr$elems, function(v) list(kind = "value", name = v, text = st$info[[v]]$disp %||% v))
+        }), recursive = FALSE)
+      }
+      if (length(s$items) == 1L && identical(s$items[[1]]$kind, "all")) {
+        if (!is.null(st$file)) abort_unsupported("PUT _ALL_ to a FILE", line)
+        st$put_all <- TRUE
+        return(s)
+      }
       s$items <- lapply(s$items, function(it) {
         if (it$kind == "lit") return(it)
+        if (!is.null(it$ref)) {
+          arr <- st$arrays[[it$name]]
+          if (arr$temporary && it$kind == "named") abort_unsupported(paste0("PUT ", toupper(it$name), "{...}= of a _TEMPORARY_ array"), line)
+          if (any(arr$elems %in% names(st$formats))) abort_unsupported(paste0("PUT of an element of array ", toupper(it$name), " whose elements have formats"), line)
+          it$ref <- an_expr(it$ref, st)
+          return(it)
+        }
         if (it$kind != "ptr" && is.null(st$info[[it$name]]) && isTRUE(it$fmt$char)) {
           reg_var(st, it$name, "char", if (is.na(it$fmt$w)) 8L else it$fmt$w, disp = it$text)
         }

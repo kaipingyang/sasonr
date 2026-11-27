@@ -193,6 +193,7 @@ classify_step <- function(an) {
   readers <- an$readers
   if (length(readers) > 1) add3("more than one SET/MERGE/INPUT statement")
   if (length(an$objects)) add3("component objects (DECLARE HASH)")
+  if (isTRUE(an$put_all)) add3("PUT _ALL_")
   if (isTRUE(an$has_point)) {
     add3("SET with POINT=")
     # without STOP (and without a reader that reaches the end of its input)

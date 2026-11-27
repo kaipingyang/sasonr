@@ -23,3 +23,11 @@ test_that("a sum statement on an array element retains it", {
   expect_identical(r$work$out$a2, c(10, 20, 30))
   expect_error(sas_run("data out; array a[2]; do i = 1 to 2; a[i] + 1; end; run;"), class = "sasonr_unsupported")
 })
+
+test_that("PUT of array elements: the value, the element's name, all elements; PUT _ALL_", {
+  m <- put_lines("data _null_; array a[3] a1-a3 (10 20 30); put a[2]=; i = 3; put a[i]= a[1]=; put a[2]; put a[*]; run;")
+  expect_true(all(c("a2=20", "a3=30 a1=10", "20", "10 20 30") %in% m))
+  m <- put_lines("data lots; Qty=1; Region='N'; output; run; data _null_; set lots; put _all_; run;")
+  expect_true("Qty=1 Region=N _ERROR_=0 _N_=1" %in% m)
+  expect_error(sas_run("data _null_; x = 1; put _character_; run;"), class = "sasonr_unsupported")
+})
