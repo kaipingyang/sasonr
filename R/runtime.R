@@ -1385,12 +1385,6 @@ sas_put_rows <- function(lines, guards, n = NULL) {
 
 # Data sets ---------------------------------------------------------------
 
-#' Fetch a WORK data set and apply KEEP=/DROP=/RENAME=/FIRSTOBS=/OBS=
-#'
-#' `work` is the WORK library (a list) or the data set itself (a data frame,
-#' as in the tidy form of a script; `name` is then not used).
-#' @export
-#' @keywords internal
 #' A member of a read-only library (LIBNAME) as a data frame
 #'
 #' The member was read when the step was analysed (library.R).
@@ -1402,6 +1396,12 @@ sas_lib_member <- function(name) {
   d
 }
 
+#' Fetch a WORK data set and apply KEEP=/DROP=/RENAME=/FIRSTOBS=/OBS=
+#'
+#' `work` is the WORK library (a list) or the data set itself (a data frame,
+#' as in the tidy form of a script; `name` is then not used).
+#' @export
+#' @keywords internal
 sas_ds <- function(work, name, keep = NULL, drop = NULL, rename = NULL, firstobs = NULL, obs = NULL) {
   d <- if (is.data.frame(work)) work else work[[name]]
   # a member of a read-only library (library.R)
@@ -1868,6 +1868,19 @@ sas_carry <- function(values, sets, init) {
 #' @export
 #' @keywords internal
 sas_dif <- function(state, key, value, n = 1L) value - sas_lag(state, key, value, n)
+
+#' The element of a multi-dimensional array: subscripts `i` of dimensions
+#' with lower bounds `lo` and sizes `dims` (row-major)
+#' @export
+#' @keywords internal
+sas_idx_md <- function(i, lo, dims) {
+  k <- 0
+  for (j in seq_along(dims)) {
+    ij <- sas_idx(i[j], lo[j], dims[j]) - 1L
+    k <- k * dims[j] + ij
+  }
+  vctrs::vec_cast(k + 1, integer())
+}
 
 #' Validate an array subscript and convert it to a 1-based position
 #' @export

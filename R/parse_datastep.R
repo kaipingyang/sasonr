@@ -465,7 +465,13 @@ parse_assign <- function(p) {
     parser_saw(p, target$name)
     advance(p)
   }
-  if (is_op(p, "+") && target$node == "array_ref") abort_unsupported("sum statement on an array element", line)
+  # a sum statement on an array element: a[1] + x;
+  if (is_op(p, "+") && target$node == "array_ref") {
+    advance(p)
+    value <- parse_expr(p)
+    expect_semi(p, "sum statement")
+    return(list(stmt = "sum", target = target, value = value, line = line))
+  }
   if (!is_op(p, "=")) abort_syntax(paste("expected '=' but found", tok_desc(p)), line)
   advance(p)
   p$assign_value <- TRUE
@@ -555,7 +561,12 @@ parse_do <- function(p) {
     expect_semi(p, "DO")
     return(list(stmt = "do", kind = wu$kind, cond = wu$cond, body = parse_block(p, "DO"), line = line))
   }
-  if (is_kw(p, "over")) abort_unsupported("DO OVER", line)
+  # DO OVER array; (an implicitly subscripted array, index _I_)
+  if (is_kw(p, "over") && tk_type(p, 1L) == "name" && tk_type(p, 2L) == "semi") {
+    arr <- tk_low(p, 1L)
+    advance(p, 3L)
+    return(list(stmt = "do", kind = "over", array = arr, body = parse_block(p, "DO"), line = line))
+  }
   if (!(tk_type(p) == "name" && is_op(p, "=", 1L))) {
     abort_syntax(paste("invalid DO statement near", tok_desc(p)), line)
   }
@@ -871,12 +882,16 @@ parse_array <- function(p) {
   if (tk_type(p) != "name") abort_syntax("expected an array name", line)
   name <- tk_low(p)
   advance(p)
-  if (!tk_type(p) %in% c("lbrace", "lparen")) abort_syntax("expected an array dimension", line)
+  # an implicitly subscripted array: no dimension (DO OVER, index _I_)
+  implicit <- tk_type(p) == "name" || is_op(p, "$")
+  if (!implicit && !tk_type(p) %in% c("lbrace", "lparen")) abort_syntax("expected an array dimension", line)
   close <- if (tk_type(p) == "lparen") "rparen" else "rbrace"
-  advance(p)
+  if (!implicit) advance(p)
   dim <- NA_integer_
   lo <- 1L
-  if (is_op(p, "*")) {
+  dims <- NULL
+  if (implicit) {
+  } else if (is_op(p, "*")) {
     advance(p)
   } else {
     # bounds may be negative: array b{-2:2}
@@ -888,18 +903,30 @@ parse_array <- function(p) {
       expect_type(p, "num", what)
       if (neg) -v else v
     }
-    n1 <- signed_int("an array dimension")
-    if (is_op(p, ":")) {
-      advance(p)
-      n2 <- signed_int("an array upper bound")
-      lo <- n1
-      dim <- n2 - n1 + 1L
-    } else {
-      dim <- n1
+    one <- function() {
+      n1 <- signed_int("an array dimension")
+      if (is_op(p, ":")) {
+        advance(p)
+        n2 <- signed_int("an array upper bound")
+        return(c(n1, n2 - n1 + 1L))
+      }
+      c(1L, n1)
     }
+    # a multi-dimensional array: the bounds of each dimension (row-major)
+    los <- integer()
+    dims <- integer()
+    repeat {
+      b <- one()
+      los <- c(los, b[1])
+      dims <- c(dims, b[2])
+      if (tk_type(p) != "comma") break
+      advance(p)
+    }
+    lo <- los[1]
+    dim <- as.integer(prod(dims))
+    if (length(dims) == 1L) dims <- NULL else attr(dims, "lo") <- los
   }
-  if (tk_type(p) == "comma") abort_unsupported("multi-dimensional arrays", line)
-  expect_type(p, close, "closing bracket")
+  if (!implicit) expect_type(p, close, "closing bracket")
   char <- FALSE
   len <- NA_integer_
   if (is_op(p, "$")) {
@@ -944,7 +971,7 @@ parse_array <- function(p) {
   }
   expect_semi(p, "ARRAY")
   p$arrays <- c(p$arrays, name)
-  list(stmt = "array", name = name, dim = dim, lo = lo, char = char, len = len,
+  list(stmt = "array", name = name, dim = dim, lo = lo, dims = dims, implicit = implicit, char = char, len = len,
        temporary = temporary, items = items, init = init, line = line)
 }
 

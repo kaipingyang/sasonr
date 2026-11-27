@@ -5,6 +5,11 @@ the development version provides.
 
 ## Running SAS programs
 
+* Multi-dimensional arrays (`array m[2,3]`, bounds per dimension), with
+  `DIM`/`LBOUND`/`HBOUND` of a dimension (`DIM2(m)`, `DIM(m, 2)`); DO OVER
+  of an implicitly subscripted array (`array v v1-v4;`, index `_I_`); a sum
+  statement on an array element with a constant subscript (or of a
+  _TEMPORARY_ array).
 * Read-only libraries: `LIBNAME ref XPORT 'file';` reads the member of a
   transport file (version 5) in SET, MERGE, PROC DATA= and data set options,
   with the attributes of its variables (lengths, formats, informats, labels)

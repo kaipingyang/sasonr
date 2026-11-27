@@ -2,30 +2,11 @@
 % Please edit documentation in R/runtime.R
 \name{sas_lib_member}
 \alias{sas_lib_member}
-\title{Fetch a WORK data set and apply KEEP=/DROP=/RENAME=/FIRSTOBS=/OBS=}
+\title{A member of a read-only library (LIBNAME) as a data frame}
 \usage{
 sas_lib_member(name)
 }
 \description{
-\code{work} is the WORK library (a list) or the data set itself (a data frame,
-as in the tidy form of a script; \code{name} is then not used).
+The member was read when the step was analysed (library.R).
 }
-\keyword{(LIBNAME)}
-\keyword{(library.R).}
-\keyword{A}
-\keyword{The}
-\keyword{a}
-\keyword{analysed}
-\keyword{as}
-\keyword{data}
-\keyword{frame}
 \keyword{internal}
-\keyword{library}
-\keyword{member}
-\keyword{of}
-\keyword{read}
-\keyword{read-only}
-\keyword{step}
-\keyword{the}
-\keyword{was}
-\keyword{when}

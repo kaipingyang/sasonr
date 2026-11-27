@@ -274,6 +274,7 @@ internal sas_hash_rc
 internal sas_hash_written
 internal sas_hiter_new
 internal sas_idx
+internal sas_idx_md
 internal sas_in
 internal sas_infile_open
 internal sas_input_at_end

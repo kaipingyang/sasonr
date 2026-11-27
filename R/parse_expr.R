@@ -406,7 +406,6 @@ parse_array_ref <- function(p) {
     idx <- c(idx, list(parse_expr(p)))
   }
   expect_type(p, close, "closing bracket")
-  if (length(idx) > 1) abort_unsupported("multi-dimensional array references", line)
   list(node = "array_ref", name = name, index = idx, line = line)
 }
 

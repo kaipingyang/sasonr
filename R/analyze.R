@@ -263,7 +263,10 @@ an_expr <- function(e, st) {
       st$uses <- c(st$uses, e$name)
     },
     array_ref = {
-      if (is.null(st$arrays[[e$name]])) abort_syntax(paste0("'", e$name, "' is not an array"), e$line)
+      arr <- st$arrays[[e$name]]
+      if (is.null(arr)) abort_syntax(paste0("'", e$name, "' is not an array"), e$line)
+      n_dim <- max(1L, length(arr$dims))
+      if (length(e$index) != n_dim) abort_unsupported(paste0("a reference to array ", toupper(e$name), " with ", length(e$index), " subscripts for ", n_dim, " dimensions"), e$line)
       e$index <- lapply(e$index, an_expr, st = st)
     },
     unary = e$arg <- an_expr(e$arg, st),
@@ -339,11 +342,27 @@ an_call <- function(e, st) {
     abort_syntax(paste0("The function ", toupper(e$name), " is unknown, or cannot be accessed. (ERROR 68-185)"), e$line, e$col, e$name)
   }
   lk <- lag_kind(e$name)
+  # DIMn, LBOUNDn, HBOUNDn: the n-th dimension (also DIM(array, n))
+  m <- regmatches(e$name, regexec("^(dim|lbound|hbound)([0-9]+)$", e$name))[[1]]
+  if (length(m) == 3L) {
+    e$name <- m[2]
+    e$bound_dim <- as.integer(m[3])
+  }
   if (e$name %in% c("dim", "lbound", "hbound")) {
     if (length(e$args) < 1 || e$args[[1]]$node != "var" || is.null(st$arrays[[e$args[[1]]$name]])) {
       abort_syntax(paste(toupper(e$name), "requires an array name"), e$line)
     }
-    if (length(e$args) > 1) abort_unsupported(paste0("multi-dimensional ", toupper(e$name)), e$line)
+    if (length(e$args) == 2L) {
+      if (!identical(e$args[[2]]$node, "num") || !is.null(e$bound_dim)) abort_unsupported(paste0(toupper(e$name), " with a dimension other than a constant"), e$line)
+      e$bound_dim <- as.integer(e$args[[2]]$value)
+      e$args <- e$args[1]
+    }
+    if (length(e$args) > 2L) abort_syntax(paste("too many arguments to", toupper(e$name)), e$line)
+    arr <- st$arrays[[e$args[[1]]$name]]
+    n_dim <- max(1L, length(arr$dims))
+    if (!is.null(e$bound_dim) && (e$bound_dim < 1L || e$bound_dim > n_dim)) {
+      abort_unsupported(paste0(toupper(e$name), " of dimension ", e$bound_dim, " of an array with ", n_dim), e$line)
+    }
     return(e)
   }
   if (e$name %in% c("put", "input")) {
@@ -677,7 +696,23 @@ an_stmt <- function(s, st) {
         if (arr$type != expr_type(s$value, st)$type) abort_unsupported("automatic type conversion in array assignment", line)
       }
     },
-    sum = {
+    sum = if (identical(s$target$node, "array_ref")) {
+      # a sum statement on an array element: the element (a constant
+      # subscript) is retained and starts at 0; the values of a _TEMPORARY_
+      # array are kept anyway
+      s$target <- an_expr(s$target, st)
+      arr <- st$arrays[[s$target$name]]
+      if (arr$type != "num") abort_unsupported("sum statement on character values", line)
+      if (!arr$temporary) {
+        k <- if (length(s$target$index) == 1L && identical(s$target$index[[1]]$node, "num")) s$target$index[[1]]$value - arr$lo + 1
+        if (is.null(k) || k < 1 || k > arr$dim || k != trunc(k)) abort_unsupported("sum statement on an array element with a subscript other than a constant", line)
+        v <- arr$elems[k]
+        st$info[[v]]$retained <- TRUE
+        if (is.null(st$info[[v]]$init)) st$info[[v]]$init <- 0
+      }
+      s$value <- an_expr(s$value, st)
+      if (expr_type(s$value, st)$type != "num") abort_unsupported("sum statement on character values", line)
+    } else {
       reg_var(st, s$target$name, "num", disp = s$target$text, retained = TRUE)
       if (is.null(st$info[[s$target$name]]$init)) st$info[[s$target$name]]$init <- 0
       s$value <- an_expr(s$value, st)
@@ -717,6 +752,18 @@ an_stmt <- function(s, st) {
       s$cond <- an_where(s$cond, st)
     },
     do = {
+      # DO OVER arr: DO _I_ = 1 TO DIM(arr) with each `arr` of the body the
+      # element _I_
+      if (s$kind == "over") {
+        arr <- st$arrays[[s$array]]
+        if (is.null(arr)) abort_syntax(paste0("'", s$array, "' is not an array"), line)
+        if (!arr$implicit) abort_unsupported("DO OVER of an explicitly subscripted array (ERROR 184-185)", line)
+        reg_var(st, "_i_", "num", kind = "auto", disp = "_I_")
+        num <- function(v) list(node = "num", value = v, text = as.character(v), line = line)
+        s <- list(stmt = "do", kind = "iter", var = "_i_", var_text = "_I_", from = num(1), to = num(arr$dim), by = NULL,
+                  while_until = NULL, body = over_rewrite(s$body, s$array), line = line)
+        st$over_index <- c(st$over_index, "_i_")
+      }
       if (s$kind == "iter") {
         reg_var(st, s$var, "num", disp = s$var_text)
         s$from <- an_expr(s$from, st)
@@ -1000,6 +1047,20 @@ const_value <- function(e) {
   )
 }
 
+# The body of DO OVER `arr`: each reference to `arr` without a subscript
+# becomes the element _I_.
+over_rewrite <- function(x, arr) {
+  if (!is.list(x)) return(x)
+  if (identical(x$node, "var") && identical(x$name, arr)) {
+    return(list(node = "array_ref", name = arr, index = list(list(node = "var", name = "_i_", text = "_I_", line = x$line)),
+                line = x$line))
+  }
+  if (identical(x$stmt, "do") && identical(x$kind, "over")) return(x)
+  y <- lapply(x, over_rewrite, arr = arr)
+  attributes(y) <- attributes(x)
+  y
+}
+
 an_array <- function(s, st) {
   line <- s$line
   type <- if (s$char) "char" else "num"
@@ -1045,6 +1106,8 @@ an_array <- function(s, st) {
   }
   st$arrays[[s$name]] <- list(
     name = s$name, elems = elems, temporary = s$temporary, dim = dim, lo = s$lo,
+    # a multi-dimensional array: the size and lower bound of each dimension
+    dims = if (!is.null(s$dims)) as.integer(s$dims), los = attr(s$dims, "lo"), implicit = isTRUE(s$implicit),
     type = type, len = len, init = init
   )
   invisible()

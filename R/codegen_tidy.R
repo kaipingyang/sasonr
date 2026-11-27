@@ -250,8 +250,11 @@ gen_call <- function(e, cx) {
   inexact <- if (isTRUE(cx$inexact)) list(.exact = FALSE)
   if (e$name %in% c("dim", "lbound", "hbound")) {
     arr <- cx$an$arrays[[e$args[[1]]$name]]
-    return(switch(e$name, dim = as.integer(arr$dim), lbound = as.integer(arr$lo),
-                  hbound = as.integer(arr$lo + arr$dim - 1L)))
+    # the n-th dimension of a multi-dimensional array (the first by default)
+    n <- e$bound_dim %||% 1L
+    size <- if (length(arr$dims) > 1L) arr$dims[n] else arr$dim
+    lo <- if (length(arr$dims) > 1L) arr$los[n] else arr$lo
+    return(switch(e$name, dim = as.integer(size), lbound = as.integer(lo), hbound = as.integer(lo + size - 1L)))
   }
   if (e$name %in% var_info_fns) return(gen_var_info(e, cx))
   if (e$name == "put") {
@@ -348,7 +351,11 @@ stmt_may_error <- function(s) {
 gen_array_lang <- function(e, cx) {
   if (cx$mode != "row") abort_unsupported("array reference in vectorised code", e$line)
   arr <- cx$an$arrays[[e$name]]
-  idx <- rlang::call2("sas_idx", gen_lang(e$index[[1]], cx), as.integer(arr$lo), as.integer(arr$dim))
+  idx <- if (length(arr$dims) > 1L) {
+    rlang::call2("sas_idx_md", cg_call("c", lapply(e$index, gen_lang, cx = cx)), cg_val(as.integer(arr$los)), cg_val(as.integer(arr$dims)))
+  } else {
+    rlang::call2("sas_idx", gen_lang(e$index[[1]], cx), as.integer(arr$lo), as.integer(arr$dim))
+  }
   if (arr$temporary) rlang::call2("[", rlang::sym(paste0(".ta_", arr$name)), idx)
   else rlang::call2("[[", rlang::sym("pdv"), rlang::call2("[", rlang::sym(paste0(".arr_", arr$name)), idx))
 }
@@ -1197,7 +1204,7 @@ gen_row_stmt1 <- function(s, cx) {
       }
     },
     sum = {
-      ref <- var_lang(s$target$name, cx)
+      ref <- if (identical(s$target$node, "array_ref")) gen_array_lang(s$target, cx) else var_lang(s$target$name, cx)
       list(assign_lang(ref, rlang::call2("sas_f_sum", ref, g(s$value))))
     },
     substr_assign = {
