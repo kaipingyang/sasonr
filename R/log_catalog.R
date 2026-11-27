@@ -58,6 +58,7 @@ log_catalog <- list(
   ds.not_replaced_incomplete = log_msg("warning", "WARNING: Data set WORK.<name> was not replaced because new file is incomplete."),
   ds.looping = log_msg("note", "NOTE: DATA STEP stopped due to looping."),
   ods.rtf_body = log_msg("note", "NOTE: Writing RTF Body file: <file>"),
+  ods.html_body = log_msg("note", "NOTE: Writing HTML Body file: <file>"),
   ds.merge_repeats = log_msg("note", "NOTE: MERGE statement has more than one data set with repeats of BY values."),
   ds.read = log_msg("note", "NOTE: There were <nobs> observations read from the data set WORK.<name>."),
   ds.read_where = log_msg("note", c("NOTE: There were <nobs> observations read from the data set WORK.<name>.",

@@ -5,6 +5,14 @@ the development version provides.
 
 ## Running SAS programs
 
+* `ODS HTML FILE="path" <STYLE=HTMLBlue>;` writes the HTML document of the
+  procedure output up to `ODS HTML CLOSE;` to that file (other ODS HTML
+  options, a directory that does not exist and a destination left open fail
+  loud).
+* `%SYSFUNC(GETOPTION(ENCODING))` returns the session encoding, UTF-8; other
+  options of GETOPTION fail loud.
+* `sas_script()` of a program with `%INCLUDE` runs the included steps once
+  (the statement itself is no longer replayed).
 * MERGE without BY (one-to-one): the n-th observation of each data set;
   the variables of a data set whose observations are all read are missing.
 * A character variable read by SET or MERGE takes the length it has in the

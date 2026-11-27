@@ -115,8 +115,20 @@ test_that("ODS HTML CLOSE and ODS HTML control which outputs reach the document"
                      grepl(pattern = "sas-table", fixed = TRUE), FALSE)
 })
 
+test_that("ODS HTML FILE= writes the document at ODS HTML CLOSE", {
+  d <- withr::local_tempdir()
+  f <- file.path(d, "out.html")
+  r <- sas_run(paste0("data a; x = 1; run; ods html file='", f, "' style=htmlblue; proc means data=a; run; ods html close;"))
+  expect_true(file.exists(f))
+  expect_match(paste(readLines(f), collapse = "\n"), "The MEANS Procedure", fixed = TRUE)
+  expect_true(any(grepl("^NOTE: Writing HTML Body file: ", as.character(sas_log(r, echo = FALSE)))))
+})
+
 test_that("ODS HTML options and other ODS statements fail loud", {
+  # an HTML file the program does not close; options other than FILE= and STYLE=HTMLBlue
   expect_error(sas_run("ods html file='out.html';"), class = "sasonr_unsupported")
+  expect_error(sas_run("ods html path='.' file='out.html'; ods html close;"), class = "sasonr_unsupported")
+  expect_error(sas_run("ods html file='out.html' style=journal; ods html close;"), class = "sasonr_unsupported")
   expect_error(sas_run("ods rtf;"), class = "sasonr_unsupported")
 })
 

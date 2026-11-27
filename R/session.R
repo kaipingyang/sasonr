@@ -52,6 +52,8 @@ SasSession <- R6::R6Class("SasSession",
     footnotes = NULL,
     # ods_html: TRUE while the HTML destination of the results is open (ODS HTML; / ODS HTML CLOSE;).
     ods_html = TRUE,
+    # ods_html_file: NULL, or list(file, outputs) while ODS HTML FILE= is open (written at ODS HTML CLOSE).
+    ods_html_file = NULL,
     # ods_rtf: NULL, or list(file, outputs) while ODS RTF FILE= is open (written at ODS RTF CLOSE).
     ods_rtf = NULL,
     # ods_output: ODS OUTPUT requests for the next step (ods_output.R): list of list(object, ds, line).

@@ -340,8 +340,14 @@ engine_exec_steps <- function(eng, text, line) {
                                                               proc = "Freq", template = "base.freq.lines")))
     }
     if (length(html_tables) > 0 && isTRUE(eng$session$ods_html)) {
-      eng$html <- c(eng$html, list(list(proc = step$name, line = step$line, titles = env$.titles, footnotes = eng$session$footnotes,
-                                          tables = html_tables, center = isTRUE(eng$session$options$center))))
+      o <- list(proc = step$name, line = step$line, titles = env$.titles, footnotes = eng$session$footnotes,
+                tables = html_tables, center = isTRUE(eng$session$options$center))
+      eng$html <- c(eng$html, list(o))
+      if (!is.null(eng$session$ods_html_file)) {
+        tpl <- vapply(html_tables, function(tb) attr(tb, "template", exact = TRUE) %||% "", "")
+        if (any(tpl %in% html_undrawn)) abort_unsupported(paste0("the HTML output of PROC ", toupper(step$name)), step$line)
+        eng$session$ods_html_file$outputs <- c(eng$session$ods_html_file$outputs, list(o))
+      }
     }
     if (length(env$.ods) > 0 && !is.null(eng$session$ods_rtf)) {
       eng$session$ods_rtf$outputs <- c(eng$session$ods_rtf$outputs,
@@ -771,7 +777,21 @@ engine_global <- function(eng, g) {
     if (!is.null(g$ps)) o$pagesize <- g$ps
     if (!is.null(g$formdlim)) o$formdlim <- g$formdlim
   }
-  if (g$kind == "ods_html") eng$session$ods_html <- g$open
+  if (g$kind == "ods_html") {
+    # a file of the HTML destination is written when it closes
+    if (!g$open && !is.null(eng$session$ods_html_file)) {
+      f <- eng$session$ods_html_file
+      html_document(unlist(lapply(f$outputs, render_html_output)), NULL, f$file)
+      eng$session$ods_html_file <- NULL
+    }
+    if (g$open && !is.null(g$file)) {
+      if (!is.null(eng$session$ods_html_file)) abort_unsupported("ODS HTML FILE= while an HTML file is open", g$line)
+      if (!dir.exists(dirname(g$file))) abort_unsupported(paste0("ODS HTML FILE= in a directory that does not exist (", dirname(g$file), ")"), g$line)
+      eng$session$ods_html_file <- list(file = g$file, outputs = list())
+      log_emit(eng, id = "ods.html_body", file = g$file)
+    }
+    eng$session$ods_html <- g$open
+  }
   if (g$kind == "ods_rtf") {
     if (isTRUE(g$open)) {
       if (!is.null(eng$session$ods_rtf)) abort_unsupported("ODS RTF FILE= while the RTF destination is open", g$line)
@@ -877,6 +897,9 @@ engine_program <- function(eng, code) {
   # leaves it open would write no file here
   if (!isTRUE(eng$deferred) && !is.null(eng$session$ods_rtf)) {
     abort_unsupported("an ODS RTF destination that the program does not close (ODS RTF CLOSE;)")
+  }
+  if (!isTRUE(eng$deferred) && !is.null(eng$session$ods_html_file)) {
+    abort_unsupported("an ODS HTML FILE= destination that the program does not close (ODS HTML CLOSE;)")
   }
   invisible(eng)
 }

@@ -366,3 +366,15 @@ test_that("a step with a macro-time WARNING is kept as SAS text in the trace, so
   suppressWarnings(sys.source(f, envir = e))
   expect_true("WARNING: Apparent symbolic reference NOSUCH not resolved." %in% as.character(sas_log(e$s)))
 })
+
+test_that("the script of a program with %INCLUDE runs the included steps once, without the statement", {
+  d <- withr::local_tempdir()
+  inc <- file.path(d, "inc.sas")
+  writeLines("data b; set a; y = x + 1; run;", inc)
+  r <- sas_run(paste0("data a; x = 1; run;\n%include '", inc, "';\ndata c; set b; run;"))
+  s <- sas_script(r)
+  expect_false(any(grepl("sas_deferred", format(s), fixed = TRUE)))
+  e <- new.env()
+  eval(parse(text = format(s)), e)
+  expect_identical(e$s$work$c, r$work$c)
+})

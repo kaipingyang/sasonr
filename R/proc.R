@@ -65,8 +65,21 @@ parse_global_stmt <- function(p, open_code = FALSE) {
       advance(p, 6L)
       return(list(type = "global", kind = "ods_rtf", open = TRUE, file = file, line = line))
     }
+    # `ODS HTML FILE="path" <STYLE=HTMLBlue>;`: the document of the outputs
+    # until ODS HTML CLOSE; written to that file
+    if (is_kw(p, "html", 1L) && (is_kw(p, c("file", "body"), 2L)) && is_op(p, "=", 3L) && tk_type(p, 4L) %in% c("str", "str_macro")) {
+      file <- tk_val(p, 4L)
+      advance(p, 5L)
+      if (is_kw(p, "style") && is_op(p, "=", 1L) && tk_type(p, 2L) == "name") {
+        if (tk_low(p, 2L) != "htmlblue") abort_unsupported(paste0("ODS HTML STYLE=", toupper(tk_val(p, 2L)), " (supported: HTMLBlue)"), line)
+        advance(p, 3L)
+      }
+      if (tk_type(p) != "semi") abort_unsupported("ODS HTML options other than FILE= and STYLE=HTMLBlue", line)
+      advance(p)
+      return(list(type = "global", kind = "ods_html", open = TRUE, file = file, line = line))
+    }
     if (is_kw(p, "html", 1L)) {
-      abort_unsupported("ODS HTML options (FILE= and the other options are not supported; use sas_html(file =))", line)
+      abort_unsupported("ODS HTML options other than FILE= and STYLE=HTMLBlue", line)
     }
     abort_unsupported(paste0("ODS ", toupper(tk_val(p, 1L)), " statement"), line)
   }

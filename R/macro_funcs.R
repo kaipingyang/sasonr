@@ -224,6 +224,13 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
     abort_runtime(paste0("The function ", toupper(fname), " referenced by %SYSFUNC, %QSYSFUNC, or %SYSCALL cannot be used ",
                          "within the MACRO function/call-routine interfaces."), line)
   }
+  # GETOPTION(ENCODING): the session encoding, UTF-8 (fixed, as PROC
+  # CONTENTS reports it); other options are not supported
+  if (fname == "getoption") {
+    opt <- toupper(trimws(mq_unmask(inner)))
+    if (!identical(opt, "ENCODING") || !is.null(fmt)) abort_unsupported(paste0("%SYSFUNC(GETOPTION(", opt, "))"), line)
+    return("UTF-8")
+  }
   spec <- sysfunc_table[[fname]] %||% sysfunc_spec_from_registry(fname)
   if (is.null(spec)) abort_unsupported(paste0("%SYSFUNC(", toupper(fname), ")"), line)
   feature_check("function", fname, line, "sysfunc")

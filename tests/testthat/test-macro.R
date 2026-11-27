@@ -359,3 +359,9 @@ test_that("a numbered ERROR on a line of an included file echoes it with a +", {
   expect_false(is.na(k))
   expect_identical(l[k + 1:2], c("             ____", "             180"))
 })
+
+test_that("%SYSFUNC(GETOPTION(ENCODING)) is the session encoding; other options fail loud", {
+  r <- sas_run("%put E=%sysfunc(getoption(encoding));")
+  expect_true("E=UTF-8" %in% as.character(sas_log(r, echo = FALSE)))
+  expect_error(sas_run("%put %sysfunc(getoption(linesize));"), class = "sasonr_unsupported")
+})

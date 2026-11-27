@@ -246,6 +246,11 @@ script_ir <- function(nodes, mode, inputs, src = character()) {
       pos <- c(pos, list(list(line = as.integer(first), col = nd$col %||% 1L)))
       next
     }
+    # a %INCLUDE statement: the steps of the included file follow as nodes
+    if (nd$type %in% c("macro", "deferred") && script_include_only(nd$sas)) {
+      k <- k + 1L
+      next
+    }
     node <- script_node(nd, mode)
     node$macro_stack <- nd$macro_stack %||% list()
     out <- c(out, list(node))
@@ -255,6 +260,13 @@ script_ir <- function(nodes, mode, inputs, src = character()) {
   }
   out <- script_comments(out, pos, src)
   structure(out, class = "sasonr_script", mode = mode, inputs = inputs, tidy = FALSE)
+}
+
+# Is the program text only %INCLUDE statements (whose files are inlined)?
+script_include_only <- function(text) {
+  text <- text %||% ""
+  rest <- gsub("%inc(lude)?[[:space:]]+(['\"])[^'\"]*\\2[[:space:]]*;", "", text, ignore.case = TRUE)
+  !grepl("[^[:space:]]", rest) && grepl("%inc", text, ignore.case = TRUE)
 }
 
 new_script_node <- function(verb, lang, text, sas, lines, kind, outputs = character(), why = NULL, tidy = NULL,
