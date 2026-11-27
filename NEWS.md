@@ -16,10 +16,14 @@ the development version provides.
   arguments) and the
   NUM_ITEMS attribute, in the value of an assignment, in an IF condition or
   as a statement. FIND copies the data variables into the PDV; a key that is
-  not there returns 160038, ADD of a key that is there 160036. OUTPUT,
-  iterators (DECLARE HITER), SUMINC:, REPLACE or REMOVE of a key that is not
-  there, a failing method call statement and a method call in an expression
-  that also reads variables fail loud.
+  not there returns 160038, ADD of a key that is there 160036, REMOVE of a
+  key that is not there 160032; REPLACE of a key that is not there adds it.
+  OUTPUT(DATASET:) of an object with `ordered: 'a'` or `'d'` writes its data
+  variables in key order (the keys without DEFINEDATA; `definedata(all:
+  'yes')` with DATASET:). A DECLARE that runs again makes a new, empty
+  object. OUTPUT without ORDERED:, iterators (DECLARE HITER), SUMINC:, a
+  failing method call statement and a method call in an expression that also
+  reads variables fail loud.
 * The row-by-row (L3) code of a DATA step shows the step's statements: the
   per-step state (the PDV prototype, reset values, OUTPUT buffers, error
   dump) is one object made by `sas_step_state()`, each SET or MERGE

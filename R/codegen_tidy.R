@@ -1021,6 +1021,9 @@ gen_row_step <- function(an) {
   }
   reset_vars <- Filter(function(v) an$info[[v]]$kind == "data" && !isTRUE(an$info[[v]]$retained), an$order)
   for (x in rd_objs) add(x)
+  # an object whose OUTPUT data set is written at the end of the step exists
+  # also when its DECLARE did not run
+  for (ob in unique(vapply(an$hash_outputs, `[[`, "", "obj"))) add(assign_lang(obj_sym(ob), NULL))
   # the step state (sas_step_state()): the PDV prototype, the values each
   # iteration resets, the variables of each output data set, the error dump,
   # the readers (an iteration that ran none of them ends the step)
@@ -1056,6 +1059,8 @@ gen_row_step <- function(an) {
   loop <- Filter(Negate(is.null), loop)
   add(cgi(rlang::call2("repeat", brace(loop))))
   if (length(ds_readers)) add(quote(sas_step_end(.st)))
+  # the data sets of hash object OUTPUT calls
+  for (o in an$hash_outputs) add(work_assign(o$name, cgi(rlang::call2("sas_hash_written", obj_sym(o$obj), o$name))))
   for (k in seq_along(an$dsir$slots$outputs)) {
     o <- an$dsir$slots$outputs[[k]]
     x <- cgi(rlang::call2("sas_step_output", rlang::sym(".st"), k))
@@ -1390,7 +1395,7 @@ translate_step <- function(step, meta, level = "auto") {
     # the structures the display is rendered from (the tidy form of sas_script())
     disp = lapply(body, cgi_disp),
     level = an$level, reasons = an$reasons,
-    line = step$line, outputs = vapply(an$dsir$slots$outputs, `[[`, "", "name"), meta = out_meta(an),
+    line = step$line, outputs = c(vapply(an$dsir$slots$outputs, `[[`, "", "name"), names(an$hash_outputs)), meta = out_meta(an),
     compile_notes = notes
   )
 }

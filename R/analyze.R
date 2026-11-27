@@ -57,8 +57,11 @@ new_state <- function(meta) {
   st$formats <- list()
   st$labels <- character()
   st$readers <- list()
-  # component objects by name (DECLARE): their class ("hash")
+  # component objects by name (DECLARE): their class ("hash"); what is known
+  # of them (an_hash_method()); the data sets of their OUTPUT calls
   st$objects <- list()
+  st$obj_def <- list()
+  st$hash_outputs <- list()
   st$by <- NULL
   st$meta <- meta
   st$lag_sites <- 0L
@@ -235,7 +238,10 @@ an_expr <- function(e, st) {
     obj_attr = {
       if (is.null(st$objects[[e$obj]])) abort_unsupported(paste0(toupper(e$obj), " is not an object declared before this reference"), e$line)
       if (e$node == "obj_attr" && e$attr != "num_items") abort_unsupported(paste0("the attribute ", toupper(e$attr)), e$line)
-      if (e$node == "method") for (k in seq_along(e$args)) e$args[[k]]$value <- an_expr(e$args[[k]]$value, st)
+      if (e$node == "method") {
+        for (k in seq_along(e$args)) e$args[[k]]$value <- an_expr(e$args[[k]]$value, st)
+        an_hash_method(e, st)
+      }
     },
     var = {
       if (e$name %in% c("_infile_", "_cmd_", "_msg_", "_iorc_")) abort_unsupported(paste0("automatic variable ", toupper(e$name)), e$line)
@@ -597,6 +603,9 @@ an_stmt <- function(s, st) {
   switch(s$stmt,
     declare = {
       if (s$class != "hash") abort_unsupported("DECLARE HITER (hash iterator objects)", line)
+      ds <- Find(function(a) identical(a$tag, "dataset"), s$args)
+      st$obj_def[[s$name]] <- list(keys = character(), data = character(),
+                                   dataset = if (!is.null(ds) && identical(ds$value$node, "str")) tolower(trimws(ds$value$value)))
       if (!is.null(st$info[[s$name]]) || !is.null(st$objects[[s$name]])) abort_unsupported(paste0("DECLARE of the name ", toupper(s$name), " that is used already"), line)
       for (k in seq_along(s$args)) s$args[[k]]$value <- an_expr(s$args[[k]]$value, st)
       st$objects[[s$name]] <- s$class
@@ -1221,6 +1230,38 @@ reader_by_specs <- function(stmts) {
   list(of = of, all = all)
 }
 
+# What the analysis knows of a hash object from the constant arguments of its
+# methods (`st$obj_def`): the key and data variables; OUTPUT(DATASET:) makes a
+# data set of the step (`st$hash_outputs`) whose variables are the data
+# variables (the keys without DEFINEDATA).
+an_hash_method <- function(e, st) {
+  def <- st$obj_def[[e$obj]] %||% list(keys = character(), data = character(), dataset = NULL)
+  strs <- function() {
+    v <- vapply(e$args, function(a) if (is.null(a$tag) && identical(a$value$node, "str")) tolower(trimws(a$value$value)) else NA_character_, "")
+    if (anyNA(v)) NULL else v
+  }
+  if (e$method == "definekey") def$keys <- c(def$keys, strs() %||% NA_character_)
+  if (e$method == "definedata") {
+    all_yes <- length(e$args) == 1L && identical(e$args[[1]]$tag, "all")
+    def$data <- c(def$data, if (all_yes && !is.null(def$dataset)) st$meta[[def$dataset]]$vars else strs() %||% NA_character_)
+  }
+  st$obj_def[[e$obj]] <- def
+  if (e$method == "output") {
+    a <- e$args
+    if (length(a) != 1L || !identical(a[[1]]$tag, "dataset") || !identical(a[[1]]$value$node, "str") ||
+        !grepl("^[A-Za-z_][A-Za-z0-9_]*$", trimws(a[[1]]$value$value))) {
+      abort_unsupported("OUTPUT(DATASET:) other than a quoted WORK data set name", e$line)
+    }
+    vars <- if (length(def$data)) def$data else def$keys
+    if (!length(vars) || anyNA(vars) || any(vapply(vars, function(v) is.null(st$info[[v]]), NA))) {
+      abort_unsupported("OUTPUT of a hash object whose data variables are not known when the step is compiled", e$line)
+    }
+    ds <- tolower(trimws(a[[1]]$value$value))
+    st$hash_outputs[[ds]] <- list(name = ds, obj = e$obj, vars = vars, out_names = vars)
+  }
+  invisible()
+}
+
 # Pre-register FIRST./LAST. vars right after the reader is annotated, from the
 # BY statement of that reader (`by`).
 register_by_flags <- function(st, by = st$by) {
@@ -1273,7 +1314,7 @@ output_specs <- function(an, sel) {
 
 out_meta <- function(an) {
   res <- list()
-  for (o in an$dsir$slots$outputs) {
+  for (o in c(an$dsir$slots$outputs, unname(an$hash_outputs))) {
     type <- lapply(o$vars, function(v) an$info[[v]]$type)
     len <- lapply(o$vars, function(v) an$info[[v]]$len)
     fmts <- lapply(o$vars, function(v) an$formats[[v]])

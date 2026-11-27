@@ -4,14 +4,16 @@
 # insertion order) and the return code of the last method call.
 #
 # Return codes [measured]: 0 success; 160038 a key that is not in the hash
-# object (FIND, CHECK, REMOVE); 160036 ADD of a key that is there already.
-# What is not measured fails loud: REPLACE and REMOVE of a key that is not
-# there, a failing method call used as a statement (no return code: an
-# ERROR), OUTPUT and iterators (the internal order without ORDERED:), SUMINC:
+# object (FIND, CHECK); 160036 ADD of a key that is there already; 160032
+# REMOVE of a key that is not there. REPLACE of a key that is not there adds
+# it (0). A DECLARE that runs again makes a new, empty object. What is not
+# measured fails loud: a failing method call used as a statement (an ERROR
+# whose effect on the step is not measured), OUTPUT and iterators, SUMINC:
 # and the methods not listed here.
 
 hash_rc_missing_key <- 160038
 hash_rc_duplicate <- 160036
+hash_rc_remove_missing <- 160032
 
 #' Create a hash object (DECLARE HASH)
 #'
@@ -89,7 +91,13 @@ sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
       h$keys <- c(h$keys, hash_names(args, method, line))
     },
     definedata = {
-      h$data <- c(h$data, hash_names(args, method, line))
+      if (length(args) == 1L && identical(args[[1]]$tag, "all")) {
+        # ALL: 'YES': the variables of the DATASET: data set, in its order [measured]
+        if (!tolower(trimws(args[[1]]$value)) %in% c("y", "yes") || is.null(h$dataset)) abort_unsupported("DEFINEDATA(ALL:) without DATASET: or other than 'YES'", line)
+        h$data <- c(h$data, tolower(names(h$work[[tolower(trimws(h$dataset))]])))
+      } else {
+        h$data <- c(h$data, hash_names(args, method, line))
+      }
     },
     definedone = {
       if (!length(h$keys)) abort_unsupported("DEFINEDONE without DEFINEKEY", line)
@@ -121,8 +129,6 @@ sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
       have <- !is.null(h$entries[[code]])
       if (method == "add" && have) {
         h$rc <- hash_rc_duplicate
-      } else if (method == "replace" && !have) {
-        abort_unsupported("REPLACE of a key that is not in the hash object", line)
       } else {
         # character values take the length of their variable
         for (v in names(dv)) if (is.character(dv[[v]])) dv[[v]] <- sas_char(dv[[v]], nchar(pdv[[v]], "bytes"))
@@ -140,11 +146,20 @@ sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
         pdv[h$data] <- e$data[h$data]
       }
     },
+    output = {
+      defined()
+      if (length(args) != 1L || !identical(args[[1]]$tag, "dataset")) abort_unsupported("OUTPUT without one DATASET: argument", line)
+      ds <- tolower(trimws(args[[1]]$value))
+      if (h$ordered == "no") abort_unsupported("OUTPUT of a hash object without ORDERED: (the internal order of its entries)", line)
+      ents <- unname(h$entries)
+      keys <- if (length(ents)) do.call(rbind, lapply(ents, function(e) as.data.frame(e$key, stringsAsFactors = FALSE))) else NULL
+      ord <- if (length(ents)) sas_order(keys, names(keys), rep(h$ordered == "d", ncol(keys))) else integer()
+      h$written[[ds]] <- list(rows = lapply(ents[ord], `[[`, "data"), proto = pdv[h$data])
+    },
     remove = {
       defined()
       code <- hash_key_code(key_vals())
-      if (is.null(h$entries[[code]])) abort_unsupported("REMOVE of a key that is not in the hash object", line)
-      h$entries[[code]] <- NULL
+      if (is.null(h$entries[[code]])) h$rc <- hash_rc_remove_missing else h$entries[[code]] <- NULL
     },
     abort_unsupported(paste0("the hash object method ", toupper(method)), line)
   )
@@ -189,6 +204,17 @@ hash_load <- function(h, pdv, line) {
   rt <- rt_diag()
   rt$reads[[length(rt$reads)]]$hash <- TRUE
   invisible()
+}
+
+#' The data set a hash object's OUTPUT method wrote (`name`), as a tibble
+#'
+#' The entries at the time of the last OUTPUT to that data set.
+#' @export
+#' @keywords internal
+sas_hash_written <- function(h, name) {
+  w <- if (is.environment(h)) h$written[[name]]
+  if (is.null(w)) abort_unsupported(paste0("a hash object OUTPUT to WORK.", toupper(name), " that did not run"))
+  sas_rows_to_tibble(w$rows, w$proto)
 }
 
 #' The return code of the last method call of a hash object
