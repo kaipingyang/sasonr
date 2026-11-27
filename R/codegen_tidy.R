@@ -80,6 +80,11 @@ gen_lang <- function(e, cx) {
   g <- function(x) gen_lang(x, cx)
   inexact <- function() if (isTRUE(cx$inexact)) list(.exact = FALSE)
   switch(e$node,
+    method = {
+      if (!isTRUE(cx$hoisted[[obj_site(e)]])) abort_unsupported(paste0("a ", toupper(e$method), " method call in this position of an expression"), e$line)
+      rlang::call2("sas_hash_rc", obj_sym(e$obj))
+    },
+    obj_attr = rlang::call2("sas_hash_num_items", obj_sym(e$obj)),
     num = cg_num(e$value),
     str = if (nzchar(e$value)) e$value else " ",
     missing = missing_lang(e$code),
@@ -1082,9 +1087,74 @@ row_cond <- function(e, cx, out_name) {
 }
 
 gen_row_stmt <- function(s, cx) {
+  pre <- hoist_methods(s, cx)
+  c(pre, gen_row_stmt1(s, cx))
+}
+
+# The character lengths of the data set of DATASET: (a quoted name of a WORK
+# data set), for the WARNING about multiple lengths.
+declare_lengths <- function(s, an) {
+  ds <- Find(function(a) identical(a$tag, "dataset"), s$args)
+  if (is.null(ds)) return(list())
+  if (!identical(ds$value$node, "str")) abort_unsupported("DATASET: other than a quoted data set name", s$line)
+  nm <- tolower(trimws(ds$value$value))
+  m <- an$meta[[nm]]
+  if (is.null(m)) abort_unsupported(paste0("DATASET: '", ds$value$value, "' (not a WORK data set of the program)"), s$line)
+  ch <- Filter(function(v) identical(m$type[[v]], "char"), m$vars)
+  lens <- lapply(m$len[ch], as.integer)
+  list(.work = quote(work), .lengths = cg_call("c", stats::setNames(lens, ch)))
+}
+
+# Component objects: `.h_<name>` holds the hash object of DECLARE HASH name.
+obj_sym <- function(name) rlang::sym(paste0(".h_", name))
+obj_site <- function(e) paste(e$obj, e$method, e$line, e$col %||% 0L)
+
+# The call of a component object method: the PDV after it (the return code
+# stays in the object, sas_hash_rc()).
+method_call_lang <- function(e, cx, stmt = FALSE) {
+  args <- lapply(e$args, function(a) gen_lang(a$value, cx))
+  names(args) <- vapply(e$args, function(a) a$tag %||% "", "")
+  if (all(!nzchar(names(args)))) names(args) <- NULL
+  # (a statement whose call can fail: .stmt)
+  fails <- stmt && e$method %in% c("add", "find", "check", "replace", "remove")
+  call_args <- c(list(obj_sym(e$obj), e$method, quote(pdv)), args, if (fails) list(.stmt = TRUE))
+  assign_lang(quote(pdv), rlang::call2("sas_hash_call", !!!call_args))
+}
+
+# A method call in the value of an assignment or in the condition of IF runs
+# before the statement; the expression reads its return code. Only where
+# nothing else in the expression reads a variable that the call could change
+# (the order of evaluation is kept); otherwise not supported.
+hoist_methods <- function(s, cx) {
+  ex <- switch(s$stmt, assign = list(s$value), "if" = , subset_if = list(s$cond), NULL)
+  if (is.null(ex)) return(list())
+  calls <- list()
+  walk_expr(ex[[1]], function(x) if (identical(x$node, "method")) calls[[length(calls) + 1L]] <<- x)
+  if (!length(calls)) return(list())
+  if (length(calls) > 1L) abort_unsupported("several method calls in one statement", s$line)
+  e <- calls[[1]]
+  rest <- ex[[1]]
+  others <- character()
+  walk_expr(rest, function(x) if (identical(x$node, "var")) others <<- c(others, x$name))
+  arg_reads <- unlist(lapply(e$args, function(a) expr_reads(a$value)))
+  if (length(setdiff(others, arg_reads)) || (s$stmt == "assign" && !identical(ex[[1]], e) && length(others))) {
+    abort_unsupported(paste0("a ", toupper(e$method), " method call in an expression that also reads variables"), s$line)
+  }
+  cx$hoisted[[obj_site(e)]] <- TRUE
+  list(method_call_lang(e, cx))
+}
+
+gen_row_stmt1 <- function(s, cx) {
   an <- cx$an
   g <- function(e) gen_lang(e, cx)
   switch(s$stmt,
+    declare = {
+      args <- lapply(s$args, function(a) g(a$value))
+      names(args) <- vapply(s$args, function(a) a$tag %||% "", "")
+      if (length(args) && any(!nzchar(names(args)))) abort_unsupported("a DECLARE HASH argument without its tag", s$line)
+      list(assign_lang(obj_sym(s$name), rlang::call2("sas_hash_new", !!!c(args, declare_lengths(s, an), list(.line = as.integer(s$line))))))
+    },
+    method = list(method_call_lang(s$call, cx, stmt = TRUE)),
     assign = {
       if (s$target$node == "var") {
         v <- s$target$name

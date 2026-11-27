@@ -282,6 +282,9 @@ dsir_lower <- function(an) {
                     index = if (length(s$targets)) match(s$targets, out_names) else seq_along(out_names)),
       put = emit("put", s, items = s$items),
       call = emit("call", s, routine = s$routine, args = s$args, targets = s$targets),
+      # component objects: instructions of a CALL routine's kind
+      declare = emit("call", s, routine = "declare", args = lapply(s$args, `[[`, "value"), targets = list()),
+      method = emit("call", s, routine = "method", args = list(s$call), targets = list()),
       "if" = {
         loop <- cur_loop(ctx)
         then_b <- new_block(loop)

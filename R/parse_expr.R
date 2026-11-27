@@ -342,9 +342,8 @@ parse_name_primary <- function(p, min_bp = 1L, operand_of = NULL) {
     parser_saw(p, name)
     return(list(node = "var", name = name, text = name, line = line))
   }
-  if (tk_type(p, 1L) == "dot" && tk_adjacent(p, 0L, 1L)) {
-    abort_unsupported(paste0("dotted reference '", tk_val(p), ".' (component objects)"), line)
-  }
+  if (tk_type(p, 1L) == "dot" && tk_adjacent(p, 0L, 1L)) return(parse_obj_ref(p))
+  if (low == "_new_") abort_unsupported("the _NEW_ operator (component objects are created by DECLARE)", line)
   if (tk_type(p, 1L) == "lbrace" || (tk_type(p, 1L) == "lparen" && low %in% p$arrays)) {
     return(parse_array_ref(p))
   }
@@ -352,6 +351,47 @@ parse_name_primary <- function(p, min_bp = 1L, operand_of = NULL) {
   advance(p)
   parser_saw(p, low)
   list(node = "var", name = low, text = tk_val(p, -1L), line = line, col = col)
+}
+
+# A component object reference (DATA step hash and hash iterator objects):
+# `obj.method(<arg>, ...)` (node "method") or `obj.attribute` (node
+# "obj_attr", NUM_ITEMS ...). An argument is an expression, also with its tag
+# (`key: k`, `dataset: 'ds'`).
+parse_obj_ref <- function(p) {
+  line <- tk_line(p)
+  col <- tk_col(p)
+  obj <- tk_low(p)
+  if (tk_type(p, 2L) != "name" || !tk_adjacent(p, 1L, 2L)) abort_syntax(paste0("expecting a method or attribute name after ", toupper(obj), "."), line)
+  m <- tk_low(p, 2L)
+  advance(p, 3L)
+  if (tk_type(p) != "lparen") return(list(node = "obj_attr", obj = obj, attr = m, line = line, col = col))
+  list(node = "method", obj = obj, method = m, args = parse_obj_args(p), line = line, col = col)
+}
+
+# The arguments of a method call or of DECLARE, from `(` to `)`: each a list
+# of `tag` (NULL without one) and `value`.
+parse_obj_args <- function(p) {
+  expect_type(p, "lparen", "(")
+  args <- list()
+  if (tk_type(p) == "rparen") {
+    advance(p)
+    return(args)
+  }
+  repeat {
+    tag <- NULL
+    if (tk_type(p) == "name" && is_op(p, ":", 1L)) {
+      tag <- tk_low(p)
+      advance(p, 2L)
+    }
+    args[[length(args) + 1L]] <- list(tag = tag, value = parse_expr(p))
+    if (tk_type(p) == "comma") {
+      advance(p)
+      next
+    }
+    break
+  }
+  expect_type(p, "rparen", ")")
+  args
 }
 
 parse_array_ref <- function(p) {

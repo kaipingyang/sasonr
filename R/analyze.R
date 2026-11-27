@@ -57,6 +57,8 @@ new_state <- function(meta) {
   st$formats <- list()
   st$labels <- character()
   st$readers <- list()
+  # component objects by name (DECLARE): their class ("hash")
+  st$objects <- list()
   st$by <- NULL
   st$meta <- meta
   st$lag_sites <- 0L
@@ -163,7 +165,9 @@ expr_type <- function(e, st) {
   if (!is.null(e$sql_type)) return(e$sql_type)
   switch(e$node,
     num = ,
-    missing = num,
+    missing = ,
+    method = ,
+    obj_attr = num,
     str = list(type = "char", len = max(1L, chr_bytes(e$value))),
     var = {
       inf <- st$info[[e$name]]
@@ -227,6 +231,12 @@ expr_type <- function(e, st) {
 an_expr <- function(e, st) {
   if (is.null(e)) return(e)
   switch(e$node,
+    method = ,
+    obj_attr = {
+      if (is.null(st$objects[[e$obj]])) abort_unsupported(paste0(toupper(e$obj), " is not an object declared before this reference"), e$line)
+      if (e$node == "obj_attr" && e$attr != "num_items") abort_unsupported(paste0("the attribute ", toupper(e$attr)), e$line)
+      if (e$node == "method") for (k in seq_along(e$args)) e$args[[k]]$value <- an_expr(e$args[[k]]$value, st)
+    },
     var = {
       if (e$name %in% c("_infile_", "_cmd_", "_msg_", "_iorc_")) abort_unsupported(paste0("automatic variable ", toupper(e$name)), e$line)
       if (e$name %in% c("_n_", "_error_")) {
@@ -585,6 +595,15 @@ file_target <- function(stmts) {
 an_stmt <- function(s, st) {
   line <- s$line
   switch(s$stmt,
+    declare = {
+      if (s$class != "hash") abort_unsupported("DECLARE HITER (hash iterator objects)", line)
+      if (!is.null(st$info[[s$name]]) || !is.null(st$objects[[s$name]])) abort_unsupported(paste0("DECLARE of the name ", toupper(s$name), " that is used already"), line)
+      for (k in seq_along(s$args)) s$args[[k]]$value <- an_expr(s$args[[k]]$value, st)
+      st$objects[[s$name]] <- s$class
+    },
+    method = {
+      s$call <- an_expr(s$call, st)
+    },
     assign = {
       if (s$target$node == "var" && s$target$name %in% c("_n_", "_error_")) {
         reg_var(st, s$target$name, "num", kind = "auto", disp = toupper(s$target$name))

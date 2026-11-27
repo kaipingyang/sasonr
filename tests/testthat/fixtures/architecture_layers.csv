@@ -48,6 +48,7 @@ codegen_passes.R,codegen
 codegen_tidy.R,codegen
 script.R,api
 script_comments.R,codegen
+hash.R,values
 input.R,values
 proc.R,engine
 ast_validate.R,parse

@@ -647,7 +647,9 @@ log_emit_reads <- function(eng, tr) {
   # PROC UNIVARIATE writes no NOTE about the observations it read
   if (identical(tr$reasons, "PROC UNIVARIATE")) rt$reads <- list()
   print <- identical(tr$reasons, "PROC PRINT")
-  for (r in rt$reads) {
+  # the data sets a hash object loaded come first
+  hash_first <- order(!vapply(rt$reads, function(r) isTRUE(r$hash), NA))
+  for (r in rt$reads[hash_first]) {
     if (isTRUE(r$skip)) next
     nm <- toupper(r$name)
     if (print && r$n == 0) {

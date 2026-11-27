@@ -5,6 +5,16 @@ the development version provides.
 
 ## Running SAS programs
 
+* DATA step hash objects: `DECLARE HASH` (also `DCL`) with `dataset:`,
+  `ordered:` and `hashexp:`, the methods DEFINEKEY, DEFINEDATA, DEFINEDONE,
+  ADD, FIND, CHECK, REPLACE and REMOVE (also with `key:` and `data:`
+  arguments) and the
+  NUM_ITEMS attribute, in the value of an assignment, in an IF condition or
+  as a statement. FIND copies the data variables into the PDV; a key that is
+  not there returns 160038, ADD of a key that is there 160036. OUTPUT,
+  iterators (DECLARE HITER), SUMINC:, REPLACE or REMOVE of a key that is not
+  there, a failing method call statement and a method call in an expression
+  that also reads variables fail loud.
 * The row-by-row (L3) code of a DATA step shows the step's statements: the
   per-step state (the PDV prototype, reset values, OUTPUT buffers, error
   dump) is one object made by `sas_step_state()`, each SET or MERGE

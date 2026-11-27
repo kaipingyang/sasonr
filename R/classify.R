@@ -22,6 +22,7 @@ expr_children <- function(e) {
     like = list(e$lhs, e$rhs),
     call = Filter(function(a) a$node != "of", e$args),
     array_ref = e$index,
+    method = lapply(e$args, `[[`, "value"),
     list()
   )
 }
@@ -55,6 +56,8 @@ stmt_exprs <- function(s) {
     put = c(lapply(Filter(function(it) it$kind %in% c("value", "named"), s$items), function(it) list(node = "var", name = it$name)),
             lapply(Filter(function(it) it$kind == "ptr" && !is.null(it$v), s$items), `[[`, "v")),
     call = s$args,
+    declare = lapply(s$args, `[[`, "value"),
+    method = list(s$call),
     list()
   )
 }
@@ -189,6 +192,7 @@ classify_step <- function(an) {
   if (length(step$outputs) > 1) add3("multiple output data sets")
   readers <- an$readers
   if (length(readers) > 1) add3("more than one SET/MERGE/INPUT statement")
+  if (length(an$objects)) add3("component objects (DECLARE HASH)")
   if (any(c("_error_") %in% an$uses)) add3("_ERROR_ is referenced")
   if (!is.null(an$infile) && !is.null(an$infile$opts$end)) add3("INFILE END= variable")
   n_ds <- sum(vapply(readers, function(r) r$stmt %in% c("set", "merge"), logical(1)))

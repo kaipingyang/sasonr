@@ -308,6 +308,12 @@ parse_statement_body <- function(p) {
     return(parse_assign(p))
   }
   if (is_op(p, "+", 1L) && !low %in% c("put", "input")) return(parse_sum(p))
+  # obj.method(...); a method call statement of a component object
+  if (tk_type(p, 1L) == "dot" && tk_adjacent(p, 0L, 1L) && tk_type(p, 2L) == "name" && tk_type(p, 3L) == "lparen") {
+    call <- parse_obj_ref(p)
+    expect_semi(p, "method call")
+    return(list(stmt = "method", call = call, line = line))
+  }
 
   switch(low,
     "if" = parse_if(p),
@@ -325,6 +331,8 @@ parse_statement_body <- function(p) {
       list(stmt = low, line = line)
     },
     select = parse_select(p),
+    declare = ,
+    dcl = parse_declare(p),
     set = ,
     merge = parse_set(p, low),
     by = parse_by(p),
@@ -483,6 +491,21 @@ parse_if <- function(p) {
     else_s <- parse_branch(p)
   }
   list(stmt = "if", cond = cond, then = then_s, "else" = else_s, line = line)
+}
+
+# DECLARE HASH name<(arguments)>; / DECLARE HITER name(arguments); (DCL too)
+parse_declare <- function(p) {
+  line <- tk_line(p)
+  advance(p)
+  if (!is_kw(p, c("hash", "hiter"))) abort_unsupported(paste0("DECLARE of the component object type ", toupper(tk_val(p))), line)
+  cls <- tk_low(p)
+  advance(p)
+  if (tk_type(p) != "name") abort_syntax("expecting the object name after DECLARE", line)
+  name <- tk_low(p)
+  advance(p)
+  args <- if (tk_type(p) == "lparen") parse_obj_args(p) else list()
+  expect_semi(p, "DECLARE")
+  list(stmt = "declare", class = cls, name = name, args = args, line = line)
 }
 
 parse_branch <- function(p) {

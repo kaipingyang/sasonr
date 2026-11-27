@@ -1,0 +1,202 @@
+# DATA step hash objects (spec 01 §4.4): DECLARE HASH and its methods in a
+# row-by-row step. A hash object is an environment: the key and data
+# variables, the entries (key code -> list of the key and data values, in
+# insertion order) and the return code of the last method call.
+#
+# Return codes [measured]: 0 success; 160038 a key that is not in the hash
+# object (FIND, CHECK, REMOVE); 160036 ADD of a key that is there already.
+# What is not measured fails loud: REPLACE and REMOVE of a key that is not
+# there, a failing method call used as a statement (no return code: an
+# ERROR), OUTPUT and iterators (the internal order without ORDERED:), SUMINC:
+# and the methods not listed here.
+
+hash_rc_missing_key <- 160038
+hash_rc_duplicate <- 160036
+
+#' Create a hash object (DECLARE HASH)
+#'
+#' `...`: the constructor arguments by tag (`dataset`, `ordered`, `hashexp`);
+#' `.work`: WORK (for DATASET:); `.lengths`: the lengths of the character
+#' variables of that data set; `.line`: the program line.
+#' @export
+#' @keywords internal
+sas_hash_new <- function(..., .work = NULL, .lengths = NULL, .line = NULL) {
+  args <- list(...)
+  line <- .line
+  known <- c("dataset", "ordered", "hashexp")
+  bad <- setdiff(names(args), known)
+  if (length(bad)) abort_unsupported(paste0("the DECLARE HASH argument ", toupper(bad[1]), ":"), line)
+  h <- new.env(parent = emptyenv())
+  h$keys <- character()
+  h$data <- character()
+  h$done <- FALSE
+  h$entries <- list()
+  h$rc <- 0
+  h$line <- line
+  ord <- tolower(trimws(args$ordered %||% "no"))
+  h$ordered <- switch(ord, a = , ascending = , y = , yes = "a", d = , descending = "d", n = , no = "no",
+                      abort_unsupported(paste0("ORDERED: '", args$ordered, "'"), line))
+  h$dataset <- args$dataset
+  h$work <- .work
+  h$lengths <- .lengths
+  h
+}
+
+hash_key_code <- function(vals) {
+  paste(vapply(vals, function(v) {
+    if (is.character(v)) return(paste0("c", sub(" +$", "", v)))
+    if (is.na(v)) return(paste0("m", sas_miss_code(v)))
+    if (v == 0) v <- 0
+    paste0("n", sprintf("%a", v))
+  }, ""), collapse = "\x1f")
+}
+
+hash_names <- function(args, what, line) {
+  if (any(!vapply(args, function(a) is.null(a$tag), NA))) abort_unsupported(paste0("tagged arguments of ", toupper(what)), line)
+  v <- vapply(args, function(a) if (is.character(a$value) && length(a$value) == 1L) tolower(trimws(a$value)) else NA_character_, "")
+  if (any(v %in% c("_all_"))) abort_unsupported(paste0("ALL: of ", toupper(what)), line)
+  if (anyNA(v)) abort_unsupported(paste0("arguments of ", toupper(what), " other than variable names"), line)
+  v
+}
+
+#' Call a method of a hash object: the PDV after the call (the return code
+#' in `h$rc`, sas_hash_rc())
+#'
+#' `...`: the arguments, named by their tags (`key = `); `.stmt`: the call is
+#' a statement (a failing call is an ERROR there).
+#' @export
+#' @keywords internal
+sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
+  args <- list(...)
+  stmt <- .stmt
+  line <- h$line
+  # the arguments as `list(tag, value)`
+  tags <- names(args) %||% rep("", length(args))
+  args <- lapply(seq_along(args), function(k) list(tag = if (nzchar(tags[k])) tags[k], value = args[[k]]))
+  h$rc <- 0
+  defined <- function() if (!h$done) abort_unsupported(paste0("the ", toupper(method), " method before DEFINEDONE"), line)
+  key_vals <- function() {
+    tagged <- Filter(function(a) identical(a$tag, "key"), args)
+    if (length(args) && length(tagged) != length(args)) abort_unsupported(paste0("arguments of the ", toupper(method), " method"), line)
+    if (length(tagged)) {
+      if (length(tagged) != length(h$keys)) abort_unsupported(paste0("KEY: arguments of the ", toupper(method), " method"), line)
+      return(lapply(tagged, `[[`, "value"))
+    }
+    pdv[h$keys]
+  }
+  switch(method,
+    definekey = {
+      h$keys <- c(h$keys, hash_names(args, method, line))
+    },
+    definedata = {
+      h$data <- c(h$data, hash_names(args, method, line))
+    },
+    definedone = {
+      if (!length(h$keys)) abort_unsupported("DEFINEDONE without DEFINEKEY", line)
+      miss <- setdiff(c(h$keys, h$data), names(pdv))
+      if (length(miss)) abort_unsupported(paste0("the hash variable ", toupper(miss[1]), " that is not in the PDV"), line)
+      # without DEFINEDATA the keys are the data
+      if (!length(h$data)) h$data <- h$keys
+      h$done <- TRUE
+      if (!is.null(h$dataset)) hash_load(h, pdv, line)
+    },
+    add = , replace = {
+      defined()
+      # KEY: and DATA: give the values in the order of DEFINEKEY and
+      # DEFINEDATA instead of the PDV's (all of them)
+      kv <- pdv[h$keys]
+      dv <- pdv[h$data]
+      if (length(args)) {
+        tags <- vapply(args, function(a) a$tag %||% "", "")
+        if (!all(tags %in% c("key", "data")) || sum(tags == "key") != length(h$keys) ||
+            sum(tags == "data") != length(h$data)) {
+          abort_unsupported(paste0("arguments of the ", toupper(method), " method other than all KEY: and DATA: values"), line)
+        }
+        kv[] <- lapply(args[tags == "key"], `[[`, "value")
+        dv[] <- lapply(args[tags == "data"], `[[`, "value")
+        types_ok <- vapply(c(h$keys, h$data), function(v) is.character(c(kv, dv)[[v]]) == is.character(pdv[[v]]), NA)
+        if (!all(types_ok)) abort_unsupported(paste0("a KEY: or DATA: value of another type than its variable (", toupper(method), ")"), line)
+      }
+      code <- hash_key_code(kv)
+      have <- !is.null(h$entries[[code]])
+      if (method == "add" && have) {
+        h$rc <- hash_rc_duplicate
+      } else if (method == "replace" && !have) {
+        abort_unsupported("REPLACE of a key that is not in the hash object", line)
+      } else {
+        # character values take the length of their variable
+        for (v in names(dv)) if (is.character(dv[[v]])) dv[[v]] <- sas_char(dv[[v]], nchar(pdv[[v]], "bytes"))
+        for (v in names(kv)) if (is.character(kv[[v]])) kv[[v]] <- sas_char(kv[[v]], nchar(pdv[[v]], "bytes"))
+        h$entries[[code]] <- list(key = kv, data = dv)
+      }
+    },
+    find = , check = {
+      defined()
+      code <- hash_key_code(key_vals())
+      e <- h$entries[[code]]
+      if (is.null(e)) {
+        h$rc <- hash_rc_missing_key
+      } else if (method == "find") {
+        pdv[h$data] <- e$data[h$data]
+      }
+    },
+    remove = {
+      defined()
+      code <- hash_key_code(key_vals())
+      if (is.null(h$entries[[code]])) abort_unsupported("REMOVE of a key that is not in the hash object", line)
+      h$entries[[code]] <- NULL
+    },
+    abort_unsupported(paste0("the hash object method ", toupper(method)), line)
+  )
+  if (stmt && h$rc != 0) abort_unsupported(paste0("a ", toupper(method), " method call statement that fails (an ERROR)"), line)
+  pdv
+}
+
+# DATASET: the observations of a WORK data set as entries (the first of
+# several with one key); the values of a character variable take the length
+# it has in the PDV (no WARNING [measured]).
+hash_load <- function(h, pdv, line) {
+  ds <- trimws(h$dataset)
+  if (!grepl("^[A-Za-z_][A-Za-z0-9_]*$", ds)) abort_unsupported(paste0("DATASET: '", ds, "' (a libref or data set options)"), line)
+  d <- h$work[[tolower(ds)]]
+  if (is.null(d)) abort_unsupported(paste0("DATASET: of a data set that does not exist (", toupper(ds), ")"), line)
+  vars <- unique(c(h$keys, h$data))
+  nms <- tolower(names(d))
+  miss <- setdiff(vars, nms)
+  if (length(miss)) abort_unsupported(paste0("DATASET: without the variable ", toupper(miss[1])), line)
+  cols <- lapply(stats::setNames(vars, vars), function(v) d[[match(v, nms)]])
+  for (v in vars) {
+    pv <- pdv[[v]]
+    if (is.character(pv) != is.character(cols[[v]])) abort_unsupported(paste0("DATASET: variable ", toupper(v), " of another type than in the PDV"), line)
+    if (is.character(pv)) {
+      lp <- nchar(pv, "bytes")
+      ld <- h$lengths[[v]]
+      if (!identical(as.integer(ld), as.integer(lp))) cols[[v]] <- sas_char(cols[[v]], lp)
+    }
+  }
+  for (i in seq_len(nrow(d))) {
+    kv <- lapply(h$keys, function(v) cols[[v]][[i]])
+    names(kv) <- h$keys
+    code <- hash_key_code(kv)
+    if (!is.null(h$entries[[code]])) next
+    dv <- lapply(h$data, function(v) cols[[v]][[i]])
+    names(dv) <- h$data
+    h$entries[[code]] <- list(key = kv, data = dv)
+  }
+  # its read NOTE comes before those of the step's SET and MERGE data sets
+  # [measured]; the readers' counts skip it
+  sas_note_read(d, tolower(ds))
+  rt <- rt_diag()
+  rt$reads[[length(rt$reads)]]$hash <- TRUE
+  invisible()
+}
+
+#' The return code of the last method call of a hash object
+#' @export
+#' @keywords internal
+sas_hash_rc <- function(h) h$rc
+
+#' The number of entries of a hash object (NUM_ITEMS)
+#' @export
+#' @keywords internal
+sas_hash_num_items <- function(h) as.numeric(length(h$entries))
