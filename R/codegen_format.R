@@ -11,7 +11,27 @@
 # The tests check the text against air where it is installed (test-codegen-format.R);
 # the text parses back to the object it shows.
 
-cg_width <- 80L
+# The backend of the display (spec 09 L6c): an object that carries the layout
+# choices; cg_emit() dispatches on its class. One backend today, the layout of
+# the air formatter (`cg_backend()`, line width 80).
+cg_backend <- function(name = "air", width = 80L) {
+  structure(list(name = name, width = as.integer(width)), class = c(paste0("cg_backend_", name), "cg_backend"))
+}
+
+#' The display lines of an item for a backend
+#' @noRd
+cg_emit <- function(backend, x) UseMethod("cg_emit")
+
+#' @export
+cg_emit.cg_backend_air <- function(backend, x) {
+  old <- cg_state$width
+  cg_state$width <- backend$width
+  on.exit(cg_state$width <- old)
+  cg_format(cg_normalize(x))
+}
+
+cg_state <- new.env(parent = emptyenv())
+cg_state$width <- 80L
 
 # A mutate() of two or more columns puts one column per line, like the SAS
 # statements it comes from (air keeps a call broken after its opening
@@ -66,7 +86,7 @@ cg_chain <- function(e, op) {
 #' @noRd
 cg_format <- function(e, col = 0L, tail = 0L, base = 0L) {
   flat <- if (cg_force_break(e)) NA_character_ else cg_flat(e)
-  if (!is.na(flat) && col + nchar(flat) + tail <= cg_width) return(flat)
+  if (!is.na(flat) && col + nchar(flat) + tail <= cg_state$width) return(flat)
   pad <- function(lines) c(lines[1], if (length(lines) > 1L) paste0("  ", lines[-1]))
   if (inherits(e, "cg_pipe") && !is.null(e$target)) {
     lhs <- paste0(cg_flat(cg_target(e$target)), " <- ")

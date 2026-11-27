@@ -69,3 +69,10 @@ test_that("the text parses back to the code and is what air writes", {
     expect_identical(readLines(f), txt)
   }
 })
+
+test_that("the backend object carries the line width and dispatches the layout (spec 09 L6c)", {
+  e <- quote(z <- sas_put_rows(list(sas_put_line(sas_put_named("r1", .d$r1))), list(TRUE), n = nrow(.d)))
+  expect_identical(cg_emit(cg_backend(), e), cg_format(e))
+  expect_length(cg_emit(cg_backend(width = 200L), e), 1L)
+  expect_s3_class(cg_backend(), c("cg_backend_air", "cg_backend"))
+})

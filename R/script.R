@@ -396,7 +396,7 @@ script_tidy_code <- function(tr) {
   lines <- character()
   anchors <- list()
   for (it in items) {
-    txt <- cg_format(cg_normalize(it))
+    txt <- cg_emit(cg_backend(), it)
     for (a in tidy_mutate_at(it, tr$disp)) {
       k <- grep(paste0("^ +", a$name, " = "), txt)
       if (!length(k) && length(txt) == 1L) k <- 1L

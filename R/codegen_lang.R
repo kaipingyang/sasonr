@@ -139,7 +139,7 @@ cgi <- function(lang, text = NULL, disp = NULL) list(lang = lang, disp = disp)
 
 # The display lines of an item, and the code that runs (the same object).
 cgi_disp <- function(x) cg_normalize(x$disp %||% x$lang)
-cgi_text <- function(x) paste(cg_format(cgi_disp(x)), collapse = "\n")
+cgi_text <- function(x, backend = cg_backend()) paste(cg_emit(backend, x$disp %||% x$lang), collapse = "\n")
 cgi_run <- function(x) cg_lang(cgi_disp(x))
 
 # `x |> stage`: the stage call gets `x` as its first argument.
