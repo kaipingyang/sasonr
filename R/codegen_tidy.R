@@ -1408,4 +1408,4 @@ translate_step <- function(step, meta, level = "auto") {
 
 # Names that exist only in generated step code: the rlang::expr() templates
 # above mention them, and R CMD check would read them as undefined globals.
-utils::globalVariables(c(".inf", ".m_in", ".status", "pdv", "work"))
+utils::globalVariables(c(".inf", ".m_in", ".st", ".status", "pdv", "work"))
