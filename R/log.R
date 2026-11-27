@@ -330,6 +330,45 @@ log_bind_callbacks <- function(eng, rt, ses) {
     log_emit(eng, "put", text = line, src = src())
     script_record_put(eng, ses, line, src())
   }
+  ses$on_mprint <- function(text, macros, from_source, line) log_mprint(eng, text, macros, from_source, line)
+  invisible()
+}
+
+# OPTIONS MPRINT: a statement that a macro generated, as the line
+# `MPRINT(NAME):   statement;` (NAME: the innermost macro), its tokens joined
+# by one blank and wrapped at LINESIZE between tokens; a token longer than
+# the line is cut at LINESIZE; the lines after the first start in column 1
+# [measured, macro_positions m04-m06, m08, m09].
+log_mprint <- function(eng, text, macros, from_source, line) {
+  if (!isTRUE(eng$session$options$mprint)) return(invisible())
+  if (from_source || length(macros) != 1L) {
+    abort_unsupported("MPRINT of a statement that is generated partly by several macros or partly written in the program", line)
+  }
+  words <- attr(text, "words")
+  text <- as.character(text)
+  joined <- paste(words, collapse = " ")
+  collapsed <- gsub("[[:space:]]+", " ", trimws(text))
+  # where the two differ (tokens written without blanks between them, a
+  # quoted string with blanks in it) the layout is not measured
+  if (!identical(joined, collapsed) || any(grepl(" ", words, fixed = TRUE))) {
+    abort_unsupported("MPRINT of a statement whose tokens are written without blanks between them or hold blanks", line)
+  }
+  ls <- rt_linesize()
+  lines <- character()
+  cur <- paste0("MPRINT(", toupper(macros), "):  ")
+  for (w in c(words[-length(words)], paste0(words[length(words)], ";"))) {
+    if (nchar(cur) + 1L + nchar(w) <= ls) {
+      cur <- paste0(cur, " ", w)
+      next
+    }
+    lines <- c(lines, cur)
+    while (nchar(w) > ls) {
+      lines <- c(lines, substr(w, 1L, ls))
+      w <- substr(w, ls + 1L, nchar(w))
+    }
+    cur <- w
+  }
+  log_emit(eng, "put", text = c(lines, cur), src = line, split = FALSE)
   invisible()
 }
 

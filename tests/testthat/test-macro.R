@@ -315,3 +315,11 @@ test_that("options(sasonr.start_time =) pins SYSDATE9, SYSDAY and SYSTIME", {
   withr::local_options(sasonr.start_time = "Tuesday")
   expect_error(sas_run("%put &sysday;"), class = "sasonr_error")
 })
+
+test_that("OPTIONS MPRINT writes the statements a macro generates, under the innermost macro", {
+  r <- sas_run("options mprint;\n%macro inner;\n  p    =    1;\n%mend;\n%macro outer;\n  %inner\n  q = 2;\n%mend;\ndata a;\n  %outer\nrun;\noptions nomprint;\ndata b;\n  %outer\nrun;")
+  l <- as.character(sas_log(r))
+  expect_identical(l[startsWith(l, "MPRINT")], c("MPRINT(INNER):   p = 1;", "MPRINT(OUTER):   q = 2;"))
+  expect_identical(r$work$a, tibble::tibble(p = 1, q = 2))
+  expect_error(sas_run("options mprint;\n%macro m;\n  x=1;\n%mend;\ndata a;\n  %m\nrun;"), class = "sasonr_unsupported")
+})

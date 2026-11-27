@@ -11,11 +11,12 @@
 # (engine_add_listing(), run.R).
 # PAGENO= only changes the page numbers, which are written only under NUMBER.
 # SOURCE / NOSOURCE turn the source echo of the rich log views on and off
-# (sas_log()); the others do not change what sasonr writes (timing, MPRINT ...).
+# (sas_log()); MPRINT writes the statements macros generate (log_mprint());
+# the others do not change what sasonr writes (timing ...).
 options_ignorable <- c(
   "center", "nocenter", "date", "nodate", "number", "nonumber", "ls", "linesize",
   "ps", "pagesize", "notes", "nonotes", "source", "nosource", "nosource2",
-  "nomprint", "nomlogic", "nosymbolgen", "nomprintnest", "nomlogicnest",
+  "mprint", "nomprint", "nomlogic", "nosymbolgen", "nomprintnest", "nomlogicnest",
   "formdlim", "pageno", "stimer", "nostimer",
   "fullstimer", "nofullstimer", "msglevel", "errors",
   # NOSYNTAXCHECK: after an ERROR the following steps still run (sas_run(on_error = "sas"))

@@ -308,6 +308,8 @@ code_sink <- function(ses) {
   s$qchar <- 0L
   s$qret <- "code"
   s$stmt <- integer()
+  s$stmt_macs <- character()
+  s$stmt_src <- FALSE
   s$stmt_begin <- NA_integer_
   s$stmt_line <- 1L
   # the program line on which the text in `acc` starts (NA: `acc` is empty);
@@ -334,6 +336,15 @@ code_sink <- function(ses) {
   }
 
   stmt_end <- function(pos) {
+    # OPTIONS MPRINT: a statement a macro generated (log_mprint())
+    if (length(s$stmt_macs) && is.function(ses$on_mprint)) {
+      st <- intToUtf8(s$stmt)
+      tok <- sas_lex(st, lossless = TRUE)
+      attr(st, "words") <- tok$text[!tok$kind %in% c("ws", "newline", "comment")]
+      ses$on_mprint(st, s$stmt_macs, isTRUE(s$stmt_src), s$stmt_line)
+    }
+    s$stmt_macs <- character()
+    s$stmt_src <- FALSE
     txt <- tolower(trimws(intToUtf8(s$stmt)))
     cp <- utf8ToInt(txt)
     k <- 1L
@@ -408,6 +419,13 @@ code_sink <- function(ses) {
     if (s$dl) return(invisible())
     cps <- utf8ToInt(text)
     cur_line <- ses$line
+    # where the statement's characters come from (OPTIONS MPRINT): the
+    # innermost macro of generated text, or the program
+    mac <- if (!mapped && length(ses$frames)) ses$frames[[length(ses$frames)]]$name else NA_character_
+    from <- function(c) {
+      if (is_ws_cp(c)) return()
+      if (is.na(mac)) s$stmt_src <- TRUE else s$stmt_macs <- union(s$stmt_macs, mac)
+    }
     for (k in seq_along(cps)) {
       c <- cps[k]
       st <- s$state
@@ -428,6 +446,7 @@ code_sink <- function(ses) {
             s$stmt_begin <- base + k
             s$stmt_line <- cur_line
           }
+          from(c)
           s$stmt[length(s$stmt) + 1L] <- c
           if (c == 34L || c == 39L) {
             s$state <- "q"
@@ -436,7 +455,10 @@ code_sink <- function(ses) {
           }
         }
       } else if (st == "q") {
-        if (s$qret == "code") s$stmt[length(s$stmt) + 1L] <- c
+        if (s$qret == "code") {
+          from(c)
+          s$stmt[length(s$stmt) + 1L] <- c
+        }
         if (c == s$qchar) s$state <- s$qret
       } else if (st == "star") {
         if (c == 59L) s$state <- "code"

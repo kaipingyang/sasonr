@@ -758,6 +758,7 @@ engine_global <- function(eng, g) {
         notes = o$notes <- TRUE, nonotes = o$notes <- FALSE,
         syntaxcheck = o$nosyntaxcheck <- FALSE, nosyntaxcheck = o$nosyntaxcheck <- TRUE,
         center = o$center <- TRUE, nocenter = o$center <- FALSE,
+        mprint = o$mprint <- TRUE, nomprint = o$mprint <- FALSE,
         date = o$date <- TRUE, nodate = o$date <- FALSE,
         number = o$number <- TRUE, nonumber = o$number <- FALSE,
         source = log_source_option(eng, g$end_line %||% g$line, TRUE),
