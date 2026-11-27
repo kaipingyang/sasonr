@@ -271,9 +271,10 @@ test_that("positive and negative system options apply in the order written", {
     data c; x = 1; run;", on_error = "sas")
   expect_identical(r$status, "error")
   expect_identical(nrow(r$work$c), 1L)
-  # CENTER wins (centred listings fail loud)
-  expect_error(sas_run("data a; x = 1; run; options nocenter center; proc print data=a; run;"),
-               class = "sasonr_unsupported", regexp = "CENTER")
+  # CENTER wins: the listing is centred
+  lst <- sas_run("data a; x = 1; run; options nocenter center; proc print data=a; run;")$listing
+  expect_true(any(startsWith(lst, "  ")))
+  expect_false(any(startsWith(sas_run("data a; x = 1; run; options center nocenter; proc print data=a; run;")$listing, " Obs")))
   expect_no_error(sas_run("data a; x = 1; run; options center nocenter date nodate number nonumber; proc print data=a; run;"))
 })
 
