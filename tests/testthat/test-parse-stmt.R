@@ -119,3 +119,10 @@ test_that("an integer is required for ARRAY dimensions, repetitions and INPUT co
   expect_error(sas_parse("data _null_; file 'o.txt' lrecl=20.5; put 'abc'; run;"), "Invalid value for the LRECL option",
                class = "sasonr_syntax_error")
 })
+
+test_that("statement nodes carry their source span up to the semicolon (spec 09 L3b)", {
+  st <- sas_parse("data out;\n  set a;\n  if x > 1 then\n    y = 2;\nrun;")$steps[[1]]$stmts
+  expect_s3_class(st[[1]], c("sas_stmt_set", "sas_stmt"), exact = TRUE)
+  expect_identical(unname(st[[2]]$span[c("line", "col", "end_line", "end_col")]), c(3L, 3L, 4L, 10L))
+  expect_identical(unname(st[[2]]$then$span[c("line", "col", "end_col")]), c(4L, 5L, 10L))
+})

@@ -270,7 +270,20 @@ parse_format <- function(p) {
 
 # Statements ----------------------------------------------------------------
 
+# Every statement node gets its source span, up to its semicolon, and the class
+# c("sas_stmt_<stmt>", "sas_stmt") (spec 09 contract 3, L3b; node_span()).
 parse_statement <- function(p) {
+  start <- p$pos
+  s <- parse_statement_body(p)
+  if (!is.list(s) || !is.character(s$stmt)) return(s)
+  last <- max(start, p$pos - 1L)
+  s$span <- c(tok = start, tok_end = last, line = p$line[start], col = p$col[start],
+              end_line = p$line[last], end_col = p$col[last])
+  class(s) <- c(paste0("sas_stmt_", s$stmt), "sas_stmt")
+  s
+}
+
+parse_statement_body <- function(p) {
   line <- tk_line(p)
   t <- tk_type(p)
   if (t == "semi") {
