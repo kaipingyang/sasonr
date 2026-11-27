@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* Implicit conversions in the DATA step: a character variable or a quoted
+  string in arithmetic, MIN/MAX, AND/OR or compared with a number is read as
+  a number (invalid data: missing, `_ERROR_` and the "Invalid numeric data"
+  NOTE); a number assigned to a character variable is written with BEST12.
+  (its rightmost characters for a shorter variable); the conversion NOTEs
+  list the places, after the NOTEs of the compilation phase. Other operands
+  (function results, expressions) fail loud.
 * `ODS HTML FILE="path" <STYLE=HTMLBlue>;` writes the HTML document of the
   procedure output up to `ODS HTML CLOSE;` to that file (other ODS HTML
   options, a directory that does not exist and a destination left open fail

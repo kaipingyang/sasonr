@@ -284,16 +284,20 @@ an_expr <- function(e, st) {
       }
       if (e$op == "||" && identical(st$context, "data")) an_concat_n2c(e, st)
       if (e$op %in% c("+", "-", "*", "/", "**", "min", "max", "and", "or")) {
-        if (expr_type(e$lhs, st)$type == "char" || expr_type(e$rhs, st)$type == "char") {
+        if (!identical(st$context, "data") && (expr_type(e$lhs, st)$type == "char" || expr_type(e$rhs, st)$type == "char")) {
           abort_unsupported("automatic character-to-numeric conversion", e$line)
         }
+        if (expr_type(e$lhs, st)$type == "char") e$lhs <- an_convert(e$lhs, "num", st)
+        if (expr_type(e$rhs, st)$type == "char") e$rhs <- an_convert(e$rhs, "num", st)
       }
     },
     compare = {
       e$lhs <- an_expr(e$lhs, st)
       e$rhs <- an_expr(e$rhs, st)
       if (expr_type(e$lhs, st)$type != expr_type(e$rhs, st)$type) {
-        abort_unsupported("comparison between character and numeric values", e$line)
+        if (!identical(st$context, "data")) abort_unsupported("comparison between character and numeric values", e$line)
+        # the character side is converted to a number [measured]
+        if (expr_type(e$lhs, st)$type == "char") e$lhs <- an_convert(e$lhs, "num", st) else e$rhs <- an_convert(e$rhs, "num", st)
       }
     },
     chain = e$args <- lapply(e$args, an_expr, st = st),
@@ -560,14 +564,37 @@ check_format_width <- function(fmt, line) {
 }
 
 
+# The type of an assignment's target (from the value when the target is
+# new); a value of the other type is converted (an_convert()). Returns the
+# value.
 assign_target_type <- function(st, name, value, line) {
   vt <- expr_type(value, st)
   inf <- st$info[[name]]
   if (is.na(inf$type)) {
     reg_var(st, name, vt$type, if (vt$type == "char") vt$len else NA_integer_)
   } else if (inf$type != vt$type) {
-    abort_unsupported(paste0("automatic type conversion when assigning to ", name), line)
+    value <- an_convert(value, inf$type, st, len = if (inf$type == "char") inf$len)
   }
+  value
+}
+
+# An implicit conversion (spec 01 P0-6): a character value used as a number
+# is read as with the BEST32. informat (invalid data: missing, _ERROR_ and an
+# "Invalid numeric data" NOTE naming the variable), a number used as a
+# character value is written with BEST12. [measured]; the place of the
+# operand goes to the conversion NOTE. Supported for a variable operand and a
+# quoted string read as a number.
+an_convert <- function(a, to, st, len = NULL) {
+  # a variable, or a quoted string read as a number (the Invalid numeric data
+  # NOTE then shows the value alone [measured])
+  if (!(identical(a$node, "var") || (to == "num" && identical(a$node, "str"))) || is.null(a$col)) {
+    abort_unsupported(paste0("automatic ", if (to == "num") "character-to-numeric" else "numeric-to-character",
+                             " conversion of a value other than a variable"), a$line)
+  }
+  log_place(if (to == "num") "conv.c2n" else "conv.n2c", a$line, a$col)
+  args <- if (to == "num") c(list(a), if (identical(a$node, "var")) list(list(node = "str", value = a$text %||% a$name, line = a$line))) else
+    c(list(a), if (!is.null(len)) list(list(node = "num", value = len, text = as.character(len), line = a$line)))
+  list(node = "call", name = if (to == "num") "cvt_c2n" else "cvt_n2c", args = args, line = a$line, col = a$col, construct = TRUE)
 }
 
 an_stmts <- function(stmts, st) lapply(stmts, an_stmt, st = st)
@@ -640,7 +667,7 @@ an_stmt <- function(s, st) {
           reg_var(st, s$target$name, "num")
         }
         reg_var(st, s$target$name, disp = s$target$text %||% s$target$name)
-        assign_target_type(st, s$target$name, s$value, line)
+        s$value <- assign_target_type(st, s$target$name, s$value, line)
         # CATX writes into a buffer as long as the target variable
         if (s$value$node == "call" && s$value$name %in% c("catx", "cat", "cats", "catt")) s$value$buf_len <- st$info[[s$target$name]]$len
       } else {

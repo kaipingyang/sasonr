@@ -124,7 +124,8 @@ place_lines <- function(entries) {
 compile_notes <- function() {
   ct <- ct_diag()
   mv <- ct$places[["mv.compile"]]
-  c(conversion_notes(), ct$notes, if (length(mv)) log_place_lines("mv.compile", mv))
+  # compile-phase detections first, then the conversion places [measured]
+  c(ct$notes, conversion_notes(), if (length(mv)) log_place_lines("mv.compile", mv))
 }
 
 #' Record the observations read from an input data set (for the log NOTE)

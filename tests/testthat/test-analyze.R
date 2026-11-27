@@ -33,7 +33,21 @@ test_that("unknown functions and formats fail loud", {
   # not a SAS 9.4 function: the compile-time ERROR 68-185
   expect_error(sas_translate("data _null_; x = notafunction(1); run;"), class = "sasonr_syntax_error")
   expect_error(sas_translate("data _null_; x = 1; put x= mystery8.; run;"), class = "sasonr_unsupported")
-  expect_error(sas_translate("data _null_; x = '1' + 1; run;"), class = "sasonr_unsupported")
+  # a character value of another shape than a variable or a quoted string as a number
+  expect_error(sas_translate("data _null_; x = substr('12', 1, 1) + 1; run;"), class = "sasonr_unsupported")
+})
+
+test_that("implicit conversions: character values in arithmetic and comparisons, numbers assigned to character variables", {
+  withr::local_options(sasonr.step_notes = TRUE)
+  r <- sas_run("data out;\n  length c $6 d $8;\n  c = 'abc'; e = '12';\n  n = 3;\n  s = n + c;\n  t = n + e;\n  if e > n then f = 1;\n  d = n;\nrun;")
+  expect_identical(r$work$out$s, NA_real_)
+  expect_identical(r$work$out$t, 15)
+  expect_identical(r$work$out$f, 1)
+  expect_identical(r$work$out$d, "       3")
+  m <- as.character(sas_log(r, echo = FALSE))
+  expect_true("NOTE: Invalid numeric data, c='abc' , at line 5 column 11." %in% m)
+  expect_true(any(grepl("^NOTE: Character values have been converted", m)))
+  expect_true(any(grepl("^NOTE: Numeric values have been converted", m)))
 })
 
 adlb <- list(adlb = data.frame(

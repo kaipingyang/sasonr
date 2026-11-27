@@ -2152,13 +2152,20 @@ fn_arg_types <- list(
 # compile-time error, ERROR 72-185, rather than an unimplemented option).
 fn_max_exact <- c("substr", "scan", "compress", "index", "round", "intnx", "intck")
 
-fn_table <- utils::modifyList(fn_table, list(cvt_n2c = fn_spec("char", 1, 1, 12L), cvt_c2n = fn_spec("num", 1, 1)))
+fn_table <- utils::modifyList(fn_table, list(cvt_n2c = fn_spec("char", 1, 2, 12L), cvt_c2n = fn_spec("num", 1, 2)))
 
 #' @export
-sas_f_cvt_n2c <- function(x) sas_fmt_best(x, 12L)
+sas_f_cvt_n2c <- function(x, len = NULL) {
+  s <- sas_fmt_best(x, 12L)
+  if (is.null(len) || len >= 12L) return(s)
+  # assigned to a shorter variable: the rightmost characters [measured]
+  cut <- substr(s, 1L, 12L - len)
+  if (any(grepl("[^ ]", cut))) abort_unsupported(paste0("a number whose BEST12. text is longer than the ", len, " characters of the variable it is assigned to"))
+  substr(s, 12L - len + 1L, 12L)
+}
 
 #' @export
-sas_f_cvt_c2n <- function(x, .at = NULL) {
+sas_f_cvt_c2n <- function(x, name = NULL, .at = NULL) {
   s <- strip_both(x)
   ok <- grepl("^[-+]?([0-9]+\\.?[0-9]*|\\.[0-9]+)([eE][-+]?[0-9]+)?$", s)
   out <- rep(NA_real_, length(s))
@@ -2166,7 +2173,7 @@ sas_f_cvt_c2n <- function(x, .at = NULL) {
   bad <- !ok & nzchar(s) & s != "."
   if (any(bad)) {
     log_place_check(.at)
-    rt_error(sprintf("NOTE: Invalid numeric data, '%s' , at line %d column %d.", s[which(bad)[1]],
+    rt_error(sprintf("NOTE: Invalid numeric data, %s'%s' , at line %d column %d.", if (is.null(name)) "" else paste0(name, "="), s[which(bad)[1]],
                      vctrs::vec_cast(.at[1] %||% NA, integer()), vctrs::vec_cast(.at[2] %||% NA, integer())))
   }
   out
