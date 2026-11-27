@@ -5,6 +5,11 @@ the development version provides.
 
 ## Running SAS programs
 
+* The R code of `sas_translate()` and `sas_script()` (also the tidy form) is
+  laid out like the air formatter writes it: an expression that fits in 80
+  columns stays on one line; a longer call puts one argument per line, a
+  pipeline one step per line; a `mutate()` of several columns writes one
+  column per line. The code that runs is the code shown.
 * PROC UNIVARIATE writes its printed output (without NOPRINT): the Moments,
   Basic Statistical Measures, Tests for Location, Quantiles and Extreme
   Observations tables of each analysis variable, with the mode Note and the
