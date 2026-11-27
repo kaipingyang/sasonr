@@ -5,6 +5,14 @@ the development version provides.
 
 ## Running SAS programs
 
+* Read-only libraries: `LIBNAME ref XPORT 'file';` reads the member of a
+  transport file (version 5) in SET, MERGE, PROC DATA= and data set options,
+  with the attributes of its variables (lengths, formats, informats, labels)
+  and special missing values; `LIBNAME ref CLEAR;`. Members are read when a
+  step names them (`ref.member`) and are not part of WORK. A directory
+  library (`LIBNAME ref 'dir';`) is assigned, but reading a `.sas7bdat`
+  member, writing to a library, other engines and options and a transport
+  file with several members fail loud.
 * Implicit conversions in the DATA step: a character variable or a quoted
   string in arithmetic, MIN/MAX, AND/OR or compared with a number is read as
   a number (invalid data: missing, `_ERROR_` and the "Invalid numeric data"

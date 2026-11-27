@@ -144,7 +144,15 @@ parse_ds_ref <- function(p, context) {
     lib <- name
     name <- tk_low(p, 1L)
     advance(p, 2L)
-    if (lib != "work") abort_unsupported(paste0("library ", toupper(lib), " (only WORK is available)"), line)
+    if (lib != "work") {
+      # a member of a read-only library (LIBNAME): read as WORK-like data set
+      # `lib.member` (library.R); writing to it is not supported
+      if (context %in% c("data_output", "output")) abort_unsupported(paste0("writing to library ", toupper(lib), " (only WORK is written)"), line)
+      if (lib %in% c("sashelp", "sasuser")) abort_unsupported(paste0("library ", toupper(lib), " outside PROC SQL"), line)
+      opts <- list()
+      if (tk_type(p) == "lparen") opts <- parse_ds_options(p, context)
+      return(list(name = paste0(lib, ".", name), libref = lib, member = name, options = opts, line = line))
+    }
   }
   opts <- list()
   if (tk_type(p) == "lparen") opts <- parse_ds_options(p, context)

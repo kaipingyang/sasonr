@@ -64,6 +64,10 @@ SasSession <- R6::R6Class("SasSession",
     formats = NULL,
     # filerefs: FILENAME assignments: fileref -> path.
     filerefs = NULL,
+    # libs: the read-only libraries of LIBNAME by libref: list(engine, path);
+    # lib_members: their members read so far, by "ref.member": list(data, meta)
+    libs = NULL,
+    lib_members = NULL,
     # macro: Macro symbol tables (global table, local frames) and macro definitions.
     macro = NULL,
     # options: System options (environment): linesize, notes, nosyntaxcheck, the listing

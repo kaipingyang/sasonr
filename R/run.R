@@ -245,7 +245,7 @@ engine_exec_steps <- function(eng, text, line) {
       engine_check_last_view(eng, step)
       tr <- translate_proc(step, eng$session$meta, eng$session$last)
     } else {
-      tr <- translate_step(step, eng$session$meta, eng$level)
+      tr <- translate_step(step, lib_step_meta(eng$session, step), eng$level)
       # sas_data_step(): the step runs the code of the script
       if (!is.null(eng$override)) {
         tr$exprs <- eng$override
@@ -280,7 +280,7 @@ engine_exec_steps <- function(eng, text, line) {
       # A data error in vectorised code: re-run the step row by row (L3) so
       # that _ERROR_, the NOTEs and the PDV dump follow the row-by-row execution.
       rt$prx <- prx0
-      tr <- translate_step(step, eng$session$meta, "L3")
+      tr <- translate_step(step, lib_step_meta(eng$session, step), "L3")
       tr$reasons <- c(if (branch) "unsupported value or step exception in vectorised code (re-run row by row)" else
         "data error at run time (re-run of the vectorised step)", tr$reasons)
       eng$steps[[length(eng$steps)]] <- tr
@@ -651,7 +651,7 @@ engine_check_step <- function(eng, step) {
     err_set_macro(eng, syserr = syserr)
     return(FALSE)
   }
-  tr <- translate_step(step, eng$session$meta, eng$level)
+  tr <- translate_step(step, lib_step_meta(eng$session, step), eng$level)
   log_boundary(eng)
   old <- vapply(tr$outputs, function(nm) exists(nm, envir = eng$session$work, inherits = FALSE), logical(1))
   if (any(old)) {
@@ -743,6 +743,21 @@ engine_eval <- function(eng, tr, stage = FALSE, empty = character()) {
 }
 
 engine_global <- function(eng, g) {
+  if (g$kind == "libname") {
+    ok <- if (g$engine == "XPORT") file.exists(g$path) && !dir.exists(g$path) else dir.exists(g$path)
+    if (!ok) abort_unsupported(paste0("LIBNAME ", toupper(g$ref), " with a physical path that does not exist (", g$path, ")"), g$line)
+    eng$session$libs[[g$ref]] <- list(engine = g$engine, path = g$path)
+    lib_drop_members(eng$session, g$ref)
+    log_emit(eng, id = "lib.assigned", ref = toupper(g$ref))
+    log_emit(eng, id = "lib.engine", engine = g$engine)
+    log_emit(eng, id = "lib.path", path = g$path)
+  }
+  if (g$kind == "libname_clear") {
+    if (is.null(eng$session$libs[[g$ref]])) abort_unsupported(paste0("LIBNAME ", toupper(g$ref), " CLEAR of a libref that is not assigned"), g$line)
+    eng$session$libs[[g$ref]] <- NULL
+    lib_drop_members(eng$session, g$ref)
+    log_emit(eng, id = "lib.deassigned", ref = toupper(g$ref))
+  }
   if (g$kind == "filename") {
     eng$session$filerefs[[g$ref]] <- g$path
     # SYSFILRC: 0 when the file or directory exists, 1 when it does not, also

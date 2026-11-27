@@ -656,6 +656,10 @@ log_emit_reads <- function(eng, tr) {
       log_emit(eng, id = "ds.no_obs", name = nm, phase = "step_end")
     } else if (print && identical(r$nvar, 0L)) {
       log_emit(eng, id = "ds.no_vars", name = nm, phase = "step_end")
+    } else if (grepl(".", nm, fixed = TRUE)) {
+      # a member of a library: its two-level name
+      if (is.null(r$where)) log_emit(eng, id = "ds.read_lib", nobs = r$n, name = nm, phase = "step_end")
+      else log_emit(eng, id = "ds.read_where_lib", nobs = r$n, name = nm, where = r$where, phase = "step_end")
     } else if (is.null(r$where)) {
       log_emit(eng, id = "ds.read", nobs = r$n, name = nm, phase = "step_end")
     } else {

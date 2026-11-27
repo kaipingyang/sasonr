@@ -161,6 +161,32 @@ parse_global_stmt <- function(p, open_code = FALSE) {
     return(list(type = "global", kind = "options", opts = opts, ls = ls, ps = ps, formdlim = formdlim, line = line,
                 end_line = end_line))
   }
+  # LIBNAME ref <XPORT|BASE|V9> 'path' <ACCESS=READONLY>; and LIBNAME ref CLEAR;
+  # (read-only libraries, spec 01 P0-9)
+  if (low == "libname") {
+    advance(p)
+    if (tk_type(p) != "name") abort_unsupported("LIBNAME without a libref", line)
+    ref <- tk_low(p)
+    advance(p)
+    if (is_kw(p, "clear") && tk_type(p, 1L) == "semi") {
+      advance(p, 2L)
+      return(list(type = "global", kind = "libname_clear", ref = ref, line = line))
+    }
+    engine <- "V9"
+    if (tk_type(p) == "name") {
+      if (!tk_low(p) %in% c("xport", "base", "v9")) abort_unsupported(paste0("the LIBNAME engine ", toupper(tk_val(p))), line)
+      engine <- if (tk_low(p) == "xport") "XPORT" else "V9"
+      advance(p)
+    }
+    if (!tk_type(p) %in% c("str", "str_macro")) abort_unsupported("LIBNAME without a quoted physical path", line)
+    path <- tk_val(p)
+    advance(p)
+    if (is_kw(p, "access") && is_op(p, "=", 1L) && is_kw(p, "readonly", 2L)) advance(p, 3L)
+    if (tk_type(p) != "semi") abort_unsupported("LIBNAME options other than ACCESS=READONLY", line)
+    advance(p)
+    if (ref %in% c("work", "sashelp", "sasuser", "dictionary")) abort_unsupported(paste0("LIBNAME ", toupper(ref)), line)
+    return(list(type = "global", kind = "libname", ref = ref, engine = engine, path = path, line = line))
+  }
   # a word that starts no statement SAS knows (measured in open code)
   if (open_code && !low %in% global_stmt_known && !split_trailing_digits(low)$base %in% global_stmt_known) {
     abort_global("Statement is not valid or it is used out of proper order. (ERROR 180-322)", line, "unknown_stmt",

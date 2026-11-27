@@ -50,6 +50,7 @@ script.R,api
 script_comments.R,codegen
 hash.R,values
 input.R,values
+xpt.R,values
 proc.R,engine
 ast_validate.R,parse
 proc_contents.R,engine
@@ -81,3 +82,4 @@ run.R,engine
 session_api.R,api
 data_api.R,api
 zzz_fn_layer.R,api
+library.R,engine

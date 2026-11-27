@@ -1391,8 +1391,21 @@ sas_put_rows <- function(lines, guards, n = NULL) {
 #' as in the tidy form of a script; `name` is then not used).
 #' @export
 #' @keywords internal
+#' A member of a read-only library (LIBNAME) as a data frame
+#'
+#' The member was read when the step was analysed (library.R).
+#' @export
+#' @keywords internal
+sas_lib_member <- function(name) {
+  d <- .active$session$lib_members[[name]]$data
+  if (is.null(d)) abort_runtime(paste0("data set ", toupper(name), " is not read"))
+  d
+}
+
 sas_ds <- function(work, name, keep = NULL, drop = NULL, rename = NULL, firstobs = NULL, obs = NULL) {
   d <- if (is.data.frame(work)) work else work[[name]]
+  # a member of a read-only library (library.R)
+  if (is.null(d) && grepl(".", name, fixed = TRUE)) d <- sas_lib_member(name)
   if (is.null(d)) abort_runtime(paste0("data set WORK.", toupper(name), " does not exist"))
   if (!is.null(keep)) d <- d[intersect(keep, names(d))]
   if (!is.null(drop)) d <- d[setdiff(names(d), drop)]

@@ -287,6 +287,7 @@ internal sas_iter_run
 internal sas_lag
 internal sas_lag_vec
 internal sas_last
+internal sas_lib_member
 internal sas_loop_unread
 internal sas_le
 internal sas_log_view
