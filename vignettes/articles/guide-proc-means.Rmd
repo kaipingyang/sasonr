@@ -206,17 +206,16 @@ unless `print = TRUE`).
 
 ## Procedures on data frames
 
-`sas_means_df()`, `sas_tabulate_df()`, `sas_freq_df()` (one-way tables) and
-`sas_transpose_df()` run one
-procedure on a data frame without a program. They read their arguments
-with the same parser and specification builder as the PROC step of a
-program and call the same computation, so the table is the one the program
-gives. `as.data.frame()` drops the table attributes; `sas_log()` gives the
+`sas_means_df()` runs the step on a data frame without a session: it takes
+the arguments of `sas_proc_means()`, with the data frame in place of `data`.
+`sas_tabulate_df()`, `sas_freq_df()` (one-way tables) and `sas_transpose_df()`
+do the same for their procedures. The step is built and computed as the step
+of a program, so the table is the one the program gives. `as.data.frame()` drops the table attributes; `sas_log()` gives the
 WARNINGs and NOTEs of the computation and `sas_html()` the HTML document.
 
 ```{r}
 df <- data.frame(arm = c("A", "A", "B", "B"), aval = c(10.2, 11.8, 10.9, 10.4))
-m <- sas_means_df(df, var = "aval", class = "arm", stats = c("n", "mean"))
+m <- sas_means_df(df, stats = c(n, mean), class = arm, var = aval)
 as.data.frame(m)
 as.data.frame(sas_tabulate_df(df, "arm all, aval*(n mean)", class = "arm", var = "aval"))
 as.data.frame(sas_freq_df(df, "arm"))

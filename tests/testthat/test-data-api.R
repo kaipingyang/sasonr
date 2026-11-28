@@ -117,3 +117,14 @@ test_that("TABLES / NOPRINT keeps the statistics and drops the frequency table",
   expect_true(any(grepl("no valid requests for displayed output", as.character(sas_log(r2)), fixed = TRUE)))
   expect_false(any(grepl("observations read", as.character(sas_log(r2)), fixed = TRUE)))
 })
+
+test_that("sas_means_df() takes the arguments of sas_proc_means() and gives the program's table", {
+  df <- data.frame(arm = c("A", "A", "B", "B"), aval = c(10.2, 11.8, 10.9, NA))
+  m <- sas_means_df(df, stats = c(n, mean, std), class = arm, var = aval)
+  r <- sas_run("data t; input arm $ aval; datalines;\nA 10.2\nA 11.8\nB 10.9\nB .\n;\nrun;\nods output Summary = s; proc means data=t n mean std; class arm; var aval; run;")
+  expect_identical(as.data.frame(m)$aval_Mean, r$work$s$aval_mean)
+  expect_identical(as.data.frame(m)$aval_StdDev, r$work$s$aval_stddev)
+  s <- sas_summary_df(df, print = TRUE, var = aval)
+  expect_identical(as.data.frame(s)$aval_N, 3)
+  expect_error(sas_means_df(df, data = "t", var = aval), class = "sasonr_error")
+})

@@ -648,18 +648,21 @@ means_class_levels <- function(x, f, cl, info) {
   key <- proc_group_key(x, info)
   u <- unique(key)
   first <- match(u, key)
-  # representative value: the lowest internal value of the group
-  rep_idx <- vapply(u, function(k) {
-    idx <- which(key == k)
-    idx[proc_internal_order(x[idx])[1]]
-  }, 1L)
+  grp <- match(key, u)
+  # representative value: the lowest internal value of the group (one stable
+  # sort of all values: the first index of each group in that order is the
+  # lowest value, ties at the first row, as sorting each group alone)
+  o <- proc_internal_order(x)
+  head_of <- !duplicated(grp[o])
+  rep_idx <- integer(length(u))
+  rep_idx[grp[o][head_of]] <- o[head_of]
   rep_val <- x[rep_idx]
   ord <- switch(cl$order,
     internal = proc_internal_order(rep_val),
     data = order(first),
     formatted = order(proc_value_text(rep_val, info), method = "radix"),
     freq = {
-      cnt <- vapply(u, function(k) sum(f[key == k]), 1)
+      cnt <- vapply(split(f, factor(grp, levels = seq_along(u))), sum, 1)
       io <- proc_internal_order(rep_val)
       rank_int <- match(seq_along(u), io)
       order(-cnt, rank_int)

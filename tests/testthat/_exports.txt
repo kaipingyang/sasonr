@@ -237,6 +237,7 @@ public sas_proc_print
 public sas_proc_tabulate
 public sas_macro_put
 public sas_means_df
+public sas_summary_df
 public sas_tabulate_df
 public sas_freq_df
 public sas_transpose_df

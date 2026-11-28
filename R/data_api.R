@@ -55,10 +55,10 @@ data_api_tables <- function(res) {
   out
 }
 
-#' Data-level PROC MEANS, PROC TABULATE, PROC FREQ and PROC TRANSPOSE
+#' Data-level PROC TABULATE, PROC FREQ and PROC TRANSPOSE
 #'
 #' Run one procedure on a data frame without writing a SAS program.
-#' `sas_means_df()`, `sas_tabulate_df()` and `sas_freq_df()` return the ODS
+#' `sas_tabulate_df()` and `sas_freq_df()` return the ODS
 #' table of the step (a `sasonr_ods_table`, a tibble with the SAS table
 #' attributes), or a list of them when there are several (one per BY group
 #' or table request); `sas_freq_df()` supports one-way (OneWayFreqs) and
@@ -72,8 +72,6 @@ data_api_tables <- function(res) {
 #'
 #' @param data A data frame.
 #' @param var,class,by,id Variable names (character vectors).
-#' @param stats Statistic keywords of the PROC MEANS statement (`"n"`,
-#'   `"mean"`, `"std"`, ...); `NULL` gives the default statistics.
 #' @param table The TABLE statement of PROC TABULATE, as SAS text
 #'   (`"grp all, x*(n mean)"`).
 #' @param tables The TABLES statement of PROC FREQ, as SAS text (`"grp sex"`,
@@ -83,21 +81,38 @@ data_api_tables <- function(res) {
 #' @return See Description.
 #' @examples
 #' d <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
-#' sas_means_df(d, var = "x", class = "grp", stats = c("n", "mean"))
+
 #' as.data.frame(sas_tabulate_df(d, "grp all, x*(n sum)", class = "grp", var = "x"))
 #' as.data.frame(sas_freq_df(d, "grp"))
 #' sas_transpose_df(d, var = "x")
 #' @name sas_data_procs
 NULL
 
-#' @rdname sas_data_procs
+#' PROC MEANS and PROC SUMMARY on a data frame
+#'
+#' Runs one PROC MEANS (or SUMMARY) step on a data frame, without a session
+#' or a program. The arguments are those of [sas_proc_means()] (the options
+#' of the PROC statement, `stats`, and the statements as arguments named
+#' after them); the data frame takes the place of `data`. The step is built
+#' and computed as the step of a program, so the values are the same.
+#' @param df A data frame.
+#' @param ... Options, `stats` and statements, as in [sas_proc_means()].
+#' @return The ODS table of the step (a `sasonr_ods_table`), or a list of
+#'   them (several tables, BY groups). `sas_log()` gives the WARNINGs and
+#'   NOTEs of the computation and `sas_html()` the HTML document.
+#' @examples
+#' df <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
+#' sas_means_df(df, stats = c(n, mean), class = grp, var = x)
+#' sas_summary_df(df, print = TRUE, var = x)
 #' @export
-sas_means_df <- function(data, var = NULL, class = NULL, by = NULL, stats = NULL, options = "") {
-  stats <- data_api_names(stats, "stats")
-  body <- paste0(data_api_stmt("class", data_api_names(class, "class")), data_api_stmt("by", data_api_names(by, "by")),
-                 data_api_stmt("var", data_api_names(var, "var")))
-  code <- data_api_text("means", paste(c(stats, if (nzchar(options)) options), collapse = " "), body)
-  data_api_tables(data_api_core(data, "means", code, means_step_spec))
+sas_means_df <- function(df, ...) {
+  data_api_means_like("means", df, rlang::enexprs(...), parent.frame())
+}
+
+#' @rdname sas_means_df
+#' @export
+sas_summary_df <- function(df, ...) {
+  data_api_means_like("summary", df, rlang::enexprs(...), parent.frame())
 }
 
 #' @rdname sas_data_procs
@@ -156,3 +171,33 @@ print.sasonr_ods_list <- function(x, ...) {
   invisible(x)
 }
 
+# The data-level form of a procedure on the spec 11 converter: the arguments
+# as in its verb (`sas_proc_means(s, data = , ...)`), the data frame as
+# `data`; the step IR from proc_ir_of_args(), no SAS text.
+data_api_means_like <- function(name, df, dots, env) {
+  if (!is.data.frame(df)) rlang::abort("`df` must be a data frame.", class = "sasonr_error")
+  sp <- proc_api_spec[[name]]
+  if (length(dots) && (is.null(names(dots)) || any(!nzchar(names(dots))))) {
+    rlang::abort(paste0("Every argument of `sas_", name, "_df()` must be named."), class = "sasonr_error")
+  }
+  if ("data" %in% names(dots)) rlang::abort(paste0("`sas_", name, "_df()` takes its data frame as `df`."), class = "sasonr_error")
+  is_stmt <- names(dots) %in% sp$stmts
+  ev <- dots[!is_stmt]
+  ev[names(ev) != "stats"] <- lapply(ev[names(ev) != "stats"], eval, envir = env)
+  step <- proc_ir_of_args(name, c(list(data = "data"), ev), dots[is_stmt])
+  data_api_tables(data_api_core_ir(df, name, step, means_step_spec))
+}
+
+# data_api_core() for a step IR.
+data_api_core_ir <- function(df, proc, step, builder) {
+  s <- SasSession$new()
+  on.exit(s$close(), add = TRUE)
+  session_add_work(s, list(data = df))
+  old <- sas_rt_active(s)
+  on.exit(sas_rt_active(old), add = TRUE)
+  b <- builder(step, s$meta, s$last)
+  d <- tibble::as_tibble(get("data", envir = s$work))
+  res <- proc_registry_entry(proc)$compute(d, b$spec)
+  res$messages <- c(b$warnings, res$events)
+  res
+}
