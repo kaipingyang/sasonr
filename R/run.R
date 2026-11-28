@@ -934,11 +934,15 @@ engine_program <- function(eng, code) {
   }
   # OPTIONS PAGESIZE= also pages the log (a page header after each page);
   # where the pages break depends on the lines of the session start, so a log
-  # that may reach the end of a page fails loud (20 lines of margin)
+  # that may reach the end of a page fails loud: 40 lines of margin (a log of
+  # 23 lines, its long source lines wrapped, ended a page of 60: print_wide w05)
   ps <- eng$session$options$pagesize
   if (!isTRUE(eng$deferred) && is.finite(ps)) {
-    n_log <- length(eng$program$lines) + sum(vapply(eng$events, function(e) length(e$text), 1L))
-    if (n_log + 20L > ps) abort_unsupported(paste0("the page headers of a log longer than PAGESIZE=", ps, " allows"))
+    # the lines as SAS wraps them at LINESIZE (a continued source line carries
+    # an 11-column prefix)
+    lines <- log_view_plain(log_result_events(eng), TRUE)
+    n_log <- sum(pmax(1L, ceiling(nchar(lines) / max(1L, rt_linesize() - 11L))))
+    if (n_log + 40L > ps) abort_unsupported(paste0("the page headers of a log longer than PAGESIZE=", ps, " allows"))
   }
   invisible(eng)
 }

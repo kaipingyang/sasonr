@@ -131,12 +131,15 @@ listing_base_print <- function(tb) {
   # the gap between columns: 4, or the widest of 3, 2, 1 that fits the table
   # on the line (measured, print_wide); a table that does not fit with a gap of
   # 1 is split into column panels, which is not implemented
-  fits <- vapply(4:1, function(g) sum(widths) + g * (nc - 1L) <= rt_linesize(), NA)
-  if (!any(fits)) {
-    abort_unsupported("a PROC PRINT table wider than LINESIZE (vertical headings and column panels are not implemented)")
+  gap <- print_fit_gap(widths)
+  panels <- NULL
+  if (is.na(gap)) {
+    wide <- print_wide_plan(a, heads, fws, widths, attr(tb, "by", exact = TRUE))
+    heads <- wide$heads
+    widths <- wide$widths
+    panels <- wide$panels
+    gap <- wide$gap
   }
-  sep <- strrep(" ", (4:1)[which(fits)[1]])
-  multi <- vapply(heads, length, 1L) > 1L
   # c: character, f: formatted number (the field is the format width), n: unformatted number or Obs
   rounded <- vapply(a$text, function(t) t$rounded %||% FALSE, NA)
   if (anyNA(rounded) && any(vapply(heads, function(h) max(nchar(h)), 1L)[is.na(rounded)] < fws[is.na(rounded)])) {
@@ -200,10 +203,13 @@ listing_base_print <- function(tb) {
     f <- formatC(s, width = if (kind[j] == "c") -fws[j] else fws[j])
     formatC(paste0(strrep(" ", off[j]), f), width = -widths[j])
   }
-  line_of <- function(cells) sas_rtrim(paste(cells, collapse = sep))
-  nl <- max(vapply(heads, length, 1L))
-  head_lines <- vapply(seq_len(nl), function(i) {
-    line_of(vapply(seq_len(nc), function(j) {
+  # the cells of columns `js` joined by the gaps after each but the last
+  line_of <- function(cells, gaps = rep(gap, length(cells) - 1L)) {
+    sas_rtrim(paste0(cells, c(strrep(" ", gaps), ""), collapse = ""))
+  }
+  head_of <- function(js, gaps) {
+    nl <- max(vapply(heads[js], length, 1L))
+    vapply(seq_len(nl), function(i) line_of(vapply(js, function(j) {
       h <- c(rep("", nl - length(heads[[j]])), heads[[j]])[i]
       if (!nzchar(h)) return(strrep(" ", widths[j]))
       gap <- widths[j] - nchar(h)
@@ -212,10 +218,23 @@ listing_base_print <- function(tb) {
       pos <- if (kind[j] == "f") (if (max(nchar(heads[[j]])) > fws[j]) floor(gap / 2) else gap) else
         if (kind[j] == "n") hpos(j, h, gap) else if (char_left[j]) 0L else floor(gap / 2)
       formatC(paste0(strrep(" ", pos), h), width = -widths[j])
-    }, ""))
-  }, "")
+    }, ""), gaps), "")
+  }
   nr <- length(a$text[[1]]$values)
-  body <- vapply(seq_len(nr), function(i) line_of(vapply(seq_len(nc), function(j) cell(j, a$text[[j]]$values[i]), "")), "")
+  body_of <- function(js, gaps) {
+    vapply(seq_len(nr), function(i) line_of(vapply(js, function(j) cell(j, a$text[[j]]$values[i]), ""), gaps), "")
+  }
+  if (!is.null(panels)) {
+    # column panels, one after the other, a blank line between them
+    lines <- unlist(lapply(seq_along(panels), function(k) {
+      pn <- panels[[k]]
+      c(if (k > 1L) "", head_of(pn$cols, pn$gaps), "", body_of(pn$cols, pn$gaps))
+    }))
+    return(lst_c(lst_lines(""), lst_unit(lines)))
+  }
+  all_gaps <- rep(gap, nc - 1L)
+  head_lines <- head_of(seq_len(nc), all_gaps)
+  body <- body_of(seq_len(nc), all_gaps)
   rule <- function(ch, first) line_of(vapply(seq_len(nc), function(j) {
     if (a$cols[[j]]$name %in% sums || (first && j == 1L)) strrep(ch, widths[j]) else strrep(" ", widths[j])
   }, ""))
@@ -236,4 +255,74 @@ listing_base_print <- function(tb) {
 
 print_listing_tables <- function(tables) {
   do.call(lst_c, lapply(tables, listing_base_print))
+}
+
+# The gap between columns of widths `w`: 4, or the widest of 3, 2, 1 that fits
+# the columns on the line (measured, print_wide); NA when none does.
+print_fit_gap <- function(w) {
+  g <- (4:1)[vapply(4:1, function(g) sum(w) + g * (length(w) - 1L) <= rt_linesize(), NA)]
+  if (length(g)) g[1] else NA_integer_
+}
+
+# A PROC PRINT table that does not fit the line with a gap of 1 (measured,
+# print_wide w01-w15, one observation each):
+#   - variable names wider than their values (values one position wide): the
+#     names are written down the columns, one character a line, and the gap is
+#     chosen again for the narrower columns;
+#   - otherwise column panels: as many as the columns need at a gap of 1, the
+#     columns filled in order, ceiling(columns / panels) a panel (print_rtf wide_n6:
+#     40 columns in 14, 14, 12), the ID
+#     column at the start of every panel; each panel has its own gap, the ID
+#     column keeps the gap of the first panel.
+# Returns list(heads, widths, gap, panels = NULL or list(list(cols, gaps))).
+# Everything else (more than one observation, BY groups, sums, N, the Obs
+# column, columns of different widths, names of different lengths, names in
+# panels wider than the values ...) is not measured: fail loud.
+print_wide_plan <- function(a, heads, fws, widths, by) {
+  nc <- length(a$cols)
+  nr <- length(a$text[[1]]$values)
+  no <- function(what) abort_unsupported(paste0("a PROC PRINT table wider than LINESIZE ", what))
+  if (nr != 1L || !is.null(by) || length(a$sums) || !is.null(a$n)) {
+    no("with more than one observation, BY groups, SUM or N (column panels measured on one observation)")
+  }
+  obs <- a$cols[[1]]$name == "Obs" && isTRUE(a$row_header) && identical(a$id_n, 0L)
+  if (obs) no("with the Obs column (column panels measured with NOOBS or ID)")
+  lab <- vapply(a$cols, function(c) isTRUE(c$label), NA)
+  char <- vapply(a$cols, function(c) isTRUE(c$char), NA)
+  nms <- vapply(a$cols, function(c) c$head, "")
+  if (!any(lab) && all(char) && all(fws == 1L) && !isTRUE(a$row_header)) {
+    # names down the columns
+    if (length(unique(nchar(nms))) != 1L) no("with vertical headings of names of different lengths")
+    heads <- lapply(nms, function(h) strsplit(h, "", fixed = TRUE)[[1]])
+    widths <- rep(1L, nc)
+    gap <- print_fit_gap(widths)
+    if (is.na(gap)) no("with vertical headings that do not fit either")
+    return(list(heads = heads, widths = widths, gap = gap, panels = NULL))
+  }
+  if (!(all(lab) || (!any(lab) && all(widths == fws)))) no("with names wider than their values in column panels")
+  id <- isTRUE(a$row_header) && a$id_n == 1L
+  if (isTRUE(a$row_header) && !id) no("with more than one ID variable")
+  rest <- if (id) seq.int(2L, length.out = nc - 1L) else seq_len(nc)
+  if (length(unique(widths[rest])) != 1L) no("with columns of different widths (column panels)")
+  w <- widths[rest[1]]
+  room <- rt_linesize() + 1L - (if (id) widths[1] + 1L else 0L)
+  cap <- room %/% (w + 1L)
+  if (cap < 1L) no("with a column wider than the line")
+  np <- ceiling(length(rest) / cap)
+  per <- ceiling(length(rest) / np)
+  ends <- pmin(seq_len(np) * per, length(rest))
+  size <- diff(c(0L, ends))
+  if (any(size < 1L)) no("with an empty last column panel")
+  panels <- lapply(seq_len(np), function(k) {
+    cols <- c(if (id) 1L, rest[seq.int(ends[k] - size[k] + 1L, ends[k])])
+    list(cols = cols, gap = print_fit_gap(widths[cols]))
+  })
+  g1 <- panels[[1]]$gap
+  panels <- lapply(panels, function(pn) {
+    if (is.na(pn$gap) || (id && pn$gap < g1)) no("with a later column panel narrower than the first")
+    n <- length(pn$cols) - 1L
+    pn$gaps <- if (id) c(g1, rep(pn$gap, n - 1L)) else rep(pn$gap, n)
+    pn
+  })
+  list(heads = heads, widths = widths, gap = g1, panels = panels)
 }

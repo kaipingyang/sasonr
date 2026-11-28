@@ -94,3 +94,28 @@ test_that("PRINT keeps a sign position in unformatted numeric fields and places 
   lst <- sas_run("data d; a = 123; run; proc print data=d noobs; run;")$listing
   expect_equal(lst[nzchar(lst)], c(" a", "123"))
 })
+
+test_that("a table too wide for the line is split into column panels, the ID column in each", {
+  vars <- sprintf("v%02d", 1:16)
+  code <- paste0("options nocenter ls=80; data have; length ", paste(vars, collapse = " "), " $8; ",
+                 paste0(vars, "='xxxxxx';", collapse = " "), " run; proc print data=have noobs; id v01; run;")
+  l <- sas_run(code)$listing
+  l <- l[nzchar(l)]
+  expect_identical(l[1], paste(c(" v01", sprintf(" v%02d", 2:9)), collapse = "     "))
+  expect_identical(l[3], paste0(" v01      v10", paste0("       ", sprintf("v%02d", 11:16), collapse = "")))
+  expect_identical(l[4], paste0("xxxxxx   xxxxxx", strrep("    xxxxxx", 6)))
+})
+
+test_that("names wider than one-position values are written down the columns", {
+  vars <- sprintf("c%02d", 1:24)
+  code <- paste0("options nocenter ls=80; data have; length ", paste(vars, collapse = " "), " $6; ",
+                 paste0(vars, "='x';", collapse = " "), " run; proc print data=have noobs; run;")
+  l <- sas_run(code)$listing
+  l <- l[nzchar(l)]
+  expect_identical(l[1:4], c(paste(rep("c", 24), collapse = "  "), paste(substr(vars, 2, 2), collapse = "  "),
+                             paste(substr(vars, 3, 3), collapse = "  "), paste(rep("x", 24), collapse = "  ")))
+  # more than one observation in panels is not measured
+  code2 <- paste0("options nocenter ls=80; data have; length ", paste(vars, collapse = " "), " $6; ",
+                  paste0(vars, "='xxxxxx';", collapse = " "), " output; output; run; proc print data=have noobs; run;")
+  expect_error(sas_run(code2), class = "sasonr_unsupported")
+})
