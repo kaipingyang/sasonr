@@ -102,6 +102,7 @@ reference:
   desc: Run one procedure on a data frame without writing a SAS program.
   contents:
   - sas_means_df
+  - sas_transpose_df
   - sas_data_procs
   - sas_sort_df
 - title: Front end (lexer, parser, analysis)

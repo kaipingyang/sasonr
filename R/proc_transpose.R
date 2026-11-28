@@ -2,6 +2,18 @@
 
 parse_proc_transpose <- function(p, line) {
   advance(p)
+  start <- p$pos
+  opts <- parse_transpose_options(p, line, "transpose")
+  # the text of the options (the R call of the step, proc_api.R)
+  opt_text <- if (p$pos > start) tok_render(p, start, p$pos - 1L)
+  advance(p)
+  body <- proc_parse_body(p, "transpose", parse_transpose_stmt)
+  list(type = "proc", name = "transpose", line = line, options = opts, stmts = body$stmts, titles = body$titles,
+       opt_text = opt_text)
+}
+
+# The options of the PROC TRANSPOSE statement, up to its semicolon.
+parse_transpose_options <- function(p, line, pname) {
   opts <- list()
   while (tk_type(p) != "semi") {
     if (at_eof(p)) abort_syntax("missing semicolon after PROC TRANSPOSE", line)
@@ -26,23 +38,24 @@ parse_proc_transpose <- function(p, line) {
     opts[[o]] <- TRUE
     advance(p)
   }
-  advance(p)
-  body <- proc_parse_body(p, "transpose", function(p, kw, sline) {
-    switch(kw,
-      var = parse_items_stmt(p, "var"),
-      id = parse_items_stmt(p, "id"),
-      idlabel = parse_items_stmt(p, "idlabel"),
-      copy = parse_items_stmt(p, "copy"),
-      by = parse_by(p),
-      where = parse_where(p),
-      format = parse_format_stmt(p),
-      label = parse_label(p),
-      attrib = parse_attrib(p),
-      abort_syntax(paste0("Statement ", toupper(kw), " is not valid in PROC TRANSPOSE ",
-                          "(ERROR 180-322: Statement is not valid or it is used out of proper order)"), sline)
-    )
-  })
-  list(type = "proc", name = "transpose", line = line, options = opts, stmts = body$stmts, titles = body$titles)
+  opts
+}
+
+# One statement of a PROC TRANSPOSE step (proc_parse_body()).
+parse_transpose_stmt <- function(p, kw, sline) {
+  switch(kw,
+    var = parse_items_stmt(p, "var"),
+    id = parse_items_stmt(p, "id"),
+    idlabel = parse_items_stmt(p, "idlabel"),
+    copy = parse_items_stmt(p, "copy"),
+    by = parse_by(p),
+    where = parse_where(p),
+    format = parse_format_stmt(p),
+    label = parse_label(p),
+    attrib = parse_attrib(p),
+    abort_syntax(paste0("Statement ", toupper(kw), " is not valid in PROC TRANSPOSE ",
+                        "(ERROR 180-322: Statement is not valid or it is used out of proper order)"), sline)
+  )
 }
 
 translate_proc_transpose <- function(step, meta, last) {

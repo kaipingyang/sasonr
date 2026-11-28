@@ -73,6 +73,9 @@ proc_means_api <- list(kind = "options", ds = "data", options = "parse_means_opt
                                  "format", "label", "attrib"))
 proc_api_spec$means <- proc_means_api
 proc_api_spec$summary <- proc_means_api
+proc_api_spec$transpose <- list(kind = "options", ds = c("data", "out"), options = "parse_transpose_options",
+                                 stmt = "parse_transpose_stmt", stat = NULL,
+                                 stmts = c("var", "id", "idlabel", "copy", "by", "where", "format", "label", "attrib"))
 
 # The SAS text of a statement argument: names (`c(a, desc(b))`, `a`), or
 # strings with the statement's SAS text (`c("a", "descending b")`,
@@ -126,7 +129,7 @@ proc_stmt_value <- function(s) {
     items <- Map(function(v, d) if (d) rlang::call2("desc", rlang::sym(v)) else rlang::sym(v), s$vars, s$descending)
     return(if (length(items) == 1L) items[[1]] else rlang::call2("c", !!!unname(items)))
   }
-  plain <- (s$stmt %in% c("var", "id", "sum", "sumby") || (identical(s$stmt, "class") && !length(s$opts))) &&
+  plain <- (s$stmt %in% c("var", "id", "sum", "sumby", "copy", "idlabel") || (identical(s$stmt, "class") && !length(s$opts))) &&
     length(s$items) && all(vapply(s$items, function(it) identical(it$kind, "name") && is.null(it$to), NA))
   if (plain) {
     items <- lapply(s$items, function(it) rlang::sym(it$text %||% it$name))
@@ -136,7 +139,7 @@ proc_stmt_value <- function(s) {
   if (is.null(text)) return(NULL)
   # SAS syntax without an R form, marked: an expression, a variable list
   if (identical(s$stmt, "where")) return(rlang::call2("sas_expr", text))
-  if (s$stmt %in% c("var", "id", "sum", "sumby") || (identical(s$stmt, "class") && !length(s$opts))) {
+  if (s$stmt %in% c("var", "id", "sum", "sumby", "copy", "idlabel") || (identical(s$stmt, "class") && !length(s$opts))) {
     return(rlang::call2("sas_vars", text))
   }
   if (identical(s$stmt, "label") && length(s$labels) && !is.null(s$texts)) {
@@ -321,7 +324,7 @@ proc_opts_args <- function(name, opt_text) {
     if (t == "num") {
       args[[w]] <- as.numeric(tk_val(p))
       if (is.na(args[[w]]) || !identical(proc_num_text(args[[w]]), tk_val(p))) return(NULL)
-    } else if (t == "name") {
+    } else if (t %in% c("name", "str")) {
       args[[w]] <- tk_val(p)
     } else {
       return(NULL)
@@ -357,7 +360,9 @@ proc_opts_text <- function(name, opts) {
     } else if (is.numeric(v) && length(v) == 1L && !is.na(v)) {
       out <- c(out, paste0(nm, "=", proc_num_text(v)))
     } else if (rlang::is_string(v)) {
-      out <- c(out, paste0(nm, "=", v))
+      # a name as it is, any other text quoted
+      q <- if (nm %in% sp$ds || grepl("^[A-Za-z_][A-Za-z0-9_]*$", v)) v else paste0("'", gsub("'", "''", v, fixed = TRUE), "'")
+      out <- c(out, paste0(nm, "=", q))
     } else {
       rlang::abort(paste0("`", nm, "` must be TRUE, a number or a string."), class = "sasonr_error")
     }

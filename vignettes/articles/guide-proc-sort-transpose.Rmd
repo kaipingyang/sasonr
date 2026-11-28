@@ -99,9 +99,27 @@ run;"))
 res$work$wide
 ```
 
-`sas_transpose_df()` runs the same transposition on a data frame.
+### As an R call
+
+`sas_proc_transpose()` is the call of the translation; options are arguments
+(`out = "wide"`, `prefix = "v_"`), statements are variable names.
+
+```{r}
+cat(tail(as.character(sas_script(res)), 3), sep = "\n")
+```
+
+```{r}
+s <- sas_session()
+invisible(sas_run(paste(prog, "proc sort data=labs; by subj visit; run;"), session = s))
+s |> sas_proc_transpose(data = "labs", out = "wide", prefix = "v_", by = c(subj, visit), var = aval)
+sas_work(s)$wide
+```
+
+### On a data frame
+
+`sas_transpose_df()` takes the same arguments with a data frame.
 
 ```{r}
 df <- data.frame(subj = c("S01", "S01", "S02"), param = c("ALT", "AST", "ALT"), aval = c(25, 22, 31))
-sas_transpose_df(df, var = "aval", by = "subj", id = "param")
+sas_transpose_df(df, var = aval, by = subj, id = param)
 ```

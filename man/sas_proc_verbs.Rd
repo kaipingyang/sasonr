@@ -6,7 +6,8 @@
 \alias{sas_proc_print}
 \alias{sas_proc_means}
 \alias{sas_proc_summary}
-\title{PROC SORT, PRINT, MEANS and SUMMARY as R calls}
+\alias{sas_proc_transpose}
+\title{PROC SORT, PRINT, MEANS, SUMMARY and TRANSPOSE as R calls}
 \usage{
 sas_proc_sort(session, data = NULL, out = NULL, ..., .sas_src = NULL)
 
@@ -15,6 +16,8 @@ sas_proc_print(session, data = NULL, ..., .sas_src = NULL)
 sas_proc_means(session, data = NULL, ..., .sas_src = NULL)
 
 sas_proc_summary(session, data = NULL, ..., .sas_src = NULL)
+
+sas_proc_transpose(session, data = NULL, ..., .sas_src = NULL)
 }
 \arguments{
 \item{session}{A session from \code{\link[=sas_session]{sas_session()}}.}
@@ -31,7 +34,10 @@ statements. PROC SORT: \code{nodupkey}, \code{noduprecs}, \code{equals}, \code{f
 arguments (\code{nway = TRUE}, \code{maxdec = 2}, \code{vardef = "wdf"}), the statistic
 keywords as \code{stats = c(n, mean, std)}; statements \code{var}, \code{class}, \code{by},
 \code{id}, \code{where}, \code{freq}, \code{weight}, \code{types}, \code{ways}, \code{output} (built with
-\code{\link[=sas_stats_output]{sas_stats_output()}}), \code{format}, \code{label}, \code{attrib}. FORMAT takes a named vector
+\code{\link[=sas_stats_output]{sas_stats_output()}}), \code{format}, \code{label}, \code{attrib}. PROC TRANSPOSE:
+\code{out}, \code{prefix}, \code{suffix}, \code{delimiter}, \code{name}, \code{label}, \code{let},
+\code{noprint}; statements \code{var}, \code{id}, \code{idlabel}, \code{copy}, \code{by}, \code{where},
+\code{format}, \code{label}, \code{attrib}. FORMAT takes a named vector
 (\code{format = c(aval = "8.2")}). A statement value held in a variable is
 injected with \verb{!!}. Any other argument fails.}
 
@@ -43,7 +49,7 @@ call from line 1.}
 The session, invisibly.
 }
 \description{
-Run a PROC SORT, PRINT, MEANS or SUMMARY step in a session from R arguments; the log,
+Run a PROC SORT, PRINT, MEANS, SUMMARY or TRANSPOSE step in a session from R arguments; the log,
 the listing and WORK of the session change as with \code{\link[=sas_run]{sas_run()}}. These are
 the calls \code{\link[=sas_script]{sas_script()}} writes for these steps, and the calls
 \code{\link[=sas_run]{sas_run()}} itself runs for them.

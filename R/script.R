@@ -775,9 +775,10 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #'   gives the variable attributes of the output data sets and the log. When
 #'   vectorised code meets a data error the step is run again row by row from
 #'   its SAS text, as in [sas_run()].
-#' * [sas_proc_sort()], [sas_proc_print()], [sas_proc_means()] and [sas_proc_summary()] take R
+#' * [sas_proc_sort()], [sas_proc_print()], [sas_proc_means()], [sas_proc_summary()] and
+#'   [sas_proc_transpose()] take R
 #'   arguments (their own page). `sas_proc_freq()`,
-#'   `sas_proc_transpose()`, `sas_proc_tabulate()`: the
+#'   `sas_proc_tabulate()`: the
 #'   options of the PROC statement and one argument per statement
 #'   (`by = "usubjid"`, `output = "out=m mean="`, `table = "grp, x*sum"`), as
 #'   the program wrote them; a statement given twice is two arguments with
@@ -863,9 +864,9 @@ script_proc_lines <- function(st, line) {
   if (identical(as.integer(abs), as.integer(dflt))) line else as.integer(abs)
 }
 
-#' PROC SORT, PRINT, MEANS and SUMMARY as R calls
+#' PROC SORT, PRINT, MEANS, SUMMARY and TRANSPOSE as R calls
 #'
-#' Run a PROC SORT, PRINT, MEANS or SUMMARY step in a session from R arguments; the log,
+#' Run a PROC SORT, PRINT, MEANS, SUMMARY or TRANSPOSE step in a session from R arguments; the log,
 #' the listing and WORK of the session change as with [sas_run()]. These are
 #' the calls [sas_script()] writes for these steps, and the calls
 #' [sas_run()] itself runs for them.
@@ -897,7 +898,10 @@ script_proc_lines <- function(st, line) {
 #'   arguments (`nway = TRUE`, `maxdec = 2`, `vardef = "wdf"`), the statistic
 #'   keywords as `stats = c(n, mean, std)`; statements `var`, `class`, `by`,
 #'   `id`, `where`, `freq`, `weight`, `types`, `ways`, `output` (built with
-#'   [sas_stats_output()]), `format`, `label`, `attrib`. FORMAT takes a named vector
+#'   [sas_stats_output()]), `format`, `label`, `attrib`. PROC TRANSPOSE:
+#'   `out`, `prefix`, `suffix`, `delimiter`, `name`, `label`, `let`,
+#'   `noprint`; statements `var`, `id`, `idlabel`, `copy`, `by`, `where`,
+#'   `format`, `label`, `attrib`. FORMAT takes a named vector
 #'   (`format = c(aval = "8.2")`). A statement value held in a variable is
 #'   injected with `!!`. Any other argument fails.
 #' @param .sas_src The SAS source of the step, [sas_src()]: the source echo
@@ -1026,10 +1030,12 @@ sas_proc_freq <- function(session, options = "", ..., line = 1L) {
   script_submit(session, script_proc_text("freq", options, list(...), line), line[1])
 }
 
-#' @rdname sas_step_verbs
+#' @rdname sas_proc_verbs
 #' @export
-sas_proc_transpose <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("transpose", options, list(...), line), line[1])
+sas_proc_transpose <- function(session, data = NULL, ..., .sas_src = NULL) {
+  dots <- rlang::enexprs(...)
+  if (proc_old_form(data, dots)) return(proc_old_run("transpose", session, data, dots, parent.frame()))
+  proc_verb_args("transpose", session, list(data = data), dots, parent.frame(), .sas_src)
 }
 
 

@@ -4,14 +4,11 @@
 \alias{sas_data_procs}
 \alias{sas_tabulate_df}
 \alias{sas_freq_df}
-\alias{sas_transpose_df}
-\title{Data-level PROC TABULATE, PROC FREQ and PROC TRANSPOSE}
+\title{Data-level PROC TABULATE and PROC FREQ}
 \usage{
 sas_tabulate_df(data, table, class = NULL, var = NULL, by = NULL, options = "")
 
 sas_freq_df(data, tables, by = NULL, weight = NULL, options = "")
-
-sas_transpose_df(data, var = NULL, by = NULL, id = NULL, options = "")
 }
 \arguments{
 \item{data}{A data frame.}
@@ -19,7 +16,7 @@ sas_transpose_df(data, var = NULL, by = NULL, id = NULL, options = "")
 \item{table}{The TABLE statement of PROC TABULATE, as SAS text
 (\code{"grp all, x*(n mean)"}).}
 
-\item{var, class, by, id}{Variable names (character vectors).}
+\item{var, class, by}{Variable names (character vectors).}
 
 \item{options}{Further options of the PROC statement, as SAS text.}
 
@@ -37,8 +34,7 @@ Run one procedure on a data frame without writing a SAS program.
 table of the step (a \code{sasonr_ods_table}, a tibble with the SAS table
 attributes), or a list of them when there are several (one per BY group
 or table request); \code{sas_freq_df()} supports one-way (OneWayFreqs) and
-two-way (CrossTabFreqs) tables without statistics options so far; \code{sas_transpose_df()}
-returns the output data set.  The arguments are read by the same parser
+two-way (CrossTabFreqs) tables without statistics options so far.  The arguments are read by the same parser
 and specification builder as the PROC step of a program, and the
 computation is the one \code{\link[=sas_run]{sas_run()}} calls for that step, so the values and
 the column attributes are the same.  \code{sas_log()} gives the WARNINGs and
@@ -49,5 +45,4 @@ NOTEs of the computation and \code{sas_html()} the HTML document of the tables
 d <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
 as.data.frame(sas_tabulate_df(d, "grp all, x*(n sum)", class = "grp", var = "x"))
 as.data.frame(sas_freq_df(d, "grp"))
-sas_transpose_df(d, var = "x")
 }

@@ -487,3 +487,18 @@ test_that("sas_expr(), sas_vars() and sas_dataset() mark SAS syntax; the trace u
   expect_identical(sas_work(env$s), r$work)
   expect_identical(sas_listing(env$s), r$listing)
 })
+
+test_that("PROC TRANSPOSE runs as its R call; sas_transpose_df() takes the verb's arguments", {
+  prog <- paste0("data l;\n  input subj $ visit param $ aval;\n  datalines;\nS01 1 ALT 25\nS01 1 AST 22\nS02 1 ALT 31\n;\nrun;\n",
+                 "proc transpose data=l out=w prefix=v_ name=src;\n  by subj visit;\n  id param;\n  var aval;\nrun;\n")
+  r <- sas_run(prog)
+  txt <- paste(as.character(sas_script(r)), collapse = "\n")
+  expect_match(txt, "sas_proc_transpose(data = \"l\", out = \"w\", prefix = \"v_\", name = \"src\", by = c(subj, visit), id = param, var = aval",
+               fixed = TRUE)
+  env <- run_script(sas_script(r))
+  expect_identical(sas_work(env$s), r$work)
+  df <- data.frame(subj = c("S01", "S01", "S02"), param = c("ALT", "AST", "ALT"), aval = c(25, 22, 31))
+  t1 <- sas_transpose_df(df, var = aval, by = subj, id = param)
+  expect_identical(names(t1), c("subj", "_name_", "alt", "ast"))
+  expect_identical(t1$alt, c(25, 31))
+})
