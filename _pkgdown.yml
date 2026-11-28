@@ -3,7 +3,7 @@ template:
   bootstrap: 5
 navbar:
   structure:
-    left: [getstarted, guides, reference, developers, news]
+    left: [getstarted, guides, procs, reference, developers, news]
     right: [search, github]
   components:
     getstarted:
@@ -16,10 +16,27 @@ navbar:
         href: articles/guide-datastep.html
       - text: PROC SQL
         href: articles/guide-sql.html
-      - text: "PROC MEANS: log, listing and HTML"
-        href: articles/guide-procs.html
       - text: Functions, formats and rounding
         href: articles/guide-functions.html
+    procs:
+      text: Procedures
+      menu:
+      - text: "PROC MEANS"
+        href: articles/guide-proc-means.html
+      - text: "PROC PRINT"
+        href: articles/guide-proc-print.html
+      - text: "PROC SORT and PROC TRANSPOSE"
+        href: articles/guide-proc-sort-transpose.html
+      - text: "PROC FREQ"
+        href: articles/guide-proc-freq.html
+      - text: "PROC TABULATE"
+        href: articles/guide-proc-tabulate.html
+      - text: "PROC UNIVARIATE"
+        href: articles/guide-proc-univariate.html
+      - text: "PROC FORMAT"
+        href: articles/guide-proc-format.html
+      - text: "PROC CONTENTS, DATASETS, APPEND, DELETE"
+        href: articles/guide-proc-datasets.html
     developers:
       text: Developers
       menu:
@@ -39,7 +56,7 @@ articles:
   - articles/guide-functions
 - title: Procedures
   contents:
-  - articles/guide-procs
+  - articles/guide-proc-means
   - articles/guide-proc-print
   - articles/guide-proc-sort-transpose
   - articles/guide-proc-freq

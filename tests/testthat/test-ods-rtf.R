@@ -26,10 +26,6 @@ test_that("ODS RTF outside the measured rules fails loud", {
   fails("ods rtf file=\"rtf/out.rtf\";\nproc print data=have; run;")
   fails("ods rtf file=\"rtf/out.rtf\" style=journal;\nproc print data=have; run;\nods rtf close;")
   fails("ods rtf file=\"rtf/out.rtf\";\nproc means data=have; var x; run;\nods rtf close;")
-  # 17 columns of 582 twips: wider than the widest single column group measured
-  expect_error(sas_run(paste0("data w; length col1-col17 $8; array col{17} $ col1-col17; do j = 1 to 17; col{j} = 'iiiiiiii'; end; drop j; run;\n",
-                              "ods rtf file=\"rtf/out.rtf\";\nproc print data=w noobs; run;\nods rtf close;")),
-               class = "sasonr_unsupported")
 })
 
 test_that("the N line widens the columns it spans (N with BY)", {

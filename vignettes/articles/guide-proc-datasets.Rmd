@@ -1,5 +1,5 @@
 ---
-title: "Data set utilities: CONTENTS, DATASETS, APPEND, DELETE"
+title: "PROC CONTENTS, PROC DATASETS, PROC APPEND and PROC DELETE"
 ---
 
 ```{r, include = FALSE}

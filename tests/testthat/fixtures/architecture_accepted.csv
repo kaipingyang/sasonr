@@ -28,8 +28,8 @@ macro_funcs.R,mac_parse_format,parse_datastep.R,is_format_ahead,macro,parse
 macro_funcs.R,mac_parse_format,parse_datastep.R,parse_format,macro,parse
 macro_funcs.R,mac_parse_format,parse_expr.R,at_eof,macro,parse
 macro_funcs.R,mac_parse_format,analyze.R,check_format,macro,analyze
-parse_datastep.R,sas_parse,proc.R,parse_proc_step,parse,engine
-parse_datastep.R,sas_parse,proc.R,parse_global_stmt,parse,engine
+parse_datastep.R,parse_program,proc.R,parse_proc_step,parse,engine
+parse_datastep.R,parse_program,proc.R,parse_global_stmt,parse,engine
 sql_parse.R,parse_sql_stmts,proc.R,parse_global_stmt,parse,engine
 diag.R,dump_value,runtime.R,strip_both,state,values
 diag.R,dump_value,formats.R,sas_format,state,values
