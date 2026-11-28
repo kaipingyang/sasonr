@@ -227,6 +227,7 @@ public sas_expr
 public sas_vars
 public sas_dataset
 public sas_stats_output
+public sas_tabulate_table
 public sas_data_step
 public sas_proc_sort
 public sas_proc_means

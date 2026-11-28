@@ -217,7 +217,7 @@ WARNINGs and NOTEs of the computation and `sas_html()` the HTML document.
 df <- data.frame(arm = c("A", "A", "B", "B"), aval = c(10.2, 11.8, 10.9, 10.4))
 m <- sas_means_df(df, stats = c(n, mean), class = arm, var = aval)
 as.data.frame(m)
-as.data.frame(sas_tabulate_df(df, "arm all, aval*(n mean)", class = "arm", var = "aval"))
+as.data.frame(sas_tabulate_df(df, class = arm, var = aval, table = sas_tabulate_table("arm all, aval*(n mean)")))
 as.data.frame(sas_freq_df(df, "arm"))
 ```
 

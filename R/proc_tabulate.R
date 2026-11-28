@@ -39,8 +39,31 @@ tab_path_stat <- c(mean = "Mean", sum = "Sum")
 
 parse_proc_tabulate <- function(p, line) {
   advance(p)
-  uns <- new.env(parent = emptyenv())
-  uns$list <- list()
+  # features outside the implemented scope, failed loud at translation
+  p$tab_uns <- new.env(parent = emptyenv())
+  p$tab_uns$list <- list()
+  start <- p$pos
+  opts <- parse_tabulate_options(p, line, "tabulate")
+  # the text of the options (the R call of the step, proc_api.R)
+  opt_text <- if (p$pos > start) tok_render(p, start, p$pos - 1L)
+  advance(p)
+  body <- proc_parse_body(p, "tabulate", parse_tabulate_stmt)
+  list(type = "proc", name = "tabulate", line = line, options = opts, stmts = body$stmts, titles = body$titles,
+       unsupported = p$tab_uns$list, opt_text = opt_text)
+}
+
+# The deferred notes of the parser (p$tab_uns, made by the first user).
+tab_uns_of <- function(p) {
+  if (is.null(p$tab_uns)) {
+    p$tab_uns <- new.env(parent = emptyenv())
+    p$tab_uns$list <- list()
+  }
+  p$tab_uns
+}
+
+# The options of the PROC TABULATE statement, up to its semicolon.
+parse_tabulate_options <- function(p, line, pname) {
+  uns <- tab_uns_of(p)
   opts <- list()
   while (tk_type(p) != "semi") {
     if (at_eof(p)) abort_syntax("missing semicolon after PROC TABULATE", line)
@@ -83,34 +106,35 @@ parse_proc_tabulate <- function(p, line) {
     }
     advance(p)
   }
-  advance(p)
-  body <- proc_parse_body(p, "tabulate", function(p, kw, sline) {
-    switch(kw,
-      class = parse_tabulate_class(p, uns),
-      var = {
-        s <- parse_items_stmt_opts(p, "var", uns)
-        s
-      },
-      table = ,
-      tables = parse_tabulate_table(p, uns),
-      keylabel = parse_tabulate_keylabel(p, uns),
-      where = parse_where(p),
-      by = {
-        b <- parse_by(p)
-        if (any(b$descending)) tab_note(uns, "BY DESCENDING in PROC TABULATE", sline)
-        b
-      },
-      format = parse_format_stmt(p),
-      label = parse_label(p),
-      {
-        tab_note(uns, paste0("PROC TABULATE statement ", toupper(tk_val(p))), sline)
-        tab_skip_stmt(p)
-        NULL
-      }
-    )
-  })
-  list(type = "proc", name = "tabulate", line = line, options = opts, stmts = body$stmts, titles = body$titles,
-       unsupported = uns$list)
+  opts
+}
+
+# One statement of a PROC TABULATE step (proc_parse_body()).
+parse_tabulate_stmt <- function(p, kw, sline) {
+  uns <- tab_uns_of(p)
+  switch(kw,
+    class = parse_tabulate_class(p, uns),
+    var = {
+      s <- parse_items_stmt_opts(p, "var", uns)
+      s
+    },
+    table = ,
+    tables = parse_tabulate_table(p, uns),
+    keylabel = parse_tabulate_keylabel(p, uns),
+    where = parse_where(p),
+    by = {
+      b <- parse_by(p)
+      if (any(b$descending)) tab_note(uns, "BY DESCENDING in PROC TABULATE", sline)
+      b
+    },
+    format = parse_format_stmt(p),
+    label = parse_label(p),
+    {
+      tab_note(uns, paste0("PROC TABULATE statement ", toupper(tk_val(p))), sline)
+      tab_skip_stmt(p)
+      NULL
+    }
+  )
 }
 
 tab_note <- function(uns, msg, line) {

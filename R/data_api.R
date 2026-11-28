@@ -55,10 +55,10 @@ data_api_tables <- function(res) {
   out
 }
 
-#' Data-level PROC TABULATE and PROC FREQ
+#' Data-level PROC FREQ
 #'
 #' Run one procedure on a data frame without writing a SAS program.
-#' `sas_tabulate_df()` and `sas_freq_df()` return the ODS
+#' `sas_freq_df()` returns the ODS
 #' table of the step (a `sasonr_ods_table`, a tibble with the SAS table
 #' attributes), or a list of them when there are several (one per BY group
 #' or table request); `sas_freq_df()` supports one-way (OneWayFreqs) and
@@ -70,9 +70,7 @@ data_api_tables <- function(res) {
 #' (both are S3 generics with methods for these results).
 #'
 #' @param data A data frame.
-#' @param var,class,by Variable names (character vectors).
-#' @param table The TABLE statement of PROC TABULATE, as SAS text
-#'   (`"grp all, x*(n mean)"`).
+#' @param by BY variable names (a character vector).
 #' @param tables The TABLES statement of PROC FREQ, as SAS text (`"grp sex"`,
 #'   `"grp / nocum"`).
 #' @param weight The WEIGHT variable (one name).
@@ -81,7 +79,7 @@ data_api_tables <- function(res) {
 #' @examples
 #' d <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
 
-#' as.data.frame(sas_tabulate_df(d, "grp all, x*(n sum)", class = "grp", var = "x"))
+
 #' as.data.frame(sas_freq_df(d, "grp"))
 
 #' @name sas_data_procs
@@ -114,13 +112,23 @@ sas_summary_df <- function(df, ...) {
   data_api_means_like("summary", df, rlang::enexprs(...), parent.frame())
 }
 
-#' @rdname sas_data_procs
+#' PROC TABULATE on a data frame
+#'
+#' Runs one PROC TABULATE step on a data frame, without a session: the
+#' arguments are those of [sas_proc_tabulate()], with the data frame in place
+#' of `data`. The step is built and computed as the step of a program.
+#' @param df A data frame.
+#' @param ... Options and statements, as in [sas_proc_tabulate()]; the TABLE
+#'   statement through [sas_tabulate_table()].
+#' @return The ODS table of the step (a `sasonr_ods_table`), or a list of them;
+#'   `sas_log()` and `sas_html()` as for [sas_means_df()].
+#' @examples
+#' df <- data.frame(grp = c("a", "a", "b"), x = c(1, 2, 4))
+#' as.data.frame(sas_tabulate_df(df, class = grp, var = x, table = sas_tabulate_table("grp all, x*(n sum)")))
 #' @export
-sas_tabulate_df <- function(data, table, class = NULL, var = NULL, by = NULL, options = "") {
-  if (!rlang::is_string(table)) rlang::abort("`table` must be the text of one TABLE statement.", class = "sasonr_error")
-  body <- paste0(data_api_stmt("class", data_api_names(class, "class")), data_api_stmt("by", data_api_names(by, "by")),
-                 data_api_stmt("var", data_api_names(var, "var")), "  table ", table, ";\n")
-  data_api_tables(data_api_core(data, "tabulate", data_api_text("tabulate", options, body), tab_step_spec))
+sas_tabulate_df <- function(df, ...) {
+  step <- data_api_step("tabulate", df, rlang::enexprs(...), parent.frame())
+  data_api_tables(data_api_core_ir(df, "tabulate", step, tab_step_spec))
 }
 
 #' @rdname sas_data_procs

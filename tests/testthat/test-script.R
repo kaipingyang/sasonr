@@ -502,3 +502,26 @@ test_that("PROC TRANSPOSE runs as its R call; sas_transpose_df() takes the verb'
   expect_identical(names(t1), c("subj", "_name_", "alt", "ast"))
   expect_identical(t1$alt, c(25, 31))
 })
+
+test_that("PROC TABULATE runs as its R call; the TABLE statement through sas_tabulate_table()", {
+  prog <- paste0("options nocenter;\ndata t;\n  input arm $ sex $ age;\n  datalines;\nA F 34\nA M 41\nB M 52\n;\nrun;\n",
+                 "proc tabulate data=t missing;\n  class arm sex;\n  var age;\n  table sex all, arm*age*(n mean);\nrun;\n")
+  r <- sas_run(prog)
+  txt <- paste(as.character(sas_script(r)), collapse = "\n")
+  expect_match(txt, "sas_proc_tabulate(data = \"t\", missing = TRUE, class = c(arm, sex), var = age, table = sas_tabulate_table(\"sex all, arm*age*(n mean)\")",
+               fixed = TRUE)
+  env <- run_script(sas_script(r))
+  expect_identical(sas_listing(env$s), r$listing)
+  expect_error(sas_tabulate_table("sex all, ("), class = "sasonr_error")
+  # a step with a feature outside the scope still fails loud as before
+  expect_error(sas_run(paste0(prog, "proc tabulate data=t; class arm; table arm; frobnicate x; run;")), class = "sasonr_unsupported")
+})
+
+test_that("an option named like a statement is <name>_opt in the call (TABULATE FORMAT=, TRANSPOSE LABEL=)", {
+  prog <- "options nocenter;\ndata t;\n  input g $ v;\n  datalines;\na 1\nb 2\n;\nrun;\nproc tabulate data=t format=8.2;\n  class g;\n  var v;\n  format v 5.1;\n  table g, v*sum;\nrun;\n"
+  r <- sas_run(prog)
+  txt <- paste(as.character(sas_script(r)), collapse = "\n")
+  expect_match(txt, "sas_proc_tabulate(data = \"t\", format_opt = 8.2, class = g, var = v, format = c(v = \"5.1\")", fixed = TRUE)
+  env <- run_script(sas_script(r))
+  expect_identical(sas_listing(env$s), r$listing)
+})

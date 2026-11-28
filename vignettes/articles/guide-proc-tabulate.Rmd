@@ -71,11 +71,28 @@ The same table as an HTML document, from `sas_html()`:
 show_html(sas_html(res), height = 300)
 ```
 
+## PROC TABULATE as an R call
+
+The translation writes the step as one call of `sas_proc_tabulate()`: CLASS
+and VAR are variable names, the TABLE statement is marked with
+`sas_tabulate_table()` (its dimensions are SAS syntax).
+
+```{r}
+cat(tail(as.character(sas_script(res)), 3), sep = "\n")
+```
+
+```{r}
+s <- sas_session()
+invisible(sas_run(prog, session = s))
+s |> sas_proc_tabulate(data = "trial", class = c(arm, sex), table = sas_tabulate_table("sex all, arm*n"))
+cat(sas_listing(s), sep = "\n")
+```
+
 ## On a data frame
 
-`sas_tabulate_df()` takes the TABLE statement as text.
+`sas_tabulate_df()` takes the same arguments with a data frame.
 
 ```{r}
 df <- data.frame(arm = c("A", "A", "B"), age = c(34, 41, 52))
-as.data.frame(sas_tabulate_df(df, "arm all, age*(n mean)", class = "arm", var = "age"))
+as.data.frame(sas_tabulate_df(df, class = arm, var = age, table = sas_tabulate_table("arm all, age*(n mean)")))
 ```

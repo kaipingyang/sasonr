@@ -73,8 +73,12 @@ proc_means_api <- list(kind = "options", ds = "data", options = "parse_means_opt
                                  "format", "label", "attrib"))
 proc_api_spec$means <- proc_means_api
 proc_api_spec$summary <- proc_means_api
+proc_api_spec$tabulate <- list(kind = "options", ds = c("data", "out", "classdata"), options = "parse_tabulate_options",
+                                stmt = "parse_tabulate_stmt", stat = NULL, state = "tab_uns", state_field = "unsupported",
+                                opt_alias = c(format = "format_opt"),
+                                stmts = c("class", "var", "table", "tables", "keylabel", "where", "by", "format", "label"))
 proc_api_spec$transpose <- list(kind = "options", ds = c("data", "out"), options = "parse_transpose_options",
-                                 stmt = "parse_transpose_stmt", stat = NULL,
+                                 stmt = "parse_transpose_stmt", stat = NULL, opt_alias = c(label = "label_opt"),
                                  stmts = c("var", "id", "idlabel", "copy", "by", "where", "format", "label", "attrib"))
 
 # The SAS text of a statement argument: names (`c(a, desc(b))`, `a`), or
@@ -106,7 +110,7 @@ proc_stmt_arg_text <- function(e, kw = NULL) {
 
 # A statement node from a statement argument (`kw` its keyword), parsed by
 # the statement parser of procedure `name`.
-proc_stmt_of_arg <- function(name, kw, e) {
+proc_stmt_of_arg <- function(name, kw, e, state = NULL) {
   text <- proc_stmt_arg_text(e, kw)
   if (is.null(text) || !nzchar(trimws(text))) {
     rlang::abort(paste0("`", kw, "` takes variable names, desc(name) or the statement as text (strings), not `", rlang::expr_deparse(e), "`."),
@@ -114,6 +118,8 @@ proc_stmt_of_arg <- function(name, kw, e) {
   }
   p <- new_parser(sas_lex(paste0(kw, " ", text, ";")))
   sp <- proc_api_spec[[name]]
+  # parser state shared by the parts of one step (PROC TABULATE notes)
+  if (!is.null(state)) p[[sp$state]] <- state
   s <- if (identical(sp$kind, "options")) match.fun(sp$stmt)(p, kw, 1L) else parse_proc_stmt(p, name)
   if (!at_eof(p)) abort_syntax(paste0("unexpected ", tok_desc(p), " after the `", kw, "` statement"))
   s
@@ -139,6 +145,7 @@ proc_stmt_value <- function(s) {
   if (is.null(text)) return(NULL)
   # SAS syntax without an R form, marked: an expression, a variable list
   if (identical(s$stmt, "where")) return(rlang::call2("sas_expr", text))
+  if (identical(s$stmt, "table")) return(rlang::call2("sas_tabulate_table", text))
   if (s$stmt %in% c("var", "id", "sum", "sumby", "copy", "idlabel") || (identical(s$stmt, "class") && !length(s$opts))) {
     return(rlang::call2("sas_vars", text))
   }
@@ -158,14 +165,20 @@ proc_ir_of_args <- function(name, opts, stmts, line = 1L) {
   if (length(bad) || (length(stmts) && is.null(names(stmts)))) {
     rlang::abort(paste0("Unknown statement of `sas_proc_", name, "()`: ", paste(bad, collapse = ", "), "."), class = "sasonr_error")
   }
-  nodes <- Map(function(kw, e) proc_stmt_of_arg(name, kw, e), names(stmts), stmts)
+  state <- if (!is.null(sp$state)) { st <- new.env(parent = emptyenv()); st$list <- list(); st }
+  nodes <- Map(function(kw, e) proc_stmt_of_arg(name, kw, e, state), names(stmts), stmts)
+  # a statement the parser skips (PROC TABULATE: noted, failed loud later)
+  nodes <- Filter(Negate(is.null), nodes)
   if (identical(sp$kind, "options")) {
     text <- proc_opts_text(name, opts)
     p <- new_parser(sas_lex(paste0(text, ";")))
+    if (!is.null(state)) p[[sp$state]] <- state
     o <- match.fun(sp$options)(p, 1L, name)
     if (!identical(tk_type(p), "semi") || p$pos != p$n) abort_syntax(paste0("unexpected ", tok_desc(p), " in the options of `sas_proc_", name, "()`"))
-    return(list(type = "proc", name = name, line = vctrs::vec_cast(line, integer()), options = o, stmts = unname(nodes),
-                titles = list(), opt_text = if (nzchar(text)) text))
+    ir <- list(type = "proc", name = name, line = vctrs::vec_cast(line, integer()), options = o, stmts = unname(nodes),
+               titles = list(), opt_text = if (nzchar(text)) text)
+    if (!is.null(state)) ir[[sp$state_field]] <- state$list
+    return(ir)
   }
   o <- list()
   if (!is.null(opts$data)) o$data <- proc_ds_arg(opts$data, "input", "data")
@@ -257,6 +270,8 @@ proc_ir_core <- function(x) {
 # step are not part of the call; a step with one, or with a statement whose
 # text was not kept, runs as parsed (and sas_script() keeps its SAS text).
 proc_ir_via_call <- function(step) {
+  # a step with features outside the implemented scope fails loud at translation
+  if (length(step[["unsupported"]])) return(step)
   if (length(step$titles)) return(step)
   call <- proc_call_of_ir(step)
   if (is.null(call)) return(step)
@@ -305,6 +320,8 @@ proc_opts_args <- function(name, opt_text) {
   while (!at_eof(p)) {
     if (tk_type(p) != "name") return(NULL)
     w <- tk_low(p)
+    # an option named like a statement of the procedure is `<name>_opt` in the call
+    if (w %in% names(sp$opt_alias)) w <- sp$opt_alias[[w]]
     if (!is_op(p, "=", 1L)) {
       if (!is.null(sp$stat) && sp$stat(w)) stats <- c(stats, w) else if (!is.null(args[[w]])) return(NULL) else args[[w]] <- TRUE
       advance(p)
@@ -349,6 +366,7 @@ proc_opts_text <- function(name, opts) {
   out <- character()
   for (nm in names(opts)) {
     v <- opts[[nm]]
+    if (nm %in% sp$opt_alias) nm <- names(sp$opt_alias)[match(nm, sp$opt_alias)]
     if (identical(nm, "stats")) {
       t <- proc_stmt_arg_text(v)
       if (is.null(t)) rlang::abort("`stats` takes statistic names (`c(n, mean)`) or strings.", class = "sasonr_error")
@@ -630,7 +648,7 @@ proc_ds_call <- function(text) {
 # Is `e` a call of one of the helpers that build the arguments of the verbs
 # (they are evaluated where the verb reads its arguments)?
 proc_helper_call <- function(e) {
-  is.call(e) && is.symbol(e[[1]]) && as.character(e[[1]]) %in% c("sas_stats_output", "sas_expr", "sas_vars", "sas_dataset")
+  is.call(e) && is.symbol(e[[1]]) && as.character(e[[1]]) %in% c("sas_stats_output", "sas_expr", "sas_vars", "sas_dataset", "sas_tabulate_table")
 }
 
 # The argument of a data set reference: its name, or a sas_dataset() call, or its
@@ -640,4 +658,27 @@ proc_ds_value <- function(ref) {
   t <- proc_ds_text(ref)
   if (is.null(t) || !length(ref$options)) return(t)
   proc_ds_call(t) %||% t
+}
+
+#' The TABLE statement of PROC TABULATE
+#'
+#' Marks the dimensions of a TABLE statement (page, row and column, crossed
+#' with `*`, concatenated with blanks, `ALL` for totals) as SAS syntax for the
+#' `table` argument of [sas_proc_tabulate()] and [sas_tabulate_df()]; the
+#' text is checked when the helper is called.
+#' @param text The TABLE statement without the keyword (`"grp all, x*(n mean)"`).
+#' @return The text with class `sas_tabulate_table` (and `sas_stmt_text`).
+#' @examples
+#' sas_tabulate_table("sex all, arm*n")
+#' @export
+sas_tabulate_table <- function(text) {
+  if (!rlang::is_string(text) || !nzchar(trimws(text))) rlang::abort("`text` must be the dimensions of a TABLE statement.", class = "sasonr_error")
+  p <- new_parser(sas_lex(paste0("table ", text, ";")))
+  uns <- tab_uns_of(p)
+  parse_tabulate_table(p, uns)
+  # what the TABLE parser notes for later (a table that does not parse, a
+  # feature outside the scope) is reported at once
+  if (length(uns$list)) abort_unsupported(paste0(uns$list[[1]]$msg, " (in `sas_tabulate_table()`)"))
+  if (!at_eof(p)) abort_syntax(paste0("unexpected ", tok_desc(p), " after the TABLE statement in `sas_tabulate_table()`"))
+  structure(text, class = c("sas_tabulate_table", "sas_stmt_text"))
 }

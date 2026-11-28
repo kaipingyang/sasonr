@@ -775,12 +775,11 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #'   gives the variable attributes of the output data sets and the log. When
 #'   vectorised code meets a data error the step is run again row by row from
 #'   its SAS text, as in [sas_run()].
-#' * [sas_proc_sort()], [sas_proc_print()], [sas_proc_means()], [sas_proc_summary()] and
-#'   [sas_proc_transpose()] take R
-#'   arguments (their own page). `sas_proc_freq()`,
-#'   `sas_proc_tabulate()`: the
+#' * [sas_proc_sort()], [sas_proc_print()], [sas_proc_means()], [sas_proc_summary()],
+#'   [sas_proc_transpose()] and [sas_proc_tabulate()] take R
+#'   arguments (their own page). `sas_proc_freq()`: the
 #'   options of the PROC statement and one argument per statement
-#'   (`by = "usubjid"`, `output = "out=m mean="`, `table = "grp, x*sum"`), as
+#'   (`tables = "grp"`), as
 #'   the program wrote them; a statement given twice is two arguments with
 #'   the same name.
 #' * `sas_proc_sql()`: the SQL statements of a PROC SQL step.
@@ -864,9 +863,9 @@ script_proc_lines <- function(st, line) {
   if (identical(as.integer(abs), as.integer(dflt))) line else as.integer(abs)
 }
 
-#' PROC SORT, PRINT, MEANS, SUMMARY and TRANSPOSE as R calls
+#' PROC SORT, PRINT, MEANS, SUMMARY, TRANSPOSE and TABULATE as R calls
 #'
-#' Run a PROC SORT, PRINT, MEANS, SUMMARY or TRANSPOSE step in a session from R arguments; the log,
+#' Run a PROC SORT, PRINT, MEANS, SUMMARY, TRANSPOSE or TABULATE step in a session from R arguments; the log,
 #' the listing and WORK of the session change as with [sas_run()]. These are
 #' the calls [sas_script()] writes for these steps, and the calls
 #' [sas_run()] itself runs for them.
@@ -901,7 +900,10 @@ script_proc_lines <- function(st, line) {
 #'   [sas_stats_output()]), `format`, `label`, `attrib`. PROC TRANSPOSE:
 #'   `out`, `prefix`, `suffix`, `delimiter`, `name`, `label`, `let`,
 #'   `noprint`; statements `var`, `id`, `idlabel`, `copy`, `by`, `where`,
-#'   `format`, `label`, `attrib`. FORMAT takes a named vector
+#'   `format`, `label`, `attrib`. PROC TABULATE: `out`, `classdata`,
+#'   `format`, `order`, `missing`, `exclusive`; statements `class`, `var`,
+#'   `table` (built with [sas_tabulate_table()]), `keylabel`, `where`, `by`,
+#'   `format`, `label`. FORMAT takes a named vector
 #'   (`format = c(aval = "8.2")`). A statement value held in a variable is
 #'   injected with `!!`. Any other argument fails.
 #' @param .sas_src The SAS source of the step, [sas_src()]: the source echo
@@ -1039,10 +1041,12 @@ sas_proc_transpose <- function(session, data = NULL, ..., .sas_src = NULL) {
 }
 
 
-#' @rdname sas_step_verbs
+#' @rdname sas_proc_verbs
 #' @export
-sas_proc_tabulate <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("tabulate", options, list(...), line), line[1])
+sas_proc_tabulate <- function(session, data = NULL, ..., .sas_src = NULL) {
+  dots <- rlang::enexprs(...)
+  if (proc_old_form(data, dots)) return(proc_old_run("tabulate", session, data, dots, parent.frame()))
+  proc_verb_args("tabulate", session, list(data = data), dots, parent.frame(), .sas_src)
 }
 
 #' @rdname sas_step_verbs

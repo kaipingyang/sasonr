@@ -97,12 +97,14 @@ reference:
   - sas_dataset
   - sas_syntax
   - sas_stats_output
+  - sas_tabulate_table
   - sas_src
 - title: Procedures on data frames
   desc: Run one procedure on a data frame without writing a SAS program.
   contents:
   - sas_means_df
   - sas_transpose_df
+  - sas_tabulate_df
   - sas_data_procs
   - sas_sort_df
 - title: Front end (lexer, parser, analysis)

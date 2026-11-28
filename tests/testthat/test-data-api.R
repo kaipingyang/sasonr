@@ -19,7 +19,7 @@ test_that("BY groups give a list of tables", {
 })
 
 test_that("sas_tabulate_df() and sas_transpose_df()", {
-  t <- sas_tabulate_df(api_d, "grp all, x*(n sum)", class = "grp", var = "x")
+  t <- sas_tabulate_df(api_d, class = grp, var = x, table = sas_tabulate_table("grp all, x*(n sum)"))
   r <- api_ref("proc tabulate data=data; class grp; var x; table grp all, x*(n sum); run;")
   expect_identical(as.data.frame(t), as.data.frame(r$ods[[1]]))
   tr <- sas_transpose_df(api_d, var = "x")
@@ -32,14 +32,14 @@ test_that("sas_log() and sas_html() take the result", {
   expect_length(sas_log(m), 0L)
   expect_match(sas_html(m), "<table", fixed = TRUE)
   # the WARNINGs of the computation are its log
-  t <- sas_tabulate_df(api_d, "grp*grp", class = "grp")
+  t <- sas_tabulate_df(api_d, class = grp, table = sas_tabulate_table("grp*grp"))
   expect_match(as.character(sas_log(t)), "crossed with itself", fixed = TRUE)
 })
 
 test_that("arguments are checked", {
   expect_error(sas_means_df(api_d, var = "x; run; data y"), class = "sasonr_error")
   expect_error(sas_means_df(list(x = 1), var = "x"), class = "sasonr_error")
-  expect_error(sas_tabulate_df(api_d, c("a", "b")), class = "sasonr_error")
+  expect_error(sas_tabulate_df(api_d, table = sas_tabulate_table(c("a", "b"))), class = "sasonr_error")
 })
 
 test_that("sas_freq_df() gives the OneWayFreqs table of the program", {
