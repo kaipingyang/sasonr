@@ -186,8 +186,8 @@ The translation of the program writes the step as one call of
 PROC statement are arguments (`maxdec = 2`, `nway = TRUE`), the statistic
 keywords are `stats`, and each statement is an argument named after it:
 variable names (`class = c(arm, week)`, `var = aval`), a named vector for
-FORMAT (`format = c(aval = "8.2")`), and `sas_out_stats()` for the OUTPUT
-statement (`output = sas_out_stats(out = "m", mean = mval, std = c(sd_aval = aval))`).
+FORMAT (`format = c(aval = "8.2")`), and `sas_stats_output()` for the OUTPUT
+statement (`output = sas_stats_output(out = "m", mean = mval, std = c(sd_aval = aval))`).
 
 ```{r}
 cat(tail(as.character(sas_script(res)), 3), sep = "\n")

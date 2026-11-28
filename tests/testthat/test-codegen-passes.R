@@ -92,7 +92,7 @@ test_that("a baseline set at FIRST. becomes one grouped value per BY group", {
   withr::local_options(sasonr.passes = "by_first_value")
   e <- step_exprs(baseline)[[1]]
   nm <- all.names(e)
-  expect_false(any(c("sas_carry", ".cv_base_1", ".cs_base_1") %in% nm))
+  expect_false(any(c("sas_rt_carry", ".cv_base_1", ".cs_base_1") %in% nm))
   expect_true(all(c("group_by", "ungroup", "first", "cumsum") %in% nm))
   txt <- sas_translate(baseline)$steps[[2]]$code
   expect_match(txt, "dplyr::group_by(.grp = cumsum(first.usubjid))", fixed = TRUE)
@@ -143,7 +143,7 @@ data chg;
 run;
 "
   withr::local_options(sasonr.passes = "by_first_value")
-  expect_false("sas_carry" %in% step_names(code2))
+  expect_false("sas_rt_carry" %in% step_names(code2))
   expect_identical(sas_run(code2)$work$chg$base, c(1, 1, 3, 4))
   expect_same_run(code2)
 })
@@ -152,7 +152,7 @@ test_that("patterns the baseline pass cannot prove equal are left alone", {
   withr::local_options(sasonr.passes = "by_first_value")
   not_rewritten <- function(step) {
     code <- paste0(lab_data, step)
-    expect_true("sas_carry" %in% step_names(code))
+    expect_true("sas_rt_carry" %in% step_names(code))
     expect_same_run(code)
   }
   # an expression, not a column: evaluated per row it can write a NOTE

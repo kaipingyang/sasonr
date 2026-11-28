@@ -52,7 +52,7 @@ translate_proc_transpose <- function(step, meta, last) {
     sprintf("# ---- PROC TRANSPOSE (SAS line %d)", as.integer(step$line)),
     paste0(".df <- ", proc_source_code(b$inp)),
     paste0(".r <- sas_rt_transpose(.df, ", r_lit(spec), ")"),
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+    ".meta <- c(.meta, sas_rt_store(work, .r$out))"
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TRANSPOSE", line = step$line,
        outputs = spec$out, meta = list())
@@ -124,7 +124,7 @@ sas_rt_transpose <- function(df, sp) {
   value_of <- function(v, rows) {
     x <- df[[v]][rows]
     if (!any_char) return(x)
-    if (info[[v]]$char) return(sas_rtrim(x))
+    if (info[[v]]$char) return(sas_rt_rtrim(x))
     sas_format(x, info[[v]]$fmt)
   }
   col_len <- if (any_char) max(vapply(vars, function(v) {

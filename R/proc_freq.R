@@ -573,9 +573,9 @@ translate_proc_freq <- function(step, meta, last) {
     header,
     paste0(".df <- ", proc_source_code(inp)),
     paste0(".r <- sas_rt_proc(\"freq\", .df, ", r_lit(spec), ")"),
-    ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
+    ".lst <- sas_rt_lst_c(.lst, sas_rt_titles_once(.titles, .r$listing))",
     ".ods <- c(.ods, Filter(function(tb) !identical(attr(tb, \"template\", exact = TRUE), \"base.freq.lines\"), .r$tables))",
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+    ".meta <- c(.meta, sas_rt_store(work, .r$out))"
   )
   out_names <- c(vctrs::list_unchop(lapply(requests, function(r) r$opts$out$name), ptype = character(), name_spec = rlang::zap()), spec$output$name)
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC FREQ", line = step$line,
@@ -614,7 +614,7 @@ freq_levels <- function(x, wt, info, order) {
     formatted = if (is.numeric(x) && is.null(info$fmt)) io else order(txt, method = "radix"),
     freq = {
       cnt <- vapply(u, function(k) sum(wt[key == k]), 1)
-      miss <- if (is.numeric(x)) !is.na(sas_miss_code(rv)) else !nzchar(sas_rtrim(rv))
+      miss <- if (is.numeric(x)) !is.na(sas_miss_code(rv)) else !nzchar(sas_rt_rtrim(rv))
       order(!miss, -cnt, txt, method = "radix")
     }
   )
@@ -622,7 +622,7 @@ freq_levels <- function(x, wt, info, order) {
 }
 
 freq_is_missing <- function(x) {
-  if (is.character(x)) !nzchar(sas_rtrim(x)) else is.na(x)
+  if (is.character(x)) !nzchar(sas_rt_rtrim(x)) else is.na(x)
 }
 
 # subset the levels of a freq_levels() result (MISSPRINT statistics use the
@@ -1133,9 +1133,9 @@ freq_oneway_listing <- function(tb) {
       if (!isTRUE(o$nofreq)) s <- paste0(s, formatC(if (mp) "." else freq_num(cum[j]), width = 13L), " ")
       if (show_pct) s <- paste0(s, formatC(if (mp) "." else freq_pct(cpct[j]), width = 12L), "  ")
     }
-    sas_rtrim(s)
+    sas_rt_rtrim(s)
   }, "")
-  lst <- c(if (show_cum) sas_rtrim(top), head, strrep("-", width), body)
+  lst <- c(if (show_cum) sas_rt_rtrim(top), head, strrep("-", width), body)
   # centred under the table, rounding up
   if (nmiss > 0) lst <- c(lst, "", freq_center_up(paste0("Frequency Missing = ", freq_num(nmiss)), width))
   lst <- c(lst, "")
@@ -1226,7 +1226,7 @@ freq_twoway <- function(tab, obs, lv, vars, info, o, nmiss, sp, title = NULL, st
   C <- max(c(8L, nchar(lc$text), 7L))
   chv <- lc$text
   if (!is.null(ci$fmt) && !is.null(user_fmt(ci$fmt$name, is.character(lc$values) || isTRUE(ci$fmt$char)))) {
-    chv <- substr(sas_rtrim(sas_format(lc$values, ci$fmt)), 1L, C)
+    chv <- substr(sas_rt_rtrim(sas_format(lc$values, ci$fmt)), 1L, C)
     chv[is.na(chv)] <- lc$text[is.na(chv)]
   }
   attr(tb, "freq") <- list(ri = ri, ci = ci, rtext = lr$text, ctext = lc$text, chead = chv, title = title, stratum = stratum,
@@ -1319,16 +1319,16 @@ freq_crosstab_listing <- function(tb) {
       k <- k + 1L
       vals <- vapply(seq_len(nc), function(cc) txt(s, at(r, cc, s)), "")
       totv <- if (s %in% c("freq", "pct")) txt(s, at(r, NA, s)) else ""
-      lines <- c(lines, sas_rtrim(paste0(if (k <= length(rv)) rv[k] else strrep(" ", R), "|", paste(vapply(vals, cell, ""), collapse = "|"), "|",
+      lines <- c(lines, sas_rt_rtrim(paste0(if (k <= length(rv)) rv[k] else strrep(" ", R), "|", paste(vapply(vals, cell, ""), collapse = "|"), "|",
                                          formatC(totv, width = 7L))))
     }
     lst <- c(lst, lines, sep)
   }
   tl <- paste0(formatC("Total", width = -R), " ", paste(vapply(seq_len(nc), function(cc) cell(freq_num(at(NA, cc, "freq"))), ""), collapse = " "),
                " ", formatC(freq_num(at(NA, NA, "freq")), width = 7L))
-  lst <- c(lst, sas_rtrim(tl))
+  lst <- c(lst, sas_rt_rtrim(tl))
   if ("pct" %in% names(labels)) {
-    lst <- c(lst, sas_rtrim(paste0(strrep(" ", R), " ", paste(vapply(seq_len(nc), function(cc) cell(freq_pct(at(NA, cc, "pct"))), ""), collapse = " "),
+    lst <- c(lst, sas_rt_rtrim(paste0(strrep(" ", R), " ", paste(vapply(seq_len(nc), function(cc) cell(freq_pct(at(NA, cc, "pct"))), ""), collapse = " "),
                                    " ", formatC(freq_pct(at(NA, NA, "pct")), width = 7L))))
   }
   if (a$nmiss > 0 && is.null(a$stratum)) lst <- c(lst, "", paste0("Frequency Missing = ", freq_num(a$nmiss)))
@@ -1471,9 +1471,9 @@ freq_list_listing <- function(tb) {
       s <- paste0(s, formatC(freq_num(tb$CumFrequency[r]), width = 13L), " ")
       if (show_pct) s <- paste0(s, formatC(freq_pct(tb$CumPercent[r]), width = 12L), "  ")
     }
-    sas_rtrim(s)
+    sas_rt_rtrim(s)
   }, "")
-  lst <- c(if (show_cum) sas_rtrim(top), head, strrep("-", width), body)
+  lst <- c(if (show_cum) sas_rt_rtrim(top), head, strrep("-", width), body)
   if (a$nmiss > 0) lst <- c(lst, "", freq_center_up(paste0("Frequency Missing = ", freq_num(a$nmiss)), width))
   c(lst, "")
 }
@@ -2278,8 +2278,8 @@ freq_request_stats <- function(tab, lv, vars, info, o, sp, nmiss) {
       }
       sel <- bo$level_index
     } else if (!is.null(bo$level)) {
-      want_txt <- sas_rtrim(as.character(bo$level))
-      hit <- which(sas_rtrim(txt) == want_txt)
+      want_txt <- sas_rt_rtrim(as.character(bo$level))
+      hit <- which(sas_rt_rtrim(txt) == want_txt)
       if (length(hit) == 0) abort_runtime(paste0("The value ", want_txt, " of the LEVEL= option is not a level of the table variable."))
       sel <- hit[1]
     }
@@ -2904,7 +2904,7 @@ freq_riskdiff_listing <- function(tb) {
                                                                               tb$ExactLowerCL[i], tb$ExactUpperCL[i])[seq_len(k)], num, ""), collapse = ""))
   head2 <- function(txt) formatC(paste0(strrep(" ", (17L - nchar(txt)) %/% 2L), txt), width = -17L)
   out <- c(freq_head_over(paste0("Column ", a$column, " Risk Estimates"), 77L), "",
-           sas_rtrim(paste0(strrep(" ", 38L), head2(a$level), strrep(" ", 5L), head2(paste("Exact", a$level)))),
+           sas_rt_rtrim(paste0(strrep(" ", 38L), head2(a$level), strrep(" ", 5L), head2(paste("Exact", a$level)))),
            "                  Risk        ASE     Confidence Limits     Confidence Limits", strrep("-", 77),
            row(tb$Row[1], 1L, 6L), row(tb$Row[2], 2L, 6L), row(tb$Row[3], 3L, 6L), "",
            row("Difference", 4L, if (a$exact) 6L else 4L), "", freq_head_over("Difference is (Row 1 - Row 2)", 77L),

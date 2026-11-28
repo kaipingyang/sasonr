@@ -502,7 +502,7 @@ translate_proc <- function(step, meta, last = NULL) {
     paste0(".df <- ", proc_source_code(inp, obs_col = TRUE)),
     if (length(vars) > 0) c(
       paste0(".r <- sas_rt_proc(\"print\", .df, ", r_lit(spec), ")"),
-      ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
+      ".lst <- sas_rt_lst_c(.lst, sas_rt_titles_once(.titles, .r$listing))",
       ".ods <- c(.ods, .r$tables)"
     )
   )
@@ -512,9 +512,22 @@ translate_proc <- function(step, meta, last = NULL) {
 
 # Runtime -------------------------------------------------------------------------
 
-#' PROC SORT: stable sort (missing values first) with optional NODUPKEY
+#' Sort a data frame as PROC SORT does
+#'
+#' The data-level form of PROC SORT ([sas_proc_sort()] runs it in a
+#' session): a stable sort by the BY variables, missing values before every
+#' number, character values in the SAS collating sequence.
+#' @param df A data frame.
+#' @param by Names of the BY variables.
+#' @param descending One logical per BY variable: sort it in descending
+#'   order.
+#' @param nodupkey Keep the first observation of each BY group.
+#' @param noduprecs Delete an observation identical to the one before.
+#' @return The sorted data frame (a tibble).
+#' @examples
+#' sas_sort_df(data.frame(id = c(2, NA, 1), x = 1:3), by = "id")
+#' sas_sort_df(data.frame(g = c("a", "a", "b")), by = "g", nodupkey = TRUE)
 #' @export
-#' @keywords internal
 sas_sort_df <- function(df, by, descending = rep(FALSE, length(by)), nodupkey = FALSE, noduprecs = FALSE) {
   rt <- rt_diag()
   df <- df[sas_order(df, by, descending), , drop = FALSE]
@@ -535,7 +548,7 @@ sas_sort_df <- function(df, by, descending = rep(FALSE, length(by)), nodupkey = 
 #' Apply FIRSTOBS= / OBS= to a data frame (after WHERE)
 #' @export
 #' @keywords internal
-sas_obs_window <- function(df, firstobs = NULL, obs = NULL) {
+sas_rt_obs_window <- function(df, firstobs = NULL, obs = NULL) {
   from <- firstobs %||% 1
   to <- min(obs %||% nrow(df), nrow(df))
   df[seq_len(max(0, to - from + 1)) + from - 1, , drop = FALSE]
@@ -901,9 +914,9 @@ format_def_value <- function(d) {
 
 translate_proc_format <- function(step) {
   defs <- lapply(step$defs, format_def_value)
-  for (d in defs) sas_define_format(d)
+  for (d in defs) sas_rt_define_format(d)
   code <- c(sprintf("# ---- PROC FORMAT (SAS line %d)", as.integer(step$line)),
-            vapply(defs, function(d) paste0("sas_define_format(", r_lit(d), ")"), ""))
+            vapply(defs, function(d) paste0("sas_rt_define_format(", r_lit(d), ")"), ""))
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC FORMAT", line = step$line,
        outputs = character(), meta = list())
 }

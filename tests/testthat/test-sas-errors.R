@@ -28,7 +28,7 @@ test_that("%SYSFUNC keeps blanks quoted with %STR()", {
 })
 
 test_that("FILE into a directory that does not exist is an ERROR, not an R error", {
-  expect_error(sas_file_write(file.path(tempfile(), "no", "x.txt"), "a"), class = "sasonr_runtime_error")
+  expect_error(sas_rt_file_write(file.path(tempfile(), "no", "x.txt"), "a"), class = "sasonr_runtime_error")
 })
 
 test_that("%SUBSTR with a length past the end warns and returns the rest", {

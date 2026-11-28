@@ -7,7 +7,7 @@
 # Equality key of a column: character values without trailing blanks;
 # special missing values (.A-.Z, ._) as distinct sentinels below every number.
 sql_norm_key <- function(x) {
-  if (is.character(x)) return(sas_rtrim(x))
+  if (is.character(x)) return(sas_rt_rtrim(x))
   code <- sas_miss_code(x)
   sp <- !is.na(code) & code != 1L
   x[is.na(x)] <- NA_real_
@@ -25,7 +25,7 @@ sas_f_sqlcase <- function(...) {
   out <- rep_len(els, n)
   done <- rep(FALSE, n)
   for (j in seq(1L, k - 1L, by = 2L)) {
-    hit <- rep_len(sas_true(a[[j]]), n) & !done
+    hit <- rep_len(sas_rt_true(a[[j]]), n) & !done
     if (any(hit)) out[hit] <- rep_len(a[[j + 1L]], n)[hit]
     done <- done | hit
   }
@@ -43,9 +43,9 @@ sas_f_sqlinlist <- function(x, ...) {
 #' @export
 sas_f_sqllike <- function(x, pattern, escape = NULL) {
   n <- max(length(x), length(pattern))
-  x <- rep_len(sas_rtrim(x), n)
-  pattern <- rep_len(sas_rtrim(pattern), n)
-  esc <- if (is.null(escape)) "" else sas_rtrim(escape)[1]
+  x <- rep_len(sas_rt_rtrim(x), n)
+  pattern <- rep_len(sas_rt_rtrim(pattern), n)
+  esc <- if (is.null(escape)) "" else sas_rt_rtrim(escape)[1]
   pats <- unique(pattern)
   out <- logical(n)
   for (pt in pats) {
@@ -73,10 +73,10 @@ sql_rx_quote <- function(ch) if (grepl("[][{}()*+?.\\\\^$|]", ch)) paste0("\\", 
 
 #' @export
 sas_f_sqlquant <- function(x, values, op, quant) {
-  f <- switch(op, "=" = sas_eq, "^=" = sas_ne, "<" = sas_lt, "<=" = sas_le, ">" = sas_gt, ">=" = sas_ge)
+  f <- switch(op, "=" = sas_rt_eq, "^=" = sas_rt_ne, "<" = sas_rt_lt, "<=" = sas_rt_le, ">" = sas_rt_gt, ">=" = sas_rt_ge)
   res <- if (quant == "all") rep(TRUE, length(x)) else rep(FALSE, length(x))
   for (v in values) {
-    hit <- sas_true(f(x, v))
+    hit <- sas_rt_true(f(x, v))
     res <- if (quant == "all") res & hit else res | hit
   }
   as.numeric(res)
@@ -179,7 +179,7 @@ sql_duck_aggregate <- function(eng, gid, G, aggs, order_known = TRUE, line = NUL
       cn <- paste0("a", k)
       v <- a$arg
       if (is.character(v)) {
-        v <- sas_rtrim(v)
+        v <- sas_rt_rtrim(v)
         v[v == ""] <- NA_character_
         if (!a$fn %in% c("count", "freq", "n", "nmiss", "min", "max")) {
           abort_syntax(paste0("The ", toupper(a$fn), " summary function requires a numeric argument."))
@@ -320,7 +320,7 @@ sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
     v <- d[[c$id]]
     if (c$type == "char") {
       s <- if (is.null(c$format)) v else sas_format(v, c$format)
-      return(formatC(sas_rtrim(s), width = -widths[k], flag = "-"))
+      return(formatC(sas_rt_rtrim(s), width = -widths[k], flag = "-"))
     }
     s <- if (is.null(c$format)) sas_fmt_best(v, 8L) else sas_format(v, c$format)
     # the listing right-aligns missing values (w.d puts them in the units column)
@@ -344,8 +344,8 @@ sas_sql_listing <- function(rel, titles = character(), number = FALSE) {
   }
   # centring units: each TITLE line, the table
   top <- if (length(titles) > 0) lst_lines(c(titles, "")) else NULL
-  out <- c(vapply(head, function(h) sas_rtrim(paste(h, collapse = "  ")), ""),
+  out <- c(vapply(head, function(h) sas_rt_rtrim(paste(h, collapse = "  ")), ""),
            strrep("-", sum(widths) + 2L * (length(widths) - 1L)))
-  if (nrow(d) > 0) out <- c(out, sas_rtrim(rlang::exec(paste, !!!unname(cells), sep = "  ")))
+  if (nrow(d) > 0) out <- c(out, sas_rt_rtrim(rlang::exec(paste, !!!unname(cells), sep = "  ")))
   lst_c(top, lst_unit(c(out, "")))
 }

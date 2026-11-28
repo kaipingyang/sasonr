@@ -153,7 +153,7 @@ test_that("a PUT pointer beyond the line size fails loud", {
   expect_error(sas_run("data _null_; put @130 'xyzw'; run;"), "writing past the line size")
   # also before a `/`, also in a vectorised step
   expect_error(sas_run("data _null_; put @130 'xyzw' / 'b'; run;"), "writing past the line size")
-  expect_identical(sasonr:::sas_put_layout(list(list(k = "col", v = 132), list(k = "text", s = "x", blank = FALSE))),
+  expect_identical(sasonr:::sas_rt_put_layout(list(list(k = "col", v = 132), list(k = "text", s = "x", blank = FALSE))),
                    paste0(strrep(" ", 131), "x"))
   expect_error(sas_run("data a; do i = 1 to 2; output; end; run; data _null_; set a; p = 120 + 20 * i; put @p 'x'; run;"),
                "PUT pointer beyond the line size")

@@ -58,7 +58,7 @@ test_that("translated steps call only exported, base or package-prefixed functio
 test_that("steps without an R translation fail loud when their code is evaluated", {
   tr <- sas_translate("data a; x = 1; run; proc sql; create table b as select * from a; quit;
                        proc datasets lib=work nolist; delete b; quit;")
-  stub <- Filter(function(s) grepl("sas_untranslated", s$code, fixed = TRUE), tr$steps)
+  stub <- Filter(function(s) grepl("sas_rt_untranslated", s$code, fixed = TRUE), tr$steps)
   expect_length(stub, 2L)
   for (s in stub) {
     expect_error(eval(parse(text = s$code), envir = new.env(parent = globalenv())), class = "sasonr_unsupported")

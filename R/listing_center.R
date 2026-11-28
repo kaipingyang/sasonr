@@ -66,7 +66,7 @@ lst_center <- function(lst, ls) {
   for (k in unique(u)) {
     i <- which(u == k & nzchar(trimws(out)))
     if (!length(i)) next
-    w <- max(nchar(sas_rtrim(out[i])))
+    w <- max(nchar(sas_rt_rtrim(out[i])))
     off <- max(0L, (ls - w + if (isTRUE((attr(lst, "up", exact = TRUE) %||% FALSE)[i[1]])) 1L else 0L) %/% 2L)
     if (off > 0L) out[i] <- paste0(strrep(" ", off), out[i])
   }
@@ -78,4 +78,4 @@ lst_center <- function(lst, ls) {
 #' @param ... Listings.
 #' @export
 #' @keywords internal
-sas_lst_c <- function(...) lst_c(...)
+sas_rt_lst_c <- function(...) lst_c(...)

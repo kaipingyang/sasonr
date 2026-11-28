@@ -148,7 +148,7 @@ proc_var_info <- function(st, vars) {
 proc_value_text <- function(x, info) {
   if (is.character(x)) {
     s <- if (is.null(info$fmt)) x else sas_format(x, info$fmt)
-    return(trimws(sas_rtrim(s), which = "left") |> sas_rtrim())
+    return(trimws(sas_rt_rtrim(s), which = "left") |> sas_rt_rtrim())
   }
   trimws(sas_format(x, info$fmt))
 }
@@ -158,7 +158,7 @@ proc_value_text <- function(x, info) {
 # values keep their special-missing identity).
 proc_group_key <- function(x, info) {
   if (!is.null(info$fmt)) return(proc_value_text(x, info))
-  if (is.character(x)) return(sas_rtrim(x))
+  if (is.character(x)) return(sas_rt_rtrim(x))
   code <- sas_miss_code(x)
   ifelse(is.na(code), format(x, digits = 17, scientific = TRUE, trim = TRUE), paste0("\001miss", code))
 }
@@ -268,13 +268,13 @@ proc_out_meta <- function(cols) {
 #' @param outs Named list of `list(data, meta)`.
 #' @export
 #' @keywords internal
-sas_proc_store <- function(work, outs) {
+sas_rt_store <- function(work, outs) {
   meta <- list()
   for (nm in names(outs)) {
     d <- outs[[nm]]$data
     m <- outs[[nm]]$meta
     for (v in names(d)) {
-      if (is.character(d[[v]])) d[[v]] <- sas_char(d[[v]], m$len[[v]])
+      if (is.character(d[[v]])) d[[v]] <- sas_rt_char(d[[v]], m$len[[v]])
     }
     assign(nm, tibble::as_tibble(d), envir = work)
     meta[[nm]] <- m
@@ -314,7 +314,7 @@ render_table <- function(cols, gap = 4L, rule = TRUE) {
   widths <- vapply(cols, function(c) vctrs::vec_cast(c$width, integer()), 1L)
   pad <- function(x, w, r) formatC(x, width = if (r) w else -w)
   line_of <- function(vals) {
-    sas_rtrim(paste(mapply(pad, vals, widths, vapply(cols, `[[`, TRUE, "right")), collapse = strrep(" ", gap)))
+    sas_rt_rtrim(paste(mapply(pad, vals, widths, vapply(cols, `[[`, TRUE, "right")), collapse = strrep(" ", gap)))
   }
   hl <- vapply(seq_len(nh), function(j) line_of(vapply(heads, `[`, "", j)), "")
   n <- length(cols[[1]]$cells)

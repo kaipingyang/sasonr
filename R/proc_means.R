@@ -255,7 +255,7 @@ parse_means_output <- function(p) {
       advance(p, 2L)
       start <- p$pos
       out$out <- parse_ds_ref(p, "output")
-      # the text of a reference with options (sas_out_stats(), proc_api.R)
+      # the text of a reference with options (sas_stats_output(), proc_api.R)
       if (length(out$out$options)) out$out$text <- tok_render(p, start, p$pos - 1L)
       next
     }
@@ -308,9 +308,9 @@ translate_proc_means <- function(step, meta, last) {
     header,
     paste0(".df <- ", proc_source_code(b$inp)),
     paste0(".r <- sas_rt_proc(\"", pname, "\", .df, ", r_lit(spec), ")"),
-    ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
+    ".lst <- sas_rt_lst_c(.lst, sas_rt_titles_once(.titles, .r$listing))",
     ".ods <- c(.ods, .r$tables)",
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+    ".meta <- c(.meta, sas_rt_store(work, .r$out))"
   )
   outputs <- spec$outputs
   outs <- vapply(outputs, `[[`, "", "name")
@@ -494,7 +494,7 @@ means_stat_gate <- function(spec, line) {
 #' @param lst The listing lines of the procedure.
 #' @export
 #' @keywords internal
-sas_titles_once <- function(titles, lst) {
+sas_rt_titles_once <- function(titles, lst) {
   if (length(lst) == 0) return(character())
   lst_c(lst_lines(c(titles, if (length(titles) > 0) "")), lst)
 }
@@ -1087,9 +1087,9 @@ means_render <- function(cols, gaps) {
     pieces[seq.int(2L, 2L * length(cells) - 2L, 2L)] <- strrep(" ", gaps)
     paste(pieces, collapse = "")
   }
-  hl <- vapply(seq_len(nh), function(j) sas_rtrim(join(vapply(heads, `[`, "", j))), "")
+  hl <- vapply(seq_len(nh), function(j) sas_rt_rtrim(join(vapply(heads, `[`, "", j))), "")
   n <- length(cols[[1L]]$cells)
-  body <- if (n > 0) vapply(seq_len(n), function(i) sas_rtrim(join(vapply(cols, function(c) c$cells[i], ""))), "") else character()
+  body <- if (n > 0) vapply(seq_len(n), function(i) sas_rt_rtrim(join(vapply(cols, function(c) c$cells[i], ""))), "") else character()
   rule <- strrep("-", sum(widths) + sum(gaps))
   c(hl, rule, body, rule)
 }
@@ -1269,7 +1269,7 @@ listing_base_summary <- function(tb, ls) {
       # centring unit; a heading wider than its
       # table and the table are units of their own [measured, listings at
       # NOCENTER and CENTER]
-      av <- sas_rtrim(paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""))
+      av <- sas_rt_rtrim(paste0("Analysis Variable : ", vinfo[[1]]$disp, " ", vinfo[[1]]$label %||% ""))
       tw <- sum(vapply(pcols, function(c) vctrs::vec_cast(c$width, integer()), 1L)) + sum(gaps) -
         if (any(vapply(fixed, function(c) !isTRUE(c$right), TRUE))) 1L else 0L
       if (nchar(av) <= tw) {

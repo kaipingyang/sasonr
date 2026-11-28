@@ -25,7 +25,7 @@ environment with the WORK data sets as data frames), \code{.log} and \code{.lst}
 table) and \code{.titles} (the current TITLE lines), with the session of the
 run bound for the log NOTEs and \verb{_ERROR_}. Steps that sasonr runs itself
 (PROC SQL, PROC DATASETS) have no R translation: their code is a call of
-\code{sas_untranslated()}, which stops with a condition of class
+\code{sas_rt_untranslated()}, which stops with a condition of class
 \code{sasonr_unsupported}.
 
 Option \code{sasonr.passes} selects the readability passes applied to the code

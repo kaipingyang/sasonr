@@ -3,7 +3,7 @@
 # DSD rules.
 #
 # An input stream (`inf`) is an environment holding the records and the
-# current position. sas_input_stmt() executes one INPUT statement against it
+# current position. sas_rt_input_stmt() executes one INPUT statement against it
 # and returns the updated PDV; reaching the end of the data before the first
 # value of a statement stops the step (sasonr_stop), reaching it in the middle
 # is a LOST CARD (data error, then stop).
@@ -17,7 +17,7 @@
 #' @param instream `TRUE` for DATALINES/CARDS (records are padded to 80).
 #' @export
 #' @keywords internal
-sas_infile_open <- function(lines, line_no = seq_along(lines), opts = list(), instream = TRUE) {
+sas_rt_infile_open <- function(lines, line_no = seq_along(lines), opts = list(), instream = TRUE) {
   inf <- new.env(parent = emptyenv())
   first <- opts$firstobs %||% 1
   last <- min(opts$obs %||% length(lines), length(lines))
@@ -35,7 +35,7 @@ sas_infile_open <- function(lines, line_no = seq_along(lines), opts = list(), in
     lines <- paste0(lines, strrep(" ", pmax(0L, w - nchar(lines))))
   }
   inf$recs <- lines
-  inf$raw <- sas_rtrim(lines)
+  inf$raw <- sas_rt_rtrim(lines)
   inf$line_no <- line_no
   inf$nrec <- length(lines)
   inf$dsd <- isTRUE(opts$dsd)
@@ -72,7 +72,7 @@ lost_card <- function(inf) {
   rt_error("NOTE: LOST CARD.")
   load_record(inf, inf$nrec + 1L)
   inf$hold <- ""
-  sas_stop_step()
+  sas_rt_stop_step()
 }
 
 # Move to the next record inside a statement (`/`, FLOWOVER).
@@ -81,7 +81,7 @@ next_record <- function(inf) {
     # nothing read yet by this statement: a normal end of the data
     if (!isTRUE(inf$started)) {
       inf$eof <- TRUE
-      sas_stop_step()
+      sas_rt_stop_step()
     }
     lost_card(inf)
   }
@@ -100,7 +100,7 @@ input_begin <- function(inf) {
   nxt <- max(inf$r, if (inf$r > 0L) inf$base + inf$N - 1L else 0L) + 1L
   if (nxt > inf$nrec) {
     inf$eof <- TRUE
-    sas_stop_step()
+    sas_rt_stop_step()
   }
   inf$base <- nxt
   load_record(inf, nxt)
@@ -223,7 +223,7 @@ store_value <- function(pdv, item, text, inf, c1, c2, mode) {
     if (!is.null(fmt) && !is.null(user_fmt(fmt$name, TRUE, "invalue"))) {
       r <- sas_informat_read(text, fmt)
       if (!r$ok) invalid_data(inf, item, c1, c2)
-      pdv[[item$name]] <- sas_char(r$v, item$len)
+      pdv[[item$name]] <- sas_rt_char(r$v, item$len)
       return(pdv)
     }
     keep <- mode == "formatted" && !is.null(fmt) && fmt$name == "char"
@@ -234,7 +234,7 @@ store_value <- function(pdv, item, text, inf, c1, c2, mode) {
     } else {
       v <- read_char_field(text, fmt, keep)
     }
-    pdv[[item$name]] <- sas_char(v, item$len)
+    pdv[[item$name]] <- sas_rt_char(v, item$len)
     return(pdv)
   }
   f <- fmt %||% fmt_spec("", NA_integer_, item$cd %||% NA_integer_)
@@ -255,7 +255,7 @@ ptr_value <- function(v, pdv) {
 #' @param spec list(items, hold): see the generated code.
 #' @export
 #' @keywords internal
-sas_input_stmt <- function(inf, pdv, spec) {
+sas_rt_input_stmt <- function(inf, pdv, spec) {
   inf$read <- TRUE
   inf$pdv <- NULL
   inf$pdv_partial <- NULL
@@ -301,7 +301,7 @@ input_items <- function(inf, pdv, spec) {
         if (it$mode %in% c("list", "modified")) {
           f <- read_list_text(inf, it)
           if (is.null(f)) {
-            pdv[[it$name]] <- if (it$char) sas_char("", it$len) else NA_real_
+            pdv[[it$name]] <- if (it$char) sas_rt_char("", it$len) else NA_real_
             next
           }
           if (it$mode == "modified" && !is.null(it$fmt) && !it$char) {
@@ -313,7 +313,7 @@ input_items <- function(inf, pdv, spec) {
           f <- read_fixed_text(inf, it$from, it$to)
           inf$c <- (if (isTRUE(f$moved)) f$c2 else it$to) + 1L
           if (is.null(f)) {
-            pdv[[it$name]] <- if (it$char) sas_char("", it$len) else NA_real_
+            pdv[[it$name]] <- if (it$char) sas_rt_char("", it$len) else NA_real_
             next
           }
           pdv <- store_value(pdv, it, f$text, inf, f$c1, f$c2, "column")
@@ -323,7 +323,7 @@ input_items <- function(inf, pdv, spec) {
           f <- read_fixed_text(inf, inf$c, inf$c + w - 1L)
           if (is.null(f)) {
             inf$c <- inf$c + w
-            pdv[[it$name]] <- if (it$char) sas_char("", it$len) else NA_real_
+            pdv[[it$name]] <- if (it$char) sas_rt_char("", it$len) else NA_real_
             next
           }
           inf$c <- f$c1 + w
@@ -339,7 +339,7 @@ input_items <- function(inf, pdv, spec) {
 #' End of a DATA step iteration: release a record held by a trailing `@`
 #' @export
 #' @keywords internal
-sas_input_iter_end <- function(inf) {
+sas_rt_input_iter_end <- function(inf) {
   inf$bad_r <- NULL
   if (identical(inf$hold, "@")) inf$hold <- ""
   invisible()
@@ -348,7 +348,7 @@ sas_input_iter_end <- function(inf) {
 #' Is the current record the last one? (INFILE END=)
 #' @export
 #' @keywords internal
-sas_input_at_end <- function(inf) {
+sas_rt_input_at_end <- function(inf) {
   # in-stream data are read unbuffered: END= is never set to 1 for DATALINES
   if (inf$instream) return(0)
   as.numeric(inf$r >= inf$nrec)
@@ -387,24 +387,24 @@ input_buffer_lines <- function(inf) {
 #' statement once; the variables it reads start missing in every iteration.
 #' @export
 #' @keywords internal
-sas_read_input <- function(inf, spec, end_var = NULL) {
+sas_rt_read_input <- function(inf, spec, end_var = NULL) {
   vars <- list()
   for (it in spec$items) {
     if (it$k == "var" && is.null(vars[[it$name]])) {
-      vars[[it$name]] <- if (it$char) sas_char("", it$len) else NA_real_
+      vars[[it$name]] <- if (it$char) sas_rt_char("", it$len) else NA_real_
     }
   }
   rows <- list()
   ends <- numeric()
   repeat {
     ok <- tryCatch({
-      rec <- sas_input_stmt(inf, vars, spec)
+      rec <- sas_rt_input_stmt(inf, vars, spec)
       TRUE
     }, sasonr_stop = function(e) FALSE)
     if (!ok) break
     rows[[length(rows) + 1L]] <- rec
-    ends <- c(ends, sas_input_at_end(inf))
-    sas_input_iter_end(inf)
+    ends <- c(ends, sas_rt_input_at_end(inf))
+    sas_rt_input_iter_end(inf)
   }
   cols <- lapply(names(vars), function(v) {
     proto <- vars[[v]]
@@ -424,7 +424,7 @@ input_var_names <- function(r) {
 #' Read an external text file for INFILE (path relative to the working directory)
 #' @export
 #' @keywords internal
-sas_read_file <- function(path) {
+sas_rt_read_file <- function(path) {
   if (!file.exists(path)) abort_runtime(paste0("Physical file does not exist, ", path))
   lines <- readLines(path, warn = FALSE, encoding = "latin1")
   sub("\r$", "", lines)

@@ -9,16 +9,16 @@
 #     class `sasonr_strict_warning`, once per function and R session);
 #   - the format registry for PUT() and INPUT() (a format given as text such as
 #     "8.2" is parsed first) and, as before, for PUTN/PUTC/INPUTN/INPUTC;
-#   - character arguments with bytes outside ASCII (sas_chr_arg());
+#   - character arguments with bytes outside ASCII (sas_rt_chr_arg());
 #   - the argument domain of the policy table (fn_policy.R) through
-#     sas_fcall(): arguments outside the exact domain go through the same
+#     sas_rt_fcall(): arguments outside the exact domain go through the same
 #     strict gate, invalid arguments give SAS's missing result;
 #   - a data error (the invalid-argument NOTE, invalid data, a mathematical
 #     operation that could not be performed, `_ERROR_` set) is signalled as a
 #     warning of class `sasonr_data_error` that carries the NOTE text.
 # Inside a submission (translated code, %SYSFUNC, PROC code) and in calls that
 # one function makes to another, the functions run unwrapped: the analyzer,
-# sas_fcall() and the %SYSFUNC gate check them there.
+# sas_rt_fcall() and the %SYSFUNC gate check them there.
 #
 # This file is collated last: every exported sas_f_* function, except the
 # helpers of translated PROC SQL code listed in `fn_layer_internal`, is
@@ -54,9 +54,9 @@ fn_layer_call <- function(name, impl, call, env) {
     if (!is.null(v)) vals[[i]] <- v
   }
   feature_check("function", name, context = "data")
-  # character arguments with bytes outside ASCII (sas_chr_arg(); PUT and INPUT
+  # character arguments with bytes outside ASCII (sas_rt_chr_arg(); PUT and INPUT
   # check their values themselves)
-  if (!name %in% c(chr_wide_ok_fns, "put", "input")) for (v in vals) sas_chr_arg(v, name)
+  if (!name %in% c(chr_wide_ok_fns, "put", "input")) for (v in vals) sas_rt_chr_arg(v, name)
   if (name %in% names(fn_layer_fmt_arg)) {
     k <- match("fmt", nms)
     if (!is.na(k) && !empty[k]) vals[[k]] <- fn_layer_fmt(vals[[k]], fn_layer_fmt_arg[[name]])
@@ -71,7 +71,7 @@ fn_layer_call <- function(name, impl, call, env) {
       # code passes them: formals in order, NULL for an empty or omitted one
       # before a given one, `...` in place; the implementation gets the call
       # as written
-      rlang::exec(sas_fcall, name, run, !!!fn_layer_positional(impl, nms, vals, empty),
+      rlang::exec(sas_rt_fcall, name, run, !!!fn_layer_positional(impl, nms, vals, empty),
                   !!!if (".at" %in% nms) list(.at = vals[[match(".at", nms)]]))
     } else {
       eval(exact, env)

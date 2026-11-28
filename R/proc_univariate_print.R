@@ -75,11 +75,11 @@ univ_print_var <- function(x0, disp, label = NULL) {
   mode <- if (cnt > 1L || n == 1L) modes[1] else NA_real_
   loc <- fmt_d_column(c(st$mean, st$median, mode), 8L, 6L)
   var <- fmt_d_column(c(st$std, st$var, st$range, st$q3 - st$q1), 10L, 4L)
-  bline <- function(l1, v1, l2, v2) sas_rtrim(paste0(formatC(l1, width = -6L), "  ", formatC(v1, width = 9L), "     ",
+  bline <- function(l1, v1, l2, v2) sas_rt_rtrim(paste0(formatC(l1, width = -6L), "  ", formatC(v1, width = 9L), "     ",
                                                      formatC(l2, width = -19L), "  ", formatC(v2, width = 11L)))
   basic <- c("    Location                    Variability", "",
              bline("Mean", loc[1], "Std Deviation", var[1]), bline("Median", loc[2], "Variance", var[2]),
-             bline("Mode", loc[3], "Range", var[3]), sas_rtrim(paste0(strrep(" ", 22L), formatC("Interquartile Range", width = -19L), "  ",
+             bline("Mode", loc[3], "Range", var[3]), sas_rt_rtrim(paste0(strrep(" ", 22L), formatC("Interquartile Range", width = -19L), "  ",
                                                                          formatC(var[4], width = 11L))))
   basic <- univ_titled("Basic Statistical Measures", basic)
   note <- if (cnt > 1L && length(modes) > 1L) {

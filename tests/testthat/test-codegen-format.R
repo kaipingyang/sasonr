@@ -3,7 +3,7 @@
 fmt_cases <- function() {
   list(
     quote(x <- f(a, b)),
-    quote(z <- sas_put_rows(list(sas_put_line(sas_put_named("r1", .d$r1), sas_put_named("r2", .d$r2))), list(TRUE), n = nrow(.d))),
+    quote(z <- sas_rt_put_rows(list(sas_rt_put_line(sas_rt_put_named("r1", .d$r1), sas_rt_put_named("r2", .d$r2))), list(TRUE), n = nrow(.d))),
     quote(.status <- tryCatch({
       a <- 1
       "ok"
@@ -21,7 +21,7 @@ fmt_cases <- function() {
       out <- 2
     }),
     cg_pipe(quote(tibble::tibble(.rows = 1L)), list(quote(dplyr::mutate(r1 = sas_f_abs(3.5))), quote(dplyr::select(r1))), target = "lab"),
-    cg_pipe(quote(sas_read_input(sas_infile_open(c("S01 1 10", "S01 2 12", "S02 1 20", "S02 2 18"), c(5L, 6L, 7L, 8L)))),
+    cg_pipe(quote(sas_rt_read_input(sas_rt_infile_open(c("S01 1 10", "S01 2 12", "S02 1 20", "S02 2 18"), c(5L, 6L, 7L, 8L)))),
             list(quote(select(usubjid, visit, aval))), target = "lab")
   )
 }
@@ -29,9 +29,8 @@ fmt_cases <- function() {
 test_that("long calls put one argument per line and short ones stay on one line", {
   expect_identical(cg_format(quote(x <- f(a, b))), "x <- f(a, b)")
   out <- cg_format(fmt_cases()[[2]])
-  expect_identical(out, c("z <- sas_put_rows(",
-                          "  list(sas_put_line(sas_put_named(\"r1\", .d$r1), sas_put_named(\"r2\", .d$r2))),",
-                          "  list(TRUE),", "  n = nrow(.d)", ")"))
+  expect_identical(out, c("z <- sas_rt_put_rows(", "  list(", "    sas_rt_put_line(", "      sas_rt_put_named(\"r1\", .d$r1),",
+                          "      sas_rt_put_named(\"r2\", .d$r2)", "    )", "  ),", "  list(TRUE),", "  n = nrow(.d)", ")"))
   expect_true(all(nchar(unlist(lapply(fmt_cases(), function(e) cg_format(cg_normalize(e))))) <= 80L))
 })
 
@@ -71,7 +70,7 @@ test_that("the text parses back to the code and is what air writes", {
 })
 
 test_that("the backend object carries the line width and dispatches the layout (spec 09 L6c)", {
-  e <- quote(z <- sas_put_rows(list(sas_put_line(sas_put_named("r1", .d$r1))), list(TRUE), n = nrow(.d)))
+  e <- quote(z <- sas_rt_put_rows(list(sas_rt_put_line(sas_rt_put_named("r1", .d$r1))), list(TRUE), n = nrow(.d)))
   expect_identical(cg_emit(cg_backend(), e), cg_format(e))
   expect_length(cg_emit(cg_backend(width = 200L), e), 1L)
   expect_s3_class(cg_backend(), c("cg_backend_air", "cg_backend"))

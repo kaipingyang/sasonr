@@ -37,7 +37,7 @@ mv_note_fns <- c("round", "rounde", "roundz", "int", "intz", "floor", "floorz", 
 #' "Missing values were generated" NOTE at the call's position
 #' @export
 #' @keywords internal
-sas_mv_args <- function(.at, ..., .exact = TRUE) {
+sas_rt_mv_args <- function(.at, ..., .exact = TRUE) {
   args <- list(...)
   num <- Filter(function(a) is.numeric(a) && length(a) > 0, args)
   if (length(num)) rlang::exec(sas_mv_count, .at, !!!unname(num), .exact = .exact)
@@ -52,7 +52,7 @@ mv_result_fns <- c("abs", "min", "max", "sum", "mean")
 #' Count missing results of a function call for the missing-value NOTE
 #' @export
 #' @keywords internal
-sas_mv_res <- function(res, .at, .exact = TRUE) {
+sas_rt_mv_res <- function(res, .at, .exact = TRUE) {
   # a special missing result (SUM(.A) is .A) is not counted
   if (anyNA(res)) {
     plain <- ifelse(sas_miss_code(res) %in% 1L, res, 0)
@@ -84,7 +84,7 @@ sas_mv_count <- function(.at, ..., .exact = TRUE) {
 #' Arithmetic operators `+ - *` with SAS missing-value semantics and NOTEs
 #' @export
 #' @keywords internal
-sas_arith <- function(a, b, op, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
+sas_rt_arith <- function(a, b, op, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
   r <- switch(op, "+" = a + b, "-" = a - b, "*" = a * b)
   if (anyNA(a) || anyNA(b)) {
     n <- max(length(a), length(b))
@@ -94,7 +94,7 @@ sas_arith <- function(a, b, op, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_
     cnt <- (ma | mb) & !(.gen_a & ma) & !(.gen_b & mb)
     if (any(cnt)) sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
   }
-  sas_num(r, .at)
+  sas_rt_num(r, .at)
 }
 
 # Sort "line:col" keys by position.
@@ -133,7 +133,7 @@ compile_notes <- function() {
 #' Returns `d` unchanged.
 #' @export
 #' @keywords internal
-sas_note_read <- function(df, name, where = NULL) {
+sas_rt_note_read <- function(df, name, where = NULL) {
   rt <- rt_diag()
   rt$reads[[length(rt$reads) + 1L]] <- list(name = name, n = nrow(df), where = where, nvar = sum(names(df) != ".obs"))
   df

@@ -18,7 +18,7 @@ fmt_attr_text <- function(f) {
 export_values <- function(x, fmt) {
   if (is.character(x)) {
     out <- if (is.null(fmt)) x else sas_format(x, fmt)
-    return(sas_rtrim(sub("^ +", "", out)))
+    return(sas_rt_rtrim(sub("^ +", "", out)))
   }
   out <- trimws(sas_format(x, fmt))
   out[is.na(x) & out == "."] <- ""

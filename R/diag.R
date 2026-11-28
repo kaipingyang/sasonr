@@ -4,8 +4,8 @@
 # the active session (`rt_diag()`, session.R): invalid function arguments,
 # division by zero, overflow, invalid data.
 # L3 code copies the flag into `_ERROR_` after each statement that can raise
-# one (sas_err_sync) and writes the SAS-style PDV dump at the end of the
-# iteration (sas_iter_dump). Vectorised (L1/L2) code only needs to know that
+# one (sas_rt_err_sync) and writes the SAS-style PDV dump at the end of the
+# iteration (sas_rt_iter_dump). Vectorised (L1/L2) code only needs to know that
 # an error happened at all: the engine then re-runs the step as L3.
 #
 # Fields of the run-time state (`SasSession$rt`): per submission prx,
@@ -56,7 +56,7 @@ arg_ord <- c("first", "second", "third", "fourth", "fifth")
 # A character argument in an invalid-argument NOTE: at most 12 characters are
 # shown ("'abababababab'[12 of 200 characters shown]").
 note_chr <- function(v, trim = TRUE) {
-  t <- if (trim) sas_rtrim(v) else v
+  t <- if (trim) sas_rt_rtrim(v) else v
   if (nchar(t) > 12) return(sprintf("'%s'[12 of %d characters shown]", substr(t, 1L, 12L), nchar(v)))
   paste0("'", if (nzchar(t)) gsub("'", "''", t, fixed = TRUE) else " ", "'")
 }
@@ -102,7 +102,7 @@ note_invalid_arg <- function(fname, argn = NULL, .at = NULL, args = NULL, bad = 
 #' supported.
 #' @export
 #' @keywords internal
-sas_where_cond <- function(x) {
+sas_rt_where_cond <- function(x) {
   rt <- rt_diag()
   saved <- list(err = rt$err, notes = rt$notes, places = log_places_save(rt), mv_rerun = rt$mv_rerun)
   force(x)
@@ -133,7 +133,7 @@ note_math <- function(.at = NULL, n = 1L) {
 #' Called from generated L3 code after statements that can raise data errors.
 #' @export
 #' @keywords internal
-sas_err_sync <- function(pdv) {
+sas_rt_err_sync <- function(pdv) {
   rt <- rt_diag()
   if (!rt$err && length(rt$notes) == 0) return(pdv)
   env <- parent.frame()
@@ -151,7 +151,7 @@ sas_err_sync <- function(pdv) {
 #'   `fmts` named list of formats.
 #' @export
 #' @keywords internal
-sas_dump_spec <- function(vars, names, fmts = list()) {
+sas_rt_dump_spec <- function(vars, names, fmts = list()) {
   d <- new.env(parent = emptyenv())
   d$vars <- vars
   d$names <- names
@@ -172,7 +172,7 @@ dump_value <- function(v, fmt) {
 #' `_ERROR_` and `_N_`, as in the error dump (measured)
 #' @export
 #' @keywords internal
-sas_put_all <- function(pdv, st) {
+sas_rt_put_all <- function(pdv, st) {
   spec <- st$dump
   vals <- vapply(seq_along(spec$vars), function(k) {
     v <- spec$vars[k]
@@ -189,11 +189,11 @@ sas_put_all <- function(pdv, st) {
 #' `var=value ... _ERROR_=1 _N_=n`. At most 20 dumps per step (ERRORS=20).
 #' @export
 #' @keywords internal
-sas_iter_dump <- function(pdv, spec, inf = NULL) {
+sas_rt_iter_dump <- function(pdv, spec, inf = NULL) {
   # the state of a row-by-row step holds its dump spec
   if (is.environment(spec) && !is.null(spec$dump)) spec <- spec$dump
   err <- pdv[["_error_"]]
-  if (is.null(err) || !sas_true(err)) return(character())
+  if (is.null(err) || !sas_rt_true(err)) return(character())
   spec$count <- spec$count + 1L
   if (spec$count > 20L) return(character())
   out <- character()

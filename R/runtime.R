@@ -49,7 +49,7 @@ sas_miss_code <- function(x) {
 }
 
 sas_is_missing <- function(x) {
-  if (is.character(x)) !nzchar(sas_rtrim(x)) else is.na(x)
+  if (is.character(x)) !nzchar(sas_rt_rtrim(x)) else is.na(x)
 }
 
 miss_label <- function(code) {
@@ -59,12 +59,12 @@ miss_label <- function(code) {
 # Character helpers -----------------------------------------------------
 
 #' @export
-sas_rtrim <- function(x) sub(" +$", "", x)
+sas_rt_rtrim <- function(x) sub(" +$", "", x)
 
 #' Store a value in a character variable of a given length (truncate / pad)
 #' @export
 #' @keywords internal
-sas_char <- function(x, len) {
+sas_rt_char <- function(x, len) {
   if (is.numeric(x)) x <- sas_fmt_best(x, 12L)
   if (anyNA(x)) x[is.na(x)] <- ""
   wide <- chr_wide(x)
@@ -169,13 +169,13 @@ chr_bytes_call <- function(name, f, args, chr = FALSE) {
 ascii_lower <- function(x) chartr("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", x)
 ascii_upper <- function(x) chartr("abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", x)
 
-# sas_char() for values with bytes outside ASCII: the stored value is the
+# sas_rt_char() for values with bytes outside ASCII: the stored value is the
 # first `len` bytes, padded with blanks to `len` bytes.  A cut inside a
 # multi-byte character leaves bytes that are not a character: not supported.
 sas_char_bytes <- function(x, len, wide) {
   len <- rep_len(len, length(x))
   out <- character(length(x))
-  if (any(!wide)) out[!wide] <- sas_char(x[!wide], len[!wide])
+  if (any(!wide)) out[!wide] <- sas_rt_char(x[!wide], len[!wide])
   w <- which(wide)
   s <- chr_utf8(x[w])
   for (k in seq_along(w)) {
@@ -198,7 +198,7 @@ sas_char_bytes <- function(x, len, wide) {
 as_sas_chr <- function(x) if (is.numeric(x)) sas_fmt_best(x, 12L) else x
 
 #' @export
-sas_concat <- function(a, b) paste0(as_sas_chr(a), as_sas_chr(b))
+sas_rt_concat <- function(a, b) paste0(as_sas_chr(a), as_sas_chr(b))
 
 # Comparisons -------------------------------------------------------------
 
@@ -208,7 +208,7 @@ recycle2 <- function(a, b) {
 }
 
 chr_cmp <- function(a, b) {
-  ab <- recycle2(sas_rtrim(a), sas_rtrim(b))
+  ab <- recycle2(sas_rt_rtrim(a), sas_rt_rtrim(b))
   a <- ab[[1]]
   b <- ab[[2]]
   n <- length(a)
@@ -251,26 +251,26 @@ sas_cmp <- function(a, b) {
 }
 
 #' @export
-sas_eq <- function(a, b) as.numeric(sas_cmp(a, b) == 0L)
+sas_rt_eq <- function(a, b) as.numeric(sas_cmp(a, b) == 0L)
 #' @export
-sas_ne <- function(a, b) as.numeric(sas_cmp(a, b) != 0L)
+sas_rt_ne <- function(a, b) as.numeric(sas_cmp(a, b) != 0L)
 #' @export
-sas_lt <- function(a, b) as.numeric(sas_cmp(a, b) < 0L)
+sas_rt_lt <- function(a, b) as.numeric(sas_cmp(a, b) < 0L)
 #' @export
-sas_le <- function(a, b) as.numeric(sas_cmp(a, b) <= 0L)
+sas_rt_le <- function(a, b) as.numeric(sas_cmp(a, b) <= 0L)
 #' @export
-sas_gt <- function(a, b) as.numeric(sas_cmp(a, b) > 0L)
+sas_rt_gt <- function(a, b) as.numeric(sas_cmp(a, b) > 0L)
 #' @export
-sas_ge <- function(a, b) as.numeric(sas_cmp(a, b) >= 0L)
+sas_rt_ge <- function(a, b) as.numeric(sas_cmp(a, b) >= 0L)
 
 cmp_fun <- function(op) {
-  switch(op, "=" = sas_eq, "^=" = sas_ne, "<" = sas_lt, "<=" = sas_le, ">" = sas_gt, ">=" = sas_ge)
+  switch(op, "=" = sas_rt_eq, "^=" = sas_rt_ne, "<" = sas_rt_lt, "<=" = sas_rt_le, ">" = sas_rt_gt, ">=" = sas_rt_ge)
 }
 
 #' Truncated (colon-modified) character comparison, e.g. `s =: 'AB'`
 #' @export
 #' @keywords internal
-sas_cmp_trunc <- function(op, a, b) {
+sas_rt_cmp_trunc <- function(op, a, b) {
   ab <- recycle2(a, b)
   # the prefix length counts bytes (byte text; the prefix may cut a character)
   if (is.character(ab[[1]]) && is.character(ab[[2]]) && any(chr_wide(ab[[1]]) | chr_wide(ab[[2]]), na.rm = TRUE)) {
@@ -285,16 +285,16 @@ sas_cmp_trunc <- function(op, a, b) {
 #' An op ending in `:` is a colon (truncated) comparison.
 #' @export
 #' @keywords internal
-sas_chain <- function(args, ops) {
+sas_rt_chain <- function(args, ops) {
   res <- TRUE
   for (k in seq_along(ops)) {
     op <- ops[k]
     v <- if (endsWith(op, ":")) {
-      sas_cmp_trunc(sub(":", "", op, fixed = TRUE), args[[k]], args[[k + 1L]])
+      sas_rt_cmp_trunc(sub(":", "", op, fixed = TRUE), args[[k]], args[[k + 1L]])
     } else {
       cmp_fun(op)(args[[k]], args[[k + 1L]])
     }
-    res <- res & sas_true(v)
+    res <- res & sas_rt_true(v)
   }
   as.numeric(res)
 }
@@ -306,7 +306,7 @@ sas_chain <- function(args, ops) {
 #' evaluated once.
 #' @export
 #' @keywords internal
-sas_between <- function(x, lo, hi) {
+sas_rt_between <- function(x, lo, hi) {
   n <- if (length(x) == 0 || length(lo) == 0 || length(hi) == 0) 0L else max(length(x), length(lo), length(hi))
   x <- rep_len(x, n)
   lo <- rep_len(lo, n)
@@ -320,7 +320,7 @@ sas_between <- function(x, lo, hi) {
 }
 
 #' @export
-sas_in <- function(x, values) {
+sas_rt_in <- function(x, values) {
   res <- rep(FALSE, length(x))
   for (v in values) res <- res | sas_cmp(x, v) == 0L
   as.numeric(res)
@@ -331,20 +331,20 @@ sas_in <- function(x, values) {
 #' Truth value of a SAS expression (missing and 0 are false)
 #' @export
 #' @keywords internal
-sas_true <- function(x) {
+sas_rt_true <- function(x) {
   if (is.logical(x)) return(!is.na(x) & x)
   if (is.character(x)) abort_unsupported_construct("character value used as a condition")
   !is.na(x) & x != 0
 }
 #' @export
-sas_not <- function(x) as.numeric(!sas_true(x))
+sas_rt_not <- function(x) as.numeric(!sas_rt_true(x))
 #' @export
-sas_and <- function(a, b) as.numeric(sas_true(a) & sas_true(b))
+sas_rt_and <- function(a, b) as.numeric(sas_rt_true(a) & sas_rt_true(b))
 #' @export
-sas_or <- function(a, b) as.numeric(sas_true(a) | sas_true(b))
+sas_rt_or <- function(a, b) as.numeric(sas_rt_true(a) | sas_rt_true(b))
 
 #' @export
-sas_div <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
+sas_rt_div <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FALSE) {
   if (anyNA(a) || anyNA(b)) {
     n <- max(length(a), length(b))
     ma <- rep_len(is.na(a), n)
@@ -358,12 +358,12 @@ sas_div <- function(a, b, .at = NULL, .exact = TRUE, .gen_a = FALSE, .gen_b = FA
   if (any(zero & !is.na(a))) rt_error(paste0("NOTE: Division by zero detected", at_text(.at), "."))
   bb <- rep_len(b, max(length(a), length(b)))
   bb[rep_len(zero, length(bb))] <- NA_real_
-  out <- sas_num(a / bb, .at)
+  out <- sas_rt_num(a / bb, .at)
   out
 }
 
 #' @export
-sas_pow <- function(a, b, .at = NULL, .exact = TRUE) {
+sas_rt_pow <- function(a, b, .at = NULL, .exact = TRUE) {
   # ** records its place also when an operand is a generated missing value
   # ((a + b) ** 2)
   if (anyNA(a) || anyNA(b)) sas_mv_count(.at, a, b, .exact = .exact)
@@ -377,7 +377,7 @@ sas_pow <- function(a, b, .at = NULL, .exact = TRUE) {
   }
   x <- a^b
   x[rep_len(bad, length(x))] <- NA_real_
-  out <- sas_num(x, .at)
+  out <- sas_rt_num(x, .at)
   out[is.na(a) | is.na(b)] <- NA_real_
   out
 }
@@ -387,7 +387,7 @@ sas_pow <- function(a, b, .at = NULL, .exact = TRUE) {
 # (-(a + b) records the "+", not the minus).
 #' @export
 #' @keywords internal
-sas_neg <- function(x, .at = NULL, .exact = TRUE, .gen_a = FALSE) {
+sas_rt_neg <- function(x, .at = NULL, .exact = TRUE, .gen_a = FALSE) {
   if (anyNA(x)) {
     n <- length(x)
     ma <- rep_len(is.na(x), n)
@@ -398,18 +398,18 @@ sas_neg <- function(x, .at = NULL, .exact = TRUE, .gen_a = FALSE) {
       sas_mv_count(.at, ifelse(cnt, NA_real_, 0), .exact = .exact)
     }
   }
-  sas_num(-x, .at)
+  sas_rt_num(-x, .at)
 }
 
 #' MIN (><) and MAX (<>) operators
 #' @export
 #' @keywords internal
-sas_min_op <- function(a, b) {
+sas_rt_min_op <- function(a, b) {
   ab <- recycle2(a, b)
   ifelse(sas_cmp(ab[[1]], ab[[2]]) <= 0L, ab[[1]], ab[[2]])
 }
 #' @export
-sas_max_op <- function(a, b) {
+sas_rt_max_op <- function(a, b) {
   ab <- recycle2(a, b)
   ifelse(sas_cmp(ab[[1]], ab[[2]]) >= 0L, ab[[1]], ab[[2]])
 }
@@ -564,7 +564,7 @@ sas_f_coalesce <- function(...) {
 
 # Character functions -----------------------------------------------------
 
-strip_both <- function(x) sub("^ +", "", sas_rtrim(x))
+strip_both <- function(x) sub("^ +", "", sas_rt_rtrim(x))
 
 # STRIP: remove the blanks matched by `pattern` with stringr (ICU regex; `\z` is the
 # absolute end, since ICU's `$` also matches before a final line feed).  The
@@ -581,12 +581,12 @@ remove_blanks <- function(x, pattern, base) {
 #' @export
 sas_f_trim <- function(x) {
   if (chr_any_wide(x)) return(chr_bytes_call("trim", sys.function(), list(x), chr = TRUE))
-  out <- sas_rtrim(as_sas_chr(x))
+  out <- sas_rt_rtrim(as_sas_chr(x))
   out[!nzchar(out)] <- " "
   out
 }
 #' @export
-sas_f_trimn <- function(x) sas_rtrim(as_sas_chr(x))
+sas_f_trimn <- function(x) sas_rt_rtrim(as_sas_chr(x))
 #' @export
 sas_f_strip <- function(x) {
   if (chr_any_wide(x)) return(chr_bytes_call("strip", sys.function(), list(x), chr = TRUE))
@@ -603,7 +603,7 @@ sas_f_left <- function(x) {
 sas_f_right <- function(x) {
   if (chr_any_wide(x)) return(chr_bytes_call("right", sys.function(), list(x), chr = TRUE))
   x <- as_sas_chr(x)
-  s <- sas_rtrim(x)
+  s <- sas_rt_rtrim(x)
   paste0(strrep(" ", nchar(x) - nchar(s)), s)
 }
 #' @export
@@ -673,7 +673,7 @@ sas_f_cats <- function(..., .at = NULL, .len = NULL) {
 #' @export
 sas_f_catt <- function(..., .at = NULL, .len = NULL) {
   if (chr_any_wide(...)) return(chr_bytes_call("catt", sys.function(), c(list(...), list(.at = .at, .len = .len)), chr = TRUE))
-  cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = sas_rtrim)), .len, "catt", list(...), .at, sas_rtrim)
+  cat_fit(rlang::exec(paste0, !!!lapply(list(...), cat_item, trim = sas_rt_rtrim)), .len, "catt", list(...), .at, sas_rt_rtrim)
 }
 #' @export
 sas_f_cat <- function(..., .at = NULL, .len = NULL) {
@@ -815,7 +815,7 @@ substr_impl <- function(x, pos, len, .at, fname) {
 # shorter than the target window is padded with blanks, a longer one is cut to
 # the room that remains.
 #' @export
-sas_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
+sas_rt_substr_assign <- function(x, pos, len = NULL, value, .at = NULL) {
   x <- as_sas_chr(x)
   value <- as_sas_chr(value)
   # values with bytes outside ASCII: not supported
@@ -918,15 +918,15 @@ sas_f_indexc <- function(x, ...) {
 }
 #' @export
 sas_f_length <- function(x) {
-  n <- chr_bytes(sas_rtrim(as_sas_chr(x)))
+  n <- chr_bytes(sas_rt_rtrim(as_sas_chr(x)))
   as.numeric(pmax(n, 1L))
 }
 #' @export
-sas_f_lengthn <- function(x) as.numeric(chr_bytes(sas_rtrim(as_sas_chr(x))))
+sas_f_lengthn <- function(x) as.numeric(chr_bytes(sas_rt_rtrim(as_sas_chr(x))))
 # Number of characters without trailing blanks; 0 for a blank value.
 #' @export
 sas_f_klength <- function(x) {
-  s <- sas_rtrim(as_sas_chr(x))
+  s <- sas_rt_rtrim(as_sas_chr(x))
   wide <- chr_wide(s)
   if (any(wide)) s[wide] <- chr_utf8(s[wide])
   as.numeric(nchar(s, type = "chars"))
@@ -951,7 +951,7 @@ sas_f_coalescec <- function(...) {
   parts <- lapply(parts, rep_len, n)
   vapply(seq_len(n), function(i) {
     v <- vapply(parts, `[`, character(1), i)
-    v <- v[nzchar(sas_rtrim(v))]
+    v <- v[nzchar(sas_rt_rtrim(v))]
     if (length(v) == 0) "" else v[1]
   }, character(1))
 }
@@ -1105,7 +1105,7 @@ sas_f_hms <- function(h, m, s) h * 3600 + m * 60 + s
 #' LAG queue for row-wise (L3) code; one queue per call site
 #' @export
 #' @keywords internal
-sas_lag <- function(state, key, value, n = 1L) {
+sas_rt_lag <- function(state, key, value, n = 1L) {
   q <- state[[key]]
   if (is.null(q)) q <- rep(list(if (is.character(value)) "" else NA_real_), n)
   state[[key]] <- c(q[-1L], list(value))
@@ -1115,7 +1115,7 @@ sas_lag <- function(state, key, value, n = 1L) {
 #' Vectorised LAG for unconditional calls (L2)
 #' @export
 #' @keywords internal
-sas_lag_vec <- function(x, n = 1L) {
+sas_rt_lag_vec <- function(x, n = 1L) {
   dplyr::lag(x, n, default = if (is.character(x)) "" else NA_real_)
 }
 
@@ -1290,15 +1290,15 @@ sas_fmt_best <- function(x, w = 12L) {
 #' Text written by PUT for one value (list or named output)
 #' @export
 #' @keywords internal
-sas_put_value <- function(value, fmt = NULL) {
+sas_rt_put_value <- function(value, fmt = NULL) {
   # list and named output write character values without leading blanks
   if (is.character(value)) return(strip_both(sas_format(value, fmt)))
   trimws(sas_format(value, fmt))
 }
 #' @export
-sas_put_named <- function(name, value, fmt = NULL) {
+sas_rt_put_named <- function(name, value, fmt = NULL) {
   if (length(value) == 0) return(character())
-  out <- sas_put_value(value, fmt)
+  out <- sas_rt_put_value(value, fmt)
   # a blank character value is written as one blank ("r=  next=...")
   if (is.character(value)) out[!nzchar(out)] <- " "
   paste0(name, "=", out)
@@ -1307,7 +1307,7 @@ sas_put_named <- function(name, value, fmt = NULL) {
 #' Assemble one PUT line per row
 #' @export
 #' @keywords internal
-sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize(), .file = FALSE, .line = NULL) {
+sas_rt_put_line <- function(..., .lit = NULL, .ls = rt_linesize(), .file = FALSE, .line = NULL) {
   parts <- list(...)
   if (length(parts) == 0) return("")
   if (any(lengths(parts) == 0)) return(character())
@@ -1322,30 +1322,30 @@ sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize(), .file = FALSE, .
       out <- character()
       for (p in parts) {
         t <- rep_len(p, length(line))[i]
-        if (nchar(cur) > 0 && nchar(cur) + nchar(sas_rtrim(t)) > .ls) {
-          out <- c(out, sas_rtrim(cur))
+        if (nchar(cur) > 0 && nchar(cur) + nchar(sas_rt_rtrim(t)) > .ls) {
+          out <- c(out, sas_rt_rtrim(cur))
           cur <- ""
         }
         cur <- paste0(cur, t)
       }
-      paste(c(out, sas_rtrim(cur)), collapse = "\n")
+      paste(c(out, sas_rt_rtrim(cur)), collapse = "\n")
     }, "")
     # a FILE record still longer than LRECL (one item wider than the record) is
     # split across records by SAS; that is not implemented yet
-    if (.file && any(nchar(sas_rtrim(unlist(strsplit(line, "\n", fixed = TRUE)))) > .ls)) {
+    if (.file && any(nchar(sas_rt_rtrim(unlist(strsplit(line, "\n", fixed = TRUE)))) > .ls)) {
       abort_unsupported_construct("PUT item longer than the FILE LRECL", .line)
     }
     # the log: a PUT of one item wider than LINESIZE is cut every LINESIZE
     # characters (measured for one item; after other items it is not)
     if (!.file && length(parts) == 1L) {
       line <- vapply(line, function(l) {
-        l <- sas_rtrim(l)
+        l <- sas_rt_rtrim(l)
         if (nchar(l) <= .ls) return(l)
         paste(substring(l, seq(1L, nchar(l), by = .ls), pmin(seq(1L, nchar(l), by = .ls) + .ls - 1L, nchar(l))), collapse = "\n")
       }, "", USE.NAMES = FALSE)
     }
   }
-  sas_rtrim(line)
+  sas_rt_rtrim(line)
 }
 
 #' Write the PUT output of a step to an external file (FILE statement)
@@ -1353,7 +1353,7 @@ sas_put_line <- function(..., .lit = NULL, .ls = rt_linesize(), .file = FALSE, .
 #' Paths are relative to the working directory; `mod = TRUE` appends.
 #' @export
 #' @keywords internal
-sas_file_write <- function(path, lines, mod = FALSE) {
+sas_rt_file_write <- function(path, lines, mod = FALSE) {
   # every PUT line is a record, an empty one too (log_split_lines())
   lines <- log_split_lines(lines %||% character(), put = rep(TRUE, length(lines)))$lines
   # a file in a directory that does not exist cannot be opened (an ERROR)
@@ -1367,19 +1367,19 @@ sas_file_write <- function(path, lines, mod = FALSE) {
 #' Interleave several guarded PUT statements row by row (L1/L2)
 #' @export
 #' @keywords internal
-sas_put_rows <- function(lines, guards, n = NULL) {
+sas_rt_put_rows <- function(lines, guards, n = NULL) {
   n <- n %||% max(lengths(lines), lengths(guards), 0L)
   if (n == 0) return(character())
   # a line is computed once (literals only) or per row
   if (!all(lengths(lines) %in% c(1L, n)) || !all(lengths(guards) %in% c(1L, n))) {
-    rlang::abort("sas_put_rows(): a PUT line or guard does not have one value per row.", .internal = TRUE)
+    rlang::abort("sas_rt_put_rows(): a PUT line or guard does not have one value per row.", .internal = TRUE)
   }
   lines <- lapply(lines, rep_len, n)
-  guards <- lapply(guards, function(g) rep_len(sas_true(g), n))
+  guards <- lapply(guards, function(g) rep_len(sas_rt_true(g), n))
   txt <- vctrs::vec_interleave(!!!unname(lines), .ptype = character())
   keep <- vctrs::vec_interleave(!!!unname(guards), .ptype = logical())
   out <- as.vector(txt)[as.vector(keep)]
-  # NA: a PUT with pointer controls that writes no line (sas_put_layout())
+  # NA: a PUT with pointer controls that writes no line (sas_rt_put_layout())
   out[!is.na(out)]
 }
 
@@ -1390,7 +1390,7 @@ sas_put_rows <- function(lines, guards, n = NULL) {
 #' The member was read when the step was analysed (library.R).
 #' @export
 #' @keywords internal
-sas_lib_member <- function(name) {
+sas_rt_lib_member <- function(name) {
   d <- .active$session$lib_members[[name]]$data
   if (is.null(d)) abort_runtime(paste0("data set ", toupper(name), " is not read"))
   d
@@ -1402,10 +1402,10 @@ sas_lib_member <- function(name) {
 #' as in the tidy form of a script; `name` is then not used).
 #' @export
 #' @keywords internal
-sas_ds <- function(work, name, keep = NULL, drop = NULL, rename = NULL, firstobs = NULL, obs = NULL) {
+sas_rt_ds <- function(work, name, keep = NULL, drop = NULL, rename = NULL, firstobs = NULL, obs = NULL) {
   d <- if (is.data.frame(work)) work else work[[name]]
   # a member of a read-only library (library.R)
-  if (is.null(d) && grepl(".", name, fixed = TRUE)) d <- sas_lib_member(name)
+  if (is.null(d) && grepl(".", name, fixed = TRUE)) d <- sas_rt_lib_member(name)
   if (is.null(d)) abort_runtime(paste0("data set WORK.", toupper(name), " does not exist"))
   if (!is.null(keep)) d <- d[intersect(keep, names(d))]
   if (!is.null(drop)) d <- d[setdiff(names(d), drop)]
@@ -1423,7 +1423,7 @@ sort_keys <- function(df, by) {
   for (v in by) {
     x <- df[[v]]
     if (is.character(x)) {
-      keys <- c(keys, list(sas_rtrim(x)))
+      keys <- c(keys, list(sas_rt_rtrim(x)))
     } else {
       code <- sas_miss_code(x)
       keys <- c(keys, list(ifelse(is.na(code), 99L, code), ifelse(is.na(x), 0, x)))
@@ -1442,7 +1442,7 @@ sas_order <- function(df, by, descending = rep(FALSE, length(by))) {
 #' Stop with a SAS-style error when a data set is not sorted by the BY variables
 #' @export
 #' @keywords internal
-sas_check_sorted <- function(df, by, descending = rep(FALSE, length(by))) {
+sas_rt_check_sorted <- function(df, by, descending = rep(FALSE, length(by))) {
   missing_vars <- setdiff(by, names(df))
   if (length(missing_vars) > 0) abort_runtime(paste0("BY variable ", missing_vars[1], " not found"))
   if (nrow(df) > 1) {
@@ -1459,7 +1459,7 @@ sas_check_sorted <- function(df, by, descending = rep(FALSE, length(by))) {
 }
 
 same_value <- function(a, b) {
-  if (is.character(a)) return(sas_rtrim(a) == sas_rtrim(b))
+  if (is.character(a)) return(sas_rt_rtrim(a) == sas_rt_rtrim(b))
   sas_cmp(a, b) == 0L
 }
 
@@ -1476,9 +1476,9 @@ key_change <- function(...) {
 #' FIRST.x / LAST.x flags from BY variables (pass the BY variables up to x)
 #' @export
 #' @keywords internal
-sas_first <- function(...) as.numeric(key_change(...))
+sas_rt_first <- function(...) as.numeric(key_change(...))
 #' @export
-sas_last <- function(...) {
+sas_rt_last <- function(...) {
   chg <- key_change(...)
   as.numeric(c(chg[-1L], length(chg) > 0))[seq_along(chg)]
 }
@@ -1486,7 +1486,7 @@ sas_last <- function(...) {
 #' Combine the data sets of a SET statement (concatenate, or interleave with BY)
 #' @export
 #' @keywords internal
-sas_set_input <- function(dfs, in_vars = NULL, by = NULL, descending = NULL) {
+sas_rt_set_input <- function(dfs, in_vars = NULL, by = NULL, descending = NULL) {
   for (j in seq_along(dfs)) dfs[[j]][[".src"]] <- rep(j, nrow(dfs[[j]]))
   d <- dplyr::bind_rows(dfs)
   if (!is.null(in_vars)) {
@@ -1495,7 +1495,7 @@ sas_set_input <- function(dfs, in_vars = NULL, by = NULL, descending = NULL) {
     }
   }
   if (!is.null(by) && length(dfs) > 1) {
-    for (df in dfs) sas_check_sorted(df, by, descending %||% rep(FALSE, length(by)))
+    for (df in dfs) sas_rt_check_sorted(df, by, descending %||% rep(FALSE, length(by)))
     d <- d[sas_order(d, c(by, ".src"), c(descending %||% rep(FALSE, length(by)), FALSE)), ]
   }
   d$.src <- NULL
@@ -1506,7 +1506,7 @@ pad_char_columns <- function(df) {
   for (v in names(df)) {
     if (is.character(df[[v]]) && nrow(df) > 0) {
       len <- max(1L, chr_bytes(df[[v]]), na.rm = TRUE)
-      df[[v]] <- sas_char(df[[v]], len)
+      df[[v]] <- sas_rt_char(df[[v]], len)
     }
   }
   df
@@ -1515,7 +1515,7 @@ pad_char_columns <- function(df) {
 #' Rows of a data frame as a list of named lists (for the L3 PDV loop)
 #' @export
 #' @keywords internal
-sas_rows <- function(df) {
+sas_rt_rows <- function(df) {
   cols <- as.list(df)
   lapply(seq_len(nrow(df)), function(i) lapply(cols, `[[`, i))
 }
@@ -1523,7 +1523,7 @@ sas_rows <- function(df) {
 #' Copy one input row into the PDV
 #' @export
 #' @keywords internal
-sas_read_row <- function(pdv, rows, i) {
+sas_rt_read_row <- function(pdv, rows, i) {
   r <- rows[[i]]
   pdv[names(r)] <- r
   pdv
@@ -1536,8 +1536,8 @@ sas_read_row <- function(pdv, rows, i) {
 #' never share a BY group write no NOTE.
 #' @export
 #' @keywords internal
-sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL) {
-  for (df in dfs) sas_check_sorted(df, by, descending)
+sas_rt_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL) {
+  for (df in dfs) sas_rt_check_sorted(df, by, descending)
   keys <- dplyr::bind_rows(lapply(seq_along(dfs), function(j) {
     k <- dfs[[j]][by]
     k$.src <- rep(j, nrow(k))
@@ -1570,8 +1570,8 @@ sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars
   plan <- dplyr::bind_rows(plan)
   for (k in seq_along(by)) {
     keyset <- unname(as.list(plan[by[seq_len(k)]]))
-    plan[[paste0("first.", by[k])]] <- rlang::exec(sas_first, !!!keyset)
-    plan[[paste0("last.", by[k])]] <- rlang::exec(sas_last, !!!keyset)
+    plan[[paste0("first.", by[k])]] <- rlang::exec(sas_rt_first, !!!keyset)
+    plan[[paste0("last.", by[k])]] <- rlang::exec(sas_rt_last, !!!keyset)
   }
   plan
 }
@@ -1579,7 +1579,7 @@ sas_merge_plan <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars
 #' Execute one MERGE read against the PDV
 #' @export
 #' @keywords internal
-sas_merge_read <- function(pdv, rows, plan, p, reset, in_vars, by) {
+sas_rt_merge_read <- function(pdv, rows, plan, p, reset, in_vars, by) {
   if (plan$.new[p]) pdv[names(reset)] <- reset
   for (j in seq_along(rows)) {
     r <- plan[[paste0(".r", j)]][p]
@@ -1598,7 +1598,7 @@ sas_merge_read <- function(pdv, rows, plan, p, reset, in_vars, by) {
 
 #' The input table of a match-merge (MERGE + BY): one row per row of the plan
 #'
-#' One row per row of [sas_merge_plan()], with the values the program data
+#' One row per row of [sas_rt_merge_plan()], with the values the program data
 #' vector holds after the MERGE read of that row: at the first row of a BY
 #' group every variable starts missing; each data set that has a row writes
 #' its variables in MERGE order (a later data set wins); a data set that has
@@ -1608,8 +1608,8 @@ sas_merge_read <- function(pdv, rows, plan, p, reset, in_vars, by) {
 #' variable read by MERGE (the row-wise path carries the changed value).
 #' @export
 #' @keywords internal
-sas_merge_input <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL) {
-  plan <- sas_merge_plan(dfs, by, descending)
+sas_rt_merge_input <- function(dfs, by, descending = rep(FALSE, length(by)), in_vars = NULL) {
+  plan <- sas_rt_merge_plan(dfs, by, descending)
   vars <- unique(vctrs::list_unchop(lapply(dfs, names), ptype = character(), name_spec = rlang::zap()))
   n <- nrow(plan)
   pos <- seq_len(n)
@@ -1651,7 +1651,7 @@ sas_merge_input <- function(dfs, by, descending = rep(FALSE, length(by)), in_var
 #' Collect PDV rows written by OUTPUT into a tibble
 #' @export
 #' @keywords internal
-sas_rows_to_tibble <- function(rows, proto) {
+sas_rt_rows_to_tibble <- function(rows, proto) {
   cols <- lapply(names(proto), function(v) {
     vapply(rows, function(r) r[[v]], FUN.VALUE = proto[[v]], USE.NAMES = FALSE)
   })
@@ -1670,7 +1670,7 @@ sas_read_datalines <- function(lines, spec) {
     if (s$char) {
       if (s$mode != "formatted" && txt == ".") txt <- ""
       if (s$mode == "formatted" && s$fmt$name != "char") txt <- sub("^ +", "", txt)
-      return(sas_char(txt, s$len))
+      return(sas_rt_char(txt, s$len))
     }
     txt <- trimws(txt)
     if (txt %in% c("", ".")) return(NA_real_)
@@ -1725,7 +1725,7 @@ sas_read_datalines <- function(lines, spec) {
 #' CALL SYMPUT / SYMPUTX
 #' @export
 #' @keywords internal
-sas_symput <- function(symtab, name, value, trim = TRUE, scope = NULL) {
+sas_rt_symput <- function(symtab, name, value, trim = TRUE, scope = NULL) {
   name <- strip_both(name)
   if (is.numeric(value)) {
     # SYMPUTX: integers keep every digit, other values BEST12.; SYMPUT: BEST12.
@@ -1755,7 +1755,7 @@ sas_symput <- function(symtab, name, value, trim = TRUE, scope = NULL) {
 #' go to the step's log buffer between its PUT lines.
 #' @export
 #' @keywords internal
-sas_call_execute <- function(symtab, value, .line = NULL) {
+sas_rt_call_execute <- function(symtab, value, .line = NULL) {
   if (!length(.line) || is.na(.line[1])) .line <- NULL
   if (!inherits(symtab, "sasonr_macro_session")) abort_unsupported("CALL EXECUTE outside sas_run()", .line)
   if (!is.character(value)) abort_unsupported("CALL EXECUTE with a numeric argument (not supported)", .line)
@@ -1792,12 +1792,12 @@ sas_call_execute <- function(symtab, value, .line = NULL) {
 # Control flow signals for L3 code ----------------------------------------
 
 #' @export
-sas_delete <- function() {
+sas_rt_delete <- function() {
   rlang::signal(message = "delete", class = "sasonr_delete")
   abort_runtime("DELETE signalled outside a DATA step loop")
 }
 #' @export
-sas_return <- function() {
+sas_rt_return <- function() {
   rlang::signal(message = "return", class = "sasonr_return")
   abort_runtime("RETURN signalled outside a DATA step loop")
 }
@@ -1806,7 +1806,7 @@ sas_return <- function() {
 # the step stops with the looping NOTE.  `why`: the step has a shape whose
 # behaviour here is not known (it fails loud).
 #' @export
-sas_loop_unread <- function(why = NULL) {
+sas_rt_loop_unread <- function(why = NULL) {
   if (!is.null(why)) abort_unsupported(why)
   rt <- rt_diag()
   rt$looping <- TRUE
@@ -1814,7 +1814,7 @@ sas_loop_unread <- function(why = NULL) {
 }
 
 #' @export
-sas_stop_step <- function(stmt = FALSE) {
+sas_rt_stop_step <- function(stmt = FALSE) {
   # `stmt`: a STOP statement of the program (not the end of the input)
   if (stmt) {
     rt <- rt_diag()
@@ -1824,12 +1824,12 @@ sas_stop_step <- function(stmt = FALSE) {
   abort_runtime("STOP signalled outside a DATA step loop")
 }
 #' @export
-sas_select_error <- function(line) abort_runtime("no WHEN clause matched and there is no OTHERWISE", line)
+sas_rt_select_error <- function(line) abort_runtime("no WHEN clause matched and there is no OTHERWISE", line)
 
 #' DO loop test for an iterative DO
 #' @export
 #' @keywords internal
-sas_do_test <- function(i, to, by) {
+sas_rt_do_test <- function(i, to, by) {
   if (is.na(by) || by == 0) abort_runtime("invalid DO loop BY value")
   if (is.na(i) || is.na(to)) abort_runtime("invalid DO loop control value")
   if (by > 0) i <= to else i >= to
@@ -1838,7 +1838,7 @@ sas_do_test <- function(i, to, by) {
 #' Running total for a vectorised sum statement (`n + x;`)
 #' @export
 #' @keywords internal
-sas_cumsum <- function(x, init, n) {
+sas_rt_cumsum <- function(x, init, n) {
   x <- rep_len(dplyr::coalesce(as.numeric(x), 0), n)
   cumsum(c(init, x))[-1L]
 }
@@ -1849,7 +1849,7 @@ sas_cumsum <- function(x, init, n) {
 #' true on that row, otherwise the result of row r - 1 (or `init`).
 #' @export
 #' @keywords internal
-sas_carry <- function(values, sets, init) {
+sas_rt_carry <- function(values, sets, init) {
   n <- length(sets[[1]])
   src <- integer(n)
   for (k in seq_along(sets)) src[sets[[k]] %in% TRUE] <- k
@@ -1867,16 +1867,16 @@ sas_carry <- function(values, sets, init) {
 #' DIF for row-wise code
 #' @export
 #' @keywords internal
-sas_dif <- function(state, key, value, n = 1L) value - sas_lag(state, key, value, n)
+sas_rt_dif <- function(state, key, value, n = 1L) value - sas_rt_lag(state, key, value, n)
 
 #' The element of a multi-dimensional array: subscripts `i` of dimensions
 #' with lower bounds `lo` and sizes `dims` (row-major)
 #' @export
 #' @keywords internal
-sas_idx_md <- function(i, lo, dims) {
+sas_rt_idx_md <- function(i, lo, dims) {
   k <- 0
   for (j in seq_along(dims)) {
-    ij <- sas_idx(i[j], lo[j], dims[j]) - 1L
+    ij <- sas_rt_idx(i[j], lo[j], dims[j]) - 1L
     k <- k * dims[j] + ij
   }
   vctrs::vec_cast(k + 1, integer())
@@ -1885,7 +1885,7 @@ sas_idx_md <- function(i, lo, dims) {
 #' Validate an array subscript and convert it to a 1-based position
 #' @export
 #' @keywords internal
-sas_idx <- function(i, lo, dim) {
+sas_rt_idx <- function(i, lo, dim) {
   k <- i - lo + 1
   if (length(k) != 1 || is.na(k) || k != trunc(k) || k < 1 || k > dim) {
     abort_runtime("array subscript out of range")
@@ -1897,7 +1897,7 @@ sas_idx <- function(i, lo, dim) {
 #' (infinite results) become the ordinary missing value.
 #' @export
 #' @keywords internal
-sas_num <- function(x, .at = NULL) {
+sas_rt_num <- function(x, .at = NULL) {
   inf <- is.infinite(x)
   if (any(inf)) note_math(.at, sum(inf))
   x[is.na(x) | inf] <- NA_real_
@@ -1907,15 +1907,15 @@ sas_num <- function(x, .at = NULL) {
 #' Truncate character columns to PDV lengths (later data sets of SET/MERGE)
 #' @export
 #' @keywords internal
-sas_trunc_chars <- function(df, lens) {
-  for (v in names(lens)) if (v %in% names(df)) df[[v]] <- sas_char(df[[v]], lens[[v]])
+sas_rt_trunc_chars <- function(df, lens) {
+  for (v in names(lens)) if (v %in% names(df)) df[[v]] <- sas_rt_char(df[[v]], lens[[v]])
   df
 }
 
 #' Formatted PUT output (`put x 8.2;`): the field keeps its alignment blanks
 #' @export
 #' @keywords internal
-sas_put_fvalue <- function(value, fmt) sas_format(value, fmt)
+sas_rt_put_fvalue <- function(value, fmt) sas_format(value, fmt)
 
 #' PUT with column/line pointer controls (`@n`, `+n`, `/`)
 #'
@@ -1926,10 +1926,10 @@ sas_put_fvalue <- function(value, fmt) sas_format(value, fmt)
 #' element per row, NA where no line is written.
 #' @export
 #' @keywords internal
-sas_put_layout <- function(pieces, .ls = rt_linesize(), .line = NULL, .file = FALSE, .guard = NULL) {
+sas_rt_put_layout <- function(pieces, .ls = rt_linesize(), .line = NULL, .file = FALSE, .guard = NULL) {
   n <- max(1L, unlist(lapply(pieces, function(p) if (p$k == "text") length(p$s) else if (!is.null(p$v)) length(p$v) else 1L)), length(.guard))
   if (any(vapply(pieces, function(p) p$k == "text" && length(p$s) == 0, logical(1)))) return(character())
-  run <- if (is.null(.guard)) rep(TRUE, n) else rep_len(sas_true(.guard), n)
+  run <- if (is.null(.guard)) rep(TRUE, n) else rep_len(sas_rt_true(.guard), n)
   has_next <- any(vapply(pieces, function(p) p$k == "next", logical(1)))
   row <- function(i) {
     lines <- character()
@@ -1938,7 +1938,7 @@ sas_put_layout <- function(pieces, .ls = rt_linesize(), .line = NULL, .file = FA
     for (j in seq_along(pieces)) {
       p <- pieces[[j]]
       if (p$k == "next") {
-        lines <- c(lines, sas_rtrim(paste(buf, collapse = "")))
+        lines <- c(lines, sas_rt_rtrim(paste(buf, collapse = "")))
         buf <- character()
         col <- 1L
         next
@@ -1969,8 +1969,8 @@ sas_put_layout <- function(pieces, .ls = rt_linesize(), .line = NULL, .file = FA
       }
     }
     buf[is.na(buf)] <- " "
-    out <- c(lines, sas_rtrim(paste(buf, collapse = "")))
-    # a pointer line longer than the line size is not implemented yet (sas_put_line() wraps list output)
+    out <- c(lines, sas_rt_rtrim(paste(buf, collapse = "")))
+    # a pointer line longer than the line size is not implemented yet (sas_rt_put_line() wraps list output)
     if (any(nchar(out) > .ls)) abort_unsupported_construct("PUT with pointer controls writing past the line size", .line)
     paste(out, collapse = "\n")
   }
@@ -1989,11 +1989,11 @@ sas_put_layout <- function(pieces, .ls = rt_linesize(), .line = NULL, .file = FA
 #' `pdv`: the initial program data vector; `reset`: the variables set to
 #' their initial value at the start of each iteration; `outputs`: the
 #' variables written to each output data set; `dump`: the error dump spec
-#' ([sas_dump_spec()]); `readers`: the reader objects of its SET, MERGE and
+#' ([sas_rt_dump_spec()]); `readers`: the reader objects of its SET, MERGE and
 #' INPUT statements.
 #' @export
 #' @keywords internal
-sas_step_state <- function(pdv, reset = character(), outputs = list(), dump = NULL, readers = list()) {
+sas_rt_step_state <- function(pdv, reset = character(), outputs = list(), dump = NULL, readers = list()) {
   st <- new.env(parent = emptyenv())
   st$readers <- readers
   st$proto <- pdv
@@ -2008,7 +2008,7 @@ sas_step_state <- function(pdv, reset = character(), outputs = list(), dump = NU
 #' Begin an iteration: reset values, `_N_` and `_ERROR_`
 #' @export
 #' @keywords internal
-sas_iter_begin <- function(st, pdv) {
+sas_rt_iter_begin <- function(st, pdv) {
   st$n <- st$n + 1L
   for (r in st$readers) r$read <- FALSE
   if (length(st$reset)) pdv[names(st$reset)] <- st$reset
@@ -2024,7 +2024,7 @@ sas_iter_begin <- function(st, pdv) {
 #' "stop".
 #' @export
 #' @keywords internal
-sas_iter_run <- function(expr) {
+sas_rt_iter_run <- function(expr) {
   tryCatch({
     expr
     "ok"
@@ -2034,7 +2034,7 @@ sas_iter_run <- function(expr) {
 #' Write the PDV to output data sets `k` (OUTPUT)
 #' @export
 #' @keywords internal
-sas_write_pdv <- function(st, pdv, k = seq_along(st$vars)) {
+sas_rt_write_pdv <- function(st, pdv, k = seq_along(st$vars)) {
   for (j in k) {
     nm <- paste0("out", j)
     st[[nm]][[length(st[[nm]]) + 1L]] <- pdv[st$vars[[j]]]
@@ -2045,8 +2045,8 @@ sas_write_pdv <- function(st, pdv, k = seq_along(st$vars)) {
 #' The observations written to output data set `k`, as a tibble
 #' @export
 #' @keywords internal
-sas_step_output <- function(st, k) {
-  sas_rows_to_tibble(st[[paste0("out", k)]], st$proto[st$vars[[k]]])
+sas_rt_step_output <- function(st, k) {
+  sas_rt_rows_to_tibble(st[[paste0("out", k)]], st$proto[st$vars[[k]]])
 }
 
 # Readers of a row-by-row step (spec 01 §4.3): one per SET or MERGE
@@ -2060,10 +2060,10 @@ sas_step_output <- function(st, k) {
 #' `ahead`: the reader reads one observation ahead (SET with BY).
 #' @export
 #' @keywords internal
-sas_set_reader <- function(df, notes = NULL, ahead = FALSE) {
+sas_rt_set_reader <- function(df, notes = NULL, ahead = FALSE) {
   r <- new.env(parent = emptyenv())
   r$kind <- "set"
-  r$rows <- sas_rows(df)
+  r$rows <- sas_rt_rows(df)
   r$n <- length(r$rows)
   r$p <- 0L
   r$notes <- notes
@@ -2076,10 +2076,10 @@ sas_set_reader <- function(df, notes = NULL, ahead = FALSE) {
 #' stops after the last one)
 #' @export
 #' @keywords internal
-sas_set_next <- function(r, pdv) {
+sas_rt_set_next <- function(r, pdv) {
   r$p <- r$p + 1L
-  if (r$p > r$n) sas_stop_step()
-  pdv <- sas_read_row(pdv, r$rows, r$p)
+  if (r$p > r$n) sas_rt_stop_step()
+  pdv <- sas_rt_read_row(pdv, r$rows, r$p)
   r$read <- TRUE
   pdv
 }
@@ -2091,14 +2091,14 @@ sas_set_next <- function(r, pdv) {
 #' NOTE about the observations it read.
 #' @export
 #' @keywords internal
-sas_set_point <- function(r, pdv, k) {
+sas_rt_set_point <- function(r, pdv, k) {
   r$point <- TRUE
   r$read <- TRUE
   if (length(k) != 1L || is.na(k) || k != trunc(k) || k < 1 || k > r$n) {
     rt_error()
     return(pdv)
   }
-  sas_read_row(pdv, r$rows, as.integer(k))
+  sas_rt_read_row(pdv, r$rows, as.integer(k))
 }
 
 #' A MERGE statement's reader: the match-merge plan of the data sets `dfs`
@@ -2108,15 +2108,15 @@ sas_set_point <- function(r, pdv, k) {
 #' (its read counts are known only when it read all of them).
 #' @export
 #' @keywords internal
-sas_merge_reader <- function(dfs, by, descending, reset, in_vars = rep(NA_character_, length(dfs)), check = NULL, notes = NULL) {
+sas_rt_merge_reader <- function(dfs, by, descending, reset, in_vars = rep(NA_character_, length(dfs)), check = NULL, notes = NULL) {
   r <- new.env(parent = emptyenv())
   r$kind <- "merge"
-  r$rows <- lapply(dfs, sas_rows)
+  r$rows <- lapply(dfs, sas_rt_rows)
   # without BY: one-to-one, the n-th observation of each data set
   r$noby <- !length(by)
   r$vars <- lapply(dfs, function(df) setdiff(names(df), ".obs"))
   r$notes <- notes
-  r$plan <- if (r$noby) merge_plan_noby(dfs) else sas_merge_plan(dfs, by, descending)
+  r$plan <- if (r$noby) merge_plan_noby(dfs) else sas_rt_merge_plan(dfs, by, descending)
   r$n <- nrow(r$plan)
   r$p <- 0L
   r$by <- by
@@ -2144,10 +2144,10 @@ merge_plan_noby <- function(dfs) {
 #' Execute a MERGE statement (`end`: its END= variable)
 #' @export
 #' @keywords internal
-sas_merge_next <- function(r, pdv, end = NULL) {
+sas_rt_merge_next <- function(r, pdv, end = NULL) {
   r$p <- r$p + 1L
-  if (r$p > r$n) sas_stop_step()
-  pdv <- sas_merge_read(pdv, r$rows, r$plan, r$p, r$reset, r$in_vars, r$by)
+  if (r$p > r$n) sas_rt_stop_step()
+  pdv <- sas_rt_merge_read(pdv, r$rows, r$plan, r$p, r$reset, r$in_vars, r$by)
   if (r$noby) {
     # a data set whose observations are all read: its variables are missing
     gone <- which(is.na(unlist(r$plan[r$p, paste0(".r", seq_along(r$rows))])))
@@ -2165,14 +2165,14 @@ sas_merge_next <- function(r, pdv, end = NULL) {
 #' Did a reader of the step run in this iteration?
 #' @export
 #' @keywords internal
-sas_iter_read <- function(st) {
+sas_rt_iter_read <- function(st) {
   any(vapply(st$readers, function(r) isTRUE(r$read), NA))
 }
 
 #' End a row-by-row step: the read NOTE counts of its readers
 #' @export
 #' @keywords internal
-sas_step_end <- function(st) {
+sas_rt_step_end <- function(st) {
   for (r in st$readers) {
     if (identical(r$kind, "set")) sas_reads_consumed(if (isTRUE(r$point)) 0 else r$p, r$notes, r$ahead)
     # an UPDATE reads all its observations when the step reaches its end
@@ -2194,10 +2194,10 @@ sas_step_end <- function(st) {
 #' looping NOTE; `why`: the reason this case is not supported, if it is not).
 #' @export
 #' @keywords internal
-sas_iter_done <- function(st, status, why = NULL) {
+sas_rt_iter_done <- function(st, status, why = NULL) {
   if (identical(status, "stop") || !length(st$readers)) return(TRUE)
-  if (sas_iter_read(st)) return(FALSE)
-  sas_loop_unread(why)
+  if (sas_rt_iter_read(st)) return(FALSE)
+  sas_rt_loop_unread(why)
   TRUE
 }
 
@@ -2211,10 +2211,10 @@ sas_iter_done <- function(st, status, why = NULL) {
 #' the special missing values .A-.Z do; `._` is not supported.
 #' @export
 #' @keywords internal
-sas_update_reader <- function(dfs, by, descending, missing = FALSE, line = NULL) {
-  plan <- sas_merge_plan(dfs, by, descending)
-  rows_m <- sas_rows(dfs[[1]])
-  rows_t <- sas_rows(dfs[[2]])
+sas_rt_update_reader <- function(dfs, by, descending, missing = FALSE, line = NULL) {
+  plan <- sas_rt_merge_plan(dfs, by, descending)
+  rows_m <- sas_rt_rows(dfs[[1]])
+  rows_t <- sas_rt_rows(dfs[[2]])
   vars <- setdiff(union(names(dfs[[1]]), names(dfs[[2]])), ".obs")
   proto <- lapply(stats::setNames(vars, vars), function(v) {
     x <- if (v %in% names(dfs[[1]])) dfs[[1]][[v]] else dfs[[2]][[v]]
@@ -2259,4 +2259,4 @@ sas_update_reader <- function(dfs, by, descending, missing = FALSE, line = NULL)
 #' The END= value of an UPDATE reader: its last observation was read
 #' @export
 #' @keywords internal
-sas_update_at_end <- function(r) as.numeric(r$p == r$n)
+sas_rt_update_at_end <- function(r) as.numeric(r$p == r$n)

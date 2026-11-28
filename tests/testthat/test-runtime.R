@@ -1,16 +1,16 @@
 test_that("missing values sort below numbers, with special missings ordered", {
-  expect_equal(sas_lt(NA_real_, -1e300), 1)
-  expect_equal(sas_lt(sas_missing("._"), NA_real_), 1)
-  expect_equal(sas_lt(sas_missing(".A"), NA_real_), 0)
+  expect_equal(sas_rt_lt(NA_real_, -1e300), 1)
+  expect_equal(sas_rt_lt(sas_missing("._"), NA_real_), 1)
+  expect_equal(sas_rt_lt(sas_missing(".A"), NA_real_), 0)
   expect_equal(sas_miss_code(c(1, NA, sas_missing(".Z"))), c(NA, 1L, 27L))
 })
 
 test_that("character comparison pads with blanks", {
-  expect_equal(sas_eq("ab", "ab   "), 1)
-  expect_equal(sas_lt("a", "a!"), 1)
-  expect_equal(sas_cmp_trunc("=", "ABC", "AB"), 1)
-  expect_equal(sas_char("abcd", 2L), "ab")
-  expect_equal(sas_char("hi", 4L), "hi  ")
+  expect_equal(sas_rt_eq("ab", "ab   "), 1)
+  expect_equal(sas_rt_lt("a", "a!"), 1)
+  expect_equal(sas_rt_cmp_trunc("=", "ABC", "AB"), 1)
+  expect_equal(sas_rt_char("abcd", 2L), "ab")
+  expect_equal(sas_rt_char("hi", 4L), "hi  ")
 })
 
 test_that("SAS functions ignore missing values", {
@@ -27,21 +27,21 @@ test_that("dates use the 1960 epoch and SAS formats", {
   d <- sas_parse_dt_literal("15MAR2026", "date")
   expect_equal(sas_format(d, list(name = "date", w = 9L, d = NA)), "15MAR2026")
   expect_equal(sas_format(d, list(name = "yymmdd", w = 10L, d = NA)), "2026-03-15")
-  expect_equal(sas_put_value(37800, list(name = "time", w = 5L, d = NA)), "10:30")
+  expect_equal(sas_rt_put_value(37800, list(name = "time", w = 5L, d = NA)), "10:30")
   expect_equal(sas_f_intck("month", sas_parse_dt_literal("01JAN2026", "date"), d), 2)
   expect_equal(sas_f_intnx("month", d, 1, "e"), sas_parse_dt_literal("30APR2026", "date"))
 })
 
 test_that("BEST12. formatting", {
   expect_equal(trimws(sas_fmt_best(c(8, -4, 3.5, 1 / 3, 1e15))), c("8", "-4", "3.5", "0.3333333333", "1E15"))
-  expect_equal(sas_put_value(sas_missing(".A")), "A")
+  expect_equal(sas_rt_put_value(sas_missing(".A")), "A")
 })
 
 test_that("LAG queues only advance when executed", {
   st <- new.env()
-  expect_true(is.na(sas_lag(st, "k", 1)))
-  expect_equal(sas_lag(st, "k", 3), 1)
-  expect_equal(sas_lag_vec(c(1, 2, 3)), c(NA, 1, 2))
+  expect_true(is.na(sas_rt_lag(st, "k", 1)))
+  expect_equal(sas_rt_lag(st, "k", 3), 1)
+  expect_equal(sas_rt_lag_vec(c(1, 2, 3)), c(NA, 1, 2))
 })
 
 test_that("ROUND is vectorised over x", {

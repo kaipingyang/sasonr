@@ -85,7 +85,7 @@ sql_table_rel <- function(src, eng, outer) {
                          var_of = stats::setNames(vars, vapply(cols, `[[`, "", "id"))))
   if (!is.null(o$where)) {
     ctx <- sql_ctx(eng, rel)
-    keep <- sas_true(sql_eval(sql_from_ds_expr(o$where, rel), ctx))
+    keep <- sas_rt_true(sql_eval(sql_from_ds_expr(o$where, rel), ctx))
     rel <- sql_rel_rows(rel, which(keep))
   }
   # FIRSTOBS=/OBS= on the rows after WHERE=, then INOBS=
@@ -198,7 +198,7 @@ sql_join_rels <- function(l, r, type, conds, eng, outer) {
   }
   if (length(residual) > 0 && length(pr$l) > 0) {
     cand <- joined(pr$l, pr$r)
-    keep <- sas_true(sql_eval(sql_and_all(residual), sql_ctx(eng, cand, outer)))
+    keep <- sas_rt_true(sql_eval(sql_and_all(residual), sql_ctx(eng, cand, outer)))
     pr <- list(l = pr$l[keep], r = pr$r[keep])
   }
   li <- pr$l
@@ -367,7 +367,7 @@ sql_select <- function(q, eng, outer) {
   ctx <- sql_ctx(eng, rel, outer, items = q$items)
   qt <- ctx$qt
   if (!is.null(fr$where)) {
-    keep <- sas_true(sql_eval(fr$where, ctx))
+    keep <- sas_rt_true(sql_eval(fr$where, ctx))
     rel <- sql_rel_rows(rel, which(keep))
     ctx <- sql_new_rows(ctx, rel)
   }
@@ -443,7 +443,7 @@ sql_select <- function(q, eng, outer) {
       id <- sql_new_id(eng, ".a")
       v <- vals[[k]][rows_gid]
       s <- specs[[k]]
-      if (s$type == "char") v <- sas_char(ifelse(is.na(v), "", v), s$len)
+      if (s$type == "char") v <- sas_rt_char(ifelse(is.na(v), "", v), s$len)
       rel$data[[id]] <- v
       rel$cols <- c(rel$cols, list(list(id = id, name = id, disp = id, quals = character(), type = s$type,
                                         len = s$len, hidden = TRUE)))
@@ -453,13 +453,13 @@ sql_select <- function(q, eng, outer) {
     ctx$qt <- qt
     ctx$aggs <- agg_map
     if (!is.null(q$having)) {
-      keep <- sas_true(sql_eval(q$having, ctx))
+      keep <- sas_rt_true(sql_eval(q$having, ctx))
       rel <- sql_rel_rows(rel, which(keep))
       ctx <- sql_new_rows(ctx, rel)
     }
   } else if (!is.null(q$having)) {
     ctx$allow_alias <- TRUE
-    keep <- sas_true(sql_eval(q$having, ctx))
+    keep <- sas_rt_true(sql_eval(q$having, ctx))
     rel <- sql_rel_rows(rel, which(keep))
     ctx <- sql_new_rows(ctx, rel)
   }
@@ -506,9 +506,9 @@ sql_select <- function(q, eng, outer) {
       # value is built from column arguments
       col$len <- 200L
     } else if (ty$type == "char" && is.null(it$length) && e$node == "call" && identical(fn_table[[e$name]]$len, 200L)) {
-      col$len <- max(1L, chr_bytes(sas_rtrim(v)))
+      col$len <- max(1L, chr_bytes(sas_rt_rtrim(v)))
     }
-    if (ty$type == "char") v <- sas_char(v, col$len)
+    if (ty$type == "char") v <- sas_rt_char(v, col$len)
     out_cols <- c(out_cols, list(col))
     out_data[[id]] <- v
   }
@@ -641,7 +641,7 @@ sql_setop <- function(q, eng, outer) {
   norm <- function(r) {
     d <- r$data
     names(d) <- ids
-    for (k in seq_along(cols)) if (cols[[k]]$type == "char") d[[ids[k]]] <- sas_char(sas_rtrim(d[[ids[k]]]), cols[[k]]$len)
+    for (k in seq_along(cols)) if (cols[[k]]$type == "char") d[[ids[k]]] <- sas_rt_char(sas_rt_rtrim(d[[ids[k]]]), cols[[k]]$len)
     d
   }
   da <- norm(a)
@@ -725,7 +725,7 @@ sql_outer_union <- function(a, b, q, eng) {
     }
   }
   d <- dplyr::bind_rows(part(a, an), part(b, bn))
-  for (c in cols) if (c$type == "char") d[[c$id]] <- sas_char(sas_rtrim(d[[c$id]]), c$len)
+  for (c in cols) if (c$type == "char") d[[c$id]] <- sas_rt_char(sas_rt_rtrim(d[[c$id]]), c$len)
   list(data = d, cols = cols, ordered = TRUE)
 }
 

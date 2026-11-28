@@ -391,7 +391,7 @@ script_node_sql <- function(stext, first, last, mode) {
 script_why_data <- function(tr, level) {
   nm <- all.names(as.call(c(quote(`{`), as.list(cg_exec(tr$exprs)))))
   # MERGE has only a row-by-row form
-  if ("sas_merge_reader" %in% nm) return("a MERGE step (MERGE runs row by row, L3)")
+  if ("sas_rt_merge_reader" %in% nm) return("a MERGE step (MERGE runs row by row, L3)")
   if (!is.null(level) || !tr$level %in% c("L1", "L2")) return("a row-by-row (L3) step")
   if (any(c(".log", ".lst") %in% nm)) return("the step writes to the log or the listing (PUT, INFILE ...)")
   if (any(c(".symtab", ".titles", ".meta") %in% nm)) return("the step uses macro variables, titles or run-time attributes")
@@ -400,9 +400,9 @@ script_why_data <- function(tr, level) {
 
 # The tidy form of the code of a step, rewritten from the structures the
 # display is rendered from (`tr$disp`, codegen_format.R) and laid out by
-# cg_format(): WORK reads and writes become R variables (`sas_ds(work, "a",
-# keep = ...)` -> `a |> sas_ds(keep = ...)`, `work$a <-` -> `a <-`), what only
-# serves the log goes (sas_note_read() stages, the `.at = c(line, col)`
+# cg_format(): WORK reads and writes become R variables (`sas_rt_ds(work, "a",
+# keep = ...)` -> `a |> sas_rt_ds(keep = ...)`, `work$a <-` -> `a <-`), what only
+# serves the log goes (sas_rt_note_read() stages, the `.at = c(line, col)`
 # positions of the log NOTEs), dplyr verbs lose their prefix (so that tidylog
 # can report them) and the step pipeline `.df <- src |> ...` with its output
 # `out <- .df |> select(...)` becomes one pipeline.  Returns `code` and
@@ -437,7 +437,7 @@ tidy_is_work <- function(x) is.call(x) && identical(x[[1]], as.name("$")) && ide
 # One display structure in the tidy form; a pipeline stays a cg_pipe.
 tidy_rw <- function(e) {
   if (inherits(e, "cg_pipe")) {
-    st <- Filter(function(s) !(is.call(s) && identical(s[[1]], as.name("sas_note_read"))), e$stages)
+    st <- Filter(function(s) !(is.call(s) && identical(s[[1]], as.name("sas_rt_note_read"))), e$stages)
     st <- lapply(st, function(s) cg_lang(tidy_rw(s)))
     src <- tidy_rw(e$src)
     if (inherits(src, "cg_pipe")) {
@@ -450,11 +450,11 @@ tidy_rw <- function(e) {
     return(cg_pipe(src, st, tgt))
   }
   if (!is.call(e)) return(e)
-  if (identical(e[[1]], as.name("sas_ds")) && length(e) >= 3L && identical(e[[2]], as.name("work")) && is.character(e[[3]])) {
+  if (identical(e[[1]], as.name("sas_rt_ds")) && length(e) >= 3L && identical(e[[2]], as.name("work")) && is.character(e[[3]])) {
     a <- rlang::sym(e[[3]])
     rest <- as.list(e)[-(1:3)]
     if (!length(rest)) return(a)
-    return(cg_pipe(a, list(as.call(c(list(as.name("sas_ds")), lapply(rest, function(x) cg_lang(tidy_rw(x))))))))
+    return(cg_pipe(a, list(as.call(c(list(as.name("sas_rt_ds")), lapply(rest, function(x) cg_lang(tidy_rw(x))))))))
   }
   if (identical(e[[1]], as.name("<-")) && length(e) == 3L) {
     lhs <- if (tidy_is_work(e[[2]])) as.character(e[[2]][[3]]) else e[[2]]
@@ -810,7 +810,7 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #' @examples
 #' s <- sas_session(work = list(a = data.frame(x = c(2, 1, 3))))
 #' s |> sas_proc_sort(data = "a", out = "b", by = desc(x))
-#' s |> sas_proc_means(data = "b", noprint = TRUE, var = x, output = sas_out_stats(out = "m", mean = xm))
+#' s |> sas_proc_means(data = "b", noprint = TRUE, var = x, output = sas_stats_output(out = "m", mean = xm))
 #' sas_work(s)$m
 #' @name sas_step_verbs
 NULL
@@ -897,7 +897,7 @@ script_proc_lines <- function(st, line) {
 #'   arguments (`nway = TRUE`, `maxdec = 2`, `vardef = "wdf"`), the statistic
 #'   keywords as `stats = c(n, mean, std)`; statements `var`, `class`, `by`,
 #'   `id`, `where`, `freq`, `weight`, `types`, `ways`, `output` (built with
-#'   [sas_out_stats()]), `format`, `label`, `attrib`. FORMAT takes a named vector
+#'   [sas_stats_output()]), `format`, `label`, `attrib`. FORMAT takes a named vector
 #'   (`format = c(aval = "8.2")`). A statement value held in a variable is
 #'   injected with `!!`. Any other argument fails.
 #' @param .sas_src The SAS source of the step, [sas_src()]: the source echo

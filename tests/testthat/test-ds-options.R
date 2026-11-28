@@ -65,7 +65,7 @@ test_that("the reading code applies the options in order", {
   code <- cgi_text(x)
   # the text displays the call that runs
   expect_identical(str2lang(code), x$lang)
-  pos <- vapply(c("sas_ds(", "rename = ", "dplyr::filter(", "sas_obs_window(2, 3)", "sas_note_read("),
+  pos <- vapply(c("sas_rt_ds(", "rename = ", "dplyr::filter(", "sas_rt_obs_window(2, 3)", "sas_rt_note_read("),
                 function(p) regexpr(p, code, fixed = TRUE), 1L)
   expect_true(all(pos > 0))
   expect_false(is.unsorted(pos))
@@ -79,8 +79,8 @@ test_that("the WHERE statement applies only without WHERE=", {
   ca <- cgi_text(ds_code(ds[[1]], an, where = w))
   cb <- cgi_text(ds_code(ds[[2]], an, where = w))
   expect_equal(lengths(regmatches(ca, gregexpr("dplyr::filter(", ca, fixed = TRUE))), 1L)
-  expect_match(ca, "sas_gt(v, 1)", fixed = TRUE)
-  expect_match(cb, "sas_eq(g, \"A\")", fixed = TRUE)
+  expect_match(ca, "sas_rt_gt(v, 1)", fixed = TRUE)
+  expect_match(cb, "sas_rt_eq(g, \"A\")", fixed = TRUE)
   # ds_code is the component applied to the record of the data set
   expect_identical(ca, cgi_text(ds_opts_apply(ds_opts_record(ds[[1]]), an, where = w)))
 })
@@ -90,7 +90,7 @@ test_that("PROC DATA= reads through the same component", {
   inp <- proc_input(step, dso_meta, NULL)
   expect_identical(proc_source_code(inp, obs_col = TRUE),
                    cgi_text(ds_opts_apply(ds_opts_record(inp$ds), list(arrays = list()), obs_col = TRUE, where = inp$where)))
-  expect_match(proc_source_code(inp), "sas_obs_window(2, NULL)", fixed = TRUE)
+  expect_match(proc_source_code(inp), "sas_rt_obs_window(2, NULL)", fixed = TRUE)
 })
 
 # Output data sets of PROC SORT OUT= and PROC MEANS OUTPUT OUT=: a wrong name

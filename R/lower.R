@@ -181,7 +181,7 @@ slot_where_effective <- function(wheres) {
 #' }
 #'
 #' Terminators are `list(term, line, ...)`: `jump(to)`, `branch(cond,
-#' true, false)` (`cond` taken as `sas_true()`), `return`, `delete`, `stop`,
+#' true, false)` (`cond` taken as `sas_rt_true()`), `return`, `delete`, `stop`,
 #' `abort(kind, msg)` (only `kind = "select"`: no WHEN matched and no
 #' OTHERWISE) and `end_iteration` (the end of the body).
 #'
@@ -248,7 +248,7 @@ dsir_lower <- function(an) {
   loop_temp <- function(k, name) list(node = "loop_temp", loop = k, name = name)
 
   # a read or INPUT that finds the input exhausted stops the step
-  # (sas_set_next() at the end of its rows): the block ends in a branch on `eof`
+  # (sas_rt_set_next() at the end of its rows): the block ends in a branch on `eof`
   end_of_input <- function(s, ctx) {
     loop <- cur_loop(ctx)
     stop_b <- new_block(loop)

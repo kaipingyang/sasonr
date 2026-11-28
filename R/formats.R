@@ -600,7 +600,7 @@ sas_format <- function(x, fmt = NULL) {
     out <- switch(fmt$name,
       upcase = toupper(x),
       quote = {
-        inner <- gsub("\"", "\"\"", sas_rtrim(x), fixed = TRUE)
+        inner <- gsub("\"", "\"\"", sas_rt_rtrim(x), fixed = TRUE)
         # too long for the width: the text is cut so that the closing quote
         # fits; a cut through a doubled quote drops its first half; $QUOTE1.
         # writes a blank [measured, probe quote_width: w = 1..20]
@@ -752,10 +752,10 @@ fmt_width <- function(fmt, x_char = fmt$char) {
 #'   nested (format spec or NULL)).
 #' @export
 #' @keywords internal
-sas_define_format <- function(def) {
+sas_rt_define_format <- function(def) {
   key <- paste0(def$kind, ":", if (def$char) "$", def$name)
   s <- sas_rt_active()
-  if (is.null(s)) rlang::abort("sas_define_format() registers a format in a session: call it inside sas_run().", class = "sasonr_error")
+  if (is.null(s)) rlang::abort("sas_rt_define_format() registers a format in a session: call it inside sas_run().", class = "sasonr_error")
   s$formats[[key]] <- def
   invisible(NULL)
 }
@@ -763,15 +763,15 @@ sas_define_format <- function(def) {
 match_user_entry <- function(v, uf) {
   ents <- uf$entries
   if (is.character(v)) {
-    s <- sas_rtrim(v)
+    s <- sas_rt_rtrim(v)
     if (isTRUE(uf$upcase)) s <- toupper(s)
     for (e in ents) {
       if (isTRUE(e$other)) next
       if (is.null(e[["hi"]])) {
-        if (identical(sas_rtrim(e[["lo"]]), s)) return(e)
+        if (identical(sas_rt_rtrim(e[["lo"]]), s)) return(e)
       } else {
-        lo <- sas_rtrim(e[["lo"]])
-        hi <- sas_rtrim(e[["hi"]])
+        lo <- sas_rt_rtrim(e[["lo"]])
+        hi <- sas_rt_rtrim(e[["hi"]])
         lo_ok <- isTRUE(e$lo_low) || (if (e$lo_excl) chr_cmp(s, lo) > 0 else chr_cmp(s, lo) >= 0)
         hi_ok <- isTRUE(e$hi_high) || (if (e$hi_excl) chr_cmp(s, hi) < 0 else chr_cmp(s, hi) <= 0)
         if (lo_ok && hi_ok) return(e)
@@ -838,7 +838,7 @@ apply_user_fmt <- function(x, uf, fmt) {
     v <- x[i]
     e <- match_user_entry(v, uf)
     if (is.null(e)) {
-      if (is.character(v)) return(just_left(sas_rtrim(v), w))
+      if (is.character(v)) return(just_left(sas_rt_rtrim(v), w))
       code <- sas_miss_code(v)
       if (!is.na(code)) return(just_right(miss_label(code), w))
       return(sas_fmt_best(v, w))
@@ -1222,11 +1222,11 @@ apply_user_invalue <- function(s, uf) {
         break
       }
     } else if (is.null(en[["hi"]])) {
-      if (identical(sas_rtrim(en[["lo"]]), t)) {
+      if (identical(sas_rt_rtrim(en[["lo"]]), t)) {
         e <- en
         break
       }
-    } else if (chr_cmp(t, sas_rtrim(en[["lo"]])) >= 0 && chr_cmp(t, sas_rtrim(en[["hi"]])) <= 0) {
+    } else if (chr_cmp(t, sas_rt_rtrim(en[["lo"]])) >= 0 && chr_cmp(t, sas_rt_rtrim(en[["hi"]])) <= 0) {
       e <- en
       break
     }
@@ -1310,7 +1310,7 @@ sas_f_input <- function(s, fmt, qq = "", .at = NULL) {
     # (not for a character informat such as $HEX)
     if (qq == "" && !is.null(.at) && !is_char) log_place("math.failed", at = .at)
   }
-  if (is_char && !is.na(w)) vals <- sas_char(vals, w)
+  if (is_char && !is.na(w)) vals <- sas_rt_char(vals, w)
   vals
 }
 
@@ -1368,7 +1368,7 @@ sas_f_inputc <- function(s, fmt, w = NULL) {
   vapply(seq_along(s), function(i) {
     f <- putn_spec(rep_len(fmt, length(s))[i], w, NULL)
     f$char <- TRUE
-    sas_rtrim(sas_f_input(s[i], f))
+    sas_rt_rtrim(sas_f_input(s[i], f))
   }, "")
 }
 

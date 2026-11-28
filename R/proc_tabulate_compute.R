@@ -170,7 +170,7 @@ tab_compute_rows <- function(df, sp) {
       extra <- vctrs::vec_c(extra, proc_preload_values(sp$info[[v]]$fmt, is.character(df[[v]]), line))
     }
     if (!is.null(extra)) {
-      if (is.character(extra)) extra <- sas_rtrim(extra)
+      if (is.character(extra)) extra <- sas_rt_rtrim(extra)
       lv[[v]] <- proc_levels_extend(lv[[v]], extra, sp$info[[v]])
     }
   }
@@ -314,7 +314,7 @@ tab_level_text <- function(v, level, lv, sp, line, row = FALSE) {
   if (!row && !is.character(val) && sas_is_missing(val)) {
     abort_unsupported(paste0("the heading of a missing level of the numeric CLASS variable ", toupper(v)), line)
   }
-  if (is.character(val) && !nzchar(sas_rtrim(val))) return("")
+  if (is.character(val) && !nzchar(sas_rt_rtrim(val))) return("")
   proc_value_text(val, sp$info[[v]])
 }
 

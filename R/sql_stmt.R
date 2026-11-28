@@ -160,7 +160,7 @@ sql_rel_to_table <- function(eng, res, line, warn_dups = TRUE) {
   names <- names[keep]
   d <- res$data[vapply(cols, `[[`, "", "id")]
   names(d) <- names
-  for (k in seq_along(cols)) if (cols[[k]]$type == "char") d[[names[k]]] <- sas_char(d[[names[k]]], cols[[k]]$len)
+  for (k in seq_along(cols)) if (cols[[k]]$type == "char") d[[names[k]]] <- sas_rt_char(d[[names[k]]], cols[[k]]$len)
   meta <- list(
     vars = names,
     type = stats::setNames(lapply(cols, `[[`, "type"), names),
@@ -268,7 +268,7 @@ sql_target <- function(eng, name, line) {
 sql_coerce_col <- function(v, type, len, name, line) {
   if (type == "char") {
     if (!is.character(v)) abort_syntax(paste0("Value for column ", name, " is not character."), line)
-    return(sas_char(v, len))
+    return(sas_rt_char(v, len))
   }
   if (is.character(v)) abort_syntax(paste0("Value for column ", name, " is not numeric."), line)
   as.numeric(v)
@@ -369,7 +369,7 @@ sql_stmt_update <- function(eng, st) {
   tg <- sql_target(eng, st$table, st$line)
   rel <- sql_target_rel(eng, st)
   ctx <- sql_ctx(eng, rel)
-  hit <- if (is.null(st$where)) rep(TRUE, nrow(rel$data)) else sas_true(sql_eval(st$where, ctx))
+  hit <- if (is.null(st$where)) rep(TRUE, nrow(rel$data)) else sas_rt_true(sql_eval(st$where, ctx))
   idx <- which(hit)
   d <- tg$data
   if (length(idx) > 0) {
@@ -391,7 +391,7 @@ sql_stmt_update <- function(eng, st) {
 sql_stmt_delete <- function(eng, st) {
   tg <- sql_target(eng, st$table, st$line)
   rel <- sql_target_rel(eng, st)
-  hit <- if (is.null(st$where)) rep(TRUE, nrow(rel$data)) else sas_true(sql_eval(st$where, sql_ctx(eng, rel)))
+  hit <- if (is.null(st$where)) rep(TRUE, nrow(rel$data)) else sas_rt_true(sql_eval(st$where, sql_ctx(eng, rel)))
   d <- tg$data[!hit, , drop = FALSE]
   k <- sum(hit)
   sql_store(eng, st$table, d, tg$meta, ordered = !st$table %in% eng$session$unordered, last = FALSE)
@@ -426,7 +426,7 @@ sql_stmt_alter <- function(eng, st) {
       if (!v %in% names(d)) abort_syntax(paste0("Column ", v, " could not be found in table WORK.", toupper(st$table), "."), st$line)
       if (!is.null(c$type) && c$type != m$type[[v]]) abort_unsupported("changing the type of a column with ALTER TABLE MODIFY", st$line)
       if (!is.null(c$len) && identical(m$type[[v]], "char")) {
-        d[[v]] <- sas_char(d[[v]], c$len)
+        d[[v]] <- sas_rt_char(d[[v]], c$len)
         m$len[[v]] <- sql_col_len(c$len)
       }
       if (!is.null(c$format)) m$formats[[v]] <- c$format

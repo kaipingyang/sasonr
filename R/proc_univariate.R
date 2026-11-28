@@ -222,8 +222,8 @@ translate_proc_univariate <- function(step, meta, last) {
     header,
     paste0(".df <- ", proc_source_code(b$inp)),
     paste0(".r <- sas_rt_proc(\"univariate\", .df, ", r_lit(spec), ")"),
-    if (isTRUE(spec$print)) ".lst <- sas_lst_c(.lst, sas_univ_titles(.titles, .r$tables))",
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+    if (isTRUE(spec$print)) ".lst <- sas_rt_lst_c(.lst, sas_rt_univ_titles(.titles, .r$tables))",
+    ".meta <- c(.meta, sas_rt_store(work, .r$out))"
   )
   outs <- vapply(spec$outputs, `[[`, "", "name")
   static_meta <- stats::setNames(lapply(spec$outputs, function(x) univ_out_meta(spec, x)), outs)
@@ -303,7 +303,7 @@ univ_compute <- function(df, spec) {
   }
   # the groups: BY groups in data order, CLASS levels in sorted order; missing
   # CLASS values are left out
-  if (length(spec$class)) df <- df[!is.na(df[[spec$class]]) & !(is.character(df[[spec$class]]) & sas_rtrim(df[[spec$class]]) == ""), , drop = FALSE]
+  if (length(spec$class)) df <- df[!is.na(df[[spec$class]]) & !(is.character(df[[spec$class]]) & sas_rt_rtrim(df[[spec$class]]) == ""), , drop = FALSE]
   if (length(gv)) {
     g <- if (length(spec$class)) {
       cl <- df[[spec$class]]
@@ -393,6 +393,6 @@ univ_location_tests <- function(x, mu0 = 0) {
 #' @param tables The tables of `sas_rt_proc()`.
 #' @export
 #' @keywords internal
-sas_univ_titles <- function(titles, tables) {
-  do.call(lst_c, lapply(tables, function(t) sas_titles_once(titles, attr(t, "lines", exact = TRUE))))
+sas_rt_univ_titles <- function(titles, tables) {
+  do.call(lst_c, lapply(tables, function(t) sas_rt_titles_once(titles, attr(t, "lines", exact = TRUE))))
 }

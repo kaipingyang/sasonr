@@ -18,7 +18,7 @@
 #   of a variable that KEEP=/DROP= removes fails loud. WHERE= uses the names
 #   after KEEP=/DROP= and RENAME= (an unknown or dropped variable is an
 #   ERROR, "is not on file"); WHERE= replaces the WHERE statement for its data
-#   set. IN= is a 0/1 variable set by sas_set_input() / the merge plan.
+#   set. IN= is a 0/1 variable set by sas_rt_set_input() / the merge plan.
 #   FIRSTOBS=/OBS= window the rows that satisfy WHERE= / WHERE.
 # - PROC DATA= (proc_input() in proc.R, then ds_code()): as DATA step input;
 #   in addition a WHERE statement variable not on the data set is an ERROR
@@ -65,7 +65,7 @@
 #   output WHERE=                        none                                         the rows are filtered
 #   PROC PRINT DATA= with IN=            ERROR 22-7: Invalid option name IN.
 #
-# Order inside the DATA step reader: KEEP=/DROP= and RENAME= (sas_ds), WHERE=
+# Order inside the DATA step reader: KEEP=/DROP= and RENAME= (sas_rt_ds), WHERE=
 # (or else the WHERE statement), FIRSTOBS=/OBS= on the rows that satisfy it,
 # truncation of character values longer than the PDV variable, then the
 # "observations were read" note.
@@ -105,12 +105,12 @@ ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
   args <- list(rlang::sym("work"), rec$name)
   if (!is.null(rec$keep) || !is.null(rec$drop)) args$keep <- cg_val(rec$vars)
   if (!is.null(rec$rename)) args$rename <- rlang::call2("c", !!!as.list(rec$rename))
-  x <- cgi(cg_call("sas_ds", args))
+  x <- cgi(cg_call("sas_rt_ds", args))
   if (obs_col) x <- cgi_pipe(x, quote(dplyr::mutate(.obs = dplyr::row_number())))
   where_stage <- function(e) {
     wcx <- new_cx("vec", an)
     wcx$where <- TRUE
-    cg_call("dplyr::filter", list(rlang::expr(sas_where_cond(sas_true(!!gen_lang(e, wcx))))))
+    cg_call("dplyr::filter", list(rlang::expr(sas_rt_where_cond(sas_rt_true(!!gen_lang(e, wcx))))))
   }
   if (!is.null(rec$where)) x <- cgi_pipe(x, where_stage(rec$where))
   # the WHERE statement condition applies to every input data set without a
@@ -118,7 +118,7 @@ ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
   if (!is.null(where) && is.null(rec$where)) x <- cgi_pipe(x, where_stage(where))
   # FIRSTOBS= / OBS= count observations that satisfy WHERE= and WHERE
   if (!is.null(rec$firstobs) || !is.null(rec$obs)) {
-    x <- cgi_pipe(x, cg_call("sas_obs_window", list(if (!is.null(rec$firstobs)) cg_num(rec$firstobs),
+    x <- cgi_pipe(x, cg_call("sas_rt_obs_window", list(if (!is.null(rec$firstobs)) cg_num(rec$firstobs),
                                                     if (!is.null(rec$obs)) cg_num(rec$obs))))
   }
   # values from a data set whose character variable is longer than the PDV
@@ -133,10 +133,10 @@ ds_opts_apply <- function(rec, an, obs_col = FALSE, where = NULL) {
         tr[[rec$out_names[j]]] <- vctrs::vec_cast(inf$len, integer())
       }
     }
-    if (length(tr) > 0) x <- cgi_pipe(x, rlang::call2("sas_trunc_chars", cg_val(tr)))
+    if (length(tr) > 0) x <- cgi_pipe(x, rlang::call2("sas_rt_trunc_chars", cg_val(tr)))
   }
   wexpr <- rec$where %||% where
-  cgi_pipe(x, cg_call("sas_note_read", c(list(rec$name), if (!is.null(wexpr)) list(where = where_text(wexpr)))))
+  cgi_pipe(x, cg_call("sas_rt_note_read", c(list(rec$name), if (!is.null(wexpr)) list(where = where_text(wexpr)))))
 }
 
 #' KEEP=, DROP= and RENAME= on an output data set

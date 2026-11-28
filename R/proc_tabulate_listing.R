@@ -40,7 +40,7 @@ tab_listing_tables <- function(tables, ls) {
   pages <- 0L
   # BY groups: the BY line and a blank line above the first page of a group;
   # `groups` gives the line of each BY line, its values and the number of
-  # pages of the group (sas_tab_titles() puts the titles above it)
+  # pages of the group (sas_rt_tab_titles() puts the titles above it)
   groups <- list()
   group <- NULL
   # centring units (listing_center.R): each page one unit (with its
@@ -94,7 +94,7 @@ tab_byval_title <- function(titles, values, info) {
 #' @param r The result of `sas_rt_proc()`.
 #' @export
 #' @keywords internal
-sas_tab_titles <- function(titles, r) {
+sas_rt_tab_titles <- function(titles, r) {
   groups <- r$groups
   if (!is.null(groups)) {
     if (length(titles) == 0L) return(r$listing)
@@ -114,7 +114,7 @@ sas_tab_titles <- function(titles, r) {
   if (length(titles) > 0L && isTRUE(r$pages > 1L)) {
     abort_unsupported("TITLE lines above a PROC TABULATE output of more than one page")
   }
-  sas_titles_once(titles, r$listing)
+  sas_rt_titles_once(titles, r$listing)
 }
 
 # The panels of one table: a list of character vectors (one per panel).

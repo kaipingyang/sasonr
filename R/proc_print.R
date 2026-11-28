@@ -43,7 +43,7 @@ print_compute <- function(df, spec) {
     extra <- if (s$name %in% sums) c(sub_tot[[s$name]], grand[[s$name]]) else NULL
     all <- if (s$char) {
       # character values are written left-justified (leading blanks dropped)
-      sub("^ +", "", if (is.null(s$fmt)) sas_rtrim(x) else sas_rtrim(sas_format(x, s$fmt)))
+      sub("^ +", "", if (is.null(s$fmt)) sas_rt_rtrim(x) else sas_rt_rtrim(sas_format(x, s$fmt)))
     } else {
       y <- c(x, extra)
       # a formatted number keeps the blanks its format writes after the value
@@ -205,7 +205,7 @@ listing_base_print <- function(tb) {
   }
   # the cells of columns `js` joined by the gaps after each but the last
   line_of <- function(cells, gaps = rep(gap, length(cells) - 1L)) {
-    sas_rtrim(paste0(cells, c(strrep(" ", gaps), ""), collapse = ""))
+    sas_rt_rtrim(paste0(cells, c(strrep(" ", gaps), ""), collapse = ""))
   }
   head_of <- function(js, gaps) {
     nl <- max(vapply(heads[js], length, 1L))

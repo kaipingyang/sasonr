@@ -48,7 +48,7 @@ data r3; set a; retain d; if v > 1; d = v; run;
   auto <- sas_run(code)
   rows <- sas_run(code, level = "L3")
   expect_equal(vapply(auto$translation$steps, `[[`, "", "level"), c("L1", "L1", "L1", "L1"))
-  expect_false(any(grepl("sas_carry", vapply(auto$translation$steps, `[[`, "", "code"))))
+  expect_false(any(grepl("sas_rt_carry", vapply(auto$translation$steps, `[[`, "", "code"))))
   expect_equal(auto$work, rows$work)
   expect_equal(names(auto$work$r1), c("b", "a", "g", "v"))
   expect_equal(auto$work$r2$k, c(1, NA, 3))

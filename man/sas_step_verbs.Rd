@@ -101,6 +101,6 @@ processor (code that depends on values known only at run time).
 \examples{
 s <- sas_session(work = list(a = data.frame(x = c(2, 1, 3))))
 s |> sas_proc_sort(data = "a", out = "b", by = desc(x))
-s |> sas_proc_means(data = "b", noprint = TRUE, var = x, output = sas_out_stats(out = "m", mean = xm))
+s |> sas_proc_means(data = "b", noprint = TRUE, var = x, output = sas_stats_output(out = "m", mean = xm))
 sas_work(s)$m
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/proc.R
 \name{sas_sort_df}
 \alias{sas_sort_df}
-\title{PROC SORT: stable sort (missing values first) with optional NODUPKEY}
+\title{Sort a data frame as PROC SORT does}
 \usage{
 sas_sort_df(
   df,
@@ -12,7 +12,27 @@ sas_sort_df(
   noduprecs = FALSE
 )
 }
-\description{
-PROC SORT: stable sort (missing values first) with optional NODUPKEY
+\arguments{
+\item{df}{A data frame.}
+
+\item{by}{Names of the BY variables.}
+
+\item{descending}{One logical per BY variable: sort it in descending
+order.}
+
+\item{nodupkey}{Keep the first observation of each BY group.}
+
+\item{noduprecs}{Delete an observation identical to the one before.}
 }
-\keyword{internal}
+\value{
+The sorted data frame (a tibble).
+}
+\description{
+The data-level form of PROC SORT (\code{\link[=sas_proc_sort]{sas_proc_sort()}} runs it in a
+session): a stable sort by the BY variables, missing values before every
+number, character values in the SAS collating sequence.
+}
+\examples{
+sas_sort_df(data.frame(id = c(2, NA, 1), x = 1:3), by = "id")
+sas_sort_df(data.frame(g = c("a", "a", "b")), by = "g", nodupkey = TRUE)
+}

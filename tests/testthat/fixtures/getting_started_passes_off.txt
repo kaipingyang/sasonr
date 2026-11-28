@@ -1,8 +1,8 @@
 ## code
 # ---- DATA LAB (SAS line 2) -- level L1
 # L1: no cross-row state
-.df <- sas_read_input(
-  sas_infile_open(
+.df <- sas_rt_read_input(
+  sas_rt_infile_open(
     c("S01 1 10", "S01 2 12", "S02 1 20", "S02 2 18"),
     c(5L, 6L, 7L, 8L),
     opts = list(lines = 1L, end_text = ";")
@@ -39,23 +39,23 @@
 )
 work$lab <- .df |> dplyr::select(usubjid, visit, aval)
 ## exprs
-.df <- sas_read_input(sas_infile_open(c("S01 1 10", "S01 2 12", "S02 1 20", "S02 2 18"), c(5L, 6L, 7L, 8L), opts = list(lines = 1L, end_text = ";")), list(items = list(list(k = "var", name = "usubjid", disp = "usubjid", char = TRUE, len = 8L, mode = "list"), list(k = "var", name = "visit", disp = "visit", char = FALSE, len = NA_integer_, mode = "list"), list(k = "var", name = "aval", disp = "aval", char = FALSE, len = NA_integer_, mode = "list")), hold = ""))
+.df <- sas_rt_read_input(sas_rt_infile_open(c("S01 1 10", "S01 2 12", "S02 1 20", "S02 2 18"), c(5L, 6L, 7L, 8L), opts = list(lines = 1L, end_text = ";")), list(items = list(list(k = "var", name = "usubjid", disp = "usubjid", char = TRUE, len = 8L, mode = "list"), list(k = "var", name = "visit", disp = "visit", char = FALSE, len = NA_integer_, mode = "list"), list(k = "var", name = "aval", disp = "aval", char = FALSE, len = NA_integer_, mode = "list")), hold = ""))
 work$lab <- dplyr::select(.df, usubjid, visit, aval)
 ## code
 # ---- DATA CHG (SAS line 12) -- level L2
 # L2: BY-group processing (FIRST./LAST.); retained value carried forward (baseline / LOCF)
-.df <- sas_ds(work, "lab") |>
-  sas_note_read("lab") |>
-  sas_check_sorted("usubjid", FALSE) |>
+.df <- sas_rt_ds(work, "lab") |>
+  sas_rt_note_read("lab") |>
+  sas_rt_check_sorted("usubjid", FALSE) |>
   dplyr::mutate(
-    first.usubjid = sas_first(usubjid),
-    last.usubjid = sas_last(usubjid),
+    first.usubjid = sas_rt_first(usubjid),
+    last.usubjid = sas_rt_last(usubjid),
     .cv_base_1 = aval,
-    .cs_base_1 = sas_true(first.usubjid),
-    base = sas_carry(list(.cv_base_1), list(.cs_base_1), NA_real_),
-    chg = sas_arith(aval, base, "-", .at = c(17L, 14L))
+    .cs_base_1 = sas_rt_true(first.usubjid),
+    base = sas_rt_carry(list(.cv_base_1), list(.cs_base_1), NA_real_),
+    chg = sas_rt_arith(aval, base, "-", .at = c(17L, 14L))
   )
 work$chg <- .df |> dplyr::select(usubjid, visit, aval, base, chg)
 ## exprs
-.df <- dplyr::mutate(sas_check_sorted(sas_note_read(sas_ds(work, "lab"), "lab"), "usubjid", FALSE), first.usubjid = sas_first(usubjid), last.usubjid = sas_last(usubjid), .cv_base_1 = aval, .cs_base_1 = sas_true(first.usubjid), base = sas_carry(list(.cv_base_1), list(.cs_base_1), NA_real_), chg = sas_arith(aval, base, "-", .at = c(17L, 14L)))
+.df <- dplyr::mutate(sas_rt_check_sorted(sas_rt_note_read(sas_rt_ds(work, "lab"), "lab"), "usubjid", FALSE), first.usubjid = sas_rt_first(usubjid), last.usubjid = sas_rt_last(usubjid), .cv_base_1 = aval, .cs_base_1 = sas_rt_true(first.usubjid), base = sas_rt_carry(list(.cv_base_1), list(.cs_base_1), NA_real_), chg = sas_rt_arith(aval, base, "-", .at = c(17L, 14L)))
 work$chg <- dplyr::select(.df, usubjid, visit, aval, base, chg)

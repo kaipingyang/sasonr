@@ -181,7 +181,7 @@ test_that("function-layer calls outside a run have no hidden state", {
   expect_null(sasonr:::user_fmt("yn", FALSE))
   expect_identical(sasonr:::rt_linesize(), 132L)
   expect_true(sasonr:::rt_notes_on())
-  expect_error(sasonr::sas_define_format(list(kind = "value", name = "yn", char = FALSE)), class = "sasonr_error")
+  expect_error(sasonr::sas_rt_define_format(list(kind = "value", name = "yn", char = FALSE)), class = "sasonr_error")
   # a fileref has nothing to resolve against: fails loud
   expect_error(sas_analyze(sas_parse("filename f 'x.txt'; data a; infile f; input x; run;")$steps[[2]]),
                class = "sasonr_unsupported")

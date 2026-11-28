@@ -16,8 +16,8 @@ test_that("a $n variable stores the first n bytes, padded with blanks", {
   skip_utf8()
   expect_identical(stored(5, paste0("'", e1, e1, "'")), "C3A9C3A920")
   expect_identical(stored(6, paste0("'", e1, "'")), "C3A920202020")
-  expect_identical(hex(sas_char(e1, 6L)), "C3A920202020")
-  expect_identical(hex(sas_char(paste0(e1, e1, e1), 4L)), "C3A9C3A9")
+  expect_identical(hex(sas_rt_char(e1, 6L)), "C3A920202020")
+  expect_identical(hex(sas_rt_char(paste0(e1, e1, e1), 4L)), "C3A9C3A9")
 })
 
 test_that("a cut inside a multi-byte character fails loud", {
@@ -28,7 +28,7 @@ test_that("a cut inside a multi-byte character fails loud", {
   expect_error(run_a(paste0("length s $4; s = '", ete, "';")), class = "sasonr_unsupported")
   # from a longer variable: the cut happens at the assignment
   expect_error(run_a(paste0("length s $5 t $3; s = '", e1, e1, "'; t = s;")), class = "sasonr_unsupported")
-  expect_error(sas_char(paste0(e1, e1), 3L), class = "sasonr_unsupported")
+  expect_error(sas_rt_char(paste0(e1, e1), 3L), class = "sasonr_unsupported")
 })
 
 test_that("a literal takes its length in bytes", {
@@ -107,9 +107,9 @@ test_that("INPUT statements from records with bytes outside ASCII fail loud", {
 })
 
 test_that("ASCII values are unchanged", {
-  expect_identical(sas_char("abc", 5L), "abc  ")
-  expect_identical(sas_char("abcdef", 3L), "abc")
-  expect_identical(sas_char(c("a", NA), 2L), c("a ", "  "))
+  expect_identical(sas_rt_char("abc", 5L), "abc  ")
+  expect_identical(sas_rt_char("abcdef", 3L), "abc")
+  expect_identical(sas_rt_char(c("a", NA), 2L), c("a ", "  "))
   d <- run_a("length s $3; s = 'abcdef'; l = length(s); c = lengthc(s); r = reverse(s);")
   expect_identical(c(d$s, d$r), c("abc", "cba"))
   expect_identical(c(d$l, d$c), c(3, 3))
@@ -150,11 +150,11 @@ test_that("a user format label outside ASCII fails loud", {
 
 test_that("a colon comparison truncates to the shorter value in bytes", {
   skip_utf8()
-  expect_equal(sasonr:::sas_cmp_trunc("=", "\u00e9t\u00e9", "\u00e9"), 1)
-  expect_equal(sasonr:::sas_cmp_trunc("=", "\u00e9a", "\u00e0"), 0)
+  expect_equal(sasonr:::sas_rt_cmp_trunc("=", "\u00e9t\u00e9", "\u00e9"), 1)
+  expect_equal(sasonr:::sas_rt_cmp_trunc("=", "\u00e9a", "\u00e0"), 0)
   # the prefix may end inside a character: 'a' C3 against 'ab'
-  expect_equal(sasonr:::sas_cmp_trunc(">", "a\u00e9", "ab"), 1)
-  expect_equal(sasonr:::sas_cmp_trunc("=", "abc", "ab"), 1)
+  expect_equal(sasonr:::sas_rt_cmp_trunc(">", "a\u00e9", "ab"), 1)
+  expect_equal(sasonr:::sas_rt_cmp_trunc("=", "abc", "ab"), 1)
 })
 
 test_that("SUBSTR counts positions and lengths in bytes", {

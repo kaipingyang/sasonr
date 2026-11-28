@@ -263,7 +263,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
       args[k]
     )
   })
-  # character arguments with bytes outside ASCII: as in a DATA step (sas_chr_arg())
+  # character arguments with bytes outside ASCII: as in a DATA step (sas_rt_chr_arg())
   if (!fname %in% setdiff(chr_wide_ok_fns, chr_wide_data_fns) && any(vapply(vals, function(v) is.character(v) && any(chr_wide(v)), TRUE))) {
     chr_wide_gate(fname, line, context = "sysfunc")
   }
@@ -274,7 +274,7 @@ mac_sysfunc <- function(text, line = NULL, ses = NULL) {
     if (fname %in% names(fn_policy)) {
       # invalid arguments: one NOTE for the %SYSFUNC call, not the DATA step NOTEs
       old <- list(err = rt$err, notes = rt$notes, places = log_places_save(rt))
-      r <- rlang::exec(sas_fcall, fname, f, !!!vals)
+      r <- rlang::exec(sas_rt_fcall, fname, f, !!!vals)
       bad <- isTRUE(rt$err) && !isTRUE(old$err)
       rt$err <- old$err
       rt$notes <- old$notes

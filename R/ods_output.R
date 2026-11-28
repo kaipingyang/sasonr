@@ -62,7 +62,7 @@ ods_output_match <- function(req, tb) {
 
 # Write the requested tables of a step.  `writer(tables, spec, line)` builds the
 # data set (list(data, meta)) of one request from the tables it matches.
-# Returns the data sets (named list for sas_proc_store()) and queues the NOTEs.
+# Returns the data sets (named list for sas_rt_store()) and queues the NOTEs.
 ods_output_write <- function(tables, spec, reqs, writer, proc) {
   rt <- rt_diag()
   out <- list()

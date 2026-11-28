@@ -38,9 +38,9 @@ data_api_core <- function(data, proc, code, builder) {
   b <- builder(step, s$meta, s$last)
   d <- tibble::as_tibble(get("data", envir = s$work))
   if (identical(proc, "transpose")) {
-    # PROC TRANSPOSE writes an output data set (sas_proc_store(), as in a program)
+    # PROC TRANSPOSE writes an output data set (sas_rt_store(), as in a program)
     r <- sas_rt_transpose(d, b$spec)
-    sas_proc_store(s$work, r$out)
+    sas_rt_store(s$work, r$out)
     return(list(out = tibble::as_tibble(get(b$spec$out, envir = s$work)), messages = c(b$warnings, s$rt$proc_notes)))
   }
   res <- proc_registry_entry(proc)$compute(d, b$spec)
@@ -137,7 +137,7 @@ sas_transpose_df <- function(data, var = NULL, by = NULL, id = NULL, options = "
   code <- data_api_text("transpose", options, body, out = "transposed")
   res <- data_api_core(data, "transpose", code, transpose_step_spec)
   # character values without their trailing blanks, as sas_work() gives them
-  out <- dplyr::mutate(res$out, dplyr::across(dplyr::where(is.character), sas_rtrim))
+  out <- dplyr::mutate(res$out, dplyr::across(dplyr::where(is.character), sas_rt_rtrim))
   attr(out, "sasonr_log") <- res$messages
   out
 }

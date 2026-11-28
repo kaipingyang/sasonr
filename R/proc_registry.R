@@ -39,7 +39,7 @@ proc_registry_entry <- function(name) {
 #' Run a procedure of the PROC registry
 #'
 #' Computes the tables and output data sets of one PROC step, then routes
-#' them: the data sets go to WORK (through `sas_proc_store()` in the
+#' them: the data sets go to WORK (through `sas_rt_store()` in the
 #' translated code), the tables are rendered to the listing.
 #' @param name The procedure name as written (`"means"`, `"summary"`).
 #' @param df Input data (after WHERE).

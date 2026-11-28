@@ -31,7 +31,7 @@ statements. PROC SORT: \code{nodupkey}, \code{noduprecs}, \code{equals}, \code{f
 arguments (\code{nway = TRUE}, \code{maxdec = 2}, \code{vardef = "wdf"}), the statistic
 keywords as \code{stats = c(n, mean, std)}; statements \code{var}, \code{class}, \code{by},
 \code{id}, \code{where}, \code{freq}, \code{weight}, \code{types}, \code{ways}, \code{output} (built with
-\code{\link[=sas_out_stats]{sas_out_stats()}}), \code{format}, \code{label}, \code{attrib}. FORMAT takes a named vector
+\code{\link[=sas_stats_output]{sas_stats_output()}}), \code{format}, \code{label}, \code{attrib}. FORMAT takes a named vector
 (\code{format = c(aval = "8.2")}). A statement value held in a variable is
 injected with \verb{!!}. Any other argument fails.}
 

@@ -899,7 +899,7 @@ engine_step_options <- function(eng, text, line) {
 # no R translation; evaluating it fails loud.
 untranslated_code <- function(what, line) {
   paste0("# ", what, " (SAS line ", line, "): run by the sasonr engine, no R translation\n",
-         "sas_untranslated(", r_lit(what), ", ", as.integer(line), "L)")
+         "sas_rt_untranslated(", r_lit(what), ", ", as.integer(line), "L)")
 }
 
 #' Stop: a step that has no R translation
@@ -911,7 +911,7 @@ untranslated_code <- function(what, line) {
 #' @param line Its SAS line.
 #' @export
 #' @keywords internal
-sas_untranslated <- function(what, line) {
+sas_rt_untranslated <- function(what, line) {
   abort_unsupported(paste0(what, " has no R translation: sasonr runs it in sas_run()"), line)
 }
 
@@ -973,7 +973,7 @@ engine_program <- function(eng, code) {
 #' table) and `.titles` (the current TITLE lines), with the session of the
 #' run bound for the log NOTEs and `_ERROR_`. Steps that sasonr runs itself
 #' (PROC SQL, PROC DATASETS) have no R translation: their code is a call of
-#' `sas_untranslated()`, which stops with a condition of class
+#' `sas_rt_untranslated()`, which stops with a condition of class
 #' `sasonr_unsupported`.
 #'
 #' Option `sasonr.passes` selects the readability passes applied to the code
@@ -1169,7 +1169,7 @@ macro_auto_vars <- mac_auto_implemented
 # The sasonr_result of an engine.
 engine_result <- function(eng) {
   out <- lapply(as.list(eng$session$work), function(df) {
-    dplyr::mutate(df, dplyr::across(dplyr::where(is.character), sas_rtrim))
+    dplyr::mutate(df, dplyr::across(dplyr::where(is.character), sas_rt_rtrim))
   })
   mv <- as.list(eng$session$macro$globals)
   autos <- macro_auto_vars

@@ -22,7 +22,7 @@ hash_rc_remove_missing <- 160032
 #' variables of that data set; `.line`: the program line.
 #' @export
 #' @keywords internal
-sas_hash_new <- function(..., .work = NULL, .lengths = NULL, .line = NULL) {
+sas_rt_hash_new <- function(..., .work = NULL, .lengths = NULL, .line = NULL) {
   args <- list(...)
   line <- .line
   known <- c("dataset", "ordered", "hashexp")
@@ -62,13 +62,13 @@ hash_names <- function(args, what, line) {
 }
 
 #' Call a method of a hash object: the PDV after the call (the return code
-#' in `h$rc`, sas_hash_rc())
+#' in `h$rc`, sas_rt_hash_rc())
 #'
 #' `...`: the arguments, named by their tags (`key = `); `.stmt`: the call is
 #' a statement (a failing call is an ERROR there).
 #' @export
 #' @keywords internal
-sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
+sas_rt_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
   args <- list(...)
   stmt <- .stmt
   line <- h$line
@@ -136,8 +136,8 @@ sas_hash_call <- function(h, method, pdv, ..., .stmt = FALSE) {
         h$rc <- hash_rc_duplicate
       } else {
         # character values take the length of their variable
-        for (v in names(dv)) if (is.character(dv[[v]])) dv[[v]] <- sas_char(dv[[v]], nchar(pdv[[v]], "bytes"))
-        for (v in names(kv)) if (is.character(kv[[v]])) kv[[v]] <- sas_char(kv[[v]], nchar(pdv[[v]], "bytes"))
+        for (v in names(dv)) if (is.character(dv[[v]])) dv[[v]] <- sas_rt_char(dv[[v]], nchar(pdv[[v]], "bytes"))
+        for (v in names(kv)) if (is.character(kv[[v]])) kv[[v]] <- sas_rt_char(kv[[v]], nchar(pdv[[v]], "bytes"))
         h$entries[[code]] <- list(key = kv, data = dv)
       }
     },
@@ -193,7 +193,7 @@ hash_load <- function(h, pdv, line) {
     if (is.character(pv)) {
       lp <- nchar(pv, "bytes")
       ld <- h$lengths[[v]]
-      if (!identical(as.integer(ld), as.integer(lp))) cols[[v]] <- sas_char(cols[[v]], lp)
+      if (!identical(as.integer(ld), as.integer(lp))) cols[[v]] <- sas_rt_char(cols[[v]], lp)
     }
   }
   for (i in seq_len(nrow(d))) {
@@ -207,7 +207,7 @@ hash_load <- function(h, pdv, line) {
   }
   # its read NOTE comes before those of the step's SET and MERGE data sets
   # [measured]; the readers' counts skip it
-  sas_note_read(d, tolower(ds))
+  sas_rt_note_read(d, tolower(ds))
   rt <- rt_diag()
   rt$reads[[length(rt$reads)]]$hash <- TRUE
   invisible()
@@ -216,7 +216,7 @@ hash_load <- function(h, pdv, line) {
 #' Create a hash iterator object (DECLARE HITER) over hash object `h`
 #' @export
 #' @keywords internal
-sas_hiter_new <- function(h, .line = NULL) {
+sas_rt_hiter_new <- function(h, .line = NULL) {
   it <- new.env(parent = emptyenv())
   it$kind <- "hiter"
   it$hash <- h
@@ -271,18 +271,18 @@ hiter_call <- function(it, method, pdv, args) {
 #' The entries at the time of the last OUTPUT to that data set.
 #' @export
 #' @keywords internal
-sas_hash_written <- function(h, name) {
+sas_rt_hash_written <- function(h, name) {
   w <- if (is.environment(h)) h$written[[name]]
   if (is.null(w)) abort_unsupported(paste0("a hash object OUTPUT to WORK.", toupper(name), " that did not run"))
-  sas_rows_to_tibble(w$rows, w$proto)
+  sas_rt_rows_to_tibble(w$rows, w$proto)
 }
 
 #' The return code of the last method call of a hash object
 #' @export
 #' @keywords internal
-sas_hash_rc <- function(h) h$rc
+sas_rt_hash_rc <- function(h) h$rc
 
 #' The number of entries of a hash object (NUM_ITEMS)
 #' @export
 #' @keywords internal
-sas_hash_num_items <- function(h) as.numeric(length(h$entries))
+sas_rt_hash_num_items <- function(h) as.numeric(length(h$entries))

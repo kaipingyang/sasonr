@@ -68,7 +68,7 @@ test_that("a type-level unsupported construct fails loud and is not re-run", {
 ;
 "), class = "sasonr_unsupported")
   # the run-time safety net is not re-run either
-  e <- tryCatch(sasonr:::sas_true("a"), error = identity)
+  e <- tryCatch(sasonr:::sas_rt_true("a"), error = identity)
   expect_s3_class(e, "sasonr_unsupported_construct")
   e <- tryCatch(sasonr:::sas_cmp("a", 1), error = identity)
   expect_s3_class(e, "sasonr_unsupported_construct")

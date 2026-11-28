@@ -197,7 +197,7 @@ sas_rt_active <- function(session) {
   invisible(old)
 }
 
-# Fast paths for the helpers called per row (sas_err_sync, rt_error ...).
+# Fast paths for the helpers called per row (sas_rt_err_sync, rt_error ...).
 # Outside a submission each call gets a throw-away state: what a standalone
 # function call records (data-error NOTEs, counters) is discarded.
 rt_diag <- function() .active$rt %||% new_rt_state()

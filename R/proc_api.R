@@ -86,7 +86,7 @@ proc_stmt_arg_text <- function(e, kw = NULL) {
     if (is.character(x) && length(x)) return(paste(x, collapse = " "))
     NULL
   }
-  # a statement built by a constructor (sas_out_stats()): its text
+  # a statement built by a constructor (sas_stats_output()): its text
   if (proc_helper_call(e)) e <- eval(e, asNamespace("sasonr"))
   if (inherits(e, "sas_stmt_text")) return(unclass(e))
   # a named vector of strings (FORMAT: `c(x = "8.2")`): `name value` pairs
@@ -381,13 +381,13 @@ proc_opts_text <- function(name, opts) {
 #' @return The OUTPUT statement as text (class `sas_stmt_text`), which the
 #'   verbs read.
 #' @examples
-#' sas_out_stats(out = "stats", mean = c(m_x, m_y), std = c(sd_x = x), n = TRUE, autoname = TRUE)
+#' sas_stats_output(out = "stats", mean = c(m_x, m_y), std = c(sd_x = x), n = TRUE, autoname = TRUE)
 #' @export
-sas_out_stats <- function(out = NULL, ..., autoname = FALSE, autolabel = FALSE, noinherit = FALSE, inherit = FALSE,
+sas_stats_output <- function(out = NULL, ..., autoname = FALSE, autolabel = FALSE, noinherit = FALSE, inherit = FALSE,
                        keeplen = FALSE, levels = FALSE, ways = FALSE) {
   specs <- rlang::enexprs(...)
   if (length(specs) && (is.null(names(specs)) || any(!nzchar(names(specs))))) {
-    rlang::abort("Every statistic of `sas_out_stats()` must be named by its keyword (`mean = c(m1, m2)`).", class = "sasonr_error")
+    rlang::abort("Every statistic of `sas_stats_output()` must be named by its keyword (`mean = c(m1, m2)`).", class = "sasonr_error")
   }
   parts <- if (!is.null(out)) paste0("out=", out) else character()
   for (k in names(specs)) parts <- c(parts, proc_output_spec_text(k, specs[[k]]))
@@ -403,21 +403,21 @@ print.sas_stmt_text <- function(x, ...) {
   invisible(x)
 }
 
-# `stat=names`, `stat(vars)=names` or `stat=` of one sas_out_stats() argument.
+# `stat=names`, `stat(vars)=names` or `stat=` of one sas_stats_output() argument.
 proc_output_spec_text <- function(k, e) {
   if (isTRUE(e)) return(paste0(k, "="))
   if (is.character(e)) return(paste0(k, "=", paste(e, collapse = " ")))
   items <- if (is.call(e) && identical(e[[1]], as.name("c"))) as.list(e)[-1] else list(e)
   nm <- names(items) %||% rep("", length(items))
   ok <- vapply(items, is.symbol, NA)
-  if (!all(ok)) rlang::abort(paste0("`", k, "` of `sas_out_stats()` takes names (`c(m1, m2)`, `c(new = var)`) or TRUE."), class = "sasonr_error")
+  if (!all(ok)) rlang::abort(paste0("`", k, "` of `sas_stats_output()` takes names (`c(m1, m2)`, `c(new = var)`) or TRUE."), class = "sasonr_error")
   new <- vapply(seq_along(items), function(i) if (nzchar(nm[i])) nm[i] else as.character(items[[i]]), "")
   if (all(nzchar(nm))) return(paste0(k, "(", paste(vapply(items, as.character, ""), collapse = " "), ")=", paste(new, collapse = " ")))
-  if (any(nzchar(nm))) rlang::abort(paste0("`", k, "` of `sas_out_stats()`: all names given to variables (`c(new = var)`) or none."), class = "sasonr_error")
+  if (any(nzchar(nm))) rlang::abort(paste0("`", k, "` of `sas_stats_output()`: all names given to variables (`c(new = var)`) or none."), class = "sasonr_error")
   paste0(k, "=", paste(new, collapse = " "))
 }
 
-# The sas_out_stats() call of an OUTPUT statement node, or NULL (a form it does
+# The sas_stats_output() call of an OUTPUT statement node, or NULL (a form it does
 # not write: variable ranges, a reference whose text was not kept).
 proc_output_call <- function(s) {
   args <- list()
@@ -439,7 +439,7 @@ proc_output_call <- function(s) {
     args <- c(args, stats::setNames(list(v), sp$stat))
   }
   for (k in names(s$opts)) if (isTRUE(s$opts[[k]])) args[[k]] <- TRUE
-  rlang::call2("sas_out_stats", !!!args)
+  rlang::call2("sas_stats_output", !!!args)
 }
 
 # The named vector of a FORMAT statement node (`c(x = "8.2")`), or NULL when a
@@ -491,7 +491,7 @@ sas_vars <- function(text) {
 #' A data set with data set options
 #'
 #' The `data` and `out` arguments of the step verbs (and `out` of
-#' [sas_out_stats()]) take a data set name, or `sas_dataset()` for a data set with
+#' [sas_stats_output()]) take a data set name, or `sas_dataset()` for a data set with
 #' data set options.
 #' @param name The data set name (`"adsl"`, `"lib.adsl"`).
 #' @param keep,drop Variables: names (`c(a, b)`), strings, or [sas_vars()].
@@ -625,7 +625,7 @@ proc_ds_call <- function(text) {
 # Is `e` a call of one of the helpers that build the arguments of the verbs
 # (they are evaluated where the verb reads its arguments)?
 proc_helper_call <- function(e) {
-  is.call(e) && is.symbol(e[[1]]) && as.character(e[[1]]) %in% c("sas_out_stats", "sas_expr", "sas_vars", "sas_dataset")
+  is.call(e) && is.symbol(e[[1]]) && as.character(e[[1]]) %in% c("sas_stats_output", "sas_expr", "sas_vars", "sas_dataset")
 }
 
 # The argument of a data set reference: its name, or a sas_dataset() call, or its

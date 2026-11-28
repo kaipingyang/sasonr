@@ -341,7 +341,7 @@ sql_subq_value <- function(e, res, ctx, row) {
   lt <- if (is.character(lhs)) "char" else "num"
   if (lt != col$type) abort_syntax("The comparison has components that are of different data types.", e$line)
   if (e$node == "in_subq") {
-    hit <- sas_true(sas_in(lhs, as.list(vals)))
+    hit <- sas_rt_true(sas_rt_in(lhs, as.list(vals)))
     return(as.numeric(if (isTRUE(e$negate)) !hit else hit))
   }
   sas_f_sqlquant(lhs, vals, e$op, e$quant)

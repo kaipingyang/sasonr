@@ -4,7 +4,7 @@
 # file -- the NAMESTR records of a transport (XPORT) file (xpt_meta()); a
 # .sas7bdat member fails loud until its column attributes are read. The members stay in the
 # session (`lib_members`), not in WORK; a step's analysis sees their metadata
-# (lib_step_meta()) and its code reads them with sas_ds() (sas_lib_member()).
+# (lib_step_meta()) and its code reads them with sas_rt_ds() (sas_rt_lib_member()).
 # What the file does not give fails loud: a .sas7bdat member, a transport
 # file with several members, a member that is not there (an ERROR in the
 # documented behaviour), writing to a library.
@@ -96,7 +96,7 @@ lib_finish <- function(df, vars, type, len, fmt, informat, label, memlabel, ref,
     if (type[j] == "char") {
       x <- df[[j]]
       if (any(nchar(x[!is.na(x)], "bytes") > len[j])) abort_unsupported(paste0("values of ", disp[j], " longer than its length"), line)
-      df[[j]] <- sas_char(ifelse(is.na(x), "", x), as.integer(len[j]))
+      df[[j]] <- sas_rt_char(ifelse(is.na(x), "", x), as.integer(len[j]))
     } else if (len[j] != 8L) {
       # a shorter numeric length: the stored precision is not modelled here
       abort_unsupported(paste0("the numeric length ", len[j], " of ", disp[j], " in ", toupper(ref), ".", toupper(mem)), line)

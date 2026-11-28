@@ -85,9 +85,9 @@ reads_all_after <- function(stages, k, facts) {
 
 # Pass: unused FIRST./LAST. columns ----------------------------------------
 
-# `first.x = sas_first(...)` / `last.x = sas_last(...)` in a mutate stage that
+# `first.x = sas_rt_first(...)` / `last.x = sas_rt_last(...)` in a mutate stage that
 # no later stage and no code after the pipeline reads: the output select()
-# drops the column, and sas_first()/sas_last() write nothing to the log.
+# drops the column, and sas_rt_first()/sas_rt_last() write nothing to the log.
 pass_unused_first_last <- function(stages, facts) {
   for (k in seq_along(stages)) {
     st <- stages[[k]]
@@ -96,7 +96,7 @@ pass_unused_first_last <- function(stages, facts) {
     flag <- vapply(seq_along(st$code), function(j) {
       e <- st$code[[j]]
       grepl("^(first|last)\\.", nms[j]) && is.call(e) &&
-        (identical(e[[1]], quote(sas_first)) || identical(e[[1]], quote(sas_last)))
+        (identical(e[[1]], quote(sas_rt_first)) || identical(e[[1]], quote(sas_rt_last)))
     }, logical(1))
     if (!any(flag)) next
     if (reads_all_after(stages, k, facts)) next
@@ -116,27 +116,27 @@ pass_unused_first_last <- function(stages, facts) {
 # Pass: value set at FIRST. of a BY group --------------------------------
 
 # retain v; if first.b then v = x;  is built as
-#   .cv_v_1 = x, .cs_v_1 = sas_true(first.b)                  (stage k)
-#   v = sas_carry(list(.cv_v_1), list(.cs_v_1), init)         (stage k + 1)
+#   .cv_v_1 = x, .cs_v_1 = sas_rt_true(first.b)                  (stage k)
+#   v = sas_rt_carry(list(.cv_v_1), list(.cs_v_1), init)         (stage k + 1)
 # and becomes
 #   group_by(.grp = cumsum(first.b)) |> mutate(v = as.numeric(dplyr::first(x))) |> ungroup()
 # when
 #   * the carry plan of v has this one assignment only (so it is the only
 #     assignment of v in the step) and its condition is first.b, b a BY variable;
-#   * first.b is the sas_first() column of the input stages and no stage before
+#   * first.b is the sas_rt_first() column of the input stages and no stage before
 #     the carry removes rows (no filter) or regroups them: then row 1 has
 #     first.b = 1, the runs of cumsum(first.b) are the runs that start at a row
-#     with first.b = 1, and on every row sas_carry() returns x on the first row
+#     with first.b = 1, and on every row sas_rt_carry() returns x on the first row
 #     of its run, so the RETAIN initial value is never used;
 #   * x is a column name (evaluated once per group instead of per row, it
-#     writes nothing and cannot fail) and v is numeric: sas_carry() returns a
+#     writes nothing and cannot fail) and v is numeric: sas_rt_carry() returns a
 #     plain double vector (the initial value is a double without attributes,
 #     and x is assigned into it), as as.numeric() does for every numeric,
 #     logical, factor or date column;
 #   * no later code reads columns by string or selection (it would see
 #     .grp in place of .cv_v_1 / .cs_v_1).
 # Runs of cumsum(first.b) are used rather than group_by() on the BY variables:
-# they follow sas_first() exactly (BY NOTSORTED, special missing values).
+# they follow sas_rt_first() exactly (BY NOTSORTED, special missing values).
 pass_by_first_value <- function(stages, facts) {
   an <- facts$an
   plan <- an$carry_plan
@@ -152,13 +152,13 @@ pass_by_first_value <- function(stages, facts) {
     nxt <- stages[[k + 1L]]
     if (nxt$kind != "mutate" || !identical(names(nxt$code), v)) next
     carry <- nxt$code[[1]]
-    if (!is.call(carry) || !identical(carry[[1]], quote(sas_carry)) ||
+    if (!is.call(carry) || !identical(carry[[1]], quote(sas_rt_carry)) ||
         !identical(carry[[2]], rlang::call2("list", rlang::sym(cv))) ||
         !identical(carry[[3]], rlang::call2("list", rlang::sym(cs)))) next
     x <- stages[[k]]$code[[1]]
     cond <- stages[[k]]$code[[2]]
     if (!is.symbol(x)) next
-    if (!is.call(cond) || !identical(cond[[1]], quote(sas_true)) || length(cond) != 2L || !is.symbol(cond[[2]])) next
+    if (!is.call(cond) || !identical(cond[[1]], quote(sas_rt_true)) || length(cond) != 2L || !is.symbol(cond[[2]])) next
     flag <- as.character(cond[[2]])
     b <- sub("^first\\.", "", flag)
     if (!startsWith(flag, "first.") || !b %in% an$by$vars) next
@@ -175,12 +175,12 @@ pass_by_first_value <- function(stages, facts) {
   stages
 }
 
-# `flag` (first.b) is set once, by the sas_first() call of the BY variables up
+# `flag` (first.b) is set once, by the sas_rt_first() call of the BY variables up
 # to b, in a mutate stage before stage `k`, and every stage before `k` is a
 # mutate or the sort check (no row is removed, added or regrouped).
 first_flag_is_input <- function(stages, k, flag, by) {
   b <- sub("^first\\.", "", flag)
-  keys <- rlang::call2("sas_first", !!!rlang::syms(by[seq_len(match(b, by))]))
+  keys <- rlang::call2("sas_rt_first", !!!rlang::syms(by[seq_len(match(b, by))]))
   set_at <- integer()
   for (i in seq_len(k - 1L)) {
     st <- stages[[i]]
@@ -191,7 +191,7 @@ first_flag_is_input <- function(stages, k, flag, by) {
       }
       next
     }
-    if (st$kind == "raw" && is.call(st$code) && identical(st$code[[1]], quote(sas_check_sorted))) next
+    if (st$kind == "raw" && is.call(st$code) && identical(st$code[[1]], quote(sas_rt_check_sorted))) next
     return(FALSE)
   }
   length(set_at) == 1L

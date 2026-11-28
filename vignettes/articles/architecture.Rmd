@@ -89,7 +89,7 @@ another (each submission still starts outside syntax-check mode).
 The generated step code does not take the session as an argument. The engine
 binds the session for the duration of a submission and restores the previous
 binding on exit; the run-time helpers that generated code calls
-(`sas_err_sync()`, `sas_put_line()`, the functions and formats) read the
+(`sas_rt_err_sync()`, `sas_rt_put_line()`, the functions and formats) read the
 bound session. Two sessions used alternately therefore never see each
 other's state, and a `sas_run()` nested inside a running step gets its own
 session without disturbing the outer one; a nested submission to the

@@ -1,7 +1,7 @@
 # Run-time behaviour (as SAS documents it) of function calls with missing or invalid arguments.
 #
 # For a function listed in `fn_policy`, translated code calls
-# sas_fcall(name, f, args, .at): the implementation computes the values; the
+# sas_rt_fcall(name, f, args, .at): the implementation computes the values; the
 # wrapper writes the log NOTEs and sets _ERROR_:
 #   miss   a missing value (any kind) in one of the positions `pos` (default:
 #          every numeric argument):
@@ -256,7 +256,7 @@ fn_policy <- list(
   }, nan = "none", math = FALSE),
   quote = fpol(dom = function(a) {
     x <- as_sas_chr(a[[1]])
-    x <- sas_rtrim(x)
+    x <- sas_rt_rtrim(x)
     code_if(nchar(x) + 2 + nchar(gsub("[^\"]", "", x)) > 200, "inv")
   }, nan = "none", math = FALSE),
   week = fpol("mv", pos = 1L, dom = function(a) {
@@ -396,7 +396,7 @@ chr_wide_data_fns <- c("substr", chr_byte_fns)
 #' @param .exact `FALSE` in vectorised code (the step is re-run row by row).
 #' @keywords internal
 #' @export
-sas_chr_arg <- function(x, .name, .line = NULL, .exact = TRUE) {
+sas_rt_chr_arg <- function(x, .name, .line = NULL, .exact = TRUE) {
   if (!is.character(x) || !any(chr_wide(x), na.rm = TRUE)) return(x)
   if (!length(.line) || is.na(.line[1])) .line <- NULL
   chr_wide_gate(.name, .line, .exact)
@@ -512,7 +512,7 @@ choose_dom <- function(a) {
 #' @param .exact `FALSE` in vectorised code (counts are redone row by row).
 #' @keywords internal
 #' @export
-sas_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
+sas_rt_fcall <- function(.name, .f, ..., .at = NULL, .exact = TRUE) {
   rt <- rt_diag()
   args <- list(...)
   p <- fn_policy[[.name]]

@@ -145,7 +145,7 @@ compress_vec <- function(x, cs, md) {
   keep <- grepl("k", md, fixed = TRUE)
   s <- x
   na <- is.na(s)
-  if (grepl("t", md, fixed = TRUE)) s[!na] <- sas_rtrim(s[!na])
+  if (grepl("t", md, fixed = TRUE)) s[!na] <- sas_rt_rtrim(s[!na])
   out <- s
   if (length(set) > 0L) {
     cls <- paste0("[", if (keep) "^", paste0("\\x{", sprintf("%X", utf8ToInt(paste(set, collapse = ""))), "}", collapse = ""), "]")
@@ -163,7 +163,7 @@ compress_rowwise <- function(x, chars, mods) {
     md <- ascii_lower(md)
     set <- c(chars_of(cs), class_chars(md))
     if (grepl("i", md, fixed = TRUE)) set <- unique(c(set, ascii_upper(set), ascii_lower(set)))
-    if (grepl("t", md, fixed = TRUE)) s <- sas_rtrim(s)
+    if (grepl("t", md, fixed = TRUE)) s <- sas_rt_rtrim(s)
     ch <- chars_of(s)
     keep <- if (grepl("k", md, fixed = TRUE)) ch %in% set else !ch %in% set
     paste(ch[keep], collapse = "")
@@ -173,8 +173,8 @@ compress_rowwise <- function(x, chars, mods) {
 find_pos <- function(s, sub, mods, start) {
   mods <- ascii_lower(mods)
   if (grepl("t", mods, fixed = TRUE)) {
-    s <- sas_rtrim(s)
-    sub <- sas_rtrim(sub)
+    s <- sas_rt_rtrim(s)
+    sub <- sas_rt_rtrim(sub)
   }
   if (grepl("i", mods, fixed = TRUE)) {
     s <- ascii_lower(s)
@@ -213,8 +213,8 @@ sas_f_findc <- function(x, chars = "", a3 = NULL, a4 = NULL) {
   rowwise(function(s, cs, md, st) {
     md <- ascii_lower(md)
     if (grepl("t", md, fixed = TRUE)) {
-      s <- sas_rtrim(s)
-      cs <- sas_rtrim(cs)
+      s <- sas_rt_rtrim(s)
+      cs <- sas_rt_rtrim(cs)
     }
     set <- c(chars_of(cs), class_chars(md))
     if (grepl("i", md, fixed = TRUE)) {
@@ -322,8 +322,8 @@ sas_f_count <- function(x, sub, mods = "") {
   md <- ascii_lower(a[[3]])
   tm <- grepl("t", md, fixed = TRUE)
   if (any(tm)) {
-    s[tm] <- sas_rtrim(s[tm])
-    b[tm] <- sas_rtrim(b[tm])
+    s[tm] <- sas_rt_rtrim(s[tm])
+    b[tm] <- sas_rt_rtrim(b[tm])
   }
   im <- grepl("i", md, fixed = TRUE)
   if (any(im)) {
@@ -343,8 +343,8 @@ count_rowwise <- function(x, sub, mods) {
   rowwise(function(s, b, md) {
     md <- ascii_lower(md)
     if (grepl("t", md, fixed = TRUE)) {
-      s <- sas_rtrim(s)
-      b <- sas_rtrim(b)
+      s <- sas_rt_rtrim(s)
+      b <- sas_rt_rtrim(b)
     }
     if (grepl("i", md, fixed = TRUE)) {
       s <- ascii_lower(s)
@@ -362,8 +362,8 @@ sas_f_countc <- function(x, chars = "", mods = "") {
   rowwise(function(s, cs, md) {
     md <- ascii_lower(md)
     if (grepl("t", md, fixed = TRUE)) {
-      s <- sas_rtrim(s)
-      cs <- sas_rtrim(cs)
+      s <- sas_rt_rtrim(s)
+      cs <- sas_rt_rtrim(cs)
     }
     set <- c(chars_of(cs), class_chars(md))
     if (grepl("i", md, fixed = TRUE)) set <- unique(c(ascii_upper(set), ascii_lower(set)))
@@ -378,7 +378,7 @@ scan_default_dlm <- " !$%&()*+,-./;<^|"
 
 scan_words <- function(s, dlm, mods = "") {
   md <- ascii_lower(mods)
-  ch <- chars_of(if (grepl("m", md, fixed = TRUE)) sas_rtrim(s) else s)
+  ch <- chars_of(if (grepl("m", md, fixed = TRUE)) sas_rt_rtrim(s) else s)
   if (length(ch) == 0) return(if (grepl("m", md, fixed = TRUE)) "" else character())
   set <- c(chars_of(dlm), class_chars(gsub("[kmbqrot]", "", md)))
   if (grepl("i", md, fixed = TRUE)) set <- unique(c(ascii_upper(set), ascii_lower(set)))
@@ -667,14 +667,14 @@ sas_f_rank <- function(x) {
 #' @export
 sas_f_ifc <- function(cond, a, b, m = NULL) {
   ab <- recycle_n(cond, as_sas_chr(a), as_sas_chr(b), if (is.null(m)) "" else as_sas_chr(m))
-  out <- ifelse(sas_true(ab[[1]]), ab[[2]], ab[[3]])
+  out <- ifelse(sas_rt_true(ab[[1]]), ab[[2]], ab[[3]])
   if (!is.null(m)) out[is.na(ab[[1]])] <- ab[[4]][is.na(ab[[1]])]
   out
 }
 #' @export
 sas_f_ifn <- function(cond, a, b, m = NULL) {
   ab <- recycle_n(cond, as.numeric(a), as.numeric(b), if (is.null(m)) NA_real_ else as.numeric(m))
-  out <- ifelse(sas_true(ab[[1]]), ab[[2]], ab[[3]])
+  out <- ifelse(sas_rt_true(ab[[1]]), ab[[2]], ab[[3]])
   if (!is.null(m)) out[is.na(ab[[1]])] <- ab[[4]][is.na(ab[[1]])]
   out
 }
@@ -709,7 +709,7 @@ sas_f_whichc <- function(x, ...) {
   ab <- rlang::exec(recycle_n, as_sas_chr(x), !!!vals)
   vapply(seq_along(ab[[1]]), function(i) {
     v <- vapply(ab[-1], `[`, "", i)
-    w <- which(sas_rtrim(v) == sas_rtrim(ab[[1]][i]))
+    w <- which(sas_rt_rtrim(v) == sas_rt_rtrim(ab[[1]][i]))
     if (length(w) == 0) 0 else as.numeric(w[1])
   }, 0)
 }
@@ -746,7 +746,7 @@ sas_f_compare <- function(a, b, mods = "") {
       y <- sub("^ +", "", y)
     }
     if (grepl(":", md, fixed = TRUE)) {
-      m <- min(nchar(sas_rtrim(x)), nchar(sas_rtrim(y)))
+      m <- min(nchar(sas_rt_rtrim(x)), nchar(sas_rt_rtrim(y)))
       x <- substr(x, 1L, m)
       y <- substr(y, 1L, m)
     }
@@ -767,7 +767,7 @@ sas_f_symget <- function(symtab, name, .at = NULL) {
   vapply(as_sas_chr(name), function(nm0) {
     # trailing blanks are ignored; a leading blank makes the name invalid (blank result,
     # NOTE "Invalid argument to function SYMGET(' mv ')", _ERROR_)
-    nm <- sas_rtrim(nm0)
+    nm <- sas_rt_rtrim(nm0)
     if (!nzchar(nm)) {
       rt$stop_step <- TRUE
       rt_error("ERROR: The macro variable name is either all blank or missing.")
@@ -2191,10 +2191,10 @@ var_info_fns <- c("vname", "vlength", "vtype", "vlabel", "vformat", "vformatn", 
 #' CALL SORTN / SORTC: the values in ascending order (missing values first)
 #' @export
 #' @keywords internal
-sas_sort_values <- function(vals) {
+sas_rt_sort_values <- function(vals) {
   v <- unlist(vals)
   if (is.character(v) && any(chr_wide(v))) chr_wide_gate("sortc")
-  if (is.character(v)) return(as.list(v[order(sas_rtrim(v), method = "radix")]))
+  if (is.character(v)) return(as.list(v[order(sas_rt_rtrim(v), method = "radix")]))
   codes <- sas_miss_code(v)
   as.list(v[order(ifelse(is.na(codes), 99L, codes), ifelse(is.na(v), 0, v), method = "radix")])
 }
@@ -2259,7 +2259,7 @@ sas_f_collate <- function(start, end = NULL, len = NULL) {
 #' @export
 sas_f_nvalid <- function(x, opt = "v7") {
   rowwise(function(s, o) {
-    s <- sas_rtrim(s)
+    s <- sas_rt_rtrim(s)
     o <- tolower(strip_both(o))
     if (!nzchar(o)) o <- "v7"
     if (o == "any") return(as.numeric(nchar(s) >= 1 && nchar(s) <= 32))

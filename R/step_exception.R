@@ -6,7 +6,7 @@
 # DO loop): the outputs are left with 0 observations.  Anything else fails
 # loud.
 
-# Raised from generated code (sas_fcall) at the failing call.
+# Raised from generated code (sas_rt_fcall) at the failing call.
 sas_step_exception <- function(.at = NULL) {
   rlang::abort("step exception", class = c("sasonr_step_exception", "sasonr_error"), sas_line = .at[1] %||% NULL)
 }

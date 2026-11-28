@@ -82,15 +82,27 @@ reference:
   - sas_export_work
   - sasonr_strict
 - title: The translation as an R script
-  desc: A runnable script for a translation or for the trace of a run, and the step verbs it calls.
+  desc: A runnable script for a translation or for the trace of a run.
   contents:
   - sas_script
-  - sas_step_verbs
   - sasonr_tidy_log
+- title: Step verbs
+  desc: One call per SAS step on a session; the calls a script is made of, and the calls sas_run() runs.
+  contents:
+  - sas_proc_verbs
+  - sas_step_verbs
+- title: Building the arguments of the step verbs
+  desc: Data sets with data set options, SAS expressions and variable lists, the OUTPUT statement of PROC MEANS, the source of a step.
+  contents:
+  - sas_dataset
+  - sas_syntax
+  - sas_stats_output
+  - sas_src
 - title: Procedures on data frames
   desc: Run one procedure on a data frame without writing a SAS program.
   contents:
   - sas_data_procs
+  - sas_sort_df
 - title: Front end (lexer, parser, analysis)
   contents:
   - sas_lex

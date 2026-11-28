@@ -116,7 +116,7 @@ contents_var_table <- function(cv, idx, title) {
 #' @param sp Options.
 #' @export
 #' @keywords internal
-sas_proc_contents <- function(work, name, m, sp) {
+sas_rt_contents <- function(work, name, m, sp) {
   d <- work[[name]]
   if (is.null(d)) abort_runtime(paste0("File WORK.", toupper(name), ".DATA does not exist."))
   nobs <- nrow(d)
@@ -248,9 +248,9 @@ translate_proc_contents <- function(step, meta, last) {
   sp <- o[c("noprint", "varnum", "short", "position", "order", "out")]
   sp <- Filter(Negate(is.null), sp)
   code <- c(sprintf("# ---- PROC CONTENTS (SAS line %d)", as.integer(step$line)),
-            sprintf(".r <- sas_proc_contents(work, %s, %s, %s)", r_str(ref$name), r_lit(m), r_lit(sp)),
-            ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
-            ".meta <- c(.meta, sas_proc_store(work, .r$out))")
+            sprintf(".r <- sas_rt_contents(work, %s, %s, %s)", r_str(ref$name), r_lit(m), r_lit(sp)),
+            ".lst <- sas_rt_lst_c(.lst, sas_rt_titles_once(.titles, .r$listing))",
+            ".meta <- c(.meta, sas_rt_store(work, .r$out))")
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC CONTENTS", line = step$line,
        outputs = if (!is.null(o$out)) o$out$name else character(), meta = list())
 }
@@ -601,12 +601,12 @@ engine_datasets <- function(eng, step) {
         if (is.null(m)) abort_runtime(paste0("File WORK.", toupper(ref$name), ".DATA does not exist."), s$line)
         sp <- Filter(Negate(is.null), o[c("noprint", "varnum", "short", "position", "order", "out")])
         sp$proc <- "DATASETS"
-        r <- sas_proc_contents(eng$session$work, ref$name, m, sp)
+        r <- sas_rt_contents(eng$session$work, ref$name, m, sp)
         if (length(r$listing) > 0) {
           tl <- if (length(lst) == 0) c(eng$session$titles, if (length(eng$session$titles)) "")
           lst <- lst_c(lst, if (length(tl)) lst_lines(tl), r$listing)
         }
-        eng$session$meta[names(r$out)] <- sas_proc_store(eng$session$work, r$out)
+        eng$session$meta[names(r$out)] <- sas_rt_store(eng$session$work, r$out)
         if (length(r$out)) {
           mac_auto_unknown(eng$session$macro, c("syslast", "sysdsn"),
                            paste0("a PROC DATASETS CONTENTS statement with OUT= (SAS line ", s$line, ")"))
@@ -664,7 +664,7 @@ datasets_append <- function(eng, s) {
   add <- dd[intersect(dm$vars, bm$vars)]
   for (v in missing_in_data) add[[v]] <- if (identical(bm$type[[v]], "char")) "" else rep(NA_real_, nrow(add))
   add <- add[bm$vars]
-  for (v in bm$vars) if (identical(bm$type[[v]], "char")) add[[v]] <- sas_char(add[[v]], bm$len[[v]])
+  for (v in bm$vars) if (identical(bm$type[[v]], "char")) add[[v]] <- sas_rt_char(add[[v]], bm$len[[v]])
   out <- dplyr::bind_rows(bd, add)
   assign(bn, tibble::as_tibble(out), envir = eng$session$work)
   bm$sortedby <- NULL

@@ -63,7 +63,7 @@ test_that("the trace of a run runs to the same WORK and log", {
 test_that("PROC SORT is an R call; PROC MEANS shows only the options the program gave", {
   txt <- as.character(sas_script(sas_translate(script_prog)))
   expect_true(any(grepl("sas_proc_sort(data = \"adsl\", out = \"srt\", nodupkey = TRUE, by = desc(age),", txt, fixed = TRUE)))
-  expect_true(any(grepl("sas_proc_means(data = \"srt\", noprint = TRUE, nway = TRUE, class = sex, var = age, output = sas_out_stats(out = \"m\", mean = mage)",
+  expect_true(any(grepl("sas_proc_means(data = \"srt\", noprint = TRUE, nway = TRUE, class = sex, var = age, output = sas_stats_output(out = \"m\", mean = mage)",
                         txt, fixed = TRUE)))
   expect_true(any(grepl("sas_proc_sql(r\"(create table c as select * from srt where age > 50;)\"", txt, fixed = TRUE)))
 })
@@ -81,7 +81,7 @@ test_that("the step verbs chain and return the session", {
   s <- sas_session(work = list(a = data.frame(x = c(2, 1, 3))))
   out <- s |> sas_proc_sort(data = "a", out = "b", by = desc(x))
   expect_identical(out, s)
-  s |> sas_proc_means(data = "b", noprint = TRUE, var = x, output = sas_out_stats(out = "m", mean = xm))
+  s |> sas_proc_means(data = "b", noprint = TRUE, var = x, output = sas_stats_output(out = "m", mean = xm))
   expect_identical(sas_work(s)$b$x, c(3, 2, 1))
   expect_identical(sas_work(s)$m$xm, 2)
   s |> sas_options("nonotes") |> sas_title("'T'", n = 2L)
@@ -151,7 +151,7 @@ test_that("the tidy form writes WORK data sets as R variables with the same valu
     expect_true(any(grepl("^# In a sasonr session: ", txt)))
     env <- sasonr_tidy_log(run_script(sc))
     for (nm in names(ref$work)) {
-      got <- dplyr::mutate(tibble::as_tibble(env[[nm]]), dplyr::across(dplyr::where(is.character), sas_rtrim))
+      got <- dplyr::mutate(tibble::as_tibble(env[[nm]]), dplyr::across(dplyr::where(is.character), sas_rt_rtrim))
       expect_identical(got, ref$work[[nm]])
     }
   }
@@ -228,8 +228,8 @@ test_that("SAS comments become R comment lines above the step or the statement",
   expect_match(txt[i + 3], "^s [|]> sas_data_step[(]\"b\"")
   # a statement comment next to an assignment, a trailing comment
   j <- grep("^ +# double it$", txt)
-  expect_match(txt[j + 1L], "^ +y = sas_arith[(]x, 2")
-  expect_match(txt[grep("^ +# plus one$", txt) + 1L], "^ +z = sas_arith[(]y, 1")
+  expect_match(txt[j + 1L], "^ +y = sas_rt_arith[(]x, 2")
+  expect_match(txt[grep("^ +# plus one$", txt) + 1L], "^ +z = sas_rt_arith[(]y, 1")
   # a comment between steps goes above the next step
   expect_match(txt[match("# between the steps", txt) + 1L], "^s [|]> sas_data_step[(]\"c\"")
   # inside a row-by-row step
@@ -277,13 +277,13 @@ test_that("a tidy step reads earlier data sets as R variables in one pipeline", 
   ref <- sas_run(prog)
   sc <- sas_script(ref, tidy = TRUE)
   txt <- as.character(sc)
-  expect_false(any(grepl("sas_session|sas_data_step|^\\.df <- |sas_note_read|\\.at = ", txt)))
+  expect_false(any(grepl("sas_session|sas_data_step|^\\.df <- |sas_rt_note_read|\\.at = ", txt)))
   # (laid out as air does: a pipeline that fits stays on one line)
-  expect_true("out <- `in` |> mutate(y = sas_arith(x, 2, \"*\")) |> select(g, x, y)" %in% txt)
-  expect_true(all(c("out2 <- out |>", "  sas_ds(keep = c(\"g\", \"y\")) |>", "  select(g, y)") %in% txt))
+  expect_true("out <- `in` |> mutate(y = sas_rt_arith(x, 2, \"*\")) |> select(g, x, y)" %in% txt)
+  expect_true(all(c("out2 <- out |>", "  sas_rt_ds(keep = c(\"g\", \"y\")) |>", "  select(g, y)") %in% txt))
   env <- sasonr_tidy_log(run_script(sc))
   for (nm in names(ref$work)) {
-    got <- dplyr::mutate(tibble::as_tibble(env[[nm]]), dplyr::across(dplyr::where(is.character), sas_rtrim))
+    got <- dplyr::mutate(tibble::as_tibble(env[[nm]]), dplyr::across(dplyr::where(is.character), sas_rt_rtrim))
     expect_identical(got, ref$work[[nm]])
   }
 })
@@ -331,7 +331,7 @@ test_that("a vectorised MERGE step is a pipeline of the tidy form", {
   sc <- sas_script(sas_translate(prog), tidy = TRUE)
   txt <- as.character(sc)
   expect_false(any(grepl("In a sasonr session", txt, fixed = TRUE)))
-  expect_true("c <- sas_merge_input(" %in% txt)
+  expect_true("c <- sas_rt_merge_input(" %in% txt)
   env <- run_script(sc)
   expect_identical(tibble::as_tibble(env$c), ref$work$c)
 })
@@ -452,19 +452,19 @@ test_that("PROC MEANS and SUMMARY run as their R calls; options as arguments, st
   expect_error(s |> sas_proc_means(data = "trial", frobnicate = TRUE, var = aval), class = "sasonr_error")
 })
 
-test_that("sas_out_stats() builds the OUTPUT statement; the trace writes it so", {
-  expect_identical(unclass(sas_out_stats(out = "st", mean = c(m_x, m_y), std = c(sd_x = x), n = TRUE, autoname = TRUE)),
+test_that("sas_stats_output() builds the OUTPUT statement; the trace writes it so", {
+  expect_identical(unclass(sas_stats_output(out = "st", mean = c(m_x, m_y), std = c(sd_x = x), n = TRUE, autoname = TRUE)),
                    "out=st mean=m_x m_y std(x)=sd_x n= / autoname")
-  expect_error(sas_out_stats(mean = c(a, b = x)), class = "sasonr_error")
+  expect_error(sas_stats_output(mean = c(a, b = x)), class = "sasonr_error")
   prog <- "data t;\n  input arm $ x y;\n  datalines;\nA 1 2\nA 3 5\nB 2 2\n;\nrun;\nproc means data=t noprint nway;\n  class arm;\n  var x y;\n  output out=m(drop=_type_) mean=mx my std(x)=sx n= / autoname;\nrun;\n"
   r <- sas_run(prog)
   txt <- paste(as.character(sas_script(r)), collapse = "\n")
-  expect_match(txt, "output = sas_out_stats(out = sas_dataset(\"m\", drop = `_type_`), mean = c(mx, my), std = c(sx = x), n = TRUE, autoname = TRUE)", fixed = TRUE)
+  expect_match(txt, "output = sas_stats_output(out = sas_dataset(\"m\", drop = `_type_`), mean = c(mx, my), std = c(sx = x), n = TRUE, autoname = TRUE)", fixed = TRUE)
   env <- run_script(sas_script(r))
   expect_identical(sas_work(env$s), r$work)
   # a statement value held in a variable is injected
   s <- sas_session(work = list(t = r$work$t))
-  o <- sas_out_stats(out = "st", mean = c(m_x, m_y))
+  o <- sas_stats_output(out = "st", mean = c(m_x, m_y))
   s |> sas_proc_means(data = "t", noprint = TRUE, var = c(x, y), output = !!o)
   expect_identical(sas_work(s)$st$m_x, 2)
 })

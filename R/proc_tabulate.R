@@ -658,13 +658,13 @@ translate_proc_tabulate <- function(step, meta, last) {
     if (is.null(spec$classdata)) {
       paste0(".r <- sas_rt_proc(\"tabulate\", .df, ", r_lit(spec), ")")
     } else c(
-      paste0(".cd <- sas_ds(work, ", r_str(spec$classdata), ") |> sas_note_read(", r_str(spec$classdata), ")"),
+      paste0(".cd <- sas_rt_ds(work, ", r_str(spec$classdata), ") |> sas_rt_note_read(", r_str(spec$classdata), ")"),
       paste0(".r <- sas_rt_proc(\"tabulate\", .df, c(", r_lit(spec), ", list(classdata_rows = .cd)))")
     ),
-    ".lst <- sas_lst_c(.lst, sas_tab_titles(.titles, .r))",
+    ".lst <- sas_rt_lst_c(.lst, sas_rt_tab_titles(.titles, .r))",
     ".ods <- c(.ods, .r$tables)",
     # the ODS OUTPUT data sets (ods_output.R)
-    ".meta <- c(.meta, sas_proc_store(work, .r$out))"
+    ".meta <- c(.meta, sas_rt_store(work, .r$out))"
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TABULATE", line = step$line,
        outputs = character(), meta = list())

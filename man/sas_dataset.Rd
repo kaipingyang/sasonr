@@ -37,7 +37,7 @@ The reference as text with class \code{sas_dataset}.
 }
 \description{
 The \code{data} and \code{out} arguments of the step verbs (and \code{out} of
-\code{\link[=sas_out_stats]{sas_out_stats()}}) take a data set name, or \code{sas_dataset()} for a data set with
+\code{\link[=sas_stats_output]{sas_stats_output()}}) take a data set name, or \code{sas_dataset()} for a data set with
 data set options.
 }
 \examples{

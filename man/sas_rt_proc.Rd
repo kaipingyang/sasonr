@@ -18,7 +18,7 @@ list(listing, out, tables).
 }
 \description{
 Computes the tables and output data sets of one PROC step, then routes
-them: the data sets go to WORK (through \code{sas_proc_store()} in the
+them: the data sets go to WORK (through \code{sas_rt_store()} in the
 translated code), the tables are rendered to the listing.
 }
 \keyword{internal}

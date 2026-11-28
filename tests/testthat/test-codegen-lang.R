@@ -65,7 +65,7 @@ test_that("running the displayed code gives the same WORK as sas_run()", {
     env$.meta <- list()
     for (s in tr$steps) eval(parse(text = s$code, keep.source = FALSE), envir = env)
     for (ds in names(r$work)) {
-      got <- dplyr::mutate(env$work[[ds]], dplyr::across(dplyr::where(is.character), sas_rtrim))
+      got <- dplyr::mutate(env$work[[ds]], dplyr::across(dplyr::where(is.character), sas_rt_rtrim))
       expect_identical(as.data.frame(got), as.data.frame(r$work[[ds]]), info = paste(nm, ds))
     }
   }
