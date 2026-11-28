@@ -13,7 +13,7 @@
 \alias{sas_macro_put}
 \title{Run one SAS step in a session}
 \usage{
-sas_data_step(session, data, fn, sas, line = 1L, level = NULL)
+sas_data_step(session, data, fn, .sas_src, level = NULL)
 
 sas_proc_freq(session, options = "", ..., line = 1L)
 
@@ -39,11 +39,8 @@ text names them).}
 
 \item{fn}{A function of \code{work} whose body is the code of the step.}
 
-\item{sas}{SAS text of the step.}
-
-\item{line}{The SAS line the step starts on (line numbers in the log). For
-the PROC verbs also one line per statement, the PROC statement first, to
-keep the program's layout.}
+\item{.sas_src}{The SAS source of the DATA step, \code{\link[=sas_src]{sas_src()}} (required: its
+text gives the attributes of the output data sets and the log).}
 
 \item{level}{\code{NULL} (the level of the translation) or \code{"L3"} (the step ran
 row by row).}
@@ -52,7 +49,13 @@ row by row).}
 
 \item{...}{Statements of the PROC step: \code{name = "text"}.}
 
+\item{line}{The SAS line the step starts on (line numbers in the log). For
+the PROC verbs also one line per statement, the PROC statement first, to
+keep the program's layout.}
+
 \item{sql}{SQL statements, each ending with a semicolon.}
+
+\item{sas}{SAS text of the step.}
 
 \item{title}{The text of a TITLE statement (quoted SAS strings).}
 
@@ -72,7 +75,7 @@ the session invisibly, so the calls can be chained with \verb{|>}.
 \details{
 \itemize{
 \item \code{sas_data_step()} runs the R code of \code{fn} (the code sasonr generated for
-the DATA step \code{sas}) in place of the translation of \code{sas}; the SAS text
+the DATA step of \code{.sas_src}) in place of its translation; the SAS text
 gives the variable attributes of the output data sets and the log. When
 vectorised code meets a data error the step is run again row by row from
 its SAS text, as in \code{\link[=sas_run]{sas_run()}}.

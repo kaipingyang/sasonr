@@ -176,7 +176,7 @@ script_comments_render <- function(nd) {
   if (length(body)) {
     tl <- strsplit(nd$text, "\n", fixed = TRUE)[[1]]
     open <- 1L
-    close <- grep("^\\}, sas = ", tl)[1]
+    close <- grep("^\\}, \\.sas_src = ", tl)[1]
     code <- if (!is.na(close)) substring(tl[(open + 1L):(close - 1L)], 3L) else character()
     at <- vapply(cms[body], function(c) script_body_anchor(code, c$stmt), 1L)
     for (j in which(is.na(at))) {

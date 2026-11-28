@@ -331,10 +331,10 @@ script_node <- function(nd, mode) {
     # a `function` call has four elements (the last one the srcref); with three
     # rlang fails to capture the call stack of a condition raised in the step
     fn <- rlang::call2("function", as.pairlist(alist(work = )), rlang::call2("{", !!!as.list(cg_exec(tr$exprs))), NULL)
-    lang <- rlang::call2("sas_data_step", quote(s), outs, fn, sas = stext, line = line, level = level)
+    lang <- rlang::call2("sas_data_step", quote(s), outs, fn, .sas_src = rlang::call2("sas_src", lines, stext), level = level)
     text <- paste0("s |> sas_data_step(", r_chr(outs), ", \\(work) {\n",
-                   paste0("  ", strsplit(code, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n}, sas = ", r_raw(stext),
-                   ", line = ", line, "L", if (!is.null(level)) ", level = \"L3\"", ")")
+                   paste0("  ", strsplit(code, "\n", fixed = TRUE)[[1]], collapse = "\n"), "\n}, .sas_src = ", script_src_text(lines, stext),
+                   if (!is.null(level)) ", level = \"L3\"", ")")
     why <- script_why_data(tr, level)
     td <- if (is.null(why)) script_tidy_code(tr) else NULL
     if (is.null(why) && is.null(td)) why <- "the step reads or writes WORK in a way the tidy form does not cover"
@@ -771,7 +771,7 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #' the session invisibly, so the calls can be chained with `|>`.
 #'
 #' * `sas_data_step()` runs the R code of `fn` (the code sasonr generated for
-#'   the DATA step `sas`) in place of the translation of `sas`; the SAS text
+#'   the DATA step of `.sas_src`) in place of its translation; the SAS text
 #'   gives the variable attributes of the output data sets and the log. When
 #'   vectorised code meets a data error the step is run again row by row from
 #'   its SAS text, as in [sas_run()].
@@ -794,6 +794,8 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #' @param data The output data sets of the DATA step (for the reader; the SAS
 #'   text names them).
 #' @param fn A function of `work` whose body is the code of the step.
+#' @param .sas_src The SAS source of the DATA step, [sas_src()] (required: its
+#'   text gives the attributes of the output data sets and the log).
 #' @param sas SAS text of the step.
 #' @param line The SAS line the step starts on (line numbers in the log). For
 #'   the PROC verbs also one line per statement, the PROC statement first, to
@@ -817,13 +819,17 @@ NULL
 
 #' @rdname sas_step_verbs
 #' @export
-sas_data_step <- function(session, data, fn, sas, line = 1L, level = NULL) {
+sas_data_step <- function(session, data, fn, .sas_src, level = NULL) {
   if (!is.function(fn)) rlang::abort("`fn` must be a function of `work`.", class = "sasonr_error")
+  # the SAS text gives the variable attributes of the outputs and the log
+  if (missing(.sas_src) || !inherits(.sas_src, "sas_src")) {
+    rlang::abort("`.sas_src` must come from `sas_src()` (the SAS text of the DATA step).", class = "sasonr_error")
+  }
   if (!is.character(data)) rlang::abort("`data` must be a character vector.", class = "sasonr_error")
   b <- body(fn)
   exprs <- if (is.call(b) && identical(b[[1]], as.name("{"))) as.list(b)[-1] else list(b)
   level <- if (is.null(level)) "auto" else rlang::arg_match(level, "L3")
-  script_submit(session, sas, line, override = exprs, level = level)
+  script_submit(session, .sas_src$text, .sas_src$lines[1], override = exprs, level = level)
 }
 
 # The text of a PROC step from its options and statements.  `line`: the SAS
@@ -1127,4 +1133,14 @@ script_call_text <- function(lang) {
   src <- startsWith(parts, ".sas_src")
   paste0("s |> ", verb, "(", paste(parts[!src], collapse = ", "),
          if (any(src)) paste0(",\n  ", parts[src]), ")")
+}
+
+# `sas_src(lines, r"(text)")` as a script writes it.
+script_src_text <- function(lines, text) {
+  lt <- if (length(lines) == 1L) paste0(lines, "L") else if (identical(as.integer(lines), seq.int(lines[1], lines[length(lines)]))) {
+    paste0(lines[1], ":", lines[length(lines)])
+  } else {
+    paste0("c(", paste0(lines, "L", collapse = ", "), ")")
+  }
+  paste0("sas_src(", lt, ", ", r_raw(text), ")")
 }

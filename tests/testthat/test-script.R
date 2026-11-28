@@ -72,9 +72,10 @@ test_that("a DATA step verb runs the code of its function", {
   s <- sas_session()
   s |> sas_data_step("a", \(work) {
     work$a <- tibble::tibble(x = 5)
-  }, sas = "data a; x = 1; run;")
+  }, .sas_src = sas_src(1L, "data a; x = 1; run;"))
   expect_identical(sas_work(s)$a$x, 5)
-  expect_error(sas_data_step(s, "a", 1, sas = "data a; x = 1; run;"), class = "sasonr_error")
+  expect_error(sas_data_step(s, "a", 1, .sas_src = sas_src(1L, "data a; x = 1; run;")), class = "sasonr_error")
+  expect_error(sas_data_step(s, "a", \(work) NULL), class = "sasonr_error")
 })
 
 test_that("the step verbs chain and return the session", {
