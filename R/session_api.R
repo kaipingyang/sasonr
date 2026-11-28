@@ -75,7 +75,7 @@ sas_work <- function(session, trim = TRUE) {
   check_session(session)
   out <- as.list(session$work)
   if (isTRUE(trim)) {
-    out <- lapply(out, function(d) dplyr::mutate(d, dplyr::across(dplyr::where(is.character), sas_rtrim)))
+    out <- lapply(out, function(df) dplyr::mutate(df, dplyr::across(dplyr::where(is.character), sas_rtrim)))
   }
   out[sort(names(out) %||% character())]
 }

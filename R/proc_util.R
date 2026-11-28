@@ -203,14 +203,14 @@ proc_preload_values <- function(fmt, char, line) {
 
 # Row index vectors of the BY groups of `d` (data order); stops with SAS's
 # error when the data are not sorted.
-proc_by_groups <- function(d, by, descending, dsname, info) {
-  n <- nrow(d)
+proc_by_groups <- function(df, by, descending, dsname, info) {
+  n <- nrow(df)
   if (length(by) == 0 || n == 0) return(if (n == 0 && length(by) > 0) list() else list(seq_len(n)))
-  keys <- lapply(by, function(v) proc_group_key(d[[v]], info[[v]]))
+  keys <- lapply(by, function(v) proc_group_key(df[[v]], info[[v]]))
   if (n > 1) {
     res <- integer(n - 1L)
     for (k in seq_along(by)) {
-      x <- d[[by[k]]]
+      x <- df[[by[k]]]
       ck <- sas_cmp(x[-n], x[-1L])
       # equal formatted values form one group whatever the internal order
       ck[keys[[k]][-n] == keys[[k]][-1L]] <- 0L
@@ -221,7 +221,7 @@ proc_by_groups <- function(d, by, descending, dsname, info) {
     if (length(bad) > 0) {
       i <- bad[1]
       desc <- function(r) paste(vapply(seq_along(by), function(k) {
-        paste0(info[[by[k]]]$disp, " = ", proc_value_text(d[[by[k]]][r], info[[by[k]]]))
+        paste0(info[[by[k]]]$disp, " = ", proc_value_text(df[[by[k]]][r], info[[by[k]]]))
       }, ""), collapse = " ")
       abort_runtime(paste0("Data set WORK.", toupper(dsname), " is not sorted in ",
                            if (all(descending)) "descending" else "ascending", " sequence. The current BY group has ",
@@ -236,8 +236,8 @@ proc_by_groups <- function(d, by, descending, dsname, info) {
 }
 
 # "g=1 h=A": the BY line of a BY group (first row `r`).
-proc_by_line <- function(d, r, by, info) {
-  paste(vapply(by, function(v) paste0(info[[v]]$disp, "=", proc_value_text(d[[v]][r], info[[v]])), ""), collapse = " ")
+proc_by_line <- function(df, r, by, info) {
+  paste(vapply(by, function(v) paste0(info[[v]]$disp, "=", proc_value_text(df[[v]][r], info[[v]])), ""), collapse = " ")
 }
 
 # Output data sets ----------------------------------------------------------------

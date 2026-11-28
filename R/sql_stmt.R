@@ -175,8 +175,8 @@ sql_rel_to_table <- function(eng, res, line, warn_dups = TRUE) {
 
 # `last`: the statement sets _LAST_ (CREATE TABLE, ALTER TABLE; not INSERT,
 # UPDATE or DELETE; session_set_last()).
-sql_store <- function(eng, name, d, meta, ordered = TRUE, last = TRUE) {
-  assign(name, tibble::as_tibble(d), envir = eng$session$work)
+sql_store <- function(eng, name, df, meta, ordered = TRUE, last = TRUE) {
+  assign(name, tibble::as_tibble(df), envir = eng$session$work)
   eng$session$meta[[name]] <- meta
   if (last) session_set_last(eng$session, name)
   eng$session$unordered <- if (ordered) setdiff(eng$session$unordered, name) else union(eng$session$unordered, name)

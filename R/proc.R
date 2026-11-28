@@ -393,8 +393,8 @@ translate_proc <- function(step, meta, last = NULL) {
     sel <- select_code(list(vars = out_vars, out_names = out_names))
     code <- c(
       header,
-      paste0(".d <- ", proc_source_code(inp)),
-      sprintf("work$%s <- sas_sort_df(.d, %s, %s, nodupkey = %s, noduprecs = %s) |>\n  %s", r_name(out$name),
+      paste0(".df <- ", proc_source_code(inp)),
+      sprintf("work$%s <- sas_sort_df(.df, %s, %s, nodupkey = %s, noduprecs = %s) |>\n  %s", r_name(out$name),
               r_chr_vec(by$vars), r_lit(by$descending), isTRUE(step$options[["nodupkey"]]) || isTRUE(step$options[["nodupkeys"]]),
               isTRUE(step$options[["noduprecs"]]) || isTRUE(step$options[["noduprec"]]) || isTRUE(step$options[["nodup"]]), sel)
     )
@@ -480,9 +480,9 @@ translate_proc <- function(step, meta, last = NULL) {
   # a data set without variables: "No variables in data set" (log_emit_reads()), no listing
   code <- c(
     header,
-    paste0(".d <- ", proc_source_code(inp, obs_col = TRUE)),
+    paste0(".df <- ", proc_source_code(inp, obs_col = TRUE)),
     if (length(vars) > 0) c(
-      paste0(".r <- sas_rt_proc(\"print\", .d, ", r_lit(spec), ")"),
+      paste0(".r <- sas_rt_proc(\"print\", .df, ", r_lit(spec), ")"),
       ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
       ".ods <- c(.ods, .r$tables)"
     )
@@ -496,30 +496,30 @@ translate_proc <- function(step, meta, last = NULL) {
 #' PROC SORT: stable sort (missing values first) with optional NODUPKEY
 #' @export
 #' @keywords internal
-sas_sort_df <- function(d, by, descending = rep(FALSE, length(by)), nodupkey = FALSE, noduprecs = FALSE) {
+sas_sort_df <- function(df, by, descending = rep(FALSE, length(by)), nodupkey = FALSE, noduprecs = FALSE) {
   rt <- rt_diag()
-  d <- d[sas_order(d, by, descending), , drop = FALSE]
-  if (nodupkey && nrow(d) > 0) {
-    n0 <- nrow(d)
-    d <- d[rlang::exec(key_change, !!!unname(as.list(d[by]))), , drop = FALSE]
-    rt$proc_notes <- c(rt$proc_notes, sprintf("NOTE: %d observations with duplicate key values were deleted.", n0 - nrow(d)))
+  df <- df[sas_order(df, by, descending), , drop = FALSE]
+  if (nodupkey && nrow(df) > 0) {
+    n0 <- nrow(df)
+    df <- df[rlang::exec(key_change, !!!unname(as.list(df[by]))), , drop = FALSE]
+    rt$proc_notes <- c(rt$proc_notes, sprintf("NOTE: %d observations with duplicate key values were deleted.", n0 - nrow(df)))
   }
-  if (noduprecs && nrow(d) > 1) {
-    n0 <- nrow(d)
-    same <- Reduce(`&`, lapply(d, function(v) c(FALSE, same_value(v[-1L], v[-nrow(d)]))))
-    d <- d[!same, , drop = FALSE]
-    rt$proc_notes <- c(rt$proc_notes, sprintf("NOTE: %d duplicate observations were deleted.", n0 - nrow(d)))
+  if (noduprecs && nrow(df) > 1) {
+    n0 <- nrow(df)
+    same <- Reduce(`&`, lapply(df, function(v) c(FALSE, same_value(v[-1L], v[-nrow(df)]))))
+    df <- df[!same, , drop = FALSE]
+    rt$proc_notes <- c(rt$proc_notes, sprintf("NOTE: %d duplicate observations were deleted.", n0 - nrow(df)))
   }
-  tibble::as_tibble(d)
+  tibble::as_tibble(df)
 }
 
 #' Apply FIRSTOBS= / OBS= to a data frame (after WHERE)
 #' @export
 #' @keywords internal
-sas_obs_window <- function(d, firstobs = NULL, obs = NULL) {
+sas_obs_window <- function(df, firstobs = NULL, obs = NULL) {
   from <- firstobs %||% 1
-  to <- min(obs %||% nrow(d), nrow(d))
-  d[seq_len(max(0, to - from + 1)) + from - 1, , drop = FALSE]
+  to <- min(obs %||% nrow(df), nrow(df))
+  df[seq_len(max(0, to - from + 1)) + from - 1, , drop = FALSE]
 }
 
 # Default PROC PRINT rendering of an unformatted numeric column: BEST7. of the

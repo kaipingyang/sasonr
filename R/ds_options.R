@@ -212,20 +212,20 @@ ds_out_plan <- function(vars, opts, file, line = NULL, rename_rules = FALSE) {
 
 #' Apply KEEP=, DROP= and RENAME= to a PROC output data set (data + metadata)
 #'
-#' @param d The data frame; `m` its metadata (`vars`, `type`, `len`,
+#' @param df The data frame; `m` its metadata (`vars`, `type`, `len`,
 #'   `formats`, `informats`, `labels`, `disp`).
 #' @param opts,line As for [ds_out_plan()]; `file` the data set name.
 #' @param warned TRUE when the translation already wrote the WARNINGs of
 #'   [ds_out_plan()] (compile notes); otherwise a WARNING fails loud.
 #' @return `list(data, meta)`.
 #' @noRd
-proc_out_options <- function(d, m, opts, line = NULL, file = "", warned = FALSE) {
-  if (length(opts) == 0) return(list(data = d, meta = m))
+proc_out_options <- function(df, m, opts, line = NULL, file = "", warned = FALSE) {
+  if (length(opts) == 0) return(list(data = df, meta = m))
   plan <- ds_out_plan(m$vars, opts, file, line)
   if (length(plan$warnings) > 0 && !warned) abort_unsupported(sub("^WARNING: ", "", plan$warnings[1]), line)
   keep <- plan$vars
   new <- plan$names
-  d <- d[keep]
+  df <- df[keep]
   ren <- function(l) {
     l <- l[intersect(keep, names(l))]
     if (length(l) == 0) return(l)
@@ -235,8 +235,8 @@ proc_out_options <- function(d, m, opts, line = NULL, file = "", warned = FALSE)
   disp <- m$disp[keep]
   ch <- new != keep
   disp[ch] <- as.list(new[ch])
-  names(d) <- new
-  list(data = d, meta = list(vars = new, type = ren(m$type), len = ren(m$len), formats = ren(m$formats),
+  names(df) <- new
+  list(data = df, meta = list(vars = new, type = ren(m$type), len = ren(m$len), formats = ren(m$formats),
                              informats = ren(m$informats), labels = ren(m$labels), disp = stats::setNames(disp, new)))
 }
 

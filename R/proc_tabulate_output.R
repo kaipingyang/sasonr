@@ -23,8 +23,8 @@ tab_output_stats <- c(n = "N", mean = "Mean", sum = "Sum", pctn = "PctN")
 
 # OUT= (D3): the data set of the same column builder as ODS OUTPUT Table
 # [measured: identical data sets, case tabulate_t2/p4_out].
-tab_compute_out <- function(d, sp) {
-  r <- tabulate_compute(d, sp)
+tab_compute_out <- function(df, sp) {
+  r <- tabulate_compute(df, sp)
   if (!is.null(sp$out)) {
     if (length(rt_diag()$ods_output)) abort_unsupported("PROC TABULATE OUT= with an ODS OUTPUT request pending", sp$line)
     res <- tab_output_data(r$tables, sp, sp$line)

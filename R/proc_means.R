@@ -290,8 +290,8 @@ translate_proc_means <- function(step, meta, last) {
   header <- sprintf("# ---- PROC %s (SAS line %d)", toupper(pname), as.integer(step$line))
   code <- c(
     header,
-    paste0(".d <- ", proc_source_code(b$inp)),
-    paste0(".r <- sas_rt_proc(\"", pname, "\", .d, ", r_lit(spec), ")"),
+    paste0(".df <- ", proc_source_code(b$inp)),
+    paste0(".r <- sas_rt_proc(\"", pname, "\", .df, ", r_lit(spec), ")"),
     ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
     ".ods <- c(.ods, .r$tables)",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
@@ -677,15 +677,15 @@ means_types_wanted <- function(sp, k, for_print) {
 # PROC MEANS / SUMMARY compute step (proc_registry.R): the Summary tables of
 # the printed output and the OUTPUT data sets.  `d` is the input data (after
 # WHERE), `sp` the specification built by the translator.
-means_compute <- function(d, sp) {
+means_compute <- function(df, sp) {
   rt <- rt_diag()
   cn <- vapply(sp$class, `[[`, "", "name")
   k <- length(cn)
   info <- sp$info
   if (!is.null(sp$by)) {
-    groups <- proc_by_groups(d, sp$by, sp$by_desc, sp$data, info)
+    groups <- proc_by_groups(df, sp$by, sp$by_desc, sp$data, info)
   } else {
-    groups <- list(seq_len(nrow(d)))
+    groups <- list(seq_len(nrow(df)))
   }
   if (sp$vardef != "df" && any(sp$stats %in% c("stderr", "t", "prt", "lclm", "uclm"))) {
     rt$proc_notes <- c(rt$proc_notes, "WARNING: STDERR and related statistics, T, PROBT, LCLM and UCLM can only be computed when VARDEF is set to its default value of DF.")
@@ -701,7 +701,7 @@ means_compute <- function(d, sp) {
   cells_by <- list()
   for (gi in seq_along(groups)) {
     rows <- groups[[gi]]
-    db <- d[rows, , drop = FALSE]
+    db <- df[rows, , drop = FALSE]
     f <- if (is.null(sp$freq)) rep(1, nrow(db)) else trunc(db[[sp$freq]])
     keep <- !is.na(f) & f >= 1
     for (cl in sp$class) if (!cl$missing) keep <- keep & !sas_is_missing(db[[cl$name]])
@@ -744,11 +744,11 @@ means_compute <- function(d, sp) {
     lay <- means_out_layout(sp, o)
     out_types <- means_types_wanted(sp, k, FALSE)
     o_two <- o$two_sided
-    data <- means_out_data(d, sp, o, lay, cells_by, out_types, all_stats, o_two)
+    data <- means_out_data(df, sp, o, lay, cells_by, out_types, all_stats, o_two)
     res <- proc_out_options(data, lay$meta, o$ds_opts, o$line, file = o$name, warned = TRUE)
     out[[o$name]] <- res
   }
-  tables <- if (sp$print) means_tables(d, sp, cells_by, means_types_wanted(sp, k, TRUE)) else list()
+  tables <- if (sp$print) means_tables(df, sp, cells_by, means_types_wanted(sp, k, TRUE)) else list()
   list(tables = tables, data = out, events = character())
 }
 
@@ -816,7 +816,7 @@ means_out_layout <- function(sp, o) {
   list(cols = cols, stat_cols = stat_cols, meta = proc_out_meta(c(cols, stat_cols)))
 }
 
-means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_sided) {
+means_out_data <- function(df, sp, o, lay, cells_by, out_types, all_stats, two_sided) {
   rows <- list()
   cn <- vapply(sp$class, `[[`, "", "name")
   default_stats <- c("n", "min", "max", "mean", "std")
@@ -829,7 +829,7 @@ means_out_data <- function(d, sp, o, lay, cells_by, out_types, all_stats, two_si
     for (cell in gcells) {
       if (!cell$type %in% out_types) next
       base <- list()
-      for (v in sp$by) base[[v]] <- d[[v]][cell$by_row]
+      for (v in sp$by) base[[v]] <- df[[v]][cell$by_row]
       for (j in seq_along(cn)) {
         v <- cn[j]
         val <- cell$class_vals[[j]]
@@ -977,10 +977,10 @@ means_count_width <- function(cells, by_nw) {
   by_nw$w
 }
 
-means_by_count_width <- function(d, sp, k) {
+means_by_count_width <- function(df, sp, k) {
   if (is.null(sp$by) || !is.null(sp$freq)) return(NULL)
-  w <- nchar(sprintf("%.0f", nrow(d)))
-  nonmiss <- vapply(sp$vars, function(v) sum(!is.na(d[[v]])), 1)
+  w <- nchar(sprintf("%.0f", nrow(df)))
+  nonmiss <- vapply(sp$vars, function(v) sum(!is.na(df[[v]])), 1)
   list(w = w, ok = k == 0L && all(nchar(sprintf("%.0f", nonmiss)) == w))
 }
 
@@ -1084,14 +1084,14 @@ means_render <- function(cols, gaps) {
 # (and per printed _TYPE_), one row per class level combination, the
 # statistics as columns <var>_<statistic> with raw values.  The listing is
 # rendered from it by the base.summary template (render_listing()).
-means_tables <- function(d, sp, cells_by, print_types) {
+means_tables <- function(df, sp, cells_by, print_types) {
   info <- sp$info
   cn <- vapply(sp$class, `[[`, "", "name")
   k <- length(cn)
   stats <- sp$stats
   multi <- length(sp$vars) > 1
   has_label <- any(vapply(sp$vars, function(v) !is.null(info[[v]]$label), TRUE))
-  by_nw <- means_by_count_width(d, sp, k)
+  by_nw <- means_by_count_width(df, sp, k)
   stat_fmt <- function(s) {
     list(engine = "means", stat = s, fw = sp$fw, maxdec = sp$maxdec, alpha = sp$alpha,
          freq = !is.null(sp$freq), count_width = by_nw)
@@ -1102,8 +1102,8 @@ means_tables <- function(d, sp, cells_by, print_types) {
     by <- NULL
     if (!is.null(sp$by)) {
       if (length(g$rows) == 0) next
-      by <- list(values = stats::setNames(lapply(sp$by, function(v) d[[v]][g$first]), sp$by),
-                 text = proc_by_line(d, g$first, sp$by, info), group = gi)
+      by <- list(values = stats::setNames(lapply(sp$by, function(v) df[[v]][g$first]), sp$by),
+                 text = proc_by_line(df, g$first, sp$by, info), group = gi)
     }
     for (ty in print_types) {
       cells <- Filter(function(c) c$type == ty, g$cells)
@@ -1117,7 +1117,7 @@ means_tables <- function(d, sp, cells_by, print_types) {
       }
       for (j in which(sel)) {
         v <- cn[j]
-        x[[info[[v]]$disp]] <- vctrs::vec_c(d[[v]][0], !!!lapply(cells, function(c) c$class_vals[[j]]))
+        x[[info[[v]]$disp]] <- vctrs::vec_c(df[[v]][0], !!!lapply(cells, function(c) c$class_vals[[j]]))
         cols[[length(cols) + 1L]] <- ods_cols(info[[v]]$disp, label = info[[v]]$label %||% NA_character_,
                                               format = list(info[[v]]$fmt), role = "class", var = v, info = list(info[[v]]))
         add_head(info[[v]]$disp, info[[v]]$disp, "class")

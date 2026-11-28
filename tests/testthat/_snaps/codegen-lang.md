@@ -5,7 +5,7 @@
     Output
       # ---- DATA B (SAS line 6) -- level L1
       # L1: no cross-row state
-      .d <- sas_ds(work, "a") |>
+      .df <- sas_ds(work, "a") |>
         sas_note_read("a") |>
         dplyr::mutate(
           c = "   ",
@@ -18,7 +18,7 @@
           ),
           c = dplyr::if_else(sas_true(sas_gt(v, 1)), sas_char("big", 3L), c)
         )
-      work$b <- .d |> dplyr::select(g, v, w, c)
+      work$b <- .df |> dplyr::select(g, v, w, c)
 
 ---
 
@@ -27,7 +27,7 @@
     Output
       # ---- DATA B (SAS line 6) -- level L2
       # L2: BY-group processing (FIRST./LAST.); sum statement (RETAIN + accumulate); unconditional LAG/DIF
-      .d <- sas_ds(work, "a") |>
+      .df <- sas_ds(work, "a") |>
         sas_note_read("a") |>
         sas_check_sorted("g", FALSE) |>
         dplyr::mutate(
@@ -38,7 +38,7 @@
         dplyr::mutate(t = sas_cumsum(v, 0, dplyr::n())) |>
         dplyr::ungroup() |>
         dplyr::mutate(p = sas_lag_vec(v, 1L))
-      work$b <- .d |> dplyr::select(g, v, t, p)
+      work$b <- .df |> dplyr::select(g, v, t, p)
 
 ---
 

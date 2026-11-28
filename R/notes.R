@@ -133,10 +133,10 @@ compile_notes <- function() {
 #' Returns `d` unchanged.
 #' @export
 #' @keywords internal
-sas_note_read <- function(d, name, where = NULL) {
+sas_note_read <- function(df, name, where = NULL) {
   rt <- rt_diag()
-  rt$reads[[length(rt$reads) + 1L]] <- list(name = name, n = nrow(d), where = where, nvar = sum(names(d) != ".obs"))
-  d
+  rt$reads[[length(rt$reads) + 1L]] <- list(name = name, n = nrow(df), where = where, nvar = sum(names(df) != ".obs"))
+  df
 }
 
 #' Set the observation counts of the SET data sets to the rows consumed
@@ -176,8 +176,8 @@ sas_merge_consumed <- function(p, n, line = NULL) {
   invisible()
 }
 
-dataset_note <- function(name, d) {
-  log_render("ds.created", list(name = toupper(name), nobs = nrow(d), nvar = ncol(d)))
+dataset_note <- function(name, df) {
+  log_render("ds.created", list(name = toupper(name), nobs = nrow(df), nvar = ncol(df)))
 }
 
 # Variables that are referenced but never given a value (compile-time NOTE).

@@ -654,12 +654,12 @@ translate_proc_tabulate <- function(step, meta, last) {
   code <- c(
     header,
     warn_code,
-    paste0(".d <- ", proc_source_code(inp)),
+    paste0(".df <- ", proc_source_code(inp)),
     if (is.null(spec$classdata)) {
-      paste0(".r <- sas_rt_proc(\"tabulate\", .d, ", r_lit(spec), ")")
+      paste0(".r <- sas_rt_proc(\"tabulate\", .df, ", r_lit(spec), ")")
     } else c(
       paste0(".cd <- sas_ds(work, ", r_str(spec$classdata), ") |> sas_note_read(", r_str(spec$classdata), ")"),
-      paste0(".r <- sas_rt_proc(\"tabulate\", .d, c(", r_lit(spec), ", list(classdata_rows = .cd)))")
+      paste0(".r <- sas_rt_proc(\"tabulate\", .df, c(", r_lit(spec), ", list(classdata_rows = .cd)))")
     ),
     ".lst <- sas_lst_c(.lst, sas_tab_titles(.titles, .r))",
     ".ods <- c(.ods, .r$tables)",

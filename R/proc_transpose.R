@@ -50,8 +50,8 @@ translate_proc_transpose <- function(step, meta, last) {
   spec <- b$spec
   code <- c(
     sprintf("# ---- PROC TRANSPOSE (SAS line %d)", as.integer(step$line)),
-    paste0(".d <- ", proc_source_code(b$inp)),
-    paste0(".r <- sas_rt_transpose(.d, ", r_lit(spec), ")"),
+    paste0(".df <- ", proc_source_code(b$inp)),
+    paste0(".r <- sas_rt_transpose(.df, ", r_lit(spec), ")"),
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
   list(code = paste(code, collapse = "\n"), level = "PROC", reasons = "PROC TRANSPOSE", line = step$line,
@@ -112,17 +112,17 @@ transpose_valid_name <- function(s) {
 #' @param sp Specification built by the translator.
 #' @export
 #' @keywords internal
-sas_rt_transpose <- function(d, sp) {
+sas_rt_transpose <- function(df, sp) {
   rt <- rt_diag()
   info <- sp$info
   vars <- sp$vars
-  groups <- if (length(sp$by) > 0) proc_by_groups(d, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(d)))
+  groups <- if (length(sp$by) > 0) proc_by_groups(df, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(df)))
   if (length(groups) == 0) groups <- list(integer())
   any_char <- any(vapply(vars, function(v) info[[v]]$char, TRUE))
   fmts <- lapply(vars, function(v) info[[v]]$fmt)
   # values of the transposed variables (character when any of them is)
   value_of <- function(v, rows) {
-    x <- d[[v]][rows]
+    x <- df[[v]][rows]
     if (!any_char) return(x)
     if (info[[v]]$char) return(sas_rtrim(x))
     sas_format(x, info[[v]]$fmt)
@@ -143,7 +143,7 @@ sas_rt_transpose <- function(d, sp) {
       ids <- vapply(seq_len(n_g), function(j) {
         r <- g[j]
         parts <- vapply(sp$id, function(v) {
-          x <- d[[v]][r]
+          x <- df[[v]][r]
           if (sas_is_missing(x)) abort_unsupported("a missing value of an ID variable")
           t <- proc_value_text(x, info[[v]])
           if (!info[[v]]$char && is.null(info[[v]]$fmt) && (x < 0 || x != trunc(x))) {
@@ -171,15 +171,15 @@ sas_rt_transpose <- function(d, sp) {
       if (!nm[j] %in% new_cols) {
         new_cols <- c(new_cols, nm[j])
         new_disp <- c(new_disp, nm_disp[j])
-        if (length(sp$idlabel) > 0) new_labels[[nm[j]]] <- proc_value_text(d[[sp$idlabel]][g[j]], info[[sp$idlabel]])
+        if (length(sp$idlabel) > 0) new_labels[[nm[j]]] <- proc_value_text(df[[sp$idlabel]][g[j]], info[[sp$idlabel]])
       }
     }
     n_rows <- max(length(vars), if (length(sp$copy) > 0) n_g else 0L, if (length(sp$copy) > 0) 1L else 0L)
     if (length(vars) == 0 && length(sp$copy) == 0) n_rows <- 0L
     for (i in seq_len(n_rows)) {
       r <- list()
-      for (v in sp$by) r[[v]] <- if (n_g > 0) d[[v]][g[1]] else NULL
-      for (v in sp$copy) r[[v]] <- if (i <= n_g) d[[v]][g[i]] else (if (info[[v]]$char) "" else NA_real_)
+      for (v in sp$by) r[[v]] <- if (n_g > 0) df[[v]][g[1]] else NULL
+      for (v in sp$copy) r[[v]] <- if (i <= n_g) df[[v]][g[i]] else (if (info[[v]]$char) "" else NA_real_)
       if (i <= length(vars)) {
         v <- vars[i]
         r$.name <- info[[v]]$disp

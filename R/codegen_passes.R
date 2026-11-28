@@ -11,7 +11,7 @@
 # then the code built without passes.
 #
 # `facts`: `an` (the step analysis) and `reads_after` (the names that code
-# after the pipeline reads from `.d`: PUT lines, the output condition and the
+# after the pipeline reads from `.df`: PUT lines, the output condition and the
 # output columns).
 
 codegen_pass_table <- function() {

@@ -18,13 +18,13 @@
 #   at the bottom [column positions measured on a grid of 120 columns,
 #   print_layout].
 
-print_compute <- function(d, spec) {
+print_compute <- function(df, spec) {
   # an empty data set prints nothing
-  if (nrow(d) == 0) return(list(tables = list(), data = list(), events = character()))
+  if (nrow(df) == 0) return(list(tables = list(), data = list(), events = character()))
   cols <- c(if (!is.null(spec$id)) list(spec$id), spec$cols)
   obs <- is.null(spec$id) && !isTRUE(spec$noobs)
   # the log after the not-sorted ERROR (observations read) is not measured
-  groups <- tryCatch(proc_by_groups(d, spec$by, rep(FALSE, length(spec$by)), spec$data, spec$by_info),
+  groups <- tryCatch(proc_by_groups(df, spec$by, rep(FALSE, length(spec$by)), spec$data, spec$by_info),
                      sasonr_runtime_error = function(e) abort_unsupported(paste0("PROC PRINT BY on data that are not sorted (", conditionMessage(e), ")"), spec$line))
   sums <- spec$sums %||% character()
   # the text of each column over the whole data set, so that the decimals of
@@ -33,13 +33,13 @@ print_compute <- function(d, spec) {
     v <- x[is.na(sas_miss_code(x))]
     if (length(v) == 0) NA_real_ else Reduce(`+`, v)
   }
-  sub_tot <- lapply(sums, function(v) vapply(groups, function(g) sum_of(d[[v]][g]), 0))
-  grand <- lapply(sums, function(v) sum_of(d[[v]]))
+  sub_tot <- lapply(sums, function(v) vapply(groups, function(g) sum_of(df[[v]][g]), 0))
+  grand <- lapply(sums, function(v) sum_of(df[[v]]))
   names(sub_tot) <- names(grand) <- sums
-  n <- nrow(d)
+  n <- nrow(df)
   ng <- length(groups)
   text <- lapply(cols, function(s) {
-    x <- d[[s$name]]
+    x <- df[[s$name]]
     extra <- if (s$name %in% sums) c(sub_tot[[s$name]], grand[[s$name]]) else NULL
     all <- if (s$char) {
       # character values are written left-justified (leading blanks dropped)
@@ -57,10 +57,10 @@ print_compute <- function(d, spec) {
   sub_rows <- length(sums) > 0 && length(spec$by) > 0
   tables <- lapply(seq_along(groups), function(k) {
     g <- groups[[k]]
-    x <- tibble::as_tibble(stats::setNames(lapply(cols, function(s) d[[s$name]][g]), names(text)))
-    if (obs) x <- tibble::add_column(x, Obs = as.integer(d$.obs[g]), .before = 1L)
-    by <- if (length(spec$by) > 0) list(values = lapply(stats::setNames(spec$by, spec$by), function(v) d[[v]][g[1]]),
-                                        text = proc_by_line(d, g[1], spec$by, spec$by_info), group = k) else NULL
+    x <- tibble::as_tibble(stats::setNames(lapply(cols, function(s) df[[s$name]][g]), names(text)))
+    if (obs) x <- tibble::add_column(x, Obs = as.integer(df$.obs[g]), .before = 1L)
+    by <- if (length(spec$by) > 0) list(values = lapply(stats::setNames(spec$by, spec$by), function(v) df[[v]][g[1]]),
+                                        text = proc_by_line(df, g[1], spec$by, spec$by_info), group = k) else NULL
     tb <- new_sasonr_ods_table(x, name = "Print", label = "Data Set", path = "Print.Print", proc = "Print",
                             template = "base.print", by = by,
                             cols = ods_cols(names(x), role = "var"))
@@ -70,7 +70,7 @@ print_compute <- function(d, spec) {
                                              fw = if (!s$char && !is.null(s$fmt)) fmt_width(s$fmt, FALSE),
                                              # a number under a user-defined format is laid out as text
                                              label_fmt = !s$char && !is.null(s$fmt) && !is.null(user_fmt(s$fmt$name, FALSE))))),
-      text = c(if (obs) list(list(values = as.character(d$.obs[g]))),
+      text = c(if (obs) list(list(values = as.character(df$.obs[g]))),
                lapply(names(text), function(nm) list(values = text[[nm]]$values[g], sub = text[[nm]]$sub[k],
                                                      grand = if (k == ng) text[[nm]]$grand, rounded = text[[nm]]$rounded,
                                                      dec = text[[nm]]$dec, sfw = text[[nm]]$sfw, hdec = text[[nm]]$hdec))),

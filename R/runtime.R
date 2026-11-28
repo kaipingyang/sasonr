@@ -1418,10 +1418,10 @@ sas_ds <- function(work, name, keep = NULL, drop = NULL, rename = NULL, firstobs
   tibble::as_tibble(d)
 }
 
-sort_keys <- function(d, by) {
+sort_keys <- function(df, by) {
   keys <- list()
   for (v in by) {
-    x <- d[[v]]
+    x <- df[[v]]
     if (is.character(x)) {
       keys <- c(keys, list(sas_rtrim(x)))
     } else {
@@ -1432,30 +1432,30 @@ sort_keys <- function(d, by) {
   keys
 }
 
-sas_order <- function(d, by, descending = rep(FALSE, length(by))) {
-  if (nrow(d) == 0) return(integer())
-  keys <- sort_keys(d, by)
-  dec <- vctrs::list_unchop(lapply(seq_along(by), function(k) rep(descending[k], if (is.character(d[[by[k]]])) 1L else 2L)), ptype = logical(), name_spec = rlang::zap())
+sas_order <- function(df, by, descending = rep(FALSE, length(by))) {
+  if (nrow(df) == 0) return(integer())
+  keys <- sort_keys(df, by)
+  dec <- vctrs::list_unchop(lapply(seq_along(by), function(k) rep(descending[k], if (is.character(df[[by[k]]])) 1L else 2L)), ptype = logical(), name_spec = rlang::zap())
   rlang::exec(order, !!!unname(keys), decreasing = dec, method = "radix")
 }
 
 #' Stop with a SAS-style error when a data set is not sorted by the BY variables
 #' @export
 #' @keywords internal
-sas_check_sorted <- function(d, by, descending = rep(FALSE, length(by))) {
-  missing_vars <- setdiff(by, names(d))
+sas_check_sorted <- function(df, by, descending = rep(FALSE, length(by))) {
+  missing_vars <- setdiff(by, names(df))
   if (length(missing_vars) > 0) abort_runtime(paste0("BY variable ", missing_vars[1], " not found"))
-  if (nrow(d) > 1) {
-    res <- integer(nrow(d) - 1L)
+  if (nrow(df) > 1) {
+    res <- integer(nrow(df) - 1L)
     for (k in seq_along(by)) {
-      x <- d[[by[k]]]
-      ck <- sas_cmp(x[-nrow(d)], x[-1L])
+      x <- df[[by[k]]]
+      ck <- sas_cmp(x[-nrow(df)], x[-1L])
       if (descending[k]) ck <- -ck
       res <- ifelse(res == 0L, ck, res)
     }
     if (any(res > 0L)) abort_runtime(paste("data set is not sorted by", paste(by, collapse = " ")))
   }
-  d
+  df
 }
 
 same_value <- function(a, b) {
@@ -1502,22 +1502,22 @@ sas_set_input <- function(dfs, in_vars = NULL, by = NULL, descending = NULL) {
   pad_char_columns(d)
 }
 
-pad_char_columns <- function(d) {
-  for (v in names(d)) {
-    if (is.character(d[[v]]) && nrow(d) > 0) {
-      len <- max(1L, chr_bytes(d[[v]]), na.rm = TRUE)
-      d[[v]] <- sas_char(d[[v]], len)
+pad_char_columns <- function(df) {
+  for (v in names(df)) {
+    if (is.character(df[[v]]) && nrow(df) > 0) {
+      len <- max(1L, chr_bytes(df[[v]]), na.rm = TRUE)
+      df[[v]] <- sas_char(df[[v]], len)
     }
   }
-  d
+  df
 }
 
 #' Rows of a data frame as a list of named lists (for the L3 PDV loop)
 #' @export
 #' @keywords internal
-sas_rows <- function(d) {
-  cols <- as.list(d)
-  lapply(seq_len(nrow(d)), function(i) lapply(cols, `[[`, i))
+sas_rows <- function(df) {
+  cols <- as.list(df)
+  lapply(seq_len(nrow(df)), function(i) lapply(cols, `[[`, i))
 }
 
 #' Copy one input row into the PDV
@@ -1617,7 +1617,7 @@ sas_merge_input <- function(dfs, by, descending = rep(FALSE, length(by)), in_var
   gstart <- if (n) cummax(ifelse(plan$.new, pos, 0L)) else integer()
   out <- list()
   for (v in vars) {
-    js <- which(vapply(dfs, function(d) v %in% names(d), NA))
+    js <- which(vapply(dfs, function(df) v %in% names(df), NA))
     cols <- lapply(dfs[js], `[[`, v)
     vals <- vctrs::vec_c(!!!lapply(cols, function(x) { attributes(x) <- NULL; x }))
     offs <- cumsum(c(0L, lengths(cols)))[seq_along(js)]
@@ -1907,9 +1907,9 @@ sas_num <- function(x, .at = NULL) {
 #' Truncate character columns to PDV lengths (later data sets of SET/MERGE)
 #' @export
 #' @keywords internal
-sas_trunc_chars <- function(d, lens) {
-  for (v in names(lens)) if (v %in% names(d)) d[[v]] <- sas_char(d[[v]], lens[[v]])
-  d
+sas_trunc_chars <- function(df, lens) {
+  for (v in names(lens)) if (v %in% names(df)) df[[v]] <- sas_char(df[[v]], lens[[v]])
+  df
 }
 
 #' Formatted PUT output (`put x 8.2;`): the field keeps its alignment blanks
@@ -2060,10 +2060,10 @@ sas_step_output <- function(st, k) {
 #' `ahead`: the reader reads one observation ahead (SET with BY).
 #' @export
 #' @keywords internal
-sas_set_reader <- function(d, notes = NULL, ahead = FALSE) {
+sas_set_reader <- function(df, notes = NULL, ahead = FALSE) {
   r <- new.env(parent = emptyenv())
   r$kind <- "set"
-  r$rows <- sas_rows(d)
+  r$rows <- sas_rows(df)
   r$n <- length(r$rows)
   r$p <- 0L
   r$notes <- notes
@@ -2114,7 +2114,7 @@ sas_merge_reader <- function(dfs, by, descending, reset, in_vars = rep(NA_charac
   r$rows <- lapply(dfs, sas_rows)
   # without BY: one-to-one, the n-th observation of each data set
   r$noby <- !length(by)
-  r$vars <- lapply(dfs, function(d) setdiff(names(d), ".obs"))
+  r$vars <- lapply(dfs, function(df) setdiff(names(df), ".obs"))
   r$notes <- notes
   r$plan <- if (r$noby) merge_plan_noby(dfs) else sas_merge_plan(dfs, by, descending)
   r$n <- nrow(r$plan)

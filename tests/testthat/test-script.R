@@ -250,7 +250,7 @@ test_that("a tidy step reads earlier data sets as R variables in one pipeline", 
   ref <- sas_run(prog)
   sc <- sas_script(ref, tidy = TRUE)
   txt <- as.character(sc)
-  expect_false(any(grepl("sas_session|sas_data_step|^\\.d <- |sas_note_read|\\.at = ", txt)))
+  expect_false(any(grepl("sas_session|sas_data_step|^\\.df <- |sas_note_read|\\.at = ", txt)))
   # (laid out as air does: a pipeline that fits stays on one line)
   expect_true("out <- `in` |> mutate(y = sas_arith(x, 2, \"*\")) |> select(g, x, y)" %in% txt)
   expect_true(all(c("out2 <- out |>", "  sas_ds(keep = c(\"g\", \"y\")) |>", "  select(g, y)") %in% txt))

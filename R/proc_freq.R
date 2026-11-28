@@ -571,8 +571,8 @@ translate_proc_freq <- function(step, meta, last) {
   header <- sprintf("# ---- PROC FREQ (SAS line %d)", as.integer(step$line))
   code <- c(
     header,
-    paste0(".d <- ", proc_source_code(inp)),
-    paste0(".r <- sas_rt_proc(\"freq\", .d, ", r_lit(spec), ")"),
+    paste0(".df <- ", proc_source_code(inp)),
+    paste0(".r <- sas_rt_proc(\"freq\", .df, ", r_lit(spec), ")"),
     ".lst <- sas_lst_c(.lst, sas_titles_once(.titles, .r$listing))",
     ".ods <- c(.ods, Filter(function(tb) !identical(attr(tb, \"template\", exact = TRUE), \"base.freq.lines\"), .r$tables))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
@@ -649,12 +649,12 @@ freq_stat_num <- function(v) {
 #' PROC FREQ engine
 #'
 #' Runs the FREQ entry of the PROC registry (`sas_rt_proc("freq", ...)`).
-#' @param d Input data (after WHERE).
+#' @param df Input data (after WHERE).
 #' @param sp Specification built by the translator.
 #' @export
 #' @keywords internal
-sas_rt_freq <- function(d, sp) {
-  r <- sas_rt_proc("freq", d, sp)
+sas_rt_freq <- function(df, sp) {
+  r <- sas_rt_proc("freq", df, sp)
   list(listing = r$listing, out = r$out)
 }
 
@@ -736,7 +736,7 @@ freq_listing_tables <- function(tables) {
   lst
 }
 
-freq_compute <- function(d, sp) {
+freq_compute <- function(df, sp) {
   info <- sp$info
   # every request NOPRINT without statistics, no OUT= and no OUTPUT
   # statement: the step reads nothing [measured, TABLES / NOPRINT]
@@ -749,22 +749,22 @@ freq_compute <- function(d, sp) {
     return(list(tables = list(), data = list(),
                 events = "NOTE: Processing will terminate because there are no valid requests for displayed output or output data sets."))
   }
-  groups <- if (!is.null(sp$by)) proc_by_groups(d, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(d)))
+  groups <- if (!is.null(sp$by)) proc_by_groups(df, sp$by, sp$by_desc, sp$data, info) else list(seq_len(nrow(df)))
   tables <- list()
   outs <- list()
   out_rows <- list()
   stat_rows <- list()
   for (gi in seq_along(groups)) {
     g <- groups[[gi]]
-    db <- d[g, , drop = FALSE]
+    db <- df[g, , drop = FALSE]
     wt <- if (is.null(sp$weight)) rep(1, nrow(db)) else db[[sp$weight]]
     use <- !is.na(wt)
     if (!sp$zeros && !is.null(sp$weight)) use <- use & wt != 0
     db <- db[use, , drop = FALSE]
     wt <- wt[use]
     pieces <- list()
-    by <- if (!is.null(sp$by) && length(g) > 0) list(values = lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
-                                                     text = proc_by_line(d, g[1], sp$by, info), group = gi)
+    by <- if (!is.null(sp$by) && length(g) > 0) list(values = lapply(stats::setNames(sp$by, sp$by), function(v) df[[v]][g[1]]),
+                                                     text = proc_by_line(df, g[1], sp$by, info), group = gi)
     if (sp$nlevels) pieces <- c(pieces, list(freq_nlevels_table(db, sp)))
     for (ri in seq_along(sp$requests)) {
       rq <- sp$requests[[ri]]
@@ -795,13 +795,13 @@ freq_compute <- function(d, sp) {
       }
       if (!is.null(rq$opts$out)) {
         nm <- rq$opts$out$name
-        byv <- lapply(sp$by, function(v) rep(d[[v]][g[1]], nrow(res$out)))
+        byv <- lapply(sp$by, function(v) rep(df[[v]][g[1]], nrow(res$out)))
         names(byv) <- sp$by
         od <- if (length(sp$by) > 0) dplyr::bind_cols(tibble::as_tibble(byv), res$out) else res$out
         out_rows[[nm]] <- list(data = dplyr::bind_rows(out_rows[[nm]]$data, od), cols = res$out_cols, opts = rq$opts$out$options,
                                line = rq$line)
       }
-      if (!is.null(sp$output)) stat_rows[[length(stat_rows) + 1L]] <- c(lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
+      if (!is.null(sp$output)) stat_rows[[length(stat_rows) + 1L]] <- c(lapply(stats::setNames(sp$by, sp$by), function(v) df[[v]][g[1]]),
                                                                      res$stats)
     }
     if (sp$print) {

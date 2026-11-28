@@ -83,20 +83,20 @@ lib_read_sas7bdat <- function(path, ref, mem, line) {
 
 # The data frame (lower-case names, character values padded to their length)
 # and its metadata in the form of WORK's (out_meta()).
-lib_finish <- function(d, vars, type, len, fmt, informat, label, memlabel, ref, mem, line) {
-  d[] <- lapply(d, function(x) {
+lib_finish <- function(df, vars, type, len, fmt, informat, label, memlabel, ref, mem, line) {
+  df[] <- lapply(df, function(x) {
     attributes(x) <- NULL
     x
   })
   disp <- vars
   vars <- tolower(vars)
-  names(d) <- tolower(names(d))
-  if (!identical(names(d), vars)) abort_unsupported(paste0("the variables of ", toupper(ref), ".", toupper(mem), " (the file's attributes do not match its columns)"), line)
+  names(df) <- tolower(names(df))
+  if (!identical(names(df), vars)) abort_unsupported(paste0("the variables of ", toupper(ref), ".", toupper(mem), " (the file's attributes do not match its columns)"), line)
   for (j in seq_along(vars)) {
     if (type[j] == "char") {
-      x <- d[[j]]
+      x <- df[[j]]
       if (any(nchar(x[!is.na(x)], "bytes") > len[j])) abort_unsupported(paste0("values of ", disp[j], " longer than its length"), line)
-      d[[j]] <- sas_char(ifelse(is.na(x), "", x), as.integer(len[j]))
+      df[[j]] <- sas_char(ifelse(is.na(x), "", x), as.integer(len[j]))
     } else if (len[j] != 8L) {
       # a shorter numeric length: the stored precision is not modelled here
       abort_unsupported(paste0("the numeric length ", len[j], " of ", disp[j], " in ", toupper(ref), ".", toupper(mem)), line)
@@ -110,5 +110,5 @@ lib_finish <- function(d, vars, type, len, fmt, informat, label, memlabel, ref, 
                formats = Filter(Negate(is.null), fmts), disp = stats::setNames(as.list(disp), vars),
                labels = Filter(Negate(is.null), labs), informats = Filter(Negate(is.null), infs))
   if (nzchar(memlabel)) meta$memlabel <- memlabel
-  list(data = tibble::as_tibble(d), meta = meta)
+  list(data = tibble::as_tibble(df), meta = meta)
 }

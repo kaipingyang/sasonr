@@ -220,8 +220,8 @@ translate_proc_univariate <- function(step, meta, last) {
   header <- sprintf("# ---- PROC UNIVARIATE (SAS line %d)", as.integer(step$line))
   code <- c(
     header,
-    paste0(".d <- ", proc_source_code(b$inp)),
-    paste0(".r <- sas_rt_proc(\"univariate\", .d, ", r_lit(spec), ")"),
+    paste0(".df <- ", proc_source_code(b$inp)),
+    paste0(".r <- sas_rt_proc(\"univariate\", .df, ", r_lit(spec), ")"),
     if (isTRUE(spec$print)) ".lst <- sas_lst_c(.lst, sas_univ_titles(.titles, .r$tables))",
     ".meta <- c(.meta, sas_proc_store(work, .r$out))"
   )
@@ -283,13 +283,13 @@ univ_weighted_moments <- function(x, w, vardef) {
   list(mean = m, css = css, var = v, std = sqrt(v))
 }
 
-univ_compute <- function(d, spec) {
+univ_compute <- function(df, spec) {
   if (isTRUE(spec$print)) {
     # one page per analysis variable
     tabs <- lapply(spec$vars, function(v) {
       tb <- new_sasonr_ods_table(tibble::tibble(), name = "Univariate", label = "Univariate", path = "Univariate",
                                  proc = "Univariate", template = "base.univariate.lines")
-      attr(tb, "lines") <- univ_print_var(as.numeric(d[[v]]), spec$disp[[v]], spec$labels[[v]])
+      attr(tb, "lines") <- univ_print_var(as.numeric(df[[v]]), spec$disp[[v]], spec$labels[[v]])
       tb
     })
     return(list(tables = tabs, data = list(), events = character()))
@@ -297,40 +297,40 @@ univ_compute <- function(d, spec) {
   stats <- setdiff(unique(unlist(lapply(spec$outputs, function(o) vapply(o$cols, `[[`, "", "stat")))), "pctlpt")
   gv <- c(spec$by, spec$class)
   if (length(spec$by)) {
-    key <- interaction(lapply(spec$by, function(v) d[[v]]), drop = TRUE, lex.order = TRUE)
+    key <- interaction(lapply(spec$by, function(v) df[[v]]), drop = TRUE, lex.order = TRUE)
     runs <- rle(as.integer(key))$values
     if (anyDuplicated(runs)) abort_runtime("Data set is not sorted in ascending sequence.", spec$line)
   }
   # the groups: BY groups in data order, CLASS levels in sorted order; missing
   # CLASS values are left out
-  if (length(spec$class)) d <- d[!is.na(d[[spec$class]]) & !(is.character(d[[spec$class]]) & sas_rtrim(d[[spec$class]]) == ""), , drop = FALSE]
+  if (length(spec$class)) df <- df[!is.na(df[[spec$class]]) & !(is.character(df[[spec$class]]) & sas_rtrim(df[[spec$class]]) == ""), , drop = FALSE]
   if (length(gv)) {
     g <- if (length(spec$class)) {
-      cl <- d[[spec$class]]
+      cl <- df[[spec$class]]
       lv <- if (is.character(cl)) sort(unique(cl), method = "radix") else sort(unique(cl))
-      byk <- if (length(spec$by)) as.integer(interaction(lapply(spec$by, function(v) d[[v]]), drop = TRUE, lex.order = TRUE)) else rep(1L, nrow(d))
+      byk <- if (length(spec$by)) as.integer(interaction(lapply(spec$by, function(v) df[[v]]), drop = TRUE, lex.order = TRUE)) else rep(1L, nrow(df))
       byo <- match(byk, unique(byk))
       paste(byo, match(cl, lv), sep = "\r")
     } else {
-      byk <- interaction(lapply(spec$by, function(v) d[[v]]), drop = TRUE, lex.order = TRUE)
+      byk <- interaction(lapply(spec$by, function(v) df[[v]]), drop = TRUE, lex.order = TRUE)
       as.character(match(as.integer(byk), unique(as.integer(byk))))
     }
-    ord <- if (length(spec$class)) order(as.integer(sub("\r.*", "", g)), as.integer(sub(".*\r", "", g))) else seq_len(nrow(d))
+    ord <- if (length(spec$class)) order(as.integer(sub("\r.*", "", g)), as.integer(sub(".*\r", "", g))) else seq_len(nrow(df))
     keys <- unique(g[ord])
     rows <- lapply(keys, function(k) which(g == k))
   } else {
-    rows <- list(seq_len(nrow(d)))
+    rows <- list(seq_len(nrow(df)))
   }
   data <- list()
   for (o in spec$outputs) {
     recs <- lapply(rows, function(ix) {
-      wv <- if (length(spec$weight)) as.numeric(d[[spec$weight]][ix])
-      vals <- lapply(spec$vars, function(v) univ_var_stats(as.numeric(d[[v]][ix]), stats, spec, wv))
+      wv <- if (length(spec$weight)) as.numeric(df[[spec$weight]][ix])
+      vals <- lapply(spec$vars, function(v) univ_var_stats(as.numeric(df[[v]][ix]), stats, spec, wv))
       names(vals) <- spec$vars
-      grp <- lapply(gv, function(v) d[[v]][ix[1]])
+      grp <- lapply(gv, function(v) df[[v]][ix[1]])
       st <- lapply(o$cols, function(c) {
         if (c$stat != "pctlpt") return(unname(vals[[c$var]][[c$stat]]))
-        x <- sort(as.numeric(d[[c$var]][ix]))
+        x <- sort(as.numeric(df[[c$var]][ix]))
         means_quantile(x, c$pct / 100, spec$pctldef)
       })
       c(stats::setNames(grp, gv), stats::setNames(st, vapply(o$cols, `[[`, "", "name")))

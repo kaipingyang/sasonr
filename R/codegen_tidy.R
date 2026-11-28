@@ -1,10 +1,10 @@
 # Code generation: DATA step AST -> R code (a character string).
 #
-# L1/L2 produce a dplyr pipeline over the input (`.d`), L3 produces an explicit
+# L1/L2 produce a dplyr pipeline over the input (`.df`), L3 produces an explicit
 # row loop over a PDV list. Expressions share one generator; only variable
 # references differ by mode:
 #   vec  bare column names inside dplyr verbs
-#   out  `.d$x` after the pipeline (PUT text)
+#   out  `.df$x` after the pipeline (PUT text)
 #   row  `pdv$x` inside the L3 loop
 
 cmp_helper <- c("=" = "sas_eq", "^=" = "sas_ne", "<" = "sas_lt", "<=" = "sas_le",
@@ -30,7 +30,7 @@ with_mode <- function(cx, mode) {
 var_lang <- function(name, cx) {
   switch(cx$mode,
     vec = rlang::sym(name),
-    out = rlang::call2("$", rlang::sym(".d"), rlang::sym(name)),
+    out = rlang::call2("$", rlang::sym(".df"), rlang::sym(name)),
     row = rlang::call2("$", rlang::sym("pdv"), rlang::sym(name))
   )
 }
@@ -634,11 +634,11 @@ gen_vec_step <- function(an) {
   if (!is.na(k0)) cx$stages <- drop_dead_inits(cx$stages, k0)
   cx$stages <- apply_codegen_passes(cx$stages, list(an = an, reads_after = vec_reads_after(cx)))
 
-  c(list(render_pipeline(".d", source_item(an), cx$stages)), vec_put_item(cx), vec_output_item(an))
+  c(list(render_pipeline(".df", source_item(an), cx$stages)), vec_put_item(cx), vec_output_item(an))
 }
 
 # The names that the code after the pipeline of a vectorised step reads from
-# `.d`: the PUT lines and their guards, the output condition, the output
+# `.df`: the PUT lines and their guards, the output condition, the output
 # columns (see vec_put_item() and vec_output_item()).
 vec_reads_after <- function(cx) {
   an <- cx$an
@@ -687,14 +687,14 @@ drop_dead_inits <- function(stages, k0) {
 }
 
 # The PUT statements of a vectorised step: one line per iteration of the step
-# (a row of `.d`), also for a PUT whose items are literals only (its line is
+# (a row of `.df`), also for a PUT whose items are literals only (its line is
 # computed once).
 vec_put_lang <- function(cx) {
   if (length(cx$puts) == 0) return(NULL)
   sink <- rlang::sym(cx$sink)
   lines <- cg_call("list", lapply(cx$puts, `[[`, "line"))
-  guards <- cg_call("list", lapply(cx$puts, function(p) if (is.null(p$guard)) TRUE else rlang::call2("$", rlang::sym(".d"), rlang::sym(p$guard))))
-  assign_lang(sink, rlang::call2("c", sink, cg_call("sas_put_rows", list(lines, guards, n = quote(nrow(.d))))))
+  guards <- cg_call("list", lapply(cx$puts, function(p) if (is.null(p$guard)) TRUE else rlang::call2("$", rlang::sym(".df"), rlang::sym(p$guard))))
+  assign_lang(sink, rlang::call2("c", sink, cg_call("sas_put_rows", list(lines, guards, n = quote(nrow(.df))))))
 }
 
 # Its display: one argument of sas_put_rows() per line, one PUT per line.
@@ -703,7 +703,7 @@ vec_put_item <- function(cx) {
   if (is.null(x)) return(list())
   rows <- x[[3]][[3]]
   args <- function(l, sep) paste(vapply(as.list(l)[-1L], cg_text, ""), collapse = sep)
-  list(cgi(x, sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s),\n  n = nrow(.d)\n))", cx$sink, cx$sink,
+  list(cgi(x, sprintf("%s <- c(%s, sas_put_rows(\n  list(%s),\n  list(%s),\n  n = nrow(.df)\n))", cx$sink, cx$sink,
                       args(rows[[2]], ",\n       "), args(rows[[3]], ", "))))
 }
 
@@ -717,7 +717,7 @@ select_code <- function(o) cg_text(select_lang(o))
 vec_output_item <- function(an) {
   if (length(an$dsir$slots$outputs) == 0) return(list())
   o <- an$dsir$slots$outputs[[1]]
-  x <- cgi(rlang::sym(".d"))
+  x <- cgi(rlang::sym(".df"))
   if (!is.null(an$output_pattern$cond)) {
     x <- cgi_pipe(x, rlang::call2(quote(dplyr::filter), rlang::call2("sas_true", rlang::sym(an$output_pattern$cond))), sep = " |>\n  ")
   }
@@ -811,7 +811,7 @@ gen_vec_stmt <- function(s, guard, cx) {
     do = gen_vec_block(s$body, guard, cx),
     select = gen_vec_select(s, guard, cx),
     put = {
-      g <- if (is.null(guard)) quote(rep(TRUE, nrow(.d))) else rlang::call2("$", rlang::sym(".d"), rlang::sym(guard))
+      g <- if (is.null(guard)) quote(rep(TRUE, nrow(.df))) else rlang::call2("$", rlang::sym(".df"), rlang::sym(guard))
       cx$puts <- c(cx$puts, list(list(guard = guard, line = put_line_lang(s, with_mode(cx, "out"), g))))
     },
     NULL

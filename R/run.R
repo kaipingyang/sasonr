@@ -1,10 +1,10 @@
 # Program drivers: run a SAS program (macro processor -> parser -> executor),
 # or translate it to R code.
 
-meta_from_df <- function(d, disp = names(d)) {
-  vars <- tolower(names(d))
-  type <- lapply(d, function(x) if (is.character(x)) "char" else "num")
-  len <- lapply(d, function(x) if (is.character(x)) max(1L, chr_bytes(x), na.rm = TRUE) else 8L)
+meta_from_df <- function(df, disp = names(df)) {
+  vars <- tolower(names(df))
+  type <- lapply(df, function(x) if (is.character(x)) "char" else "num")
+  len <- lapply(df, function(x) if (is.character(x)) max(1L, chr_bytes(x), na.rm = TRUE) else 8L)
   disp <- as.list(disp)
   names(type) <- names(len) <- names(disp) <- vars
   list(vars = vars, type = type, len = len, formats = list(), disp = disp)
@@ -15,10 +15,10 @@ prepare_work <- function(work) {
   if (is.null(names(work)) || any(!nzchar(names(work)))) {
     rlang::abort("`work` must be a named list of data frames.", class = "sasonr_error")
   }
-  out <- lapply(work, function(d) {
-    d <- tibble::as_tibble(d)
-    names(d) <- tolower(names(d))
-    pad_char_columns(d)
+  out <- lapply(work, function(df) {
+    df <- tibble::as_tibble(df)
+    names(df) <- tolower(names(df))
+    pad_char_columns(df)
   })
   names(out) <- tolower(names(work))
   out
@@ -1162,8 +1162,8 @@ macro_auto_vars <- mac_auto_implemented
 
 # The sasonr_result of an engine.
 engine_result <- function(eng) {
-  out <- lapply(as.list(eng$session$work), function(d) {
-    dplyr::mutate(d, dplyr::across(dplyr::where(is.character), sas_rtrim))
+  out <- lapply(as.list(eng$session$work), function(df) {
+    dplyr::mutate(df, dplyr::across(dplyr::where(is.character), sas_rtrim))
   })
   mv <- as.list(eng$session$macro$globals)
   autos <- macro_auto_vars

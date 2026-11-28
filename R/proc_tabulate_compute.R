@@ -122,16 +122,16 @@ tab_spec <- function(step, decl, irs, inp) {
 # BY groups (sorted data, proc_by_groups()): each group is computed on its
 # own rows (PCTN/PCTSUM per group) and its tables carry the BY line; each BY
 # group starts a page under the titles [measured, case tabulate_t2/p1_by].
-tabulate_compute <- function(d, sp) {
-  if (!length(sp$by)) return(tab_compute_rows(d, sp))
-  groups <- proc_by_groups(d, sp$by, rep(FALSE, length(sp$by)), sp$data, sp$by_info)
+tabulate_compute <- function(df, sp) {
+  if (!length(sp$by)) return(tab_compute_rows(df, sp))
+  groups <- proc_by_groups(df, sp$by, rep(FALSE, length(sp$by)), sp$data, sp$by_info)
   tables <- list()
   events <- character()
   for (k in seq_along(groups)) {
     g <- groups[[k]]
-    r <- tab_compute_rows(d[g, , drop = FALSE], sp)
-    by <- list(values = lapply(stats::setNames(sp$by, sp$by), function(v) d[[v]][g[1]]),
-               text = proc_by_line(d, g[1], sp$by, sp$by_info), group = k, info = sp$by_info)
+    r <- tab_compute_rows(df[g, , drop = FALSE], sp)
+    by <- list(values = lapply(stats::setNames(sp$by, sp$by), function(v) df[[v]][g[1]]),
+               text = proc_by_line(df, g[1], sp$by, sp$by_info), group = k, info = sp$by_info)
     tables <- c(tables, lapply(r$tables, function(t) {
       attr(t, "by") <- by
       t
@@ -141,14 +141,14 @@ tabulate_compute <- function(d, sp) {
   list(tables = tables, data = list(), events = events)
 }
 
-tab_compute_rows <- function(d, sp) {
+tab_compute_rows <- function(df, sp) {
   line <- sp$line
   events <- character()
-  n0 <- nrow(d)
+  n0 <- nrow(df)
   keep <- rep(TRUE, n0)
-  for (cl in sp$class) if (!cl$missing) keep <- keep & !sas_is_missing(d[[cl$name]])
-  d <- d[keep, , drop = FALSE]
-  if (n0 > 0L && nrow(d) == 0L) {
+  for (cl in sp$class) if (!cl$missing) keep <- keep & !sas_is_missing(df[[cl$name]])
+  df <- df[keep, , drop = FALSE]
+  if (n0 > 0L && nrow(df) == 0L) {
     events <- "WARNING: A class, frequency, or weight variable is missing on every observation."
   }
   used <- unique(unlist(lapply(sp$irs, function(ir) {
@@ -159,15 +159,15 @@ tab_compute_rows <- function(d, sp) {
     v <- names(sp$class)[1]
     cd <- sp$classdata_rows
     if (is.null(cd[[v]])) abort_unsupported(paste0("a CLASSDATA= data set without the CLASS variable ", toupper(v)), line)
-    if (sp$exclusive) d <- d[proc_group_key(d[[v]], sp$info[[v]]) %in% proc_group_key(cd[[v]], sp$info[[v]]), , drop = FALSE]
+    if (sp$exclusive) df <- df[proc_group_key(df[[v]], sp$info[[v]]) %in% proc_group_key(cd[[v]], sp$info[[v]]), , drop = FALSE]
   }
   lv <- list()
   for (v in used) {
-    lv[[v]] <- tab_levels(d[[v]], sp$class[[v]], sp$info[[v]], line)
+    lv[[v]] <- tab_levels(df[[v]], sp$class[[v]], sp$info[[v]], line)
     extra <- NULL
     if (!is.null(sp$classdata)) extra <- sp$classdata_rows[[v]]
     if (isTRUE(sp$class[[v]]$preloadfmt)) {
-      extra <- vctrs::vec_c(extra, proc_preload_values(sp$info[[v]]$fmt, is.character(d[[v]]), line))
+      extra <- vctrs::vec_c(extra, proc_preload_values(sp$info[[v]]$fmt, is.character(df[[v]]), line))
     }
     if (!is.null(extra)) {
       if (is.character(extra)) extra <- sas_rtrim(extra)
@@ -180,15 +180,15 @@ tab_compute_rows <- function(d, sp) {
   for (s in used_stats) proc_stat_check("TABULATE", if (s == "stddev") "std" else s, line)
   msp <- list(freq = NULL, vardef = "df", exclnpwgt = FALSE, alpha = 0.05, qntldef = 5L)
   stats_of <- function(v, rows, need) {
-    x <- d[[v]][rows]
+    x <- df[[v]][rows]
     means_cell_stats(x, rep(1, length(x)), NULL, need, msp, two_sided = FALSE)
   }
-  tot <- lapply(sp$vars, function(v) stats_of(v, seq_len(nrow(d)), c("n", "sum")))
+  tot <- lapply(sp$vars, function(v) stats_of(v, seq_len(nrow(df)), c("n", "sum")))
   names(tot) <- sp$vars
   tables <- list()
   for (k in seq_along(sp$irs)) {
     ir <- sp$irs[[k]]
-    tables <- c(tables, tab_table_pages(ir, k, d, sp, lv, tot, stats_of))
+    tables <- c(tables, tab_table_pages(ir, k, df, sp, lv, tot, stats_of))
   }
   for (t in tables) validate_sasonr_ods_table(t)
   list(tables = tables, data = list(), events = events)
@@ -320,12 +320,12 @@ tab_level_text <- function(v, level, lv, sp, line, row = FALSE) {
 
 # Tables -------------------------------------------------------------------------
 
-tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
+tab_table_pages <- function(ir, k, df, sp, lv, tot, stats_of) {
   line <- ir$line
   env <- new.env(parent = emptyenv())
   env$id <- 0L
   dims <- lapply(ir$dims, function(t) if (is.null(t)) NULL else tab_number(t, env))
-  all_rows <- seq_len(nrow(d))
+  all_rows <- seq_len(nrow(df))
   pages <- tab_paths(dims$page, all_rows, lv)
   rpaths <- tab_paths(dims$row, all_rows, lv)
   cpaths <- tab_paths(dims$col, all_rows, lv)
@@ -338,7 +338,7 @@ tab_table_pages <- function(ir, k, d, sp, lv, tot, stats_of) {
       }
     }
   }
-  if (nrow(d) == 0L) {
+  if (nrow(df) == 0L) {
     col_class <- any(vapply(tab_nodes(dims$col), function(n) identical(n$kind, "class"), logical(1)))
     if (!is.null(dims$page) || is.null(dims$row) || length(rpaths) || col_class) {
       abort_unsupported("an empty PROC TABULATE table with an ALL row, a page dimension or class columns", line)

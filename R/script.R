@@ -395,8 +395,8 @@ script_why_data <- function(tr, level) {
 # keep = ...)` -> `a |> sas_ds(keep = ...)`, `work$a <-` -> `a <-`), what only
 # serves the log goes (sas_note_read() stages, the `.at = c(line, col)`
 # positions of the log NOTEs), dplyr verbs lose their prefix (so that tidylog
-# can report them) and the step pipeline `.d <- src |> ...` with its output
-# `out <- .d |> select(...)` becomes one pipeline.  Returns `code` and
+# can report them) and the step pipeline `.df <- src |> ...` with its output
+# `out <- .df |> select(...)` becomes one pipeline.  Returns `code` and
 # `anchors` (the SAS position of each mutate() column and its line in `code`,
 # for the comments), NULL when the result still refers to WORK.
 script_tidy_code <- function(tr) {
@@ -463,20 +463,20 @@ tidy_rw <- function(e) {
   as.call(args)
 }
 
-# `.d <- src |> stages` followed by `out <- .d |> more`: one pipeline, when
-# `.d` is used nowhere else (no PUT reads it).
+# `.df <- src |> stages` followed by `out <- .df |> more`: one pipeline, when
+# `.df` is used nowhere else (no PUT reads it).
 tidy_merge <- function(items) {
   run <- lapply(items, cg_lang)
-  if (sum(all.names(as.call(c(quote(`{`), run))) == ".d") != 2L) return(items)
+  if (sum(all.names(as.call(c(quote(`{`), run))) == ".df") != 2L) return(items)
   target <- function(x) if (inherits(x, "cg_pipe")) x$target else if (is.call(x) && identical(x[[1]], as.name("<-"))) x[[2]]
   for (k in seq_len(length(items) - 1L)) {
     a <- items[[k]]
     b <- items[[k + 1L]]
-    if (!identical(cg_target(target(a) %||% ""), as.name(".d"))) next
+    if (!identical(cg_target(target(a) %||% ""), as.name(".df"))) next
     src <- if (inherits(a, "cg_pipe")) list(a$src, a$stages) else list(a[[3]], list())
-    if (inherits(b, "cg_pipe") && identical(b$src, as.name(".d"))) {
+    if (inherits(b, "cg_pipe") && identical(b$src, as.name(".df"))) {
       items[[k]] <- cg_pipe(src[[1]], c(src[[2]], b$stages), b$target)
-    } else if (is.call(b) && identical(b[[1]], as.name("<-")) && identical(b[[3]], as.name(".d"))) {
+    } else if (is.call(b) && identical(b[[1]], as.name("<-")) && identical(b[[3]], as.name(".df"))) {
       items[[k]] <- if (length(src[[2]])) cg_pipe(src[[1]], src[[2]], b[[2]]) else call("<-", b[[2]], src[[1]])
     } else {
       next

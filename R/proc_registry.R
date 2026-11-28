@@ -42,14 +42,14 @@ proc_registry_entry <- function(name) {
 #' them: the data sets go to WORK (through `sas_proc_store()` in the
 #' translated code), the tables are rendered to the listing.
 #' @param name The procedure name as written (`"means"`, `"summary"`).
-#' @param d Input data (after WHERE).
+#' @param df Input data (after WHERE).
 #' @param spec Specification built by the translator.
 #' @return list(listing, out, tables).
 #' @export
 #' @keywords internal
-sas_rt_proc <- function(name, d, spec) {
+sas_rt_proc <- function(name, df, spec) {
   e <- proc_registry_entry(name)
-  res <- e$compute(d, spec)
+  res <- e$compute(df, spec)
   if (length(res$events) > 0) {
     rt <- rt_diag()
     rt$proc_notes <- c(rt$proc_notes, res$events)
