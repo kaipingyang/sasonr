@@ -1,0 +1,31 @@
+---
+title: "PROC UNIVARIATE"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup}
+library(sasonr)
+```
+
+PROC UNIVARIATE describes the distribution of numeric variables: moments,
+basic measures of location and variability, tests for location, quantiles and
+extreme observations.
+
+```{r}
+res <- sas_run("
+options nocenter;
+data vitals;
+  input sbp @@;
+  datalines;
+128 124 135 131 118 121 140 126 133 119
+;
+run;
+proc univariate data=vitals;
+  var sbp;
+run;
+")
+cat(res$listing, sep = "\n")
+```

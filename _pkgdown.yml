@@ -36,8 +36,17 @@ articles:
   contents:
   - articles/guide-datastep
   - articles/guide-sql
-  - articles/guide-procs
   - articles/guide-functions
+- title: Procedures
+  contents:
+  - articles/guide-procs
+  - articles/guide-proc-print
+  - articles/guide-proc-sort-transpose
+  - articles/guide-proc-freq
+  - articles/guide-proc-tabulate
+  - articles/guide-proc-univariate
+  - articles/guide-proc-format
+  - articles/guide-proc-datasets
 - title: Developers
   contents:
   - articles/architecture

@@ -190,11 +190,11 @@ gives. `as.data.frame()` drops the table attributes; `sas_log()` gives the
 WARNINGs and NOTEs of the computation and `sas_html()` the HTML document.
 
 ```{r}
-d <- data.frame(arm = c("A", "A", "B", "B"), aval = c(10.2, 11.8, 10.9, 10.4))
-m <- sas_means_df(d, var = "aval", class = "arm", stats = c("n", "mean"))
+df <- data.frame(arm = c("A", "A", "B", "B"), aval = c(10.2, 11.8, 10.9, 10.4))
+m <- sas_means_df(df, var = "aval", class = "arm", stats = c("n", "mean"))
 as.data.frame(m)
-as.data.frame(sas_tabulate_df(d, "arm all, aval*(n mean)", class = "arm", var = "aval"))
-as.data.frame(sas_freq_df(d, "arm"))
+as.data.frame(sas_tabulate_df(df, "arm all, aval*(n mean)", class = "arm", var = "aval"))
+as.data.frame(sas_freq_df(df, "arm"))
 ```
 
 ## The RTF document
@@ -224,8 +224,8 @@ ods rtf close;
 ## What fails loud
 
 sasonr stops with a `sasonr_unsupported` condition, naming the SAS line,
-for output requests it does not implement: `ODS HTML FILE=` and the other
-ODS HTML options (write the document with `sas_html(file = )` instead),
+for output requests it does not implement: ODS HTML options other than
+`FILE=` and `STYLE=HTMLBlue`,
 `ODS OUTPUT` with MATCH_ALL, PERSIST= or BY groups, the ODS actions (CLOSE,
 SELECT, EXCLUDE, ...), and FOOTNOTE statements in the HTML document. `sas_html()` also stops when the HTML destination received output that has
 no HTML view yet (PROC PRINT, PROC FREQ statistics other than CHISQ) (close the destination around

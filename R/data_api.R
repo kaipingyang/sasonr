@@ -136,7 +136,8 @@ sas_transpose_df <- function(data, var = NULL, by = NULL, id = NULL, options = "
                  data_api_stmt("var", data_api_names(var, "var")))
   code <- data_api_text("transpose", options, body, out = "transposed")
   res <- data_api_core(data, "transpose", code, transpose_step_spec)
-  out <- res$out
+  # character values without their trailing blanks, as sas_work() gives them
+  out <- dplyr::mutate(res$out, dplyr::across(dplyr::where(is.character), sas_rtrim))
   attr(out, "sasonr_log") <- res$messages
   out
 }

@@ -1,0 +1,65 @@
+---
+title: "PROC FREQ"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup}
+library(sasonr)
+```
+
+PROC FREQ counts the values of variables: one-way tables with percentages and
+cumulative columns, two-way tables with row and column percentages, and the
+chi-square tests of a two-way table.
+
+```{r}
+prog <- "
+options nocenter;
+data ae;
+  input subj $ arm $ sev $;
+  datalines;
+S01 A MILD
+S02 A MILD
+S03 A SEVERE
+S04 B MILD
+S05 B MODERATE
+S06 B SEVERE
+S07 B SEVERE
+;
+run;
+"
+```
+
+## One-way tables
+
+```{r}
+res <- sas_run(paste(prog, "proc freq data=ae; tables sev; run;"))
+cat(res$listing, sep = "\n")
+```
+
+## Two-way tables
+
+```{r}
+res <- sas_run(paste(prog, "proc freq data=ae; tables arm*sev; run;"))
+cat(res$listing, sep = "\n")
+```
+
+## OUT= data sets
+
+`OUT=` on the TABLES statement writes the counts and percentages as a data set.
+
+```{r}
+res <- sas_run(paste(prog, "proc freq data=ae noprint; tables arm*sev / out=counts; run;"))
+res$work$counts
+```
+
+## On a data frame
+
+`sas_freq_df()` runs a one-way table on a data frame.
+
+```{r}
+df <- data.frame(sev = c("MILD", "MILD", "SEVERE"))
+as.data.frame(sas_freq_df(df, "sev"))
+```

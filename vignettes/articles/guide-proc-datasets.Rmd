@@ -1,0 +1,65 @@
+---
+title: "Data set utilities: CONTENTS, DATASETS, APPEND, DELETE"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup}
+library(sasonr)
+```
+
+These procedures describe and manage the members of a library (WORK here).
+
+```{r}
+prog <- "
+options nocenter;
+data adsl;
+  length subj $ 6;
+  input subj $ age;
+  label age = 'Age (years)';
+  format age 3.;
+  datalines;
+S01 34
+S02 41
+;
+run;
+data extra;
+  length subj $ 6;
+  input subj $ age;
+  datalines;
+S03 29
+;
+run;
+"
+```
+
+## PROC CONTENTS
+
+The variables of a data set with their type, length, format and label.
+
+```{r}
+res <- sas_run(paste(prog, "proc contents data=adsl; run;"))
+cat(res$listing, sep = "\n")
+```
+
+## PROC APPEND
+
+`BASE=` gets the observations of `DATA=`.
+
+```{r}
+res <- sas_run(paste(prog, "proc append base=adsl data=extra; run;"))
+res$work$adsl
+```
+
+## PROC DATASETS and PROC DELETE
+
+`DELETE` removes members; the log lists what was deleted.
+
+```{r}
+res <- sas_run(paste(prog, "proc datasets library=work nolist; delete extra; run; quit;"))
+names(res$work)
+res <- sas_run(paste(prog, "proc delete data=extra; run;"))
+names(res$work)
+```

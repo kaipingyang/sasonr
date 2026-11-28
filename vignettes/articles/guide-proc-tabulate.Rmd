@@ -1,0 +1,65 @@
+---
+title: "PROC TABULATE"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+```{r setup}
+library(sasonr)
+```
+
+PROC TABULATE builds a table from CLASS and VAR variables and a TABLE
+statement: the page, row and column dimensions, crossed with `*`, concatenated
+with blanks, and `ALL` for totals. sasonr writes the table in the listing with
+its box lines, as an ODS table, and in the HTML or RTF document.
+
+```{r}
+prog <- "
+options nocenter;
+data trial;
+  input arm $ sex $ age;
+  datalines;
+A F 34
+A M 41
+A F 29
+B M 52
+B F 47
+B M 38
+;
+run;
+"
+```
+
+## Counts by two classes
+
+```{r}
+res <- sas_run(paste(prog, "
+proc tabulate data=trial;
+  class arm sex;
+  table sex all, arm*n;
+run;"))
+cat(res$listing, sep = "\n")
+```
+
+## Statistics of an analysis variable
+
+```{r}
+res <- sas_run(paste(prog, "
+proc tabulate data=trial;
+  class arm;
+  var age;
+  table arm all, age*(n mean min max);
+run;"))
+cat(res$listing, sep = "\n")
+```
+
+## On a data frame
+
+`sas_tabulate_df()` takes the TABLE statement as text.
+
+```{r}
+df <- data.frame(arm = c("A", "A", "B"), age = c(34, 41, 52))
+as.data.frame(sas_tabulate_df(df, "arm all, age*(n mean)", class = "arm", var = "age"))
+```
