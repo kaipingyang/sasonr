@@ -126,11 +126,12 @@ test_that("two analysis variables add a VName_<var> column before the statistics
   expect_identical(r$meta$s$labels$vname_y, "Variable")
 })
 
-test_that("labels add Label_<var> columns as long as the label, and the CLASS variable keeps its format and label", {
-  r <- oo2_run(paste0("data lab; set have; label x=\"Weight in kg\" grp=\"Treatment group\"; format x 8.2 grp $3.; run;\n",
+test_that("labels add Label_<var> columns as long as the label, and the CLASS variable keeps its format", {
+  # (a labelled CLASS variable: its listing heading fails loud, see below)
+  r <- oo2_run(paste0("data lab; set have; label x=\"Weight in kg\"; format x 8.2 grp $3.; run;\n",
                       "ods output Summary=s;\nproc means data=lab mean sum; class grp; var x y; run;"))
   expect_identical(oo_attrs(r$meta$s), c(
-    "grp|char|8|$3.|Treatment group", "NObs|num|8|BEST1.|N Obs", "VName_x|char|1||Variable", "Label_x|char|12||Label",
+    "grp|char|8|$3.|", "NObs|num|8|BEST1.|N Obs", "VName_x|char|1||Variable", "Label_x|char|12||Label",
     "x_Mean|num|8|BEST12.|Mean", "x_Sum|num|8|BEST12.|Sum", "VName_y|char|1||Variable", "Label_y|char|1||Label",
     "y_Mean|num|8|BEST12.|Mean", "y_Sum|num|8|BEST12.|Sum"))
   expect_identical(r$work$s$label_x, c("Weight in kg", "Weight in kg"))
@@ -206,4 +207,9 @@ test_that("the ODS OUTPUT data set becomes _LAST_ unless the step also writes an
   expect_true(any(grepl("There were 1 observations read from the data set WORK.S.", r$log, fixed = TRUE)))
   r2 <- oo2_run("ods output Summary=s;\nproc means data=have mean; var x; output out=o mean=m; run;\n%put last=&syslast;")
   expect_true(any(grepl("^last=WORK.O\\s*$", r2$log)))
+})
+
+test_that("the listing heading of a labelled CLASS variable fails loud (not implemented)", {
+  expect_error(sas_run("data a; g = 'x'; v = 1; label g = 'Treatment group'; run; proc means data=a; class g; var v; run;"),
+               class = "sasonr_unsupported")
 })

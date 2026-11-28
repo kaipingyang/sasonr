@@ -54,6 +54,8 @@ SasSession <- R6::R6Class("SasSession",
     ods_html = TRUE,
     # ods_html_file: NULL, or list(file, outputs) while ODS HTML FILE= is open (written at ODS HTML CLOSE).
     ods_html_file = NULL,
+    # ods_trace: ODS TRACE ON (the "Output Added" lines of each ODS table)
+    ods_trace = FALSE,
     # ods_rtf: NULL, or list(file, outputs) while ODS RTF FILE= is open (written at ODS RTF CLOSE).
     ods_rtf = NULL,
     # ods_output: ODS OUTPUT requests for the next step (ods_output.R): list of list(object, ds, line).
@@ -130,9 +132,10 @@ SasSession <- R6::R6Class("SasSession",
 )
 
 # System options of a session, set by OPTIONS statements (engine_global()).
-# The listing layout starts at CENTER (the SAS default; the R option
-# sasonr.center = FALSE or the environment variable SASONR_CENTER=FALSE start
-# at NOCENTER) NODATE NONUMBER FORMDLIM=' '
+# The listing layout starts at NOCENTER (a listing read in the R console has
+# no use for the blank margin of centred output; the R option
+# sasonr.center = TRUE or the environment variable SASONR_CENTER=TRUE start at
+# CENTER, the SAS default) NODATE NONUMBER FORMDLIM=' '
 # PAGESIZE=MAX; DATE, NUMBER, another FORMDLIM= or PAGESIZE= fail loud when a
 # procedure writes output under them, as does CENTER for output whose
 # centring is not implemented (engine_add_listing(), listing_center.R).  Options whose
@@ -146,7 +149,10 @@ new_session_options <- function() {
   o$linesize <- 132L
   o$notes <- TRUE
   o$nosyntaxcheck <- FALSE
-  o$center <- !isFALSE(getOption("sasonr.center", !identical(toupper(Sys.getenv("SASONR_CENTER")), "FALSE")))
+  o$center <- isTRUE(getOption("sasonr.center", identical(toupper(Sys.getenv("SASONR_CENTER")), "TRUE")))
+  # whether the program set CENTER or NOCENTER (the HTML output is centred
+  # unless the program asks for NOCENTER)
+  o$center_set <- FALSE
   o$date <- FALSE
   o$number <- FALSE
   o$pagesize <- Inf

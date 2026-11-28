@@ -1170,6 +1170,9 @@ listing_base_summary <- function(tb, ls) {
   cols <- attr(tb, "cols", exact = TRUE)
   header <- attr(tb, "header", exact = TRUE)
   ccols <- cols[cols$role == "class", ]
+  # the heading of a CLASS variable with a label (the label split over the
+  # heading lines) is not implemented
+  if (nrow(ccols) && any(!is.na(ccols$label))) abort_unsupported("the PROC MEANS listing heading of a CLASS variable with a label")
   scols <- cols[cols$role == "stat" & !is.na(cols$var), ]
   vars <- unique(scols$var)
   vinfo <- scols$info[match(vars, scols$var)]

@@ -314,6 +314,8 @@ engine_exec_steps <- function(eng, text, line) {
       log_buffer_add(env, log_render("step.stopped"))
     }
     if (step$type == "data") engine_store_numlen(eng, tr$outputs)
+    # ODS TRACE ON: the "Output Added" lines of the step's tables
+    if (isTRUE(eng$session$ods_trace) && length(env$.ods)) rt$trace_lines <- ods_trace_lines(env$.ods, step)
     # PROC PRINT with an ODS OUTPUT request pending: the table is not created
     if (step$type == "proc" && step$name == "print" && length(eng$session$ods_output) > 0) {
       rt$ods_missing <- eng$session$ods_output[[1]]$object
@@ -341,7 +343,7 @@ engine_exec_steps <- function(eng, text, line) {
     }
     if (length(html_tables) > 0 && isTRUE(eng$session$ods_html)) {
       o <- list(proc = step$name, line = step$line, titles = env$.titles, footnotes = eng$session$footnotes,
-                tables = html_tables, center = isTRUE(eng$session$options$center))
+                tables = html_tables, center = html_center(eng$session$options))
       eng$html <- c(eng$html, list(o))
       if (!is.null(eng$session$ods_html_file)) {
         tpl <- vapply(html_tables, function(tb) attr(tb, "template", exact = TRUE) %||% "", "")
@@ -742,6 +744,10 @@ engine_eval <- function(eng, tr, stage = FALSE, empty = character()) {
   env
 }
 
+# The HTML output is centred unless the program set NOCENTER (the listing's
+# default is NOCENTER, new_session_options()).
+html_center <- function(o) if (isTRUE(o$center_set)) isTRUE(o$center) else TRUE
+
 engine_global <- function(eng, g) {
   if (g$kind == "libname") {
     ok <- if (g$engine == "XPORT") file.exists(g$path) && !dir.exists(g$path) else dir.exists(g$path)
@@ -781,7 +787,14 @@ engine_global <- function(eng, g) {
       switch(opt,
         notes = o$notes <- TRUE, nonotes = o$notes <- FALSE,
         syntaxcheck = o$nosyntaxcheck <- FALSE, nosyntaxcheck = o$nosyntaxcheck <- TRUE,
-        center = o$center <- TRUE, nocenter = o$center <- FALSE,
+        center = {
+          o$center <- TRUE
+          o$center_set <- TRUE
+        },
+        nocenter = {
+          o$center <- FALSE
+          o$center_set <- TRUE
+        },
         mprint = o$mprint <- TRUE, nomprint = o$mprint <- FALSE,
         date = o$date <- TRUE, nodate = o$date <- FALSE,
         number = o$number <- TRUE, nonumber = o$number <- FALSE,
@@ -792,6 +805,7 @@ engine_global <- function(eng, g) {
     if (!is.null(g$ps)) o$pagesize <- g$ps
     if (!is.null(g$formdlim)) o$formdlim <- g$formdlim
   }
+  if (g$kind == "ods_trace") eng$session$ods_trace <- g$on
   if (g$kind == "ods_html") {
     # a file of the HTML destination is written when it closes
     if (!g$open && !is.null(eng$session$ods_html_file)) {

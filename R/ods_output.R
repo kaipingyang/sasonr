@@ -206,3 +206,28 @@ ods_not_created_lines <- function(name, ls = rt_linesize()) {
   lines
 }
 
+
+# ODS TRACE ON: the "Output Added" lines of the ODS tables of a PROC step,
+# for the tables whose name, label, template and path are known (MEANS
+# Summary; PRINT, whose label names its data set and whose template line is
+# "Data Name:  ProcPrintTable") (measured); other tables fail loud.
+ods_trace_lines <- function(tables, step) {
+  out <- character()
+  for (tb in tables) {
+    proc <- attr(tb, "proc", exact = TRUE) %||% ""
+    name <- attr(tb, "name", exact = TRUE) %||% ""
+    if (!is.null(attr(tb, "by", exact = TRUE))) abort_unsupported(paste0("ODS TRACE of BY-group tables of PROC ", toupper(proc)), step$line)
+    if (proc == "Means" && name == "Summary") {
+      fields <- c(paste0("Label:      ", attr(tb, "label")), paste0("Template:   ", attr(tb, "template")))
+    } else if (proc == "Print" && name == "Print") {
+      ds <- step$options$data$name
+      if (is.null(ds) || grepl(".", ds, fixed = TRUE)) abort_unsupported("ODS TRACE of PROC PRINT without DATA= of a WORK data set", step$line)
+      fields <- c(paste0("Label:      Data Set WORK.", toupper(ds)), "Data Name:  ProcPrintTable")
+    } else {
+      abort_unsupported(paste0("ODS TRACE of the table ", name, " of PROC ", toupper(proc)), step$line)
+    }
+    out <- c(out, "", "Output Added:", "-------------", paste0("Name:       ", name), fields,
+             paste0("Path:       ", attr(tb, "path")), "-------------")
+  }
+  out
+}

@@ -61,3 +61,14 @@ proc means data=a mean; by grp; var x; run;")
   expect_identical(attr(r$ods[[3]], "by")$text, "grp=b")
   expect_identical(trimws(sasonr:::render_listing(t1, 132L)[1]), "Analysis Variable : x")
 })
+
+test_that("ODS TRACE ON writes the Output Added lines of MEANS and PRINT tables", {
+  r <- sas_run("data a; x = 1; run; ods trace on; proc means data=a; run; proc print data=a; run; ods trace off;")
+  m <- as.character(sas_log(r, echo = FALSE))
+  k <- which(m == "Output Added:")
+  expect_length(k, 2L)
+  expect_identical(m[k[1] + 1:5], c("-------------", "Name:       Summary", "Label:      Summary statistics",
+                                    "Template:   base.summary", "Path:       Means.Summary"))
+  expect_identical(m[k[2] + 3:4], c("Label:      Data Set WORK.A", "Data Name:  ProcPrintTable"))
+  expect_error(sas_run("data a; x = 1; run; ods trace on; proc freq data=a; tables x; run;"), class = "sasonr_unsupported")
+})

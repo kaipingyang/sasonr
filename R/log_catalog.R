@@ -131,7 +131,7 @@ log_catalog <- list(
 log_close_order <- list(
   data = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "looping", "reads", "proc", "datasets"),
                     notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)),
-  proc = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "ods", "ods.warn", "reads", "proc", "datasets"),
-                    notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE)),
+  proc = data.frame(part = c("compile", "run", "input.new_line", "mv.generated", "math.failed", "trace", "ods", "ods.warn", "reads", "proc", "datasets"),
+                    notes = c(TRUE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE)),
   sql = data.frame(part = c("input.new_line", "math.failed"), notes = c(TRUE, TRUE))
 )

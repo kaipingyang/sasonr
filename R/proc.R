@@ -81,6 +81,12 @@ parse_global_stmt <- function(p, open_code = FALSE) {
     if (is_kw(p, "html", 1L)) {
       abort_unsupported("ODS HTML options other than FILE= and STYLE=HTMLBlue", line)
     }
+    # ODS TRACE ON; / ODS TRACE OFF;
+    if (is_kw(p, "trace", 1L) && is_kw(p, c("on", "off"), 2L) && tk_type(p, 3L) == "semi") {
+      on <- tk_low(p, 2L) == "on"
+      advance(p, 4L)
+      return(list(type = "global", kind = "ods_trace", on = on, line = line))
+    }
     abort_unsupported(paste0("ODS ", toupper(tk_val(p, 1L)), " statement"), line)
   }
   if (low == "filename") {

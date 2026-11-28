@@ -8,11 +8,17 @@ center_lst <- function(code) {
   lst[nzchar(lst)]
 }
 
-test_that("a session starts at CENTER", {
+test_that("a session starts at NOCENTER for the listing, the HTML output is centred; OPTIONS CENTER centres both", {
   withr::local_options(sasonr.center = NULL)
   withr::local_envvar(SASONR_CENTER = NA)
-  lst <- sas_run("options ls=80; data a; x = 1; y = 'abc'; run; proc print data=a; run;")$listing
-  expect_identical(lst[nzchar(lst)], c(paste0(strrep(" ", 32), "Obs    x     y"), paste0(strrep(" ", 33), "1     1    abc")))
+  prog <- "data a; x = 1; y = 'abc'; run; proc print data=a; run;"
+  r <- sas_run(paste("options ls=80;", prog))
+  expect_identical(r$listing[nzchar(r$listing)], c("Obs    x     y", " 1     1    abc"))
+  m <- "data a; x = 1; run; proc means data=a; var x; run;"
+  expect_match(sas_html(sas_run(m)), "sas-center", fixed = TRUE)
+  r <- sas_run(paste("options ls=80 center;", prog))
+  expect_identical(r$listing[nzchar(r$listing)], c(paste0(strrep(" ", 32), "Obs    x     y"), paste0(strrep(" ", 33), "1     1    abc")))
+  expect_match(sas_html(sas_run(paste("options nocenter;", m))), "sas-left", fixed = TRUE)
 })
 
 test_that("titles are centred line by line, the table as one unit", {

@@ -5,6 +5,13 @@ the development version provides.
 
 ## Running SAS programs
 
+* The listing starts at NOCENTER: printed output read in the R console is
+  left-aligned, without the blank margin of centred output (the HTML output
+  stays centred). `OPTIONS CENTER;` in the program centres both, `OPTIONS
+  NOCENTER;` neither; `options(sasonr.center = TRUE)` starts sessions at
+  CENTER.
+* `ODS TRACE ON;` / `ODS TRACE OFF;`: the "Output Added" lines of the PROC
+  MEANS Summary and PROC PRINT tables (other tables fail loud).
 * PUT of array elements (`put a[2]=` writes the element's name, `a[i]`,
   `a[*]` the values of all elements) and `PUT _ALL_;` (every variable as
   `name=value`, then `_ERROR_` and `_N_`). `PUT _CHARACTER_`/`_NUMERIC_` and
