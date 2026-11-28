@@ -212,7 +212,8 @@ err_assign_rest <- function(p, start) {
   if (ty[1] == "name" && low[1] == "if") return(character())
   bad_name <- function(i) low[i] %in% c(err_stmt_words, names(mnemonic_cmp), "and", "or", "not", "in", "min", "max") ||
     low[i] %in% p$arrays
-  if (m == 1L && ty[1] == "name") return(if (bad_name(1)) NULL else low[1])
+  # (`x = 1 run;`: RUN becomes a variable [measured])
+  if (m == 1L && ty[1] == "name") return(if (bad_name(1) && low[1] != "run") NULL else low[1])
   if (m == 2L && identical(ty, c("num", "name"))) return(if (bad_name(2)) NULL else low[2])
   if (m == 2L && identical(ty, c("name", "name"))) return(if (bad_name(1) || bad_name(2)) NULL else character())
   # assignments, optionally followed by IF name / THEN name
@@ -558,6 +559,7 @@ engine_empty_dataset <- function(eng, nm, m) {
 # token when the condition knows them (`sas_col`, `sas_token`: the underscore
 # marker).
 err_emit_error <- function(eng, e) {
+  if (!is.null(e$sas_block_msgs)) return(err_emit_block_errors(eng, e))
   line <- e$sas_line
   # (`sas_step_end`: the ERROR follows the source of the whole step)
   exact <- identical(eng$phase, "compile") && length(line) == 1L && !is.na(line) && !isTRUE(e$sas_step_end)
@@ -656,4 +658,47 @@ err_macro_echo <- function(eng, line, col, token) {
   starts_step <- grepl("^(data|proc)\\b", core, ignore.case = TRUE)
   pad <- if (n_lead > 0L && alone && !starts_step) "   " else " "
   list(name = toupper(ct$name), text = paste0(pad, core), col = prov$off[i] - n_lead + nchar(pad))
+}
+
+# The DO/SELECT block ERRORs that the parser recorded in `step`
+# (parse_program(recover = TRUE)): an END without DO is ERROR 161-185 at the
+# END, the step otherwise compiled without it; blocks still open at RUN are
+# ERROR 117-185 after the source of the step, one per kind from the innermost
+# block out ("There were 2 unclosed DO blocks."), each after the RUN line
+# written again with the marker under its semicolon (measured).  Both kinds in
+# one step, two ENDs without DO, and a kind in two groups are not measured:
+# fail loud.
+engine_block_errors <- function(eng, step) {
+  be <- step$block_errors
+  kinds <- vapply(be, `[[`, "", "kind")
+  if (all(kinds == "nomatch")) {
+    if (length(be) > 1L) abort_unsupported("two END statements without a matching DO or SELECT in one step", be[[2]]$line)
+    abort_syntax_numbered("No matching DO/SELECT statement. (ERROR 161-185)", be[[1]]$line, be[[1]]$col, "end")
+  }
+  if (any(kinds == "nomatch")) abort_unsupported("an END without DO and a DO or SELECT block left open in one step", step$line)
+  what <- vapply(be, `[[`, "", "what")
+  runs <- rle(what)
+  if (anyDuplicated(runs$values)) abort_unsupported("DO and SELECT blocks left open in alternating order", step$line)
+  msgs <- sprintf("ERROR 117-185: There %s %d unclosed %s block%s.", ifelse(runs$lengths == 1L, "was", "were"),
+                  runs$lengths, runs$values, ifelse(runs$lengths == 1L, "", "s"))
+  rlang::abort(paste("Syntax error:", msgs[1]), class = c("sasonr_syntax_error", "sasonr_error"),
+               sas_line = be[[1]]$line, sas_block_msgs = msgs, sas_reecho = c(be[[1]]$line, be[[1]]$col))
+}
+
+# The ERRORs of engine_block_errors() for blocks left open at RUN.
+err_emit_block_errors <- function(eng, e) {
+  ln <- e$sas_reecho[1]
+  if (log_macro_line(ln, eng$session$rt) || !log_source_on_all(eng$program$source, ln)) {
+    abort_unsupported("ERROR 117-185 at a RUN statement that a macro generated or NOSOURCE hides", ln)
+  }
+  log_source_read(eng, eng$chunk_end)
+  log_boundary(eng)
+  pos <- 11L + e$sas_reecho[2] - 1L
+  src_txt <- sub("[[:space:]]+$", "", eng$program$lines[ln])
+  for (m in e$sas_block_msgs) {
+    log_emit(eng, "put", text = c(paste0(formatC(ln, width = -10), " ", src_txt), paste0(strrep(" ", pos), "_"),
+                                  paste0(strrep(" ", pos), "117")), phase = "step_end", split = FALSE, gen_echo = TRUE)
+    log_emit(eng, "error", text = m, phase = "step_end")
+  }
+  invisible()
 }

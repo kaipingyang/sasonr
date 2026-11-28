@@ -366,3 +366,34 @@ test_that("numbered ERRORs at one token share one marker with the numbers stacke
   # on_error = "abort" keeps aborting
   expect_error(sas_run(paste0(se_have, "data out; set have; foo x; run;"), on_error = "abort"), class = "sasonr_syntax_error")
 })
+
+test_that("a name after the constant that ends an assignment is ERROR 22-322 with the operator list", {
+  r <- sas_run("data a;\n  x = 1 run;\ndata b;\n  set a;\nrun;", on_error = "sas")
+  m <- msgs(r)
+  expect_true(any(startsWith(m, "ERROR 22-322: Syntax error, expecting one of the following: !, !!, &, *, **, +, -, /, <,")))
+  expect_identical(names(r$work$a), c("x", "run"))
+  expect_identical(dim(r$work$b), c(0L, 2L))
+  r <- sas_run("data one;\n  x = 1\n  y = 2;\nrun;", on_error = "sas")
+  expect_true(any(startsWith(msgs(r), "ERROR 22-322: Syntax error, expecting one of the following: !, !!, &, *, **, +, -, /, ;, <,")))
+  expect_identical(names(r$work$one), c("x", "y"))
+})
+
+test_that("DO and SELECT blocks left open at RUN are ERROR 117-185 after the step, innermost first", {
+  r <- sas_run("data two;\n  do i = 1 to 2;\n    do j = 1 to 2;\n      x = i;\nrun;\ndata after;\n  set two;\nrun;", on_error = "sas")
+  m <- msgs(r)
+  expect_true("ERROR 117-185: There were 2 unclosed DO blocks." %in% m)
+  expect_identical(names(r$work$two), c("i", "j", "x"))
+  expect_identical(dim(r$work$after), c(0L, 3L))
+  r <- sas_run("data four;\n  x = 1;\n  select (x);\n    when (1) do;\n      y = 1;\nrun;", on_error = "sas")
+  e <- grep("^ERROR 117-185", msgs(r), value = TRUE)
+  expect_identical(e, c("ERROR 117-185: There was 1 unclosed DO block.", "ERROR 117-185: There was 1 unclosed SELECT block."))
+  # without the batch error model the parse fails as before
+  expect_error(sas_parse("data a; do i = 1 to 2; x = i; run;"), class = "sasonr_syntax_error")
+})
+
+test_that("END without DO is ERROR 161-185 and the step compiles without it", {
+  r <- sas_run("data three;\n  x = 1;\n  end;\n  y = 2;\n  length c $ 3;\nrun;", on_error = "sas")
+  expect_true("ERROR 161-185: No matching DO/SELECT statement." %in% msgs(r))
+  expect_identical(names(r$work$three), c("x", "y", "c"))
+  expect_identical(dim(r$work$three), c(0L, 3L))
+})

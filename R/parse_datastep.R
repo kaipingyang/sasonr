@@ -16,10 +16,19 @@
 #' str(p$steps[[1]]$stmts, max.level = 1)
 #' @export
 sas_parse <- function(code, resolved = FALSE, sql_open = FALSE) {
+  parse_program(code, resolved, sql_open)
+}
+
+# The body of sas_parse().  `recover`: a DO or SELECT block left open at RUN
+# and an END without DO do not stop the parse; they are recorded in the
+# step (`block_errors`) for the engine to report (ERROR 117-185,
+# 161-185; engine_block_errors()).
+parse_program <- function(code, resolved = FALSE, sql_open = FALSE, recover = FALSE) {
   toks <- if (is.data.frame(code)) code else sas_lex(code)
   if (resolved) toks$type[toks$type == "str_macro"] <- "str"
   p <- new_parser(toks)
   p$resolved <- resolved
+  p$recover <- recover
   steps <- list()
   # a chunk that continues an open PROC SQL (statements are executed one by one)
   if (sql_open) {
@@ -112,6 +121,7 @@ parse_data_step <- function(p) {
 
   p$arrays <- character()
   stmts <- list()
+  p$block_errors <- list()
   repeat {
     if (at_eof(p)) break
     if (is_kw(p, "run") && tk_type(p, 1L) == "semi") {
@@ -120,7 +130,12 @@ parse_data_step <- function(p) {
     }
     # Implicit step boundary: the next DATA or PROC statement.
     if (is_kw(p, c("data", "proc")) && !is_op(p, c("=", "+"), 1L)) break
+    end_col <- tk_col(p)
     s <- parse_statement(p)
+    if (s$stmt == "end" && isTRUE(p$recover)) {
+      p$block_errors <- c(p$block_errors, list(list(kind = "nomatch", line = s$line, col = end_col)))
+      next
+    }
     if (s$stmt == "end") abort_syntax("END without a matching DO or SELECT", s$line)
     stmts <- c(stmts, list(s))
     if (s$stmt == "datalines") break
@@ -129,7 +144,8 @@ parse_data_step <- function(p) {
     type = "data", line = line, null = any(is_null),
     # _NULL_ together with other output names (`data a _null_;`)
     null_mixed = any(is_null) && !all(is_null),
-    outputs = if (any(is_null)) list() else outputs, stmts = stmts
+    outputs = if (any(is_null)) list() else outputs, stmts = stmts,
+    block_errors = if (length(p$block_errors)) p$block_errors
   )
 }
 
@@ -479,6 +495,7 @@ parse_assign <- function(p) {
   advance(p)
   p$assign_value <- TRUE
   value <- parse_expr(p)
+  if (tk_type(p) == "name" && p$pos > 1L && p$type[p$pos - 1L] == "num") assign_missing_semi(p)
   expect_semi(p, "assignment")
   list(stmt = "assign", target = target, value = value, line = line)
 }
@@ -535,6 +552,7 @@ parse_block <- function(p, what) {
   body <- list()
   repeat {
     if (at_eof(p)) abort_syntax(paste("missing END for", what), tk_line(p))
+    if (parse_unclosed_at_run(p, what)) break
     s <- parse_statement(p)
     if (s$stmt == "end") break
     if (s$stmt %in% c("datalines")) abort_syntax(paste("DATALINES inside", what), s$line)
@@ -641,6 +659,7 @@ parse_select <- function(p) {
       advance(p, 2L)
       break
     } else {
+      if (parse_unclosed_at_run(p, "SELECT")) break
       abort_syntax(paste("expected WHEN, OTHERWISE or END in SELECT but found", tok_desc(p)), tk_line(p))
     }
   }
@@ -1448,4 +1467,25 @@ parse_datalines <- function(p) {
   end_no <- tk_line(p)
   expect_type(p, "datalines_end", "end of DATALINES block")
   list(stmt = "datalines", lines = lines, line_no = line_no, end_no = end_no, four = four, line = line)
+}
+
+# A name right after a numeric constant that ends an assignment's value
+# (`x = 1 y = 2;`, `x = 1 run;`): ERROR 22-322 with the operators that may
+# follow the constant, the marker under the name.  The list holds `;` except
+# before RUN (measured, both forms); other places fail with the plain message.
+assign_missing_semi <- function(p) {
+  ops <- c("!", "!!", "&", "*", "**", "+", "-", "/", ";", "<", "<=", "<>", "=", ">", "><", ">=", "AND", "EQ", "GE",
+           "GT", "IN", "LE", "LT", "MAX", "MIN", "NE", "NG", "NL", "NOTIN", "OR", "^=", "|", "||", "~=")
+  if (tk_low(p) == "run") ops <- setdiff(ops, ";")
+  abort_syntax_numbered(paste0("Syntax error, expecting one of the following: ", paste(ops, collapse = ", "),
+                               ". (ERROR 22-322)"), tk_line(p), tk_col(p), tk_val(p))
+}
+
+# RUN; where a DO or SELECT block (`what`) is still open: under `p$recover`
+# the block ends there and is recorded for ERROR 117-185 (the marker goes
+# under the semicolon of RUN); TRUE when so.
+parse_unclosed_at_run <- function(p, what) {
+  if (!isTRUE(p$recover) || !is_kw(p, "run") || tk_type(p, 1L) != "semi") return(FALSE)
+  p$block_errors <- c(p$block_errors, list(list(kind = "unclosed", what = what, line = tk_line(p, 1L), col = tk_col(p, 1L))))
+  TRUE
 }

@@ -100,7 +100,8 @@ engine_exec <- function(eng, text, line) {
 
 engine_exec_steps <- function(eng, text, line) {
   rt <- eng$session$rt
-  prog <- sas_parse(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE, sql_open = eng$sql_open)
+  prog <- parse_program(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE, sql_open = eng$sql_open,
+                        recover = identical(eng$on_error, "sas"))
   eng$sql_open <- isTRUE(attr(prog, "sql_open"))
   # the last program line of each step (the source echo of the rich log views)
   ends <- log_step_ends(prog$steps, text, line)
@@ -124,6 +125,7 @@ engine_exec_steps <- function(eng, text, line) {
         log_emit(eng, "put", text = eng$ce_echo[[eng$ce_k]], split = FALSE)
       }
       if (!is.null(dl <- log_step_datalines(step))) log_source_skip(eng, dl$line_no)
+      if (!is.null(step$block_errors)) engine_block_errors(eng, step)
       eng$in_sql_step <- step$type == "sql_begin"
     } else {
       # global statements between steps are open code; a PROC SQL step lasts until QUIT
