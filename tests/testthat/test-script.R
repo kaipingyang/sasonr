@@ -95,7 +95,7 @@ test_that("PROC SORT runs as its R call; the call gives back the parsed step", {
   st <- sas_parse(prog)$steps[[2]]
   call <- proc_call_of_ir(st)
   expect_identical(rlang::call_args(call)$by, quote(c(desc(id), x)))
-  expect_identical(rlang::call_args(call)$data, "a(where=(id > 1))")
+  expect_identical(rlang::call_args(call)$data, quote(sas_dataset("a", where = sas_expr("id > 1"))))
   expect_true(rlang::call_args(call)$nodupkey)
   w <- st
   w$titles <- list()
@@ -412,7 +412,7 @@ test_that("PROC PRINT runs as its R call, statements as names or SAS text", {
                  "proc print data=b noobs label split='*';\n  var id x y;\n  sum y;\n  format y 5.1;\nrun;\n")
   r <- sas_run(prog)
   txt <- as.character(sas_script(r))
-  expect_true(any(grepl("sas_proc_sort(data = \"a\", out = \"b\", where = \"y ne .\", by = desc(id),", txt, fixed = TRUE)))
+  expect_true(any(grepl("sas_proc_sort(data = \"a\", out = \"b\", where = sas_expr(\"y ne .\"), by = desc(id),", txt, fixed = TRUE)))
   expect_true(any(grepl("sas_proc_print(data = \"b\", noobs = TRUE, label = TRUE, split = \"*\", var = c(id, x, y), sum = y, format = c(y = \"5.1\"),",
                         txt, fixed = TRUE)))
   env <- run_script(sas_script(r))
@@ -439,7 +439,7 @@ test_that("PROC MEANS and SUMMARY run as their R calls; options as arguments, st
   txt <- as.character(sas_script(r))
   expect_true(any(grepl("sas_proc_means(data = \"trial\", stats = c(n, mean, std), maxdec = 2, nway = TRUE, class = arm, var = aval,",
                         txt, fixed = TRUE)))
-  expect_true(any(grepl("sas_proc_summary(data = \"trial(where=(week > 0))\", print = TRUE, var = aval,", txt, fixed = TRUE)))
+  expect_true(any(grepl("sas_proc_summary(data = sas_dataset(\"trial\", where = sas_expr(\"week > 0\")), print = TRUE, var = aval,", txt, fixed = TRUE)))
   env <- run_script(sas_script(r))
   expect_identical(sas_work(env$s), r$work)
   expect_identical(sas_listing(env$s), r$listing)
@@ -459,7 +459,7 @@ test_that("sas_out_stats() builds the OUTPUT statement; the trace writes it so",
   prog <- "data t;\n  input arm $ x y;\n  datalines;\nA 1 2\nA 3 5\nB 2 2\n;\nrun;\nproc means data=t noprint nway;\n  class arm;\n  var x y;\n  output out=m(drop=_type_) mean=mx my std(x)=sx n= / autoname;\nrun;\n"
   r <- sas_run(prog)
   txt <- paste(as.character(sas_script(r)), collapse = "\n")
-  expect_match(txt, "output = sas_out_stats(out = \"m(drop=_type_)\", mean = c(mx, my), std = c(sx = x), n = TRUE, autoname = TRUE)", fixed = TRUE)
+  expect_match(txt, "output = sas_out_stats(out = sas_dataset(\"m\", drop = `_type_`), mean = c(mx, my), std = c(sx = x), n = TRUE, autoname = TRUE)", fixed = TRUE)
   env <- run_script(sas_script(r))
   expect_identical(sas_work(env$s), r$work)
   # a statement value held in a variable is injected
@@ -467,4 +467,23 @@ test_that("sas_out_stats() builds the OUTPUT statement; the trace writes it so",
   o <- sas_out_stats(out = "st", mean = c(m_x, m_y))
   s |> sas_proc_means(data = "t", noprint = TRUE, var = c(x, y), output = !!o)
   expect_identical(sas_work(s)$st$m_x, 2)
+})
+
+test_that("sas_expr(), sas_vars() and sas_dataset() mark SAS syntax; the trace uses them", {
+  expect_s3_class(sas_expr("x > 1 and y = 'a'"), "sas_expr")
+  expect_error(sas_expr("x > "), class = "sasonr_syntax_error")
+  expect_error(sas_vars("x1- ;"), class = "sasonr_error")
+  expect_identical(unclass(sas_dataset("t", where = sas_expr("w > 0"), keep = c(a, b), rename = c(bb = b), obs = 5)),
+                   "t(keep=a b rename=(b=bb) where=(w > 0) obs=5)")
+  expect_error(sas_dataset("t", where = "w > 0"), class = "sasonr_error")
+  prog <- paste0("options nocenter;\ndata t;\n  input arm $ x1 x2 y;\n  datalines;\nA 1 2 3\nA 3 5 1\nB 2 2 .\n;\nrun;\n",
+                 "proc sort data=t(where=(yy ne .) keep=arm x1 x2 y rename=(y=yy)) out=s2(drop=x2); by arm; run;\n",
+                 "proc print data=t; var x1-x2 y; where x1 > 1 and arm = 'A'; run;\n")
+  r <- sas_run(prog)
+  txt <- paste(as.character(sas_script(r)), collapse = "\n")
+  expect_match(txt, "data = sas_dataset(\"t\", where = sas_expr(\"yy ne .\"), keep = c(arm, x1, x2, y), rename = c(yy = y))", fixed = TRUE)
+  expect_match(txt, "var = sas_vars(\"x1-x2 y\"), where = sas_expr(\"x1 > 1 and arm = 'A'\")", fixed = TRUE)
+  env <- run_script(sas_script(r))
+  expect_identical(sas_work(env$s), r$work)
+  expect_identical(sas_listing(env$s), r$listing)
 })

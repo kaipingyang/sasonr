@@ -223,6 +223,9 @@ public sas_work
 public sas_session_add
 public sas_script
 public sas_src
+public sas_expr
+public sas_vars
+public sas_dataset
 public sas_out_stats
 public sas_data_step
 public sas_proc_sort

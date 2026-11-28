@@ -953,6 +953,14 @@ proc_verb_run <- function(name, session, opts, stmts, .sas_src) {
 # expressions (names, desc(), strings).
 proc_verb_args <- function(name, session, opts, dots, env, .sas_src) {
   sp <- proc_api_spec[[name]]
+  # SAS syntax in plain strings (the form of the first release of the verbs)
+  plain_syntax <- (is.character(dots$where) && !inherits(dots$where, "sas_stmt_text")) ||
+    any(vapply(opts, function(v) rlang::is_string(v) && !inherits(v, "sas_stmt_text") && grepl("(", v, fixed = TRUE), NA))
+  if (plain_syntax) {
+    rlang::warn(c("A WHERE condition or data set options in a plain string are deprecated in the step verbs.",
+                  i = "Use `sas_expr()` for WHERE and `sas_dataset()` for data set options."),
+                .frequency = "once", .frequency_id = "sasonr_plain_syntax")
+  }
   if (length(dots) && (is.null(names(dots)) || any(!nzchar(names(dots))))) {
     rlang::abort(paste0("Every argument of `sas_proc_", name, "()` must be named."), class = "sasonr_error")
   }

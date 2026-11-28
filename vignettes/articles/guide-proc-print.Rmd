@@ -111,8 +111,10 @@ cat(sas_run(wide)$listing, sep = "\n")
 The translation of the program writes each PROC PRINT step as one call of
 `sas_proc_print()`, and `sas_run()` runs that same call. Options of the PROC
 statement are arguments (`noobs = TRUE`, `split = "*"`), each statement is an
-argument named after it: variable names (`var = c(subj, sbp)`) or the
-statement's text (`where = "sbp > 125"`, `format = "sbp 5.1"`).
+argument named after it: variable names (`var = c(subj, sbp)`), a named
+vector for FORMAT (`format = c(sbp = "5.1")`), and `sas_expr()` for the WHERE
+condition, which follows the SAS rules (`where = sas_expr("sbp > 125")`).
+A data set with data set options is `sas_dataset("vitals", keep = c(subj, sbp))`.
 
 ```{r}
 res <- sas_run(paste(prog, "proc print data=vitals noobs label; var subj sbp; where sbp > 125; run;"))
@@ -125,7 +127,7 @@ The same call works in a session of your own:
 ```{r}
 s <- sas_session()
 invisible(sas_run(prog, session = s))
-s |> sas_proc_print(data = "vitals", noobs = TRUE, var = c(subj, visit, sbp), where = "sbp > 125")
+s |> sas_proc_print(data = "vitals", noobs = TRUE, var = c(subj, visit, sbp), where = sas_expr("sbp > 125"))
 cat(sas_listing(s), sep = "\n")
 ```
 

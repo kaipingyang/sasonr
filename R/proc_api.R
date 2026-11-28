@@ -77,7 +77,7 @@ proc_api_spec$summary <- proc_means_api
 # The SAS text of a statement argument: names (`c(a, desc(b))`, `a`), or
 # strings with the statement's SAS text (`c("a", "descending b")`,
 # `"x > 1"`).  NULL when the expression is neither.
-proc_stmt_arg_text <- function(e) {
+proc_stmt_arg_text <- function(e, kw = NULL) {
   one <- function(x) {
     if (is.symbol(x)) return(as.character(x))
     if (is.call(x) && identical(x[[1]], as.name("desc")) && length(x) == 2L && is.symbol(x[[2]])) {
@@ -87,12 +87,13 @@ proc_stmt_arg_text <- function(e) {
     NULL
   }
   # a statement built by a constructor (sas_out_stats()): its text
-  if (is.call(e) && identical(e[[1]], as.name("sas_out_stats"))) e <- eval(e, asNamespace("sasonr"))
+  if (proc_helper_call(e)) e <- eval(e, asNamespace("sasonr"))
   if (inherits(e, "sas_stmt_text")) return(unclass(e))
   # a named vector of strings (FORMAT: `c(x = "8.2")`): `name value` pairs
   if (is.call(e) && identical(e[[1]], as.name("c")) && !is.null(names(e)) && all(nzchar(names(e)[-1]))) {
     vals <- as.list(e)[-1]
     if (!all(vapply(vals, rlang::is_string, NA))) return(NULL)
+    if (identical(kw, "label")) return(paste0(names(vals), "='", gsub("'", "''", unlist(vals), fixed = TRUE), "'", collapse = " "))
     return(paste(names(vals), unlist(vals), collapse = " "))
   }
   parts <- if (is.call(e) && identical(e[[1]], as.name("c"))) lapply(as.list(e)[-1], one) else list(one(e))
@@ -103,7 +104,7 @@ proc_stmt_arg_text <- function(e) {
 # A statement node from a statement argument (`kw` its keyword), parsed by
 # the statement parser of procedure `name`.
 proc_stmt_of_arg <- function(name, kw, e) {
-  text <- proc_stmt_arg_text(e)
+  text <- proc_stmt_arg_text(e, kw)
   if (is.null(text) || !nzchar(trimws(text))) {
     rlang::abort(paste0("`", kw, "` takes variable names, desc(name) or the statement as text (strings), not `", rlang::expr_deparse(e), "`."),
                  class = "sasonr_error")
@@ -131,7 +132,17 @@ proc_stmt_value <- function(s) {
     items <- lapply(s$items, function(it) rlang::sym(it$text %||% it$name))
     return(if (length(items) == 1L) items[[1]] else rlang::call2("c", !!!unname(items)))
   }
-  s[["text"]]
+  text <- s[["text"]]
+  if (is.null(text)) return(NULL)
+  # SAS syntax without an R form, marked: an expression, a variable list
+  if (identical(s$stmt, "where")) return(rlang::call2("sas_expr", text))
+  if (s$stmt %in% c("var", "id", "sum", "sumby") || (identical(s$stmt, "class") && !length(s$opts))) {
+    return(rlang::call2("sas_vars", text))
+  }
+  if (identical(s$stmt, "label") && length(s$labels) && !is.null(s$texts)) {
+    return(rlang::call2("c", !!!stats::setNames(as.list(unname(s$labels)), unname(s$texts))))
+  }
+  text
 }
 
 # The IR of a step from the arguments of its verb: `opts` the PROC statement
@@ -196,7 +207,7 @@ proc_call_of_ir <- function(step, src = NULL) {
   }
   for (nm in c("data", "out")) {
     if (is.null(o[[nm]])) next
-    args[[nm]] <- proc_ds_text(o[[nm]])
+    args[[nm]] <- proc_ds_value(o[[nm]])
     if (is.null(args[[nm]])) return(NULL)
   }
   for (nm in sp$flags) if (isTRUE(o[[nm]])) args[[nm]] <- TRUE
@@ -217,6 +228,8 @@ proc_ir_of_call <- function(call, line) {
   args$.sas_src <- NULL
   sp <- proc_api_spec[[name]]
   is_stmt <- names(args) %in% sp$stmts
+  # sas_dataset() and the other helpers build values
+  args[!is_stmt] <- lapply(args[!is_stmt], function(a) if (proc_helper_call(a)) eval(a, asNamespace("sasonr")) else a)
   proc_ir_of_args(name, args[!is_stmt], args[is_stmt], line)
 }
 # An IR without what a round trip does not keep (source positions, spans, the
@@ -263,7 +276,7 @@ proc_step_text <- function(step) {
                 collapse = " ")
   body <- vapply(step$stmts, function(s) {
     v <- proc_stmt_value(s)
-    paste0("  ", s$stmt, " ", if (is.character(v)) v else proc_stmt_arg_text(v), ";")
+    paste0("  ", s$stmt, " ", if (is.character(v)) v else proc_stmt_arg_text(v, s$stmt), ";")
   }, "")
   paste(c(paste0(head, ";"), body, "run;"), collapse = "\n")
 }
@@ -299,8 +312,9 @@ proc_opts_args <- function(name, opt_text) {
     if (w %in% sp$ds) {
       start <- p$pos
       parse_ds_ref(p, "input")
-      args[[w]] <- tok_render(p, start, p$pos - 1L)
-      if (is.null(args[[w]])) return(NULL)
+      t <- tok_render(p, start, p$pos - 1L)
+      if (is.null(t)) return(NULL)
+      args[[w]] <- proc_ds_call(t) %||% t
       next
     }
     t <- tk_type(p)
@@ -408,7 +422,7 @@ proc_output_spec_text <- function(k, e) {
 proc_output_call <- function(s) {
   args <- list()
   if (!is.null(s$out)) {
-    t <- proc_ds_text(s$out)
+    t <- proc_ds_value(s$out)
     if (is.null(t)) return(NULL)
     args$out <- t
   }
@@ -436,4 +450,189 @@ proc_format_value <- function(s) {
   vals <- vapply(s$specs, function(sp) sp$fmt$text, "")
   names(vals) <- vapply(s$specs, function(sp) sp$vars[[1]]$text %||% sp$vars[[1]]$name, "")
   rlang::call2("c", !!!as.list(vals))
+}
+
+#' SAS syntax inside the R arguments of the step verbs
+#'
+#' Marks a string as SAS syntax, where the verbs and [sas_dataset()] have no R
+#' form for it yet; plain strings are names or values only. `sas_expr()` is
+#' a SAS expression (a WHERE condition), `sas_vars()` a SAS variable list
+#' (`x1-x5`, `a--c`, `pre:`). The text is checked when the helper is called.
+#' @param text The SAS syntax, a single string.
+#' @return The text with class `sas_expr` or `sas_vars` (and
+#'   `sas_stmt_text`).
+#' @examples
+#' s <- sas_session(work = list(a = data.frame(x = 1:3, y = c("a", "b", "a"))))
+#' s |> sas_proc_print(data = "a", where = sas_expr("x > 1 and y = 'a'"))
+#' sas_vars("x1-x3 y")
+#' @name sas_syntax
+NULL
+
+#' @rdname sas_syntax
+#' @export
+sas_expr <- function(text) {
+  if (!rlang::is_string(text) || !nzchar(trimws(text))) rlang::abort("`text` must be an expression (a string).", class = "sasonr_error")
+  p <- new_parser(sas_lex(text))
+  parse_where_expr(p)
+  if (!at_eof(p)) abort_syntax(paste0("unexpected ", tok_desc(p), " after the expression in `sas_expr()`"))
+  structure(text, class = c("sas_expr", "sas_stmt_text"))
+}
+
+#' @rdname sas_syntax
+#' @export
+sas_vars <- function(text) {
+  if (!rlang::is_string(text) || !nzchar(trimws(text))) rlang::abort("`text` must be a variable list (a string).", class = "sasonr_error")
+  p <- new_parser(sas_lex(text))
+  while (tk_type(p) == "name") parse_varlist_item(p)
+  if (!at_eof(p)) abort_syntax(paste0("unexpected ", tok_desc(p), " in the variable list of `sas_vars()`"))
+  structure(text, class = c("sas_vars", "sas_stmt_text"))
+}
+
+#' A data set with data set options
+#'
+#' The `data` and `out` arguments of the step verbs (and `out` of
+#' [sas_out_stats()]) take a data set name, or `sas_dataset()` for a data set with
+#' data set options.
+#' @param name The data set name (`"adsl"`, `"lib.adsl"`).
+#' @param keep,drop Variables: names (`c(a, b)`), strings, or [sas_vars()].
+#' @param rename New names for variables: `c(new = old)`, as
+#'   `dplyr::rename()`.
+#' @param where The condition: [sas_expr()].
+#' @param firstobs,obs Observation numbers.
+#' @param in_var The IN= variable (input data sets).
+#' @param label The data set label (output data sets of a DATA step).
+#' @return The reference as text with class `sas_dataset`.
+#' @examples
+#' sas_dataset("trial", where = sas_expr("week > 0"), keep = c(arm, aval))
+#' sas_dataset("m", drop = `_type_`, rename = c(mean_aval = aval))
+#' @export
+sas_dataset <- function(name, keep = NULL, drop = NULL, rename = NULL, where = NULL, firstobs = NULL, obs = NULL,
+                   in_var = NULL, label = NULL) {
+  if (!rlang::is_string(name) || !nzchar(trimws(name))) rlang::abort("`name` must be a data set name (a string).", class = "sasonr_error")
+  opts <- character()
+  vars <- function(e, arg) {
+    if (is.null(e)) return(NULL)
+    t <- proc_stmt_arg_text(e)
+    if (is.null(t)) rlang::abort(paste0("`", arg, "` of `sas_dataset()` takes variable names, strings or sas_vars()."), class = "sasonr_error")
+    t
+  }
+  k <- vars(rlang::enexpr(keep), "keep")
+  d <- vars(rlang::enexpr(drop), "drop")
+  if (!is.null(k)) opts <- c(opts, paste0("keep=", k))
+  if (!is.null(d)) opts <- c(opts, paste0("drop=", d))
+  r <- rlang::enexpr(rename)
+  if (!is.null(r)) {
+    items <- if (is.call(r) && identical(r[[1]], as.name("c"))) as.list(r)[-1] else list(r)
+    nm <- names(items) %||% rep("", length(items))
+    old <- vapply(items, function(x) if (is.symbol(x)) as.character(x) else if (rlang::is_string(x)) x else NA_character_, "")
+    if (anyNA(old) || any(!nzchar(nm))) rlang::abort("`rename` of `sas_dataset()` takes `c(new = old)`.", class = "sasonr_error")
+    opts <- c(opts, paste0("rename=(", paste0(old, "=", nm, collapse = " "), ")"))
+  }
+  if (!is.null(where)) {
+    if (!inherits(where, "sas_expr")) rlang::abort("`where` of `sas_dataset()` takes sas_expr().", class = "sasonr_error")
+    opts <- c(opts, paste0("where=(", unclass(where), ")"))
+  }
+  for (nm in c("firstobs", "obs")) {
+    v <- get(nm)
+    if (is.null(v)) next
+    if (!is.numeric(v) || length(v) != 1L || is.na(v)) rlang::abort(paste0("`", nm, "` must be a number."), class = "sasonr_error")
+    opts <- c(opts, paste0(nm, "=", proc_num_text(v)))
+  }
+  iv <- rlang::enexpr(in_var)
+  if (!is.null(iv)) opts <- c(opts, paste0("in=", if (is.symbol(iv)) as.character(iv) else iv))
+  if (!is.null(label)) opts <- c(opts, paste0("label='", gsub("'", "''", label, fixed = TRUE), "'"))
+  text <- if (length(opts)) paste0(name, "(", paste(opts, collapse = " "), ")") else name
+  structure(text, class = c("sas_dataset", "sas_stmt_text"))
+}
+
+# The R form of a data set reference text ("a", "lib.a", "a(keep=x y
+# where=(x > 1))"): the name, or a sas_dataset() call; NULL when an option has a
+# form sas_dataset() does not write (the text is then the fallback).
+proc_ds_call <- function(text) {
+  p <- new_parser(sas_lex(text))
+  if (tk_type(p) != "name") return(NULL)
+  start <- p$pos
+  advance(p)
+  if (tk_type(p) == "dot") advance(p, 2L)
+  name <- tok_render(p, start, p$pos - 1L)
+  if (at_eof(p)) return(name)
+  if (tk_type(p) != "lparen") return(NULL)
+  advance(p)
+  args <- list(name)
+  plain_vars <- function(from, to) {
+    k <- seq.int(from, length.out = max(0L, to - from + 1L))
+    if (!length(k)) return(NULL)
+    if (all(p$type[k] == "name")) {
+      syms <- lapply(p$value[k], rlang::sym)
+      return(if (length(syms) == 1L) syms[[1]] else rlang::call2("c", !!!syms))
+    }
+    t <- tok_render(p, from, to)
+    if (is.null(t)) NULL else rlang::call2("sas_vars", t)
+  }
+  while (tk_type(p) == "name" && is_op(p, "=", 1L)) {
+    o <- tk_low(p)
+    advance(p, 2L)
+    if (o %in% c("keep", "drop")) {
+      from <- p$pos
+      while (!at_eof(p) && tk_type(p) != "rparen" && !(tk_type(p) == "name" && is_op(p, "=", 1L))) advance(p)
+      v <- plain_vars(from, p$pos - 1L)
+      if (is.null(v)) return(NULL)
+      args[[o]] <- v
+    } else if (o == "rename") {
+      if (tk_type(p) != "lparen") return(NULL)
+      advance(p)
+      pairs <- list()
+      while (tk_type(p) == "name" && is_op(p, "=", 1L) && tk_type(p, 2L) == "name") {
+        pairs[[p$value[p$pos + 2L]]] <- rlang::sym(p$value[p$pos])
+        advance(p, 3L)
+      }
+      if (tk_type(p) != "rparen" || !length(pairs)) return(NULL)
+      advance(p)
+      args$rename <- rlang::call2("c", !!!pairs)
+    } else if (o == "where") {
+      if (tk_type(p) != "lparen") return(NULL)
+      depth <- 0L
+      from <- p$pos + 1L
+      repeat {
+        if (at_eof(p)) return(NULL)
+        if (tk_type(p) == "lparen") depth <- depth + 1L
+        if (tk_type(p) == "rparen") depth <- depth - 1L
+        advance(p)
+        if (depth == 0L) break
+      }
+      t <- tok_render(p, from, p$pos - 2L)
+      if (is.null(t)) return(NULL)
+      args$where <- rlang::call2("sas_expr", t)
+    } else if (o %in% c("firstobs", "obs") && tk_type(p) == "num" && !(tk_type(p, 1L) == "name" && tk_adjacent(p, 0L, 1L))) {
+      args[[o]] <- as.numeric(tk_val(p))
+      advance(p)
+    } else if (o == "in" && tk_type(p) == "name") {
+      args$in_var <- rlang::sym(tk_val(p))
+      advance(p)
+    } else if (o == "label" && tk_type(p) == "str") {
+      args$label <- tk_val(p)
+      advance(p)
+    } else {
+      return(NULL)
+    }
+  }
+  if (tk_type(p) != "rparen") return(NULL)
+  advance(p)
+  if (!at_eof(p)) return(NULL)
+  rlang::call2("sas_dataset", !!!args)
+}
+
+# Is `e` a call of one of the helpers that build the arguments of the verbs
+# (they are evaluated where the verb reads its arguments)?
+proc_helper_call <- function(e) {
+  is.call(e) && is.symbol(e[[1]]) && as.character(e[[1]]) %in% c("sas_out_stats", "sas_expr", "sas_vars", "sas_dataset")
+}
+
+# The argument of a data set reference: its name, or a sas_dataset() call, or its
+# text when an option has a form sas_dataset() does not write; NULL when the text
+# was not kept.
+proc_ds_value <- function(ref) {
+  t <- proc_ds_text(ref)
+  if (is.null(t) || !length(ref$options)) return(t)
+  proc_ds_call(t) %||% t
 }
