@@ -51,7 +51,8 @@ log_catalog <- list(
   step.exception = log_msg("error", c(log_exception_block, "Traceback of the Exception:", " ", " ", log_exception_block),
                            neutral = TRUE),
   # data sets
-  ds.created = log_msg("note", "NOTE: The data set WORK.<name> has <nobs> observations and <nvar> variables."),
+  # (wrapped at LINESIZE at a blank, continued 6 positions in: measured at LS=64)
+  ds.created = log_msg("note", "NOTE: The data set WORK.<name> has <nobs> observations and <nvar> variables.", wrap = "linesize"),
   ds.incomplete = log_msg("warning", paste("WARNING: The data set WORK.<name> may be incomplete.  When this step was stopped",
                                            "there were <nobs> observations and <nvar> variables.")),
   ds.not_replaced_stopped = log_msg("warning", "WARNING: Data set WORK.<name> was not replaced because this step was stopped."),
@@ -67,7 +68,7 @@ log_catalog <- list(
   ds.read_where_lib = log_msg("note", c("NOTE: There were <nobs> observations read from the data set <name>.",
                                         "      WHERE <where>;")),
   ds.merge_repeats = log_msg("note", "NOTE: MERGE statement has more than one data set with repeats of BY values."),
-  ds.read = log_msg("note", "NOTE: There were <nobs> observations read from the data set WORK.<name>."),
+  ds.read = log_msg("note", "NOTE: There were <nobs> observations read from the data set WORK.<name>.", wrap = "linesize"),
   ds.read_where = log_msg("note", c("NOTE: There were <nobs> observations read from the data set WORK.<name>.",
                                     "      WHERE <where>;")),
   ds.no_obs = log_msg("note", "NOTE: No observations in data set WORK.<name>."),

@@ -930,6 +930,14 @@ engine_program <- function(eng, code) {
   if (!isTRUE(eng$deferred) && !is.null(eng$session$ods_html_file)) {
     abort_unsupported("an ODS HTML FILE= destination that the program does not close (ODS HTML CLOSE;)")
   }
+  # OPTIONS PAGESIZE= also pages the log (a page header after each page);
+  # where the pages break depends on the lines of the session start, so a log
+  # that may reach the end of a page fails loud (20 lines of margin)
+  ps <- eng$session$options$pagesize
+  if (!isTRUE(eng$deferred) && is.finite(ps)) {
+    n_log <- length(eng$program$lines) + sum(vapply(eng$events, function(e) length(e$text), 1L))
+    if (n_log + 20L > ps) abort_unsupported(paste0("the page headers of a log longer than PAGESIZE=", ps, " allows"))
+  }
   invisible(eng)
 }
 

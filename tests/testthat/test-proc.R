@@ -151,7 +151,9 @@ test_that("listing layout options fail loud only when procedure output is writte
   # the supported layout, and other values while no output is written
   r <- sas_run(paste("options nocenter nodate nonumber pageno = 1 ps = max formdlim = ' ';", prt))
   expect_identical(r$status, "ok")
-  expect_identical(sas_run("options center date number ps = 15 formdlim = '-'; data a; x = 1; run;")$status, "ok")
+  expect_identical(sas_run("options center date number ps = 40 formdlim = '-'; data a; x = 1; run;")$status, "ok")
+  # a small PAGESIZE pages the log too (its page headers are not implemented)
+  expect_error(sas_run("options ps = 15; data a; x = 1; run;"), class = "sasonr_unsupported")
   for (o in c("date", "number")) {
     expect_error(sas_run(paste0("options ", o, ";", prt)), class = "sasonr_unsupported")
   }

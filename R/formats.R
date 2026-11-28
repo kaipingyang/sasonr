@@ -796,6 +796,42 @@ match_user_entry <- function(v, uf) {
   NULL
 }
 
+# A value through a PICTURE template (measured): |x| times the multiplier (by
+# default 10 to the number of digit selectors after the decimal point),
+# truncated; its last n digits fill the n digit selectors from the right;
+# everything before the first significant position (a nonzero digit or a
+# selector 1-9) is dropped; message characters stay in place; the sign is not
+# written (a range of negative values carries it in its PREFIX=). Missing
+# values are written as their code. NOEDIT writes the template as it is.
+picture_text <- function(v, tpl, po) {
+  code <- sas_miss_code(v)
+  if (!is.na(code)) return(miss_label(code))
+  if (isTRUE(po$noedit)) return(tpl)
+  ch <- strsplit(tpl, "", fixed = TRUE)[[1]]
+  sel <- ch %in% as.character(0:9)
+  if (!any(sel)) abort_unsupported(paste0("a PICTURE template without digit selectors ('", tpl, "')"))
+  dot <- which(ch == ".")
+  ndec <- if (length(dot) == 1L) sum(sel[seq_along(ch) > dot]) else 0L
+  if (length(dot) > 1L) abort_unsupported(paste0("a PICTURE template with several decimal points ('", tpl, "')"))
+  mult <- po$mult %||% 10^ndec
+  y <- abs(v) * mult
+  k <- floor(y)
+  # (a product just below an integer: the truncation depends on fuzz rules not measured)
+  if (y - k > 1 - 1e-9) abort_unsupported(paste0("a PICTURE value whose scaled product ", format(y, digits = 17), " is just below an integer"))
+  n <- sum(sel)
+  if (n > 15L) abort_unsupported("a PICTURE template with more than 15 digit selectors")
+  digits <- strsplit(formatC(k %% 10^n, width = n, format = "f", digits = 0, flag = "0"), "", fixed = TRUE)[[1]]
+  out <- ch
+  out[sel] <- digits
+  sig <- which(sel & (ch %in% as.character(1:9) | out != "0"))
+  s <- if (length(sig)) paste(out[sig[1]:length(out)], collapse = "") else ""
+  if (!is.null(po$prefix)) {
+    s <- paste0(po$prefix, s)
+    if (nchar(s) > length(ch)) abort_unsupported("a PICTURE prefix and value longer than the template")
+  }
+  s
+}
+
 apply_user_fmt <- function(x, uf, fmt) {
   w <- if (is.na(fmt$w)) uf$default_w else fmt$w
   vapply(seq_along(x), function(i) {
@@ -809,8 +845,11 @@ apply_user_fmt <- function(x, uf, fmt) {
     }
     if (!is.null(e$nested)) {
       out <- sas_format(v, e$nested)
+      # a nested user format writes its label on the left (measured)
+      if (!is.character(v) && !is.null(user_fmt(e$nested$name, FALSE))) return(just_left(trimws(out), w))
       return(if (is.character(v)) just_left(out, w) else just_right(trimws(out), w))
     }
+    if (!is.null(e$picture)) return(just_right(picture_text(v, e$label, e$picture), w))
     just_left(e$label, w)
   }, character(1), USE.NAMES = FALSE)
 }

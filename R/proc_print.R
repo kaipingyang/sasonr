@@ -128,11 +128,14 @@ listing_base_print <- function(tb) {
   }, 1L)
   heads <- lapply(seq_len(nc), function(j) print_heading(a$cols[[j]], fws[j], a$split))
   widths <- pmax(fws, vapply(heads, function(h) max(nchar(h)), 1L))
-  # wider than the line: SAS stacks the headings vertically or splits the
-  # columns into panels; neither is implemented (the lines would be too long)
-  if (sum(widths) + 4L * (nc - 1L) > rt_linesize()) {
+  # the gap between columns: 4, or the widest of 3, 2, 1 that fits the table
+  # on the line (measured, print_wide); a table that does not fit with a gap of
+  # 1 is split into column panels, which is not implemented
+  fits <- vapply(4:1, function(g) sum(widths) + g * (nc - 1L) <= rt_linesize(), NA)
+  if (!any(fits)) {
     abort_unsupported("a PROC PRINT table wider than LINESIZE (vertical headings and column panels are not implemented)")
   }
+  sep <- strrep(" ", (4:1)[which(fits)[1]])
   multi <- vapply(heads, length, 1L) > 1L
   # c: character, f: formatted number (the field is the format width), n: unformatted number or Obs
   rounded <- vapply(a$text, function(t) t$rounded %||% FALSE, NA)
@@ -197,7 +200,7 @@ listing_base_print <- function(tb) {
     f <- formatC(s, width = if (kind[j] == "c") -fws[j] else fws[j])
     formatC(paste0(strrep(" ", off[j]), f), width = -widths[j])
   }
-  line_of <- function(cells) sas_rtrim(paste(cells, collapse = "    "))
+  line_of <- function(cells) sas_rtrim(paste(cells, collapse = sep))
   nl <- max(vapply(heads, length, 1L))
   head_lines <- vapply(seq_len(nl), function(i) {
     line_of(vapply(seq_len(nc), function(j) {

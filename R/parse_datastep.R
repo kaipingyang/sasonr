@@ -269,6 +269,8 @@ parse_format <- function(p) {
     } else if (tk_type(p) == "num" && tk_adjacent(p, -1L, 0L) && startsWith(tk_val(p), ".")) {
       d <- as.integer(substring(tk_val(p), 2L))
       advance(p)
+    } else if (isTRUE(p$fmt_no_period) && tk_type(p) == "rbrace") {
+      # a format in brackets (PROC FORMAT label [fmt]) needs no period
     } else {
       abort_syntax("a format name must end with a period", line)
     }

@@ -650,7 +650,10 @@ parse_proc_format <- function(p, line) {
       defs <- c(defs, list(parse_format_def(p, kw, sline)))
       next
     }
-    if (kw == "picture") abort_unsupported("PROC FORMAT PICTURE", sline)
+    if (kw == "picture") {
+      defs <- c(defs, list(parse_format_def(p, kw, sline)))
+      next
+    }
     abort_unsupported(paste0("PROC FORMAT statement ", toupper(tk_val(p))), sline)
   }
   if (fmtlib_opt && length(defs) == 0 && length(ls(sas_rt_active()$formats %||% emptyenv())) == 0) abort_runtime("Catalog WORK.FORMATS does not exist", line)
@@ -764,7 +767,9 @@ parse_format_def <- function(p, kind, line) {
       advance(p)
     } else if (tk_type(p) == "lbrace") {
       advance(p)
+      p$fmt_no_period <- TRUE
       lab$nested <- parse_format(p)
+      p$fmt_no_period <- FALSE
       lab$label <- ""
       if (!tk_type(p) %in% c("rbrace")) abort_syntax("expected ']' after a nested format", line)
       advance(p)
@@ -785,9 +790,40 @@ parse_format_def <- function(p, kind, line) {
     } else {
       abort_syntax(paste("expected a label in", toupper(kind), "but found", tok_desc(p)), line)
     }
+    # a PICTURE label: the template and its options in parentheses
+    if (kind == "picture" && is.null(lab$nested)) {
+      po <- list()
+      if (tk_type(p) == "lparen") {
+        advance(p)
+        while (tk_type(p) != "rparen") {
+          if (tk_type(p) != "name") abort_syntax(paste("unexpected", tok_desc(p), "in picture options"), line)
+          o <- tk_low(p)
+          advance(p)
+          if (is_op(p, "=")) {
+            advance(p)
+            neg <- is_op(p, "-")
+            if (neg) advance(p)
+            po[[o]] <- if (tk_type(p) == "num") (if (neg) -1 else 1) * as.numeric(tk_val(p)) else tk_val(p)
+            advance(p)
+          } else {
+            po[[o]] <- TRUE
+          }
+        }
+        advance(p)
+      }
+      if (!is.null(po$multiplier)) po$mult <- po$multiplier
+      po$multiplier <- NULL
+      bad <- setdiff(names(po), c("prefix", "mult", "noedit"))
+      if (length(bad)) abort_unsupported(paste0("the PICTURE option ", toupper(bad[1])), line)
+      lab$picture <- po
+    }
     for (k in keys) entries <- c(entries, list(c(k, lab)))
   }
   advance(p)
+  if (kind == "picture") {
+    if (char) abort_syntax(paste0("a PICTURE format is numeric (", toupper(name), ")"), line)
+    if (length(setdiff(names(opts), "default"))) abort_unsupported(paste0("the PICTURE format option ", toupper(setdiff(names(opts), "default")[1])), line)
+  }
   list(kind = kind, name = name, char = char, opts = opts, entries = entries, line = line)
 }
 
@@ -825,6 +861,7 @@ format_def_value <- function(d) {
     }
     if (!is.null(e$action)) out$action <- e$action
     if (!is.null(e$nested)) out$nested <- e$nested
+    if (!is.null(e$picture)) out$picture <- e$picture
     if (d$kind == "invalue") {
       out$value <- if (d$char) e$label else if (!is.null(e$num)) e$num else {
         r <- read_std_num(e$label %||% "", NA_integer_)
@@ -837,7 +874,9 @@ format_def_value <- function(d) {
   labs <- vapply(ents, function(e) if (!is.null(e$nested)) fmt_width(e$nested) %|NA|% nchar(e$label) else nchar(e$label), 1L)
   dw <- if (!is.null(d$opts$default)) as.integer(d$opts$default) else max(c(1L, labs))
   if (d$kind == "value") dw <- min(dw, 40L)
-  list(kind = d$kind, name = d$name, char = d$char, entries = ents, default_w = dw,
+  # a PICTURE is a numeric format of the catalogue's VALUE kind
+  kind <- if (d$kind == "picture") "value" else d$kind
+  list(kind = kind, name = d$name, char = d$char, entries = ents, default_w = dw,
        upcase = isTRUE(d$opts$upcase))
 }
 

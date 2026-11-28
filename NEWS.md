@@ -5,6 +5,17 @@ the development version provides.
 
 ## Running SAS programs
 
+* PROC FORMAT PICTURE: digit selectors (0 suppresses leading zeros, 1-9
+  keep them), the default multiplier from the decimals of the picture,
+  `MULT=`, `PREFIX=` (also for a range of negative values), message
+  characters, `NOEDIT`, ranges with `OTHER=[format]`; values longer than the
+  selectors keep their last digits. FILL=, ROUND and DATATYPE= fail loud.
+* PROC PRINT narrows the gap between columns (to 3, 2 or 1) to fit a table
+  on the line; a table that does not fit with a gap of 1 (column panels)
+  still fails loud. The NOTEs about data sets created and read wrap at the
+  line size.
+* A small PAGESIZE= that would page the log fails loud (the log's page
+  headers are not implemented).
 * The listing starts at NOCENTER: printed output read in the R console is
   left-aligned, without the blank margin of centred output (the HTML output
   stays centred). `OPTIONS CENTER;` in the program centres both, `OPTIONS
