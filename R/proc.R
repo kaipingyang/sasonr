@@ -240,10 +240,14 @@ parse_proc_step <- function(p) {
     oline <- tk_line(p)
     if (is_op(p, "=", 1L)) {
       advance(p, 2L)
+      start <- p$pos
       if (opt == "data") {
         opts$data <- parse_ds_ref(p, "input")
+        # the text of a reference with options (the R call of a PROC SORT step names it so)
+        if (name == "sort" && length(opts$data$options)) opts$data$text <- tok_render(p, start, p$pos - 1L)
       } else if (opt == "out" && name == "sort") {
         opts$out <- parse_ds_ref(p, "output")
+        if (length(opts$out$options)) opts$out$text <- tok_render(p, start, p$pos - 1L)
       } else if (name == "print" && opt %in% c("obs", "split")) {
         if (!tk_type(p) %in% c("str", "str_macro")) abort_unsupported(paste0("PROC PRINT option ", toupper(opt), "= without a quoted string"), oline)
         opts[[opt]] <- tk_val(p)
@@ -264,6 +268,8 @@ parse_proc_step <- function(p) {
       proc_option_error(name, p)
       abort_unsupported(paste0("PROC ", toupper(name), " option ", toupper(opt)), oline)
     }
+    # the aliases of PROC SORT options under one name
+    if (name == "sort") opt <- switch(opt, nodupkeys = "nodupkey", noduprec = , nodup = "noduprecs", opt)
     opts[[opt]] <- TRUE
     advance(p)
   }

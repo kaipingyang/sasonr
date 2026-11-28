@@ -52,6 +52,7 @@ hash.R,values
 input.R,values
 xpt.R,values
 proc.R,engine
+proc_api.R,engine
 ast_validate.R,parse
 proc_contents.R,engine
 proc_freq.R,engine

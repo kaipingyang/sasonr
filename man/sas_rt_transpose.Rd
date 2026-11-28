@@ -4,12 +4,12 @@
 \alias{sas_rt_transpose}
 \title{PROC TRANSPOSE engine}
 \usage{
-sas_rt_transpose(d, sp)
+sas_rt_transpose(df, sp)
 }
 \arguments{
-\item{d}{Input data (after WHERE).}
-
 \item{sp}{Specification built by the translator.}
+
+\item{d}{Input data (after WHERE).}
 }
 \description{
 PROC TRANSPOSE engine

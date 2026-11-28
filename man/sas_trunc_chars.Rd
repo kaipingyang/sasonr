@@ -4,7 +4,7 @@
 \alias{sas_trunc_chars}
 \title{Truncate character columns to PDV lengths (later data sets of SET/MERGE)}
 \usage{
-sas_trunc_chars(d, lens)
+sas_trunc_chars(df, lens)
 }
 \description{
 Truncate character columns to PDV lengths (later data sets of SET/MERGE)

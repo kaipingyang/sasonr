@@ -4,7 +4,7 @@
 \alias{sas_rows}
 \title{Rows of a data frame as a list of named lists (for the L3 PDV loop)}
 \usage{
-sas_rows(d)
+sas_rows(df)
 }
 \description{
 Rows of a data frame as a list of named lists (for the L3 PDV loop)

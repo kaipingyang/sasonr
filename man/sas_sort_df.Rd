@@ -5,7 +5,7 @@
 \title{PROC SORT: stable sort (missing values first) with optional NODUPKEY}
 \usage{
 sas_sort_df(
-  d,
+  df,
   by,
   descending = rep(FALSE, length(by)),
   nodupkey = FALSE,

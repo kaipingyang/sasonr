@@ -4,7 +4,7 @@
 \alias{sas_set_reader}
 \title{A SET statement's reader over the observations of \code{d}}
 \usage{
-sas_set_reader(d, notes = NULL, ahead = FALSE)
+sas_set_reader(df, notes = NULL, ahead = FALSE)
 }
 \description{
 \code{notes}: the read NOTE entries of its data sets (all of them by default);

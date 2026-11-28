@@ -85,6 +85,19 @@ tk_adjacent <- function(p, k1 = 0L, k2 = 1L) {
   p$line[a] == p$line[b] && p$col[b] == p$col[a] + nchar(p$value[a])
 }
 
+# The text of tokens `from`..`to`, one blank between tokens that do not touch,
+# strings in single quotes; NULL when a token has another form (date, hex and
+# name literals, macro-quoted strings).  Read back by the lexer it gives the
+# same tokens.
+tok_render <- function(p, from, to) {
+  k <- seq.int(from, to)
+  if (!all(p$type[k] %in% c("name", "num", "op", "lparen", "rparen", "dot", "comma", "str"))) return(NULL)
+  txt <- ifelse(p$type[k] == "str", paste0("'", gsub("'", "''", p$value[k], fixed = TRUE), "'"), p$value[k])
+  touch <- c(FALSE, p$line[k[-1]] == p$line[k[-length(k)]] & p$col[k[-1]] == p$col[k[-length(k)]] + nchar(p$value[k[-length(k)]]) &
+               p$type[k[-length(k)]] != "str")
+  paste0(ifelse(touch, "", " "), txt, collapse = "") |> sub(pattern = "^ ", replacement = "")
+}
+
 # Public entry ------------------------------------------------------------
 
 #' Parse a single SAS expression

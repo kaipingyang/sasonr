@@ -77,8 +77,9 @@ sas_script(sas_translate(code2), tidy = TRUE)
 
 Without `tidy`, every SAS step becomes one call of a step verb on a session:
 `sas_data_step()` holds the generated code of a DATA step and the SAS text it
-came from, `sas_proc_sort()` and `sas_proc_means()` show the options the
-program gave, and other steps keep their SAS text. This script gives the same
+came from, `sas_proc_sort()` takes R arguments (`by = c(usubjid, desc(age))`),
+`sas_proc_means()` shows the options the program gave, and other steps keep
+their SAS text. This script gives the same
 WORK data sets and the same log as `sas_run()`.
 
 ```{r}

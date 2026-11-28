@@ -4,12 +4,12 @@
 \alias{sas_rt_proc}
 \title{Run a procedure of the PROC registry}
 \usage{
-sas_rt_proc(name, d, spec)
+sas_rt_proc(name, df, spec)
 }
 \arguments{
 \item{name}{The procedure name as written (\code{"means"}, \code{"summary"}).}
 
-\item{d}{Input data (after WHERE).}
+\item{df}{Input data (after WHERE).}
 
 \item{spec}{Specification built by the translator.}
 }

@@ -222,6 +222,7 @@ public sas_translate
 public sas_work
 public sas_session_add
 public sas_script
+public sas_src
 public sas_data_step
 public sas_proc_sort
 public sas_proc_means

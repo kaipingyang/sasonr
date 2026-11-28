@@ -4,10 +4,10 @@
 \alias{sas_rt_freq}
 \title{PROC FREQ engine}
 \usage{
-sas_rt_freq(d, sp)
+sas_rt_freq(df, sp)
 }
 \arguments{
-\item{d}{Input data (after WHERE).}
+\item{df}{Input data (after WHERE).}
 
 \item{sp}{Specification built by the translator.}
 }

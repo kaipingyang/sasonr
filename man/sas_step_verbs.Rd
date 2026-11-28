@@ -3,7 +3,6 @@
 \name{sas_step_verbs}
 \alias{sas_step_verbs}
 \alias{sas_data_step}
-\alias{sas_proc_sort}
 \alias{sas_proc_means}
 \alias{sas_proc_freq}
 \alias{sas_proc_transpose}
@@ -19,8 +18,6 @@
 \title{Run one SAS step in a session}
 \usage{
 sas_data_step(session, data, fn, sas, line = 1L, level = NULL)
-
-sas_proc_sort(session, options = "", ..., line = 1L)
 
 sas_proc_means(session, options = "", ..., line = 1L)
 
@@ -91,7 +88,7 @@ the DATA step \code{sas}) in place of the translation of \code{sas}; the SAS tex
 gives the variable attributes of the output data sets and the log. When
 vectorised code meets a data error the step is run again row by row from
 its SAS text, as in \code{\link[=sas_run]{sas_run()}}.
-\item \code{sas_proc_sort()}, \code{sas_proc_means()}, \code{sas_proc_freq()},
+\item \code{\link[=sas_proc_sort]{sas_proc_sort()}} takes R arguments (its own page). \code{sas_proc_means()}, \code{sas_proc_freq()},
 \code{sas_proc_transpose()}, \code{sas_proc_print()}, \code{sas_proc_tabulate()}: the
 options of the PROC statement and one argument per statement
 (\code{by = "usubjid"}, \code{output = "out=m mean="}, \code{table = "grp, x*sum"}), as
@@ -108,7 +105,7 @@ processor (code that depends on values known only at run time).
 }
 \examples{
 s <- sas_session(work = list(a = data.frame(x = c(2, 1, 3))))
-s |> sas_proc_sort("data=a out=b", by = "descending x")
+s |> sas_proc_sort(data = "a", out = "b", by = desc(x))
 s |> sas_proc_means("data=b noprint", var = "x", output = "out=m mean=xm")
 sas_work(s)$m
 }

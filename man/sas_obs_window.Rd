@@ -4,7 +4,7 @@
 \alias{sas_obs_window}
 \title{Apply FIRSTOBS= / OBS= to a data frame (after WHERE)}
 \usage{
-sas_obs_window(d, firstobs = NULL, obs = NULL)
+sas_obs_window(df, firstobs = NULL, obs = NULL)
 }
 \description{
 Apply FIRSTOBS= / OBS= to a data frame (after WHERE)

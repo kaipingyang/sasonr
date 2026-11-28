@@ -4,7 +4,7 @@
 \alias{sas_note_read}
 \title{Record the observations read from an input data set (for the log NOTE)}
 \usage{
-sas_note_read(d, name, where = NULL)
+sas_note_read(df, name, where = NULL)
 }
 \description{
 Returns \code{d} unchanged.

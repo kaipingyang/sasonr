@@ -60,9 +60,9 @@ test_that("the trace of a run runs to the same WORK and log", {
   expect_identical(as.character(sas_log(env$s, echo = FALSE)), as.character(sas_log(ref, echo = FALSE)))
 })
 
-test_that("PROC SORT and PROC MEANS show only the options the program gave", {
+test_that("PROC SORT is an R call; PROC MEANS shows only the options the program gave", {
   txt <- as.character(sas_script(sas_translate(script_prog)))
-  expect_true(any(grepl("sas_proc_sort(\"data=adsl out=srt nodupkey\", by = \"descending age\"", txt, fixed = TRUE)))
+  expect_true(any(grepl("sas_proc_sort(data = \"adsl\", out = \"srt\", by = desc(age), nodupkey = TRUE,", txt, fixed = TRUE)))
   expect_true(any(grepl("sas_proc_means(\"data=srt noprint nway\", class = \"sex\", var = \"age\", output = \"out=m mean=mage\"",
                         txt, fixed = TRUE)))
   expect_true(any(grepl("sas_proc_sql(r\"(create table c as select * from srt where age > 50;)\"", txt, fixed = TRUE)))
@@ -79,14 +79,41 @@ test_that("a DATA step verb runs the code of its function", {
 
 test_that("the step verbs chain and return the session", {
   s <- sas_session(work = list(a = data.frame(x = c(2, 1, 3))))
-  out <- s |> sas_proc_sort("data=a out=b", by = "descending x")
+  out <- s |> sas_proc_sort(data = "a", out = "b", by = desc(x))
   expect_identical(out, s)
   s |> sas_proc_means("data=b noprint", var = "x", output = "out=m mean=xm")
   expect_identical(sas_work(s)$b$x, c(3, 2, 1))
   expect_identical(sas_work(s)$m$xm, 2)
   s |> sas_options("nonotes") |> sas_title("'T'", n = 2L)
   expect_identical(s$titles[2], "T")
-  expect_error(sas_proc_sort(s, "data=a", "x"), class = "sasonr_error")
+  expect_error(sas_proc_sort(s, data = "a", by = x, frobnicate = TRUE), class = "sasonr_error")
+  expect_error(sas_proc_sort(s, data = "a"), class = "sasonr_error")
+})
+
+test_that("PROC SORT runs as its R call; the call gives back the parsed step", {
+  prog <- "data a; input id x; datalines;\n2 5\n1 .\n3 7\n;\nrun;\nproc sort data=a(where=(id > 1)) out=b nodupkeys; by descending id x; run;"
+  st <- sas_parse(prog)$steps[[2]]
+  call <- proc_call_sort(st)
+  expect_identical(rlang::call_args(call)$by, quote(c(desc(id), x)))
+  expect_identical(rlang::call_args(call)$data, "a(where=(id > 1))")
+  expect_true(rlang::call_args(call)$nodupkey)
+  w <- st
+  w$titles <- list()
+  expect_identical(proc_ir_core(proc_ir_of_call(call, st$line)), proc_ir_core(w))
+  # the trace runs the call and gives the same WORK and log
+  r <- sas_run(prog)
+  env <- run_script(sas_script(r))
+  expect_identical(sas_work(env$s), r$work)
+  # BY items as strings, a vector injected with !!, the SAS-text form (deprecated)
+  s <- sas_session(work = list(a = data.frame(id = c(2, 1, 3))))
+  v <- "descending id"
+  s |> sas_proc_sort(data = "a", out = "b", by = !!v)
+  expect_identical(sas_work(s)$b$id, c(3, 2, 1))
+  s |> sas_proc_sort(data = "a", out = "c", by = c("id"))
+  expect_identical(sas_work(s)$c$id, c(1, 2, 3))
+  rlang::local_options(rlib_warning_verbosity = "verbose")
+  expect_warning(s |> sas_proc_sort("data=a out=d", by = "descending id"), "deprecated")
+  expect_identical(sas_work(s)$d$id, c(3, 2, 1))
 })
 
 test_that("macro code that depends on run-time values is deferred", {

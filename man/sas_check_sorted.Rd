@@ -4,7 +4,7 @@
 \alias{sas_check_sorted}
 \title{Stop with a SAS-style error when a data set is not sorted by the BY variables}
 \usage{
-sas_check_sorted(d, by, descending = rep(FALSE, length(by)))
+sas_check_sorted(df, by, descending = rep(FALSE, length(by)))
 }
 \description{
 Stop with a SAS-style error when a data set is not sorted by the BY variables

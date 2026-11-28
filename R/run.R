@@ -100,8 +100,12 @@ engine_exec <- function(eng, text, line) {
 
 engine_exec_steps <- function(eng, text, line) {
   rt <- eng$session$rt
-  prog <- parse_program(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE, sql_open = eng$sql_open,
-                        recover = identical(eng$on_error, "sas"))
+  # a step a verb built from R arguments (spec 11) runs without parsing `text`
+  # (its source, for the echo)
+  prog <- eng$prog_override %||%
+    parse_program(paste0(strrep("\n", max(0L, line - 1L)), text), resolved = TRUE, sql_open = eng$sql_open,
+                  recover = identical(eng$on_error, "sas"))
+  eng$prog_override <- NULL
   eng$sql_open <- isTRUE(attr(prog, "sql_open"))
   # the last program line of each step (the source echo of the rich log views)
   ends <- log_step_ends(prog$steps, text, line)
@@ -109,6 +113,8 @@ engine_exec_steps <- function(eng, text, line) {
   if (!length(prog$steps) && log_step_tail_extend(eng, log_chunk_last(text, line), text)) return(invisible())
   for (k in seq_along(prog$steps)) {
     step <- prog$steps[[k]]
+    # a PROC SORT step runs as its R call gives it (proc_api.R)
+    if (identical(step$type, "proc") && identical(step$name, "sort")) step <- proc_ir_via_call(step)
     if (length(eng$session$macro$ce_queue)) {
       abort_unsupported("CALL EXECUTE in a DATA step that did not end normally (not supported)", step$line)
     }
