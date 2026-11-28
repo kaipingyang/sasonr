@@ -1,0 +1,22 @@
+pandoc: 2.9.2.1
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  articles/architecture: architecture.html
+  articles/dev-base-vs-tidyverse: dev-base-vs-tidyverse.html
+  articles/getting-started: getting-started.html
+  articles/guide-datastep: guide-datastep.html
+  articles/guide-functions: guide-functions.html
+  articles/guide-proc-datasets: guide-proc-datasets.html
+  articles/guide-proc-format: guide-proc-format.html
+  articles/guide-proc-freq: guide-proc-freq.html
+  articles/guide-proc-means: guide-proc-means.html
+  articles/guide-proc-print: guide-proc-print.html
+  articles/guide-proc-sort-transpose: guide-proc-sort-transpose.html
+  articles/guide-proc-tabulate: guide-proc-tabulate.html
+  articles/guide-proc-univariate: guide-proc-univariate.html
+  articles/guide-sql: guide-sql.html
+last_built: 2026-11-28T10:10Z
+urls:
+  reference: https://kaipingyang.github.io/sasonr/reference
+  article: https://kaipingyang.github.io/sasonr/articles
