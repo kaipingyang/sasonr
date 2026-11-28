@@ -4,6 +4,14 @@ title: "PROC FREQ"
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+# Show an HTML document of sas_html() in an isolated frame, so its style
+# sheet does not mix with the page.
+show_html <- function(doc, height = 320) {
+  esc <- gsub('"', "&quot;", gsub("&", "&amp;", doc, fixed = TRUE), fixed = TRUE)
+  knitr::asis_output(sprintf(
+    '<iframe srcdoc="%s" style="width: 100%%; height: %dpx; border: 1px solid #c1c1c1;"></iframe>',
+    esc, height))
+}
 ```
 
 ```{r setup}
@@ -44,6 +52,20 @@ cat(res$listing, sep = "\n")
 ```{r}
 res <- sas_run(paste(prog, "proc freq data=ae; tables arm*sev; run;"))
 cat(res$listing, sep = "\n")
+```
+
+## The HTML output
+
+`sas_html()` writes the tables of a result as an HTML document in the
+blue-and-grey style of the HTML destination. `CHISQ` adds the chi-square
+tests of a two-way table.
+
+```{r}
+res <- sas_run(paste(prog, "proc freq data=ae; tables arm*sev / chisq; run;"))
+```
+
+```{r, echo = FALSE}
+show_html(sas_html(res), height = 520)
 ```
 
 ## OUT= data sets

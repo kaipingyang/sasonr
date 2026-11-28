@@ -55,7 +55,28 @@ run;"))
 res$work$first
 ```
 
-`sas_sort_df()` sorts a data frame the same way without a program.
+### As an R call
+
+The translation of a PROC SORT step is one call of `sas_proc_sort()`, the
+call `sas_run()` itself runs: `data` and `out` name the data sets, `by` takes
+variable names with `desc()` for a descending one (or the BY text as
+strings), switches such as `nodupkey` are `TRUE`.
+
+```{r}
+res <- sas_run(paste(prog, "proc sort data=labs out=bysubj; by subj descending visit; run;"))
+cat(tail(as.character(sas_script(res)), 3), sep = "\n")
+```
+
+```{r}
+s <- sas_session()
+invisible(sas_run(prog, session = s))
+s |> sas_proc_sort(data = "labs", out = "first", by = subj, nodupkey = TRUE)
+sas_work(s)$first
+```
+
+### On a data frame
+
+`sas_sort_df()` sorts a data frame the same way without a session.
 
 ```{r}
 df <- data.frame(subj = c("S02", "S01", "S01"), aval = c(31, NA, 25))

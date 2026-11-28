@@ -26,8 +26,8 @@ script_record <- function(eng, step, text, line, tr = NULL) {
   node <- list(type = step$type, name = step$name, kind = step$kind, line = step$line,
                col = if (is.null(step$span)) 1L else as.integer(step$span[["col"]]),
                sas = script_slice(text, line, step$span), tr = tr, macro_stack = stack)
-  # a PROC SORT step is written as its R call (proc_api.R)
-  if (identical(step$type, "proc") && identical(step$name, "sort")) node$step <- step
+  # a PROC SORT or PRINT step is written as its R call (proc_api.R)
+  if (identical(step$type, "proc") && step$name %in% names(proc_api_spec)) node$step <- step
   if (eng$execute && !length(stack) && !is.null(node$sas)) node <- script_inner_macro(eng, node)
   # the %PUT lines of the invocations before this step
   script_flush_puts(eng)
@@ -343,12 +343,12 @@ script_node <- function(nd, mode) {
     return(node)
   }
   name <- nd$name %||% ""
-  if (identical(nd$type, "proc") && name == "sort" && !is.null(nd$step) && !length(nd$step$titles) &&
-      length(nd$step$stmts) == 1L) {
-    src <- sas_src(lines, stext)
-    lang <- proc_call_sort(nd$step, src)
-    return(new_script_node("sas_proc_sort", lang, script_call_text(lang), stext, lines, kind, outs,
-                           "PROC SORT runs in the session"))
+  # PROC SORT and PROC PRINT: the R call of the step (proc_api.R)
+  lang <- if (identical(nd$type, "proc") && !is.null(nd$step) && !length(nd$step$titles)) proc_call_of_ir(nd$step, sas_src(lines, stext))
+  if (!is.null(lang)) {
+    verb <- paste0("sas_proc_", name)
+    return(new_script_node(verb, lang, script_call_text(lang), stext, lines, kind, outs,
+                           paste0("PROC ", toupper(name), " runs in the session")))
   }
   if (identical(nd$type, "proc") && name %in% c("sort", "means", "freq", "transpose", "print", "tabulate")) {
     st <- script_stmts(stext)
@@ -775,8 +775,8 @@ script_submit <- function(session, text, line = 1L, macro = FALSE, override = NU
 #'   gives the variable attributes of the output data sets and the log. When
 #'   vectorised code meets a data error the step is run again row by row from
 #'   its SAS text, as in [sas_run()].
-#' * [sas_proc_sort()] takes R arguments (its own page). `sas_proc_means()`, `sas_proc_freq()`,
-#'   `sas_proc_transpose()`, `sas_proc_print()`, `sas_proc_tabulate()`: the
+#' * [sas_proc_sort()] and [sas_proc_print()] take R arguments (their own page). `sas_proc_means()`, `sas_proc_freq()`,
+#'   `sas_proc_transpose()`, `sas_proc_tabulate()`: the
 #'   options of the PROC statement and one argument per statement
 #'   (`by = "usubjid"`, `output = "out=m mean="`, `table = "grp, x*sum"`), as
 #'   the program wrote them; a statement given twice is two arguments with
@@ -862,66 +862,128 @@ script_proc_lines <- function(st, line) {
   if (identical(as.integer(abs), as.integer(dflt))) line else as.integer(abs)
 }
 
-#' PROC SORT as an R call
+#' PROC SORT and PROC PRINT as R calls
 #'
-#' Sorts a data set of the session as PROC SORT does: by the BY variables,
-#' missing values first, `desc()` for a descending variable; the log and WORK
-#' of the session change as with [sas_run()]. This is the call
-#' [sas_script()] writes for a PROC SORT step, and the call [sas_run()]
-#' itself runs for one.
+#' Run a PROC SORT or PROC PRINT step in a session from R arguments; the log,
+#' the listing and WORK of the session change as with [sas_run()]. These are
+#' the calls [sas_script()] writes for these steps, and the calls
+#' [sas_run()] itself runs for them.
+#'
+#' Options of the PROC statement are arguments: `data` and `out` name data
+#' sets (`"adsl"`, `"lib.adsl"`, with data set options in SAS form if any:
+#' `"adsl(where=(age > 30))"`); switches are `TRUE` (`nodupkey = TRUE`,
+#' `noobs = TRUE`); valued options are strings (`split = "*"`).
+#'
+#' Each statement is an argument named after it, in the order of the step
+#' (a statement given twice is two arguments): variable names
+#' (`by = c(usubjid, desc(age))`, `var = c(a, b)`), or the statement's SAS
+#' text as strings (`by = c("usubjid", "descending age")`, `var = "x1-x5"`,
+#' `where = "age > 30"`, `format = "aval 8.2"`). A vector held in a variable
+#' is injected with `!!`.
 #'
 #' The form of earlier releases, `sas_proc_sort(s, "data=a out=b", by =
 #' "descending x", line = 8L)` (SAS options as text), still runs and warns
 #' that it is deprecated.
 #' @param session A session from [sas_session()].
-#' @param data,out The input and output data sets: a name (`"adsl"`,
-#'   `"lib.adsl"`) with data set options in SAS form if any
-#'   (`"adsl(where=(age > 30))"`). `out = NULL` sorts `data` in place.
-#' @param by The BY variables: names (`c(usubjid, desc(age))`), or a
-#'   character vector of SAS BY items (`c("usubjid", "descending age")`); a
-#'   vector held in a variable is injected with `!!`.
-#' @param nodupkey,noduprecs Keep the first observation of each BY group /
-#'   delete observations identical to the one before.
-#' @param ... Other PROC SORT switches as `TRUE` (`equals`, `force`,
-#'   `tagsort`, `threads`, `nothreads`, `overwrite`); any other argument
-#'   fails.
+#' @param data,out The input and output data sets (`out` for PROC SORT only;
+#'   without it PROC SORT sorts `data` in place).
+#' @param ... Switches and valued options of the PROC statement, and the
+#'   statements. PROC SORT: `nodupkey`, `noduprecs`, `equals`, `force`,
+#'   `tagsort`, `threads`, `nothreads`, `overwrite`; statements `by`
+#'   (required) and `where`. PROC PRINT: `noobs`, `uniform`, `n`, `label`,
+#'   `obs`, `split`; statements `var`, `id`, `by`, `sum`, `sumby`, `where`,
+#'   `format`. Any other argument fails.
 #' @param .sas_src The SAS source of the step, [sas_src()]: the source echo
 #'   and line numbers of the log. Without it the log echoes a SAS form of the
 #'   call from line 1.
 #' @return The session, invisibly.
 #' @examples
 #' s <- sas_session(work = list(a = data.frame(id = c(2, 1, 3), x = c(5, NA, 7))))
-#' s |> sas_proc_sort(data = "a", out = "b", by = c(desc(id)))
+#' s |> sas_proc_sort(data = "a", out = "b", by = desc(id))
 #' sas_work(s)$b
-#' s |> sas_proc_sort(data = "a", by = "x")
-#' sas_work(s)$a
+#' s |> sas_proc_print(data = "b", noobs = TRUE, var = c(id, x), where = "id > 1")
+#' cat(sas_listing(s), sep = "\n")
+#' @name sas_proc_verbs
+NULL
+
+#' @rdname sas_proc_verbs
 #' @export
-sas_proc_sort <- function(session, data = NULL, out = NULL, by = NULL, nodupkey = FALSE, noduprecs = FALSE, ...,
-                          .sas_src = NULL) {
-  dots <- list(...)
-  # the form of earlier releases: SAS options as text, statements as strings
-  if ("line" %in% names(dots) || (rlang::is_string(data) && grepl("^[[:space:]]*([A-Za-z_]+[[:space:]]*=|$)", data))) {
-    rlang::warn(c("The SAS-text form of `sas_proc_sort()` is deprecated.",
-                  i = "Use R arguments: `sas_proc_sort(s, data = \"a\", out = \"b\", by = c(x, desc(y)))`."),
-                .frequency = "once", .frequency_id = "sasonr_proc_sort_text")
-    stmts <- c(if (!is.null(by)) list(by = by), dots[setdiff(names(dots), "line")])
-    line <- dots$line %||% 1L
-    return(script_submit(session, script_proc_text("sort", data %||% "", stmts, line), line[1]))
-  }
-  bad <- setdiff(names(dots), proc_sort_flags)
-  if (length(bad) || (length(dots) && is.null(names(dots)))) {
-    rlang::abort(paste0("Unknown argument of `sas_proc_sort()`: ", paste(if (length(bad)) bad else "(unnamed)", collapse = ", "), "."),
-                 class = "sasonr_error")
-  }
+sas_proc_sort <- function(session, data = NULL, out = NULL, ..., .sas_src = NULL) {
+  dots <- rlang::enexprs(...)
+  if (proc_old_form(data, dots)) return(proc_old_run("sort", session, data, dots, parent.frame()))
+  proc_verb_args("sort", session, list(data = data, out = out), dots, parent.frame(), .sas_src)
+}
+
+#' @rdname sas_proc_verbs
+#' @export
+sas_proc_print <- function(session, data = NULL, ..., .sas_src = NULL) {
+  dots <- rlang::enexprs(...)
+  if (proc_old_form(data, dots)) return(proc_old_run("print", session, data, dots, parent.frame()))
+  proc_verb_args("print", session, list(data = data), dots, parent.frame(), .sas_src)
+}
+
+# The verb of a procedure: the IR from the arguments, run in the session.
+proc_verb_run <- function(name, session, opts, stmts, .sas_src) {
   if (!is.null(.sas_src) && !inherits(.sas_src, "sas_src")) rlang::abort("`.sas_src` must come from `sas_src()`.", class = "sasonr_error")
-  by_expr <- rlang::enexpr(by)
-  if (is.null(by_expr)) rlang::abort("`by` is required.", class = "sasonr_error")
   line <- if (is.null(.sas_src)) 1L else .sas_src$lines[1]
-  flags <- c(list(nodupkey = nodupkey, noduprecs = noduprecs), dots)
-  step <- proc_ir_sort(data, out, by_expr, flags, line)
+  step <- proc_ir_of_args(name, opts, stmts, line)
   step$span <- proc_text_span(line)
-  text <- if (is.null(.sas_src)) proc_sort_text(step) else .sas_src$text
+  text <- if (is.null(.sas_src)) proc_step_text(step) else .sas_src$text
+  if (!is.null(.sas_src)) {
+    # the source must be the step of the arguments; it then runs as parsed
+    # from the source (the line numbers of its parts, for the messages)
+    prog <- parse_program(paste0(strrep("\n", line - 1L), text), resolved = TRUE)
+    src <- if (length(prog$steps) == 1L) prog$steps[[1]]
+    if (is.null(src) || !identical(proc_ir_core(src), proc_ir_core(step))) {
+      rlang::abort(paste0("`.sas_src` of `sas_proc_", name, "()` is not the step of its arguments."), class = "sasonr_error")
+    }
+    step <- src
+  }
   script_submit(session, text, line, step = step)
+}
+
+# The arguments of a verb: options are evaluated, statements kept as
+# expressions (names, desc(), strings).
+proc_verb_args <- function(name, session, opts, dots, env, .sas_src) {
+  sp <- proc_api_spec[[name]]
+  if (length(dots) && (is.null(names(dots)) || any(!nzchar(names(dots))))) {
+    rlang::abort(paste0("Every argument of `sas_proc_", name, "()` must be named."), class = "sasonr_error")
+  }
+  is_stmt <- names(dots) %in% sp$stmts
+  opts <- c(Filter(Negate(is.null), opts), lapply(dots[!is_stmt], eval, envir = env))
+  if (name == "sort" && sum(names(dots) == "by") != 1L) {
+    rlang::abort("`sas_proc_sort()` needs one `by` argument.", class = "sasonr_error")
+  }
+  proc_verb_run(name, session, opts, dots[is_stmt], .sas_src)
+}
+
+# The SAS-text form of earlier releases: options as one string, statements
+# as strings, `line =`.
+proc_old_form <- function(data, dots) {
+  if (any(c("line", "options") %in% names(dots))) return(TRUE)
+  if (!rlang::is_string(data)) return(FALSE)
+  # a data set reference is one name with options in parentheses; the old
+  # form has several words or `=` outside parentheses (or is empty)
+  outside <- data
+  repeat {
+    nxt <- gsub("\\([^()]*\\)", "", outside)
+    if (identical(nxt, outside)) break
+    outside <- nxt
+  }
+  outside <- trimws(outside)
+  !nzchar(outside) || grepl("[[:space:]=]", outside)
+}
+
+proc_old_run <- function(name, session, data, dots, env) {
+  rlang::warn(c(paste0("The text form of `sas_proc_", name, "()` is deprecated."),
+                i = "Use R arguments: `sas_proc_sort(s, data = \"a\", out = \"b\", by = c(x, desc(y)))`."),
+              .frequency = "once", .frequency_id = paste0("sasonr_proc_text_", name))
+  vals <- lapply(dots, eval, envir = env)
+  line <- vals$line %||% 1L
+  options <- data %||% vals$options %||% ""
+  vals$line <- NULL
+  vals$options <- NULL
+  script_submit(session, script_proc_text(name, options, vals, line), line[1])
 }
 
 #' @rdname sas_step_verbs
@@ -942,11 +1004,6 @@ sas_proc_transpose <- function(session, options = "", ..., line = 1L) {
   script_submit(session, script_proc_text("transpose", options, list(...), line), line[1])
 }
 
-#' @rdname sas_step_verbs
-#' @export
-sas_proc_print <- function(session, options = "", ..., line = 1L) {
-  script_submit(session, script_proc_text("print", options, list(...), line), line[1])
-}
 
 #' @rdname sas_step_verbs
 #' @export

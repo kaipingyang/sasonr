@@ -91,10 +91,13 @@ tk_adjacent <- function(p, k1 = 0L, k2 = 1L) {
 # same tokens.
 tok_render <- function(p, from, to) {
   k <- seq.int(from, to)
-  if (!all(p$type[k] %in% c("name", "num", "op", "lparen", "rparen", "dot", "comma", "str"))) return(NULL)
-  txt <- ifelse(p$type[k] == "str", paste0("'", gsub("'", "''", p$value[k], fixed = TRUE), "'"), p$value[k])
+  lit <- c(date = "d", time = "t", datetime = "dt")
+  if (!all(p$type[k] %in% c("name", "num", "op", "lparen", "rparen", "dot", "comma", "str", "missing", names(lit)))) return(NULL)
+  q <- p$type[k] %in% c("str", names(lit))
+  txt <- ifelse(q, paste0("'", gsub("'", "''", p$value[k], fixed = TRUE), "'", ifelse(p$type[k] %in% names(lit), lit[p$type[k]], "")),
+                p$value[k])
   touch <- c(FALSE, p$line[k[-1]] == p$line[k[-length(k)]] & p$col[k[-1]] == p$col[k[-length(k)]] + nchar(p$value[k[-length(k)]]) &
-               p$type[k[-length(k)]] != "str")
+               !q[-length(k)])
   paste0(ifelse(touch, "", " "), txt, collapse = "") |> sub(pattern = "^ ", replacement = "")
 }
 

@@ -62,7 +62,7 @@ test_that("the trace of a run runs to the same WORK and log", {
 
 test_that("PROC SORT is an R call; PROC MEANS shows only the options the program gave", {
   txt <- as.character(sas_script(sas_translate(script_prog)))
-  expect_true(any(grepl("sas_proc_sort(data = \"adsl\", out = \"srt\", by = desc(age), nodupkey = TRUE,", txt, fixed = TRUE)))
+  expect_true(any(grepl("sas_proc_sort(data = \"adsl\", out = \"srt\", nodupkey = TRUE, by = desc(age),", txt, fixed = TRUE)))
   expect_true(any(grepl("sas_proc_means(\"data=srt noprint nway\", class = \"sex\", var = \"age\", output = \"out=m mean=mage\"",
                         txt, fixed = TRUE)))
   expect_true(any(grepl("sas_proc_sql(r\"(create table c as select * from srt where age > 50;)\"", txt, fixed = TRUE)))
@@ -93,7 +93,7 @@ test_that("the step verbs chain and return the session", {
 test_that("PROC SORT runs as its R call; the call gives back the parsed step", {
   prog <- "data a; input id x; datalines;\n2 5\n1 .\n3 7\n;\nrun;\nproc sort data=a(where=(id > 1)) out=b nodupkeys; by descending id x; run;"
   st <- sas_parse(prog)$steps[[2]]
-  call <- proc_call_sort(st)
+  call <- proc_call_of_ir(st)
   expect_identical(rlang::call_args(call)$by, quote(c(desc(id), x)))
   expect_identical(rlang::call_args(call)$data, "a(where=(id > 1))")
   expect_true(rlang::call_args(call)$nodupkey)
@@ -404,4 +404,29 @@ test_that("the script of a program with %INCLUDE runs the included steps once, w
   e <- new.env()
   eval(parse(text = format(s)), e)
   expect_identical(e$s$work$c, r$work$c)
+})
+
+test_that("PROC PRINT runs as its R call, statements as names or SAS text", {
+  prog <- paste0("options nocenter;\ndata a;\n  input id x $ y;\n  label y = 'Why';\n  datalines;\n2 b 5\n1 a .\n3 c 7\n;\nrun;\n",
+                 "proc sort data=a out=b; where y ne .; by descending id; run;\n",
+                 "proc print data=b noobs label split='*';\n  var id x y;\n  sum y;\n  format y 5.1;\nrun;\n")
+  r <- sas_run(prog)
+  txt <- as.character(sas_script(r))
+  expect_true(any(grepl("sas_proc_sort(data = \"a\", out = \"b\", where = \"y ne .\", by = desc(id),", txt, fixed = TRUE)))
+  expect_true(any(grepl("sas_proc_print(data = \"b\", noobs = TRUE, label = TRUE, split = \"*\", var = c(id, x, y), sum = y, format = \"y 5.1\",",
+                        txt, fixed = TRUE)))
+  env <- run_script(sas_script(r))
+  expect_identical(sas_work(env$s), r$work)
+  expect_identical(sas_listing(env$s), r$listing)
+  # a source that is not the step of the arguments fails
+  s <- sas_session(work = list(a = data.frame(id = c(2, 1))))
+  expect_error(s |> sas_proc_sort(data = "a", out = "b", by = id, .sas_src = sas_src(1:3, "proc sort data=a out=c;\n  by id;\nrun;")),
+               class = "sasonr_error")
+  # a BY string with more than one statement fails; an unknown statement fails
+  expect_error(s |> sas_proc_sort(data = "a", by = "id; x"), class = "sasonr_syntax_error")
+  expect_error(s |> sas_proc_print(data = "a", table = "id"), class = "sasonr_error")
+  # the old form with options = and with several words warns and runs
+  rlang::local_options(rlib_warning_verbosity = "verbose")
+  expect_warning(s |> sas_proc_sort("nodupkey data=a out=d", by = "id"), "deprecated")
+  expect_identical(sas_work(s)$d$id, c(1, 2))
 })

@@ -4,6 +4,14 @@ title: "PROC UNIVARIATE"
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+# Show an HTML document of sas_html() in an isolated frame, so its style
+# sheet does not mix with the page.
+show_html <- function(doc, height = 320) {
+  esc <- gsub('"', "&quot;", gsub("&", "&amp;", doc, fixed = TRUE), fixed = TRUE)
+  knitr::asis_output(sprintf(
+    '<iframe srcdoc="%s" style="width: 100%%; height: %dpx; border: 1px solid #c1c1c1;"></iframe>',
+    esc, height))
+}
 ```
 
 ```{r setup}
@@ -28,4 +36,12 @@ proc univariate data=vitals;
 run;
 ")
 cat(res$listing, sep = "\n")
+```
+
+## The HTML output
+
+The same tables as an HTML document, from `sas_html()`:
+
+```{r, echo = FALSE}
+show_html(sas_html(res), height = 700)
 ```

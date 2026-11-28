@@ -113,8 +113,8 @@ engine_exec_steps <- function(eng, text, line) {
   if (!length(prog$steps) && log_step_tail_extend(eng, log_chunk_last(text, line), text)) return(invisible())
   for (k in seq_along(prog$steps)) {
     step <- prog$steps[[k]]
-    # a PROC SORT step runs as its R call gives it (proc_api.R)
-    if (identical(step$type, "proc") && identical(step$name, "sort")) step <- proc_ir_via_call(step)
+    # a PROC SORT or PRINT step runs as its R call gives it (proc_api.R)
+    if (identical(step$type, "proc") && isTRUE(step$name %in% names(proc_api_spec))) step <- proc_ir_via_call(step)
     if (length(eng$session$macro$ce_queue)) {
       abort_unsupported("CALL EXECUTE in a DATA step that did not end normally (not supported)", step$line)
     }

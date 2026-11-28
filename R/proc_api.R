@@ -3,7 +3,7 @@
 # IR and the engine runs it.  `sas_run()` builds the call of a parsed step from
 # its IR and converts the call's arguments back (proc_ir_via_call()), so the
 # printed call is what runs; it fails loud when the round trip does not give
-# the same IR.  PROC SORT so far.
+# the same IR.  PROC SORT and PROC PRINT so far.
 
 #' The SAS source of a step
 #'
@@ -47,75 +47,132 @@ proc_ds_arg <- function(x, context, arg) {
 # The string of a data set reference (proc_ds_arg() reads it back).
 proc_ds_text <- function(ref) {
   if (!is.null(ref$text)) return(ref$text)
+  # options whose text was not kept: no string (the step keeps its SAS text)
+  if (length(ref$options)) return(NULL)
   ref$name
 }
 
-# The BY variables of an argument: an expression `c(a, desc(b))` or a single
-# name, or a character vector of SAS BY items (`c("a", "descending b")`).
-proc_by_arg <- function(e, arg = "by") {
-  vars <- character()
-  desc <- logical()
+
+# The procedures whose steps run as their R call, with the switches of the
+# PROC statement (TRUE in the IR), its valued options (strings in the IR) and
+# the statements the call takes as arguments (parse_proc_stmt()).  The
+# parser accepts more options than these (WIDTH=, CONTENTS=, SORTSIZE=), but
+# keeps nothing of them.
+proc_api_spec <- list(
+  sort = list(flags = c("nodupkey", "noduprecs", "equals", "force", "tagsort", "threads", "nothreads", "overwrite"),
+              values = character(), stmts = c("by", "where")),
+  print = list(flags = c("noobs", "uniform", "n", "label"), values = c("obs", "split"),
+               stmts = c("var", "id", "by", "sum", "sumby", "where", "format"))
+)
+
+# The SAS text of a statement argument: names (`c(a, desc(b))`, `a`), or
+# strings with the statement's SAS text (`c("a", "descending b")`,
+# `"x > 1"`).  NULL when the expression is neither.
+proc_stmt_arg_text <- function(e) {
   one <- function(x) {
-    if (is.symbol(x)) {
-      vars <<- c(vars, tolower(as.character(x)))
-      desc <<- c(desc, FALSE)
-    } else if (is.call(x) && identical(x[[1]], as.name("desc")) && length(x) == 2L && is.symbol(x[[2]])) {
-      vars <<- c(vars, tolower(as.character(x[[2]])))
-      desc <<- c(desc, TRUE)
-    } else if (is.character(x) && length(x)) {
-      b <- parse_by(new_parser(sas_lex(paste0("by ", paste(x, collapse = " "), ";"))))
-      vars <<- c(vars, b$vars)
-      desc <<- c(desc, b$descending)
+    if (is.symbol(x)) return(as.character(x))
+    if (is.call(x) && identical(x[[1]], as.name("desc")) && length(x) == 2L && is.symbol(x[[2]])) {
+      return(paste("descending", as.character(x[[2]])))
+    }
+    if (is.character(x) && length(x)) return(paste(x, collapse = " "))
+    NULL
+  }
+  parts <- if (is.call(e) && identical(e[[1]], as.name("c"))) lapply(as.list(e)[-1], one) else list(one(e))
+  if (!length(parts) || any(vapply(parts, is.null, NA))) return(NULL)
+  paste(unlist(parts), collapse = " ")
+}
+
+# A statement node from a statement argument (`kw` its keyword), parsed by
+# the statement parser of procedure `name`.
+proc_stmt_of_arg <- function(name, kw, e) {
+  text <- proc_stmt_arg_text(e)
+  if (is.null(text) || !nzchar(trimws(text))) {
+    rlang::abort(paste0("`", kw, "` takes variable names, desc(name) or the statement as text (strings), not `", rlang::expr_deparse(e), "`."),
+                 class = "sasonr_error")
+  }
+  p <- new_parser(sas_lex(paste0(kw, " ", text, ";")))
+  s <- parse_proc_stmt(p, name)
+  if (!at_eof(p)) abort_syntax(paste0("unexpected ", tok_desc(p), " after the `", kw, "` statement"))
+  s
+}
+
+# The argument of a statement node: names when the statement is plain
+# variable names (BY with desc()), else its SAS text; NULL when the text was
+# not kept (a token form tok_render() does not write).
+proc_stmt_value <- function(s) {
+  if (identical(s$stmt, "by")) {
+    items <- Map(function(v, d) if (d) rlang::call2("desc", rlang::sym(v)) else rlang::sym(v), s$vars, s$descending)
+    return(if (length(items) == 1L) items[[1]] else rlang::call2("c", !!!unname(items)))
+  }
+  plain <- s$stmt %in% c("var", "id", "sum", "sumby") &&
+    all(vapply(s$items, function(it) identical(it$kind, "name") && is.null(it$to), NA))
+  if (plain) {
+    items <- lapply(s$items, function(it) rlang::sym(it$text %||% it$name))
+    return(if (length(items) == 1L) items[[1]] else rlang::call2("c", !!!unname(items)))
+  }
+  s$text
+}
+
+# The IR of a step from the arguments of its verb: `opts` the PROC statement
+# options (data, out, switches, valued options), `stmts` the statement
+# arguments as expressions, in order (a statement given twice is two
+# arguments).
+proc_ir_of_args <- function(name, opts, stmts, line = 1L) {
+  sp <- proc_api_spec[[name]]
+  o <- list()
+  if (!is.null(opts$data)) o$data <- proc_ds_arg(opts$data, "input", "data")
+  if (!is.null(opts$out)) o$out <- proc_ds_arg(opts$out, "output", "out")
+  for (nm in setdiff(names(opts), c("data", "out"))) {
+    v <- opts[[nm]]
+    if (nm %in% sp$flags) {
+      if (!rlang::is_bool(v)) rlang::abort(paste0("`", nm, "` must be TRUE or FALSE."), class = "sasonr_error")
+      if (v) o[[nm]] <- TRUE
+    } else if (nm %in% sp$values) {
+      if (!rlang::is_string(v)) rlang::abort(paste0("`", nm, "` must be a string."), class = "sasonr_error")
+      o[[nm]] <- v
     } else {
-      rlang::abort(paste0("`", arg, "` takes variable names, desc(name) or strings, not `", rlang::expr_deparse(x), "`."),
-                   class = "sasonr_error")
+      rlang::abort(paste0("Unknown argument of `sas_proc_", name, "()`: ", nm, "."), class = "sasonr_error")
     }
   }
-  if (is.call(e) && identical(e[[1]], as.name("c"))) for (x in as.list(e)[-1]) one(x) else one(e)
-  if (!length(vars)) rlang::abort(paste0("`", arg, "` names no variable."), class = "sasonr_error")
-  list(stmt = "by", vars = vars, descending = desc)
-}
-
-# The PROC SORT options that are switches (the IR keeps each as TRUE).
-proc_sort_flags <- c("nodupkey", "noduprecs", "equals", "noequals", "force", "tagsort", "threads", "nothreads", "overwrite")
-
-# The IR of a PROC SORT step from R arguments.  `by` is an expression.
-proc_ir_sort <- function(data = NULL, out = NULL, by, flags = list(), line = 1L) {
-  opts <- list()
-  if (!is.null(data)) opts$data <- proc_ds_arg(data, "input", "data")
-  if (!is.null(out)) opts$out <- proc_ds_arg(out, "output", "out")
-  for (nm in names(flags)) {
-    v <- flags[[nm]]
-    if (!rlang::is_bool(v)) rlang::abort(paste0("`", nm, "` must be TRUE or FALSE."), class = "sasonr_error")
-    if (v) opts[[nm]] <- TRUE
+  bad <- setdiff(names(stmts), sp$stmts)
+  if (length(bad) || (length(stmts) && is.null(names(stmts)))) {
+    rlang::abort(paste0("Unknown statement of `sas_proc_", name, "()`: ", paste(bad, collapse = ", "), "."), class = "sasonr_error")
   }
-  list(type = "proc", name = "sort", options = opts, stmts = list(proc_by_arg(by)), titles = list(),
-       line = vctrs::vec_cast(line, integer()))
+  nodes <- Map(function(kw, e) proc_stmt_of_arg(name, kw, e), names(stmts), stmts)
+  list(type = "proc", name = name, options = o, stmts = unname(nodes), titles = list(), line = vctrs::vec_cast(line, integer()))
 }
 
-# The R call of a PROC SORT step (IR -> call); `src` a sas_src or NULL.
-proc_call_sort <- function(step, src = NULL) {
+# The R call of a step (IR -> call); NULL when the step has a part the call
+# cannot hold (a statement whose text was not kept).  `src` a sas_src or NULL.
+proc_call_of_ir <- function(step, src = NULL) {
+  sp <- proc_api_spec[[step$name]]
   o <- step$options
-  by <- Filter(function(s) identical(s$stmt, "by"), step$stmts)[[1]]
-  items <- Map(function(v, d) if (d) rlang::call2("desc", rlang::sym(v)) else rlang::sym(v), by$vars, by$descending)
   args <- list(quote(s))
-  if (!is.null(o$data)) args$data <- proc_ds_text(o$data)
-  if (!is.null(o$out)) args$out <- proc_ds_text(o$out)
-  args$by <- if (length(items) == 1L) items[[1]] else rlang::call2("c", !!!unname(items))
-  for (nm in proc_sort_flags) if (isTRUE(o[[nm]])) args[[nm]] <- TRUE
+  for (nm in c("data", "out")) {
+    if (is.null(o[[nm]])) next
+    args[[nm]] <- proc_ds_text(o[[nm]])
+    if (is.null(args[[nm]])) return(NULL)
+  }
+  for (nm in sp$flags) if (isTRUE(o[[nm]])) args[[nm]] <- TRUE
+  for (nm in sp$values) if (!is.null(o[[nm]])) args[[nm]] <- o[[nm]]
+  for (s in step$stmts) {
+    v <- proc_stmt_value(s)
+    if (is.null(v)) return(NULL)
+    args <- c(args, stats::setNames(list(v), s$stmt))
+  }
   if (!is.null(src)) args$.sas_src <- rlang::call2("sas_src", src$lines, src$text)
-  rlang::call2("sas_proc_sort", !!!args)
+  rlang::call2(paste0("sas_proc_", step$name), !!!args)
 }
 
 # The IR of a call of a PROC verb, as the verb builds it.
 proc_ir_of_call <- function(call, line) {
-  args <- rlang::call_args(call)
-  args[[1]] <- NULL
+  name <- sub("^sas_proc_", "", as.character(call[[1]]))
+  args <- rlang::call_args(call)[-1]
   args$.sas_src <- NULL
-  flags <- args[intersect(names(args), proc_sort_flags)]
-  proc_ir_sort(args$data, args$out, args$by, flags, line)
+  sp <- proc_api_spec[[name]]
+  is_stmt <- names(args) %in% sp$stmts
+  proc_ir_of_args(name, args[!is_stmt], args[is_stmt], line)
 }
-
 # An IR without what a round trip does not keep (source positions, spans, the
 # source text of a data set reference).
 proc_ir_core <- function(x) {
@@ -130,33 +187,39 @@ proc_ir_core <- function(x) {
   x
 }
 
-# A parsed PROC SORT step as it runs (spec 11): the IR of its R call (the call
+# A parsed step as it runs (spec 11): the IR of its R call (the call
 # sas_script() prints) must be the step; a call whose IR differs from it
 # fails loud.  The step then runs with the line numbers of the program (the
-# call has the line of the PROC statement only); TITLE statements inside the
-# step are not part of the call (sas_script() writes them as sas_title()).
+# call has the line of the PROC statement only).  TITLE statements inside the
+# step are not part of the call; a step with one, or with a statement whose
+# text was not kept, runs as parsed (and sas_script() keeps its SAS text).
 proc_ir_via_call <- function(step) {
-  # a step without exactly one BY statement stops in translate_proc() (its ERROR)
-  if (sum(vapply(step$stmts, function(s) identical(s$stmt, "by"), NA)) != 1L || length(step$stmts) != 1L) return(step)
-  ir <- proc_ir_of_call(proc_call_sort(step), step$line)
-  want <- step
-  want$titles <- list()
-  if (!identical(proc_ir_core(ir), proc_ir_core(want))) {
-    abort_unsupported("a PROC SORT step whose R call gives a different step", step$line)
+  if (length(step$titles)) return(step)
+  call <- proc_call_of_ir(step)
+  if (is.null(call)) return(step)
+  ir <- proc_ir_of_call(call, step$line)
+  if (!identical(proc_ir_core(ir), proc_ir_core(step))) {
+    abort_unsupported(paste0("a PROC ", toupper(step$name), " step whose R call gives a different step"), step$line)
   }
   step
 }
 
-# The SAS text of a PROC SORT IR (the source echo of a verb called without
+# The SAS text of a step IR (the source echo of a verb called without
 # `.sas_src`).
-proc_sort_text <- function(step) {
+proc_step_text <- function(step) {
+  sp <- proc_api_spec[[step$name]]
   o <- step$options
-  by <- step$stmts[[1]]
-  head <- paste(c("proc sort", if (!is.null(o$data)) paste0("data=", proc_ds_text(o$data)),
-                  if (!is.null(o$out)) paste0("out=", proc_ds_text(o$out)), intersect(proc_sort_flags, names(o))), collapse = " ")
-  items <- ifelse(by$descending, paste("descending", by$vars), by$vars)
-  paste0(head, ";\n  by ", paste(items, collapse = " "), ";\nrun;")
+  head <- paste(c(paste("proc", step$name), if (!is.null(o$data)) paste0("data=", proc_ds_text(o$data)),
+                  if (!is.null(o$out)) paste0("out=", proc_ds_text(o$out)), intersect(sp$flags, names(o)),
+                  vapply(intersect(sp$values, names(o)), function(nm) paste0(nm, "='", gsub("'", "''", o[[nm]]), "'"), "")),
+                collapse = " ")
+  body <- vapply(step$stmts, function(s) {
+    v <- proc_stmt_value(s)
+    paste0("  ", s$stmt, " ", if (is.character(v)) v else proc_stmt_arg_text(v), ";")
+  }, "")
+  paste(c(paste0(head, ";"), body, "run;"), collapse = "\n")
 }
+
 
 # The span of the only step of a text from program line `line` (step_span():
 # the step runs to the end of the text).

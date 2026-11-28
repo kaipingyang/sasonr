@@ -106,6 +106,43 @@ wide <- paste0("options nocenter ls=64; data w; length ",
 cat(sas_run(wide)$listing, sep = "\n")
 ```
 
+## PROC PRINT as an R call
+
+The translation of the program writes each PROC PRINT step as one call of
+`sas_proc_print()`, and `sas_run()` runs that same call. Options of the PROC
+statement are arguments (`noobs = TRUE`, `split = "*"`), each statement is an
+argument named after it: variable names (`var = c(subj, sbp)`) or the
+statement's text (`where = "sbp > 125"`, `format = "sbp 5.1"`).
+
+```{r}
+res <- sas_run(paste(prog, "proc print data=vitals noobs label; var subj sbp; where sbp > 125; run;"))
+script <- sas_script(res)
+cat(tail(as.character(script), 3), sep = "\n")
+```
+
+The same call works in a session of your own:
+
+```{r}
+s <- sas_session()
+invisible(sas_run(prog, session = s))
+s |> sas_proc_print(data = "vitals", noobs = TRUE, var = c(subj, visit, sbp), where = "sbp > 125")
+cat(sas_listing(s), sep = "\n")
+```
+
+## The RTF document
+
+PROC PRINT has no HTML view yet; under `ODS RTF FILE="path";` its table goes
+into an RTF document in the default RTF style (heading row repeated on every
+page, BY lines, tables wider than the page split into column groups), written
+at `ODS RTF CLOSE;`.
+
+```{r, eval = FALSE}
+sas_run(paste(prog, "
+ods rtf file=\"vitals.rtf\";
+proc print data=vitals noobs label; var subj visit sbp dbp; run;
+ods rtf close;"))
+```
+
 ## What fails loud
 
 sasonr stops with a `sasonr_unsupported` condition, naming the SAS line, for

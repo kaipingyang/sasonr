@@ -243,8 +243,8 @@ parse_proc_step <- function(p) {
       start <- p$pos
       if (opt == "data") {
         opts$data <- parse_ds_ref(p, "input")
-        # the text of a reference with options (the R call of a PROC SORT step names it so)
-        if (name == "sort" && length(opts$data$options)) opts$data$text <- tok_render(p, start, p$pos - 1L)
+        # the text of a reference with options (the R call of a PROC SORT or PRINT step names it so)
+        if (name %in% c("sort", "print") && length(opts$data$options)) opts$data$text <- tok_render(p, start, p$pos - 1L)
       } else if (opt == "out" && name == "sort") {
         opts$out <- parse_ds_ref(p, "output")
         if (length(opts$out$options)) opts$out$text <- tok_render(p, start, p$pos - 1L)
@@ -293,40 +293,53 @@ parse_proc_step <- function(p) {
       titles <- c(titles, list(parse_global_stmt(p)))
       next
     }
-    s <- switch(paste(name, low),
-      "sort by" = ,
-      "print by" = {
-        b <- parse_by(p)
-        if (name == "print" && any(b$descending)) abort_unsupported("BY DESCENDING in PROC PRINT", sline)
-        b
-      },
-      "print id" = ,
-      "print sum" = ,
-      "print sumby" = {
-        kw <- low
-        advance(p)
-        items <- list()
-        while (tk_type(p) == "name") items <- c(items, list(parse_varlist_item(p)))
-        expect_semi(p, toupper(kw))
-        if (length(items) == 0) abort_syntax(paste(toupper(kw), "statement without variables"), sline)
-        list(stmt = kw, items = items, line = sline)
-      },
-      "sort where" = ,
-      "print where" = parse_where(p),
-      "print format" = parse_format_stmt(p),
-      "print var" = {
-        advance(p)
-        items <- list()
-        while (tk_type(p) == "name") items <- c(items, list(parse_varlist_item(p)))
-        if (is_op(p, "/")) abort_unsupported("VAR statement options in PROC PRINT", sline)
-        expect_semi(p, "VAR")
-        list(stmt = "var", items = items, line = sline)
-      },
-      abort_unsupported(paste0("PROC ", toupper(name), " statement ", toupper(tk_val(p))), sline)
-    )
+    s <- parse_proc_stmt(p, name)
     stmts <- c(stmts, list(s))
   }
   list(type = "proc", name = name, line = line, options = opts, stmts = stmts, titles = titles)
+}
+
+# One statement of a PROC SORT or PROC PRINT step at the parser position
+# (`name` the procedure): its node, with the text of the statement after the
+# keyword (`text`, tok_render()) for the R call of the step (proc_api.R).
+parse_proc_stmt <- function(p, name) {
+  sline <- tk_line(p)
+  low <- tk_low(p)
+  start <- p$pos
+  s <- switch(paste(name, low),
+    "sort by" = ,
+    "print by" = {
+      b <- parse_by(p)
+      if (name == "print" && any(b$descending)) abort_unsupported("BY DESCENDING in PROC PRINT", sline)
+      b
+    },
+    "print id" = ,
+    "print sum" = ,
+    "print sumby" = {
+      kw <- low
+      advance(p)
+      items <- list()
+      while (tk_type(p) == "name") items <- c(items, list(parse_varlist_item(p)))
+      expect_semi(p, toupper(kw))
+      if (length(items) == 0) abort_syntax(paste(toupper(kw), "statement without variables"), sline)
+      list(stmt = kw, items = items, line = sline)
+    },
+    "sort where" = ,
+    "print where" = parse_where(p),
+    "print format" = parse_format_stmt(p),
+    "print var" = {
+      advance(p)
+      items <- list()
+      while (tk_type(p) == "name") items <- c(items, list(parse_varlist_item(p)))
+      if (is_op(p, "/")) abort_unsupported("VAR statement options in PROC PRINT", sline)
+      expect_semi(p, "VAR")
+      list(stmt = "var", items = items, line = sline)
+    },
+    abort_unsupported(paste0("PROC ", toupper(name), " statement ", toupper(tk_val(p))), sline)
+  )
+  # the tokens between the keyword and the semicolon
+  if (p$pos - 2L > start) s$text <- tok_render(p, start + 1L, p$pos - 2L)
+  s
 }
 
 # Translation -----------------------------------------------------------------
