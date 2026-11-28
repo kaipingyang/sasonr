@@ -33,7 +33,12 @@ proc_parse_body <- function(p, pname, handler, run_ends = TRUE) {
       titles <- c(titles, list(parse_global_stmt(p)))
       next
     }
+    start <- p$pos
     s <- handler(p, low, sline)
+    # the text after the keyword (the R call of the step, proc_api.R)
+    if (is.list(s) && is.null(s[["text"]]) && p$pos - 2L > start && identical(p$type[p$pos - 1L], "semi")) {
+      s$text <- tok_render(p, start + 1L, p$pos - 2L)
+    }
     if (!is.null(s)) stmts <- c(stmts, list(s))
   }
   list(stmts = stmts, titles = titles)

@@ -4,11 +4,17 @@
 \alias{sas_proc_verbs}
 \alias{sas_proc_sort}
 \alias{sas_proc_print}
-\title{PROC SORT and PROC PRINT as R calls}
+\alias{sas_proc_means}
+\alias{sas_proc_summary}
+\title{PROC SORT, PRINT, MEANS and SUMMARY as R calls}
 \usage{
 sas_proc_sort(session, data = NULL, out = NULL, ..., .sas_src = NULL)
 
 sas_proc_print(session, data = NULL, ..., .sas_src = NULL)
+
+sas_proc_means(session, data = NULL, ..., .sas_src = NULL)
+
+sas_proc_summary(session, data = NULL, ..., .sas_src = NULL)
 }
 \arguments{
 \item{session}{A session from \code{\link[=sas_session]{sas_session()}}.}
@@ -21,7 +27,13 @@ statements. PROC SORT: \code{nodupkey}, \code{noduprecs}, \code{equals}, \code{f
 \code{tagsort}, \code{threads}, \code{nothreads}, \code{overwrite}; statements \code{by}
 (required) and \code{where}. PROC PRINT: \code{noobs}, \code{uniform}, \code{n}, \code{label},
 \code{obs}, \code{split}; statements \code{var}, \code{id}, \code{by}, \code{sum}, \code{sumby}, \code{where},
-\code{format}. Any other argument fails.}
+\code{format}. PROC MEANS and SUMMARY: the options of the PROC statement as
+arguments (\code{nway = TRUE}, \code{maxdec = 2}, \code{vardef = "wdf"}), the statistic
+keywords as \code{stats = c(n, mean, std)}; statements \code{var}, \code{class}, \code{by},
+\code{id}, \code{where}, \code{freq}, \code{weight}, \code{types}, \code{ways}, \code{output} (built with
+\code{\link[=sas_out_stats]{sas_out_stats()}}), \code{format}, \code{label}, \code{attrib}. FORMAT takes a named vector
+(\code{format = c(aval = "8.2")}). A statement value held in a variable is
+injected with \verb{!!}. Any other argument fails.}
 
 \item{.sas_src}{The SAS source of the step, \code{\link[=sas_src]{sas_src()}}: the source echo
 and line numbers of the log. Without it the log echoes a SAS form of the
@@ -31,7 +43,7 @@ call from line 1.}
 The session, invisibly.
 }
 \description{
-Run a PROC SORT or PROC PRINT step in a session from R arguments; the log,
+Run a PROC SORT, PRINT, MEANS or SUMMARY step in a session from R arguments; the log,
 the listing and WORK of the session change as with \code{\link[=sas_run]{sas_run()}}. These are
 the calls \code{\link[=sas_script]{sas_script()}} writes for these steps, and the calls
 \code{\link[=sas_run]{sas_run()}} itself runs for them.

@@ -54,6 +54,18 @@ means_autoname <- c(
 
 parse_proc_means <- function(p, line, pname) {
   advance(p)
+  start <- p$pos
+  opts <- parse_means_options(p, line, pname)
+  # the text of the options (the R call of the step, proc_api.R)
+  opt_text <- if (p$pos > start) tok_render(p, start, p$pos - 1L)
+  advance(p)
+  body <- proc_parse_body(p, pname, parse_means_stmt)
+  list(type = "proc", name = pname, line = line, options = opts, stmts = body$stmts, titles = body$titles,
+       opt_text = opt_text)
+}
+
+# The options of the PROC MEANS / SUMMARY statement, up to its semicolon.
+parse_means_options <- function(p, line, pname) {
   opts <- list(stats = character())
   while (tk_type(p) != "semi") {
     if (at_eof(p)) abort_syntax(paste("missing semicolon after PROC", toupper(pname)), line)
@@ -130,38 +142,39 @@ parse_proc_means <- function(p, line, pname) {
     }
     advance(p)
   }
-  advance(p)
-  body <- proc_parse_body(p, pname, function(p, kw, sline) {
-    switch(kw,
-      var = parse_items_stmt(p, "var"),
-      id = parse_items_stmt(p, "id"),
-      class = parse_means_class(p),
-      by = parse_by(p),
-      where = parse_where(p),
-      freq = ,
-      weight = {
-        s <- parse_items_stmt(p, kw)
-        if (length(s$items) != 1 || s$items[[1]]$kind != "name") abort_syntax(paste("expected one variable in the", toupper(kw), "statement"), sline)
-        s
-      },
-      types = parse_means_types(p),
-      ways = {
-        advance(p)
-        w <- integer()
-        while (tk_type(p) == "num" || (is_op(p, "-") && tk_type(p, 1L) == "num")) {
-          w <- c(w, as.integer(parse_opt_number(p, sline)))
-        }
-        expect_semi(p, "WAYS")
-        list(stmt = "ways", ways = w, line = sline)
-      },
-      output = parse_means_output(p),
-      format = parse_format_stmt(p),
-      label = parse_label(p),
-      attrib = parse_attrib(p),
-      abort_syntax("Statement is not valid or it is used out of proper order. (ERROR 180-322)", sline, tk_col(p), tk_val(p))
-    )
-  })
-  list(type = "proc", name = pname, line = line, options = opts, stmts = body$stmts, titles = body$titles)
+  opts
+}
+
+# One statement of a PROC MEANS / SUMMARY step (proc_parse_body()).
+parse_means_stmt <- function(p, kw, sline) {
+  switch(kw,
+    var = parse_items_stmt(p, "var"),
+    id = parse_items_stmt(p, "id"),
+    class = parse_means_class(p),
+    by = parse_by(p),
+    where = parse_where(p),
+    freq = ,
+    weight = {
+      s <- parse_items_stmt(p, kw)
+      if (length(s$items) != 1 || s$items[[1]]$kind != "name") abort_syntax(paste("expected one variable in the", toupper(kw), "statement"), sline)
+      s
+    },
+    types = parse_means_types(p),
+    ways = {
+      advance(p)
+      w <- integer()
+      while (tk_type(p) == "num" || (is_op(p, "-") && tk_type(p, 1L) == "num")) {
+        w <- c(w, as.integer(parse_opt_number(p, sline)))
+      }
+      expect_semi(p, "WAYS")
+      list(stmt = "ways", ways = w, line = sline)
+    },
+    output = parse_means_output(p),
+    format = parse_format_stmt(p),
+    label = parse_label(p),
+    attrib = parse_attrib(p),
+    abort_syntax("Statement is not valid or it is used out of proper order. (ERROR 180-322)", sline, tk_col(p), tk_val(p))
+  )
 }
 
 parse_means_class <- function(p) {
@@ -240,7 +253,10 @@ parse_means_output <- function(p) {
     sline <- tk_line(p)
     if (kw == "out" && is_op(p, "=", 1L)) {
       advance(p, 2L)
+      start <- p$pos
       out$out <- parse_ds_ref(p, "output")
+      # the text of a reference with options (sas_out_stats(), proc_api.R)
+      if (length(out$out$options)) out$out$text <- tok_render(p, start, p$pos - 1L)
       next
     }
     if (kw %in% c("idgroup", "maxid", "minid")) abort_unsupported(paste0("OUTPUT ", toupper(kw)), sline)

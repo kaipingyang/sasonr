@@ -63,7 +63,7 @@ test_that("the trace of a run runs to the same WORK and log", {
 test_that("PROC SORT is an R call; PROC MEANS shows only the options the program gave", {
   txt <- as.character(sas_script(sas_translate(script_prog)))
   expect_true(any(grepl("sas_proc_sort(data = \"adsl\", out = \"srt\", nodupkey = TRUE, by = desc(age),", txt, fixed = TRUE)))
-  expect_true(any(grepl("sas_proc_means(\"data=srt noprint nway\", class = \"sex\", var = \"age\", output = \"out=m mean=mage\"",
+  expect_true(any(grepl("sas_proc_means(data = \"srt\", noprint = TRUE, nway = TRUE, class = sex, var = age, output = sas_out_stats(out = \"m\", mean = mage)",
                         txt, fixed = TRUE)))
   expect_true(any(grepl("sas_proc_sql(r\"(create table c as select * from srt where age > 50;)\"", txt, fixed = TRUE)))
 })
@@ -81,7 +81,7 @@ test_that("the step verbs chain and return the session", {
   s <- sas_session(work = list(a = data.frame(x = c(2, 1, 3))))
   out <- s |> sas_proc_sort(data = "a", out = "b", by = desc(x))
   expect_identical(out, s)
-  s |> sas_proc_means("data=b noprint", var = "x", output = "out=m mean=xm")
+  s |> sas_proc_means(data = "b", noprint = TRUE, var = x, output = sas_out_stats(out = "m", mean = xm))
   expect_identical(sas_work(s)$b$x, c(3, 2, 1))
   expect_identical(sas_work(s)$m$xm, 2)
   s |> sas_options("nonotes") |> sas_title("'T'", n = 2L)
@@ -413,7 +413,7 @@ test_that("PROC PRINT runs as its R call, statements as names or SAS text", {
   r <- sas_run(prog)
   txt <- as.character(sas_script(r))
   expect_true(any(grepl("sas_proc_sort(data = \"a\", out = \"b\", where = \"y ne .\", by = desc(id),", txt, fixed = TRUE)))
-  expect_true(any(grepl("sas_proc_print(data = \"b\", noobs = TRUE, label = TRUE, split = \"*\", var = c(id, x, y), sum = y, format = \"y 5.1\",",
+  expect_true(any(grepl("sas_proc_print(data = \"b\", noobs = TRUE, label = TRUE, split = \"*\", var = c(id, x, y), sum = y, format = c(y = \"5.1\"),",
                         txt, fixed = TRUE)))
   env <- run_script(sas_script(r))
   expect_identical(sas_work(env$s), r$work)
@@ -429,4 +429,42 @@ test_that("PROC PRINT runs as its R call, statements as names or SAS text", {
   rlang::local_options(rlib_warning_verbosity = "verbose")
   expect_warning(s |> sas_proc_sort("nodupkey data=a out=d", by = "id"), "deprecated")
   expect_identical(sas_work(s)$d$id, c(1, 2))
+})
+
+test_that("PROC MEANS and SUMMARY run as their R calls; options as arguments, statistics as stats", {
+  prog <- paste0("options nocenter;\ndata trial;\n  input arm $ week aval;\n  datalines;\nA 0 10.2\nA 4 11.8\nB 0 10.9\nB 4 9.8\n;\nrun;\n",
+                 "proc means data=trial n mean std maxdec=2 nway;\n  class arm;\n  var aval;\n  output out=m mean=mval;\nrun;\n",
+                 "proc summary data=trial(where=(week > 0)) print;\n  var aval;\nrun;\n")
+  r <- sas_run(prog)
+  txt <- as.character(sas_script(r))
+  expect_true(any(grepl("sas_proc_means(data = \"trial\", stats = c(n, mean, std), maxdec = 2, nway = TRUE, class = arm, var = aval,",
+                        txt, fixed = TRUE)))
+  expect_true(any(grepl("sas_proc_summary(data = \"trial(where=(week > 0))\", print = TRUE, var = aval,", txt, fixed = TRUE)))
+  env <- run_script(sas_script(r))
+  expect_identical(sas_work(env$s), r$work)
+  expect_identical(sas_listing(env$s), r$listing)
+  call <- proc_call_of_ir(sas_parse(prog)$steps[[3]])
+  expect_identical(proc_ir_core(proc_ir_of_call(call, 1L)), proc_ir_core(sas_parse(prog)$steps[[3]]))
+  s <- sas_session()
+  invisible(sas_run(prog, session = s))
+  s |> sas_proc_means(data = "trial", stats = c(n, mean), maxdec = 1, class = arm, var = aval)
+  expect_true(any(grepl("^A +2 +2 +11\\.0$", sas_listing(s))))
+  expect_error(s |> sas_proc_means(data = "trial", frobnicate = TRUE, var = aval), class = "sasonr_error")
+})
+
+test_that("sas_out_stats() builds the OUTPUT statement; the trace writes it so", {
+  expect_identical(unclass(sas_out_stats(out = "st", mean = c(m_x, m_y), std = c(sd_x = x), n = TRUE, autoname = TRUE)),
+                   "out=st mean=m_x m_y std(x)=sd_x n= / autoname")
+  expect_error(sas_out_stats(mean = c(a, b = x)), class = "sasonr_error")
+  prog <- "data t;\n  input arm $ x y;\n  datalines;\nA 1 2\nA 3 5\nB 2 2\n;\nrun;\nproc means data=t noprint nway;\n  class arm;\n  var x y;\n  output out=m(drop=_type_) mean=mx my std(x)=sx n= / autoname;\nrun;\n"
+  r <- sas_run(prog)
+  txt <- paste(as.character(sas_script(r)), collapse = "\n")
+  expect_match(txt, "output = sas_out_stats(out = \"m(drop=_type_)\", mean = c(mx, my), std = c(sx = x), n = TRUE, autoname = TRUE)", fixed = TRUE)
+  env <- run_script(sas_script(r))
+  expect_identical(sas_work(env$s), r$work)
+  # a statement value held in a variable is injected
+  s <- sas_session(work = list(t = r$work$t))
+  o <- sas_out_stats(out = "st", mean = c(m_x, m_y))
+  s |> sas_proc_means(data = "t", noprint = TRUE, var = c(x, y), output = !!o)
+  expect_identical(sas_work(s)$st$m_x, 2)
 })

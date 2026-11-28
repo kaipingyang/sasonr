@@ -223,9 +223,11 @@ public sas_work
 public sas_session_add
 public sas_script
 public sas_src
+public sas_out_stats
 public sas_data_step
 public sas_proc_sort
 public sas_proc_means
+public sas_proc_summary
 public sas_proc_freq
 public sas_proc_transpose
 public sas_proc_print

@@ -179,6 +179,31 @@ sas_log(res_out, echo = FALSE)
 res_out$work$stats
 ```
 
+## PROC MEANS as an R call
+
+The translation of the program writes the step as one call of
+`sas_proc_means()`, and `sas_run()` runs that same call. The options of the
+PROC statement are arguments (`maxdec = 2`, `nway = TRUE`), the statistic
+keywords are `stats`, and each statement is an argument named after it:
+variable names (`class = c(arm, week)`, `var = aval`), a named vector for
+FORMAT (`format = c(aval = "8.2")`), and `sas_out_stats()` for the OUTPUT
+statement (`output = sas_out_stats(out = "m", mean = mval, std = c(sd_aval = aval))`).
+
+```{r}
+cat(tail(as.character(sas_script(res)), 3), sep = "\n")
+```
+
+The same call in a session of your own:
+
+```{r}
+s <- sas_session(work = list(trial = res$work$trial))
+s |> sas_proc_means(data = "trial", stats = c(n, mean), maxdec = 1, class = arm, var = aval)
+cat(sas_listing(s), sep = "\n")
+```
+
+`sas_proc_summary()` takes the same arguments (PROC SUMMARY writes no table
+unless `print = TRUE`).
+
 ## Procedures on data frames
 
 `sas_means_df()`, `sas_tabulate_df()`, `sas_freq_df()` (one-way tables) and
